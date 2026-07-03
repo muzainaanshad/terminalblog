@@ -1,0 +1,61 @@
+---
+title: "Multi-Agent Orchestration in Hermes: How Mixture-of-Agents Produces Better Results"
+description: "Inside Hermes Agent's Mixture-of-Agents (MOA) architecture — how multiple specialist agents collaborate on complex reasoning tasks for superior output."
+pubDate: "2026-07-03T13:20:00Z"
+author: "Workflow Insights Team"
+keywords: "multi-agent systems, mixture of agents, AI agent orchestration, Hermes Agent, MOA, autonomous life assistants, workflow orchestration, collaborative AI"
+---
+
+# Multi-Agent Orchestration in Hermes: How Mixture-of-Agents Produces Better Results
+
+Most AI assistants follow a simple pattern: user asks, model answers. Hermes Agent uses **Mixture-of-Agents (MOA)** — multiple specialist agents collaborating on complex tasks, producing results no single model could achieve alone.
+
+## The MOA Pattern
+
+In MOA, a task is decomposed into perspectives, each handled by a specialized **advisor agent**, and then synthesized by an **aggregator**:
+
+```
+User Goal: "Is this codebase production-ready?"
+
+Advisor 1 (Security)     → finds 3 CVEs
+Advisor 2 (Performance)  → finds 2 bottlenecks
+Advisor 3 (Architecture) → questions the schema
+Advisor 4 (Testing)      → notes missing coverage
+
+Aggregator → synthesizes a ranked report
+```
+
+Each advisor runs with a different system prompt, toolset, and sometimes a different underlying model. They operate in parallel — no one waits for another.
+
+## Why MOA Produces Better Results
+
+Multiple specialist perspectives outperform a single generalist because there are no blind spots — a security-focused agent catches things a generalist might dismiss. Each advisor focuses its limited context on one dimension. If two advisors disagree, the aggregator flags the discrepancy. Advisors with stronger evidence get more weight.
+
+## Prompt Caching in MOA
+
+Recent updates restored **prompt caching for the aggregator and advisors** — a critical optimization. The system prompt is shared across the entire agent tree. Caching it means each advisor pays the prompt-processing cost only once, making MOA runs up to 4x faster.
+
+## When to Use MOA
+
+Simple questions are faster with a single agent. MOA shines on code audits (separate advisors for security, performance, style, correctness), architecture reviews (different perspectives on the same design), decision analysis (pros/cons from multiple angles), and quality gates (pre-PR checks combining linting, testing, and security scanning).
+
+## Configuring MOA
+
+```yaml
+moa:
+  enabled: true
+  advisors:
+    security:
+      model: deepseek-v4
+      temperature: 0.3
+    performance:
+      model: claude-haiku-4.5
+      temperature: 0.5
+    architecture:
+      model: claude-sonnet-4.5
+      temperature: 0.7
+  aggregator:
+    model: claude-opus-4.7
+```
+
+MOA transforms Hermes from a single AI assistant into a coordinated team of specialists — all working on your problem simultaneously.
