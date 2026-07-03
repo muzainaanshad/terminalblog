@@ -203,8 +203,8 @@ function generateMockArticle(commits, seoKeywords) {
 
 async function generateArticle(commits, seoKeywords) {
   if (!CONFIG.bynaraApiKey) {
-    console.warn('BYNARA_API_KEY not set. Using mock response for testing.');
-    return generateMockArticle(commits, seoKeywords);
+    console.error('BYNARA_API_KEY not set. Skipping article generation.');
+    return null;
   }
 
   const commitSummary = commits.map(commit => {
@@ -278,7 +278,7 @@ Requirements:
   } catch (error) {
     console.error('Error generating article with ByNara:', error.message);
     console.warn('Falling back to mock article generation.');
-    return generateMockArticle(commits, seoKeywords);
+    return null;
   }
 }
 
@@ -352,8 +352,13 @@ async function main() {
     ];
   }
 
-  console.log('Generating SEO-optimized article...');
   const articleContent = await generateArticle(filteredCommits, CONFIG.seoKeywords);
+
+  if (!articleContent) {
+    console.log('No article generated (API unavailable or error). Exiting.');
+    console.log('=== AI Content Engine completed (no output) ===');
+    return;
+  }
 
   console.log('Saving article...');
   const result = saveArticle(articleContent, CONFIG.outputDir);
