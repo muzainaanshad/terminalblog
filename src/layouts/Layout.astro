@@ -1,0 +1,72 @@
+---
+import '../styles/global.css';
+import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
+
+const { title, description } = Astro.props as any;
+const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+---
+
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+    <link rel="alternate" type="application/rss+xml" title={SITE_TITLE} href={new URL('rss.xml', Astro.site)} />
+    <meta name="generator" content={Astro.generator} />
+    <link rel="canonical" href={canonicalURL} />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="robots" content="index, follow" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={Astro.url} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:site_name" content={SITE_TITLE} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <script is:inline>
+      (() => {
+        try {
+          const stored = localStorage.getItem('theme');
+          const theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          document.documentElement.setAttribute('data-theme', theme);
+          document.documentElement.style.colorScheme = theme;
+        } catch (_) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <header style="border-bottom:1px solid var(--border);background:var(--background);position:sticky;top:0;z-index:50;backdrop-filter:blur(8px);">
+      <nav style="display:flex;align-items:center;justify-content:space-between;max-width:42rem;margin:0 auto;padding:0 1.5rem;height:56px;">
+        <a href="/" style="font-family:var(--font-lipi-sans);font-weight:600;color:var(--foreground);text-decoration:none;font-size:0.95rem;">{SITE_TITLE}</a>
+        <div style="display:flex;align-items:center;gap:0.25rem;">
+          <a href="/" class="nav-link" style="padding:0.4rem 0.6rem;">Home</a>
+          <a href="/blog" class="nav-link" style="padding:0.4rem 0.6rem;">Articles</a>
+          <a href="/about" class="nav-link" style="padding:0.4rem 0.6rem;">About</a>
+          <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" style="margin-left:0.5rem;">&#9681;</button>
+        </div>
+      </nav>
+    </header>
+    <main style="padding:3rem 0 4rem;">
+      <slot />
+    </main>
+    <footer style="border-top:1px solid var(--border);padding:2.5rem 1.5rem;text-align:center;font-family:var(--font-lipi-sans);font-size:0.85rem;color:var(--muted-foreground);">
+      &copy; {new Date().getFullYear()} <a href="/">{SITE_TITLE}</a>. All rights reserved.<br />
+      Tracking the open-source coding agent ecosystem &mdash; Hermes, Mimo, OpenCode, Kilo, and beyond.<br />
+      <a href="https://github.com/NousResearch/hermes-agent" target="_blank" style="color:var(--muted-foreground);">GitHub</a>
+    </footer>
+    <script>
+      document.getElementById('theme-toggle')?.addEventListener('click', () => {
+        const html = document.documentElement;
+        const current = html.getAttribute('data-theme');
+        const next = current === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        html.style.colorScheme = next;
+        localStorage.setItem('theme', next);
+      });
+    </script>
+  </body>
+</html>

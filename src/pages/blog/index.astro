@@ -1,99 +1,37 @@
 ---
-import { getCollection } from 'astro:content';
-import BaseHead from '../../components/BaseHead.astro';
-import Footer from '../../components/Footer.astro';
-import Header from '../../components/Header.astro';
+import Layout from '../../layouts/Layout.astro';
 import { SITE_TITLE, SITE_DESCRIPTION } from '../../consts';
+import { getCollection } from 'astro:content';
 
-const posts = (await getCollection('blog')).sort(
-	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
-);
+const posts = (await getCollection('blog')).sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
 ---
 
-<!doctype html>
-<html lang="en">
-	<head>
-		<BaseHead title={`Articles — ${SITE_TITLE}`} description={SITE_DESCRIPTION} />
-	</head>
-	<body>
-		<Header />
-		<main class="container" style="padding:3rem 1.5rem 4rem;">
-			<h1 style="font-size:1.75rem;margin-bottom:0.5rem;">All Articles</h1>
-			<p style="color:rgba(255,255,255,0.45);margin-bottom:2.5rem;font-size:0.9rem;">
-				{posts.length} article{posts.length !== 1 ? 's' : ''} about Hermes Agent and autonomous workflow orchestration
-			</p>
-			<div class="list">
-				{posts.map((post) => (
-					<a href={`/blog/${post.id}/`} class="row">
-						<time>{new Date(post.data.pubDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</time>
-						<div>
-							<h2>{post.data.title}</h2>
-							{post.data.description && <p>{post.data.description}</p>}
-						</div>
-						<span class="arrow">&rarr;</span>
-					</a>
-				))}
-			</div>
-		</main>
-		<Footer />
-	</body>
-</html>
-<style>
-	.list {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-	.row {
-		display: grid;
-		grid-template-columns: 7rem 1fr 2rem;
-		align-items: baseline;
-		gap: 1.5rem;
-		padding: 1rem 1.25rem;
-		border-radius: 8px;
-		text-decoration: none;
-		transition: all 0.15s;
-		border: 1px solid transparent;
-	}
-	.row:hover {
-		background: rgba(255,255,255,0.03);
-		border-color: rgba(255,255,255,0.06);
-	}
-	.row time {
-		font-size: 0.8rem;
-		color: rgba(255,255,255,0.35);
-		font-variant-numeric: tabular-nums;
-		padding-top: 0.1rem;
-	}
-	.row h2 {
-		font-size: 1rem;
-		font-weight: 600;
-		color: #fff;
-		margin: 0 0 0.2rem;
-		line-height: 1.3;
-	}
-	.row p {
-		font-size: 0.85rem;
-		color: rgba(255,255,255,0.45);
-		margin: 0;
-		line-height: 1.4;
-	}
-	.arrow {
-		color: rgba(255,255,255,0.2);
-		font-size: 1.1rem;
-		transition: transform 0.15s, color 0.15s;
-		text-align: right;
-	}
-	.row:hover .arrow {
-		color: var(--accent);
-		transform: translateX(3px);
-	}
-	@media (max-width: 600px) {
-		.row {
-			grid-template-columns: 1fr;
-			gap: 0.25rem;
-			padding: 1rem;
-		}
-		.row time { font-size: 0.75rem; }
-	}
-</style>
+<Layout title={`Articles — ${SITE_TITLE}`} description={SITE_DESCRIPTION}>
+  <div class="content">
+    <h1 style="font-size:1.75rem;margin-bottom:0.5rem;">All Articles</h1>
+    <p style="color:var(--muted-foreground);margin-bottom:2.5rem;font-size:0.9rem;">{posts.length} articles about open-source coding agents</p>
+
+    <div style="display:flex;flex-direction:column;">
+      {posts.map((post, i) => (
+        <a
+          href={`/blog/${post.id}/`}
+          style="display:grid;grid-template-columns:6rem 1fr;gap:1rem;padding:0.75rem 0;text-decoration:none;color:var(--foreground);transition:opacity 0.15s;"
+          onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"
+        >
+          <time style="font-family:var(--font-lipi-sans);font-size:0.8rem;color:var(--muted-foreground);padding-top:0.15rem;">
+            {new Date(post.data.pubDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          </time>
+          <div>
+            <span style="font-family:var(--font-lipi-sans);font-weight:500;font-size:0.95rem;line-height:1.4;">
+              {post.data.title}
+            </span>
+            <p style="margin:0.25rem 0 0;font-size:0.85rem;color:var(--muted-foreground);line-height:1.4;">
+              {post.data.description?.substring(0, 150)}
+              {post.data.description?.length > 150 ? '…' : ''}
+            </p>
+          </div>
+        </a>
+      ))}
+    </div>
+  </div>
+</Layout>
