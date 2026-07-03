@@ -1,0 +1,56 @@
+name: Daily SEO Article Publish
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # Daily at 2:00 AM UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate-and-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run AI Content Engine
+        env:
+          BYNARA_API_KEY: ${{ secrets.BYNARA_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/ai-content-engine.js
+
+      - name: Check for new files
+        id: check
+        run: |
+          git add src/content/blog/
+          if git diff --cached --quiet; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No new articles generated"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "New articles detected"
+          fi
+
+      - name: Configure Git
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git config user.name "AI Content Bot"
+          git config user.email "bot@ai-workflow-insights.com"
+
+      - name: Commit and push
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git commit -m "chore: auto-generate daily SEO article [skip ci]"
+          git push
