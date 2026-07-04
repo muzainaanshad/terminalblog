@@ -4,10 +4,15 @@ import FormattedDate from '../components/FormattedDate.astro';
 import type { CollectionEntry } from 'astro:content';
 
 type Props = CollectionEntry<'blog'>['data'];
-const { title, description, pubDate, updatedDate } = Astro.props;
+const { title, description, pubDate, updatedDate, tags, tool } = Astro.props;
+
+const toolNames: Record<string, string> = {
+  hermes: 'Hermes Agent', opencode: 'OpenCode', mimo: 'Mimo Code',
+  kilo: 'Kilo Code CLI', 'pi-dot-dev': 'pi.dev', 'gitlab-zero': 'GitLab Zero',
+};
 ---
 
-<Layout title={title} description={description}>
+<Layout title={title} description={description || ''}>
   <article class="content">
     <header style="margin-bottom:2.5rem;">
       <p style="font-family:var(--font-lipi-sans);font-size:0.8rem;color:var(--muted-foreground);margin-bottom:0.5rem;">
@@ -15,6 +20,12 @@ const { title, description, pubDate, updatedDate } = Astro.props;
         {updatedDate && <span style="margin-left:0.75rem;">· Updated <FormattedDate date={updatedDate} /></span>}
       </p>
       <h1 style="font-size:2rem;margin:0;">{title}</h1>
+      <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:1rem;">
+        {tool && <a href={`/tool/${tool}/`} style="font-family:var(--font-lipi-sans);font-size:0.75rem;background:var(--primary);color:var(--primary-fg);padding:0.2rem 0.6rem;border-radius:3px;text-decoration:none;">{toolNames[tool] || tool}</a>}
+        {(tags || []).map(tag => (
+          <a href={`/blog/tag/${tag}/`} style="font-family:var(--font-lipi-sans);font-size:0.75rem;background:var(--muted);color:var(--muted-foreground);padding:0.2rem 0.6rem;border-radius:3px;text-decoration:none;">#{tag}</a>
+        ))}
+      </div>
     </header>
     <slot />
   </article>

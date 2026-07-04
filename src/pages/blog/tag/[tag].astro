@@ -1,0 +1,41 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import { SITE_TITLE } from '../../../consts';
+import { getCollection } from 'astro:content';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog');
+  const tags = new Set<string>();
+  for (const p of posts) {
+    for (const t of p.data.tags || []) tags.add(t);
+  }
+  return Array.from(tags).map(tag => ({
+    params: { tag },
+    props: { tag },
+  }));
+}
+
+const { tag } = Astro.props;
+const allPosts = (await getCollection('blog'))
+  .filter(p => (p.data.tags || []).includes(tag))
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+---
+
+<Layout title={`#${tag} — ${SITE_TITLE}`} description={`Articles tagged with #${tag}`}>
+  <div class="content">
+    <h1 style="font-size:1.75rem;margin-bottom:0.5rem;">#<span style="color:var(--primary);">{tag}</span></h1>
+    <p style="color:var(--muted-foreground);margin-bottom:2.5rem;font-size:0.9rem;">{allPosts.length} article{allPosts.length !== 1 ? 's' : ''}</p>
+
+    <div style="display:flex;flex-direction:column;">
+      {allPosts.map(post => (
+        <a href={`/blog/${post.id}/`} style="display:grid;grid-template-columns:6rem 1fr;gap:1rem;padding:0.75rem 0;text-decoration:none;color:var(--foreground);border-bottom:1px solid var(--border);transition:opacity 0.15s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">
+          <time style="font-family:var(--font-lipi-sans);font-size:0.8rem;color:var(--muted-foreground);padding-top:0.15rem;">{new Date(post.data.pubDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</time>
+          <div>
+            <span style="font-family:var(--font-lipi-sans);font-weight:500;font-size:0.95rem;line-height:1.4;">{post.data.title}</span>
+            <p style="margin:0.25rem 0 0;font-size:0.85rem;color:var(--muted-foreground);line-height:1.4;">{post.data.description?.substring(0, 150)}{post.data.description?.length > 150 ? '…' : ''}</p>
+          </div>
+        </a>
+      ))}
+    </div>
+  </div>
+</Layout>

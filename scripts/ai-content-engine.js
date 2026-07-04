@@ -10,7 +10,11 @@ const __dirname = path.dirname(__filename);
 const CONFIG = {
   repos: [
     { owner: 'NousResearch', name: 'hermes-agent' },
-    { owner: 'opencode-ai', name: 'opencode' }
+    { owner: 'opencode-ai', name: 'opencode' },
+    { owner: 'mimo-code', name: 'mimo' },
+    { owner: 'kilocode', name: 'cli' },
+    { owner: 'pi-delabs', name: 'pi' },
+    { owner: 'gitlab-org', name: 'gitlab-zero' }
   ],
   hoursToLookBack: 24,
   outputDir: path.join(__dirname, '..', 'src', 'content', 'blog'),

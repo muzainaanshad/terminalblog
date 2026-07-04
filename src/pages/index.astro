@@ -5,14 +5,22 @@ import { getCollection } from 'astro:content';
 
 const posts = (await getCollection('blog')).sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
 
-// Group posts by year
 const years: Record<string, typeof posts> = {};
 for (const p of posts) {
-  const year = new Date(p.data.pubDate).getFullYear().toString();
-  if (!years[year]) years[year] = [];
-  years[year].push(p);
+  const y = new Date(p.data.pubDate).getFullYear().toString();
+  if (!years[y]) years[y] = [];
+  years[y].push(p);
 }
 const sortedYears = Object.keys(years).sort((a, b) => Number(b) - Number(a));
+
+const tools = [
+  { id: 'hermes', name: 'Hermes Agent', desc: 'Full-featured autonomous agent with MOA, cron, memory, skills', color: '#e85d2a' },
+  { id: 'opencode', name: 'OpenCode', desc: 'Skill-driven coding agent with slash command workflows', color: '#6366f1' },
+  { id: 'mimo', name: 'Mimo Code', desc: 'OpenCode fork with vision and reasoning support', color: '#8b5cf6' },
+  { id: 'kilo', name: 'Kilo Code CLI', desc: 'Lightweight LLM orchestrator for quick tasks', color: '#059669' },
+  { id: 'pi-dot-dev', name: 'pi.dev', desc: 'Long-running agents with persistent knowledge graphs', color: '#0891b2' },
+  { id: 'gitlab-zero', name: 'GitLab Zero', desc: 'DevSecOps coding agent for GitLab ecosystems', color: '#dc2626' },
+];
 ---
 
 <Layout title={SITE_TITLE} description={SITE_DESCRIPTION}>
@@ -25,6 +33,18 @@ const sortedYears = Object.keys(years).sort((a, b) => Number(b) - Number(a));
       </p>
     </section>
 
+    <section style="margin-bottom:3rem;">
+      <h2 style="font-family:var(--font-lipi-sans);font-size:0.85rem;font-weight:500;color:var(--muted-foreground);margin-bottom:1rem;text-transform:uppercase;letter-spacing:0.05em;">Tools</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:0.75rem;">
+        {tools.map(t => (
+          <a href={`/tool/${t.id}/`} style="display:flex;flex-direction:column;gap:0.25rem;padding:1rem;border:1px solid var(--border);border-radius:6px;text-decoration:none;color:var(--foreground);transition:all 0.15s;" onmouseover="this.style.borderColor=this.style.backgroundColor='var(--muted)'" onmouseout="this.style.borderColor=''">
+            <span style="font-family:var(--font-lipi-sans);font-weight:600;font-size:0.9rem;">{t.name}</span>
+            <span style="font-size:0.8rem;color:var(--muted-foreground);line-height:1.4;">{t.desc}</span>
+          </a>
+        ))}
+      </div>
+    </section>
+
     {sortedYears.map(year => (
       <section style="margin-bottom:2.5rem;">
         <h2 style="font-family:var(--font-lipi-sans);font-size:0.85rem;font-weight:500;color:var(--muted-foreground);margin-bottom:1.25rem;text-transform:uppercase;letter-spacing:0.05em;">{year}</h2>
@@ -34,9 +54,12 @@ const sortedYears = Object.keys(years).sort((a, b) => Number(b) - Number(a));
               <time style="flex-shrink:0;width:3rem;font-family:var(--font-lipi-sans);font-size:0.8rem;color:var(--muted-foreground);padding-top:0.15rem;">
                 {new Date(post.data.pubDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
               </time>
-              <span style="font-family:var(--font-lipi-sans);font-weight:500;font-size:0.95rem;line-height:1.4;">
-                {post.data.title}
-              </span>
+              <div style="display:flex;flex-wrap:wrap;gap:0.3rem;align-items:baseline;">
+                <span style="font-family:var(--font-lipi-sans);font-weight:500;font-size:0.95rem;line-height:1.4;">
+                  {post.data.title}
+                </span>
+                {post.data.tool && <span style="font-family:var(--font-lipi-sans);font-size:0.7rem;background:var(--muted);color:var(--muted-foreground);padding:0.1rem 0.4rem;border-radius:2px;">{post.data.tool}</span>}
+              </div>
             </a>
           ))}
         </div>
