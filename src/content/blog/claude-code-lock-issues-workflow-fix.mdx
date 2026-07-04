@@ -1,0 +1,35 @@
+---
+title: "Claude Code Just Fixed One of the Most Annoying Issues in Open Source Automation"
+description: "The lock-closed-issues workflow was broken by GitHub API changes. Claude Code's fix uses the search API instead of pagination — and it's a masterclass in maintainable CI."
+pubDate: "2026-06-19T12:00:00Z"
+tags: ["claude-code", "github-actions", "ci", "workflow", "automation", "viral"]
+tool: "claude-code"
+---
+
+GitHub Actions are great until they break silently. Claude Code just fixed a workflow bug that was quietly failing — and the fix is a textbook example of robust CI design.
+
+## The Bug
+
+The `lock-closed-issues` workflow in Claude Code's repository was using offset pagination to fetch issues. The problem: GitHub's API changes broke offset pagination, causing the workflow to only see the first page of results. Old issues weren't getting locked.
+
+This is the kind of bug that goes unnoticed for weeks. The workflow runs successfully (green checkmark), but it's not actually doing its job. Silent failure is the most dangerous kind.
+
+## The Fix
+
+The solution: switch from offset pagination to GitHub's search API.
+
+The search API is more reliable for this use case because:
+- It handles pagination consistently regardless of result set size
+- It supports the `is:issue is:closed` query syntax that's maintained by GitHub's search team
+- It's designed for the exact query pattern: "find all closed issues that match these criteria"
+
+The fix also reduces API calls — search is more efficient than paging through every open issue.
+
+## What Other Coding Agents Can Learn
+
+This is the kind of fix that separates maintainable CI from fragile CI:
+1. **Don't trust pagination** — GitHub's REST pagination changes. Use the search API for query patterns.
+2. **Assume APIs will change** — offset pagination broke because GitHub's API evolved. Build for evolution.
+3. **Test for correctness, not just success** — a green workflow that does nothing is worse than a red one.
+
+Claude Code's workflow fix is small. But it's the kind of attention to infrastructure that keeps open-source projects healthy.

@@ -15,7 +15,8 @@ const CONFIG = {
     { owner: 'kilocode', name: 'cli' },
     { owner: 'pi-delabs', name: 'pi' },
     { owner: 'gitlawb', name: 'zero' },
-    { owner: 'can1357', name: 'oh-my-pi' }
+    { owner: 'can1357', name: 'oh-my-pi' },
+    { owner: 'anthropics', name: 'claude-code' }
   ],
   hoursToLookBack: 24,
   outputDir: path.join(__dirname, '..', 'src', 'content', 'blog'),

@@ -1,0 +1,32 @@
+---
+title: "Hermes Just Plugged a Secret Leak You Probably Didn't Notice"
+description: "Hermes added a case-insensitive .env file guard. If you thought naming a file '.ENV' would bypass detection — it won't anymore."
+pubDate: "2026-07-03T18:00:00Z"
+tags: ["security", "env-files", "credentials", "dashboard", "viral"]
+tool: "hermes"
+---
+
+Here's a security fix that sounds small but matters a lot: Hermes now catches `.env` files regardless of their letter case.
+
+The commit: `fix(dashboard): make .env sensitive-file guard case-insensitive`.
+
+## The Problem
+
+Hermes's dashboard has a managed-files API that blocks `.env` files — you can't upload or share files containing secrets through the web interface. But the guard was case-sensitive. It blocked `.env` but not `.ENV`, `.Env`, or `.eNv`.
+
+On case-insensitive filesystems (Windows, macOS), these are all the same file. A user or agent could rename `.env` to `.ENV` and upload it straight through the guard.
+
+## Two Layers of Protection
+
+The fix includes two changes:
+
+1. **`fix(dashboard): block .env files from managed-files API`** — blocks the direct upload path
+2. **`fix(dashboard): use pattern match for .env sensitive file guard`** — uses case-insensitive pattern matching instead of exact string comparison
+
+Between them, Hermes now catches `.env` in any casing, on any filesystem, through any upload path.
+
+## Why This Is Important
+
+Most security fixes get attention for being complex. This one matters for being simple. The most dangerous security bugs aren't the sophisticated exploits — they're the obvious gaps that everyone assumed were covered.
+
+Hermes's credential guard system is one of its strongest security features. The case-insensitive .env fix closes a gap that existed since the guard was introduced. It's the kind of attention to detail that suggests the Hermes team thinks like security engineers, not just feature developers.

@@ -1,0 +1,31 @@
+---
+title: "Gitlawb Zero Just Got Paranoid About Permissions — And You Should Be Too"
+description: "Zero now rejects malformed permission payloads before prompting. A critical security hardening for the agent that runs in your terminal."
+pubDate: "2026-07-04T00:45:00Z"
+tags: ["gitlawb-zero", "permissions", "security", "malformed-payload", "viral"]
+tool: "gitlawb-zero"
+---
+
+Gitlawb Zero handles permissions differently than other agents. Instead of asking for every permission upfront, it prompts you when a tool needs access — and you decide in the moment.
+
+But what if the prompt itself is malformed?
+
+## The Bug
+
+Zero's permission system works by sending a payload describing what the tool wants to do — "tool X needs to access file Y" — and the user approves or rejects it. The bug: if the payload was malformed (missing fields, wrong types, corrupted), Zero would still present the prompt to the user.
+
+A malformed payload could mask what the tool is actually trying to access. The user sees "tool X wants to read file Y" but the actual access requested is something else entirely.
+
+## The Fix
+
+Zero now validates every permission payload before presenting it to the user. If the payload is malformed — missing required fields, wrong data types, unexpected keys — Zero rejects it immediately and logs the incident.
+
+The fix specifically targets `additional_permissions` payloads, which is the extensibility point where tool plugins declare their permission needs. A malicious or buggy plugin can't slip through a malformed permission request.
+
+## Why This Matters
+
+Permission systems are only as strong as their input validation. Presenting a malformed prompt to the user and relying on them to notice the discrepancy is not security — it's theater.
+
+Zero's fix is the right approach: reject malformed payloads at the system level, before they reach the user. The user should never have to decide whether a malformed permission request is safe, because the system has already decided it's not.
+
+This kind of security hardening is especially important for agents that run locally with access to your filesystem, credentials, and network. Zero's permission system was already well-designed. Now it's well-defended too.
