@@ -1,0 +1,36 @@
+---
+title: "Oh My Pi's Mnemonic Extraction Just Got Smarter — Empty Results No Longer Break Your Workflow"
+description: "A fix that sounds small but fixes a painful bug: mnemonic structured extraction now preserves empty values instead of silently dropping them."
+pubDate: "2026-07-03T03:30:00Z"
+tags: ["oh-my-pi", "mnemonic-extraction", "structured-data", "fix", "viral"]
+tool: "oh-my-pi"
+---
+
+The best fixes are the ones you didn't know you needed until you see them. Oh My Pi's latest commit fixes a subtle but painful bug in mnemonic extraction: empty structured results were being silently dropped.
+
+The fix: `fix(mnemopi): preserve empty structured extraction`.
+
+## The Bug
+
+Oh My Pi uses mnemonic structured extraction to parse data from agent outputs into structured formats — JSON, tables, schemas. When a field was legitimately empty, the extraction pipeline would skip it entirely instead of preserving it as an empty value.
+
+This meant:
+- An empty array became `undefined` instead of `[]`
+- A null field disappeared instead of being `null`
+- An empty string became missing instead of `""`
+
+For workflows that validate output schemas, this was a silent data corruption. Your agent thought it was extracting correctly, but the data was subtly wrong.
+
+## The Fix
+
+The commit (b24052b in the `farm/cf3baff7` branch) modifies the structured extraction parser to preserve empty values. The pipeline now treats empty arrays, null fields, and empty strings as valid values rather than omitting them.
+
+## Why This Matters for Coding Agents
+
+Structured extraction is the backbone of agent-to-tool communication. When an agent extracts data from a web page, parses a response, or converts natural language to structured output, the result needs to be faithful to the source.
+
+A bug that silently drops empty values means your agent's understanding of the world is missing data. It might think a list has fewer items than it actually does, or misinterpret an absence as a value.
+
+This fix restores correctness. If the data says "empty," Oh My Pi now respects that.
+
+It's a small commit. But it's the kind of attention to detail that separates professional tools from prototypes.
