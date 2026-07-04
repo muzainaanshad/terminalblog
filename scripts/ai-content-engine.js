@@ -14,7 +14,8 @@ const CONFIG = {
     { owner: 'mimo-code', name: 'mimo' },
     { owner: 'kilocode', name: 'cli' },
     { owner: 'pi-delabs', name: 'pi' },
-    { owner: 'gitlab-org', name: 'gitlab-zero' }
+    { owner: 'gitlawb', name: 'zero' },
+    { owner: 'can1357', name: 'oh-my-pi' }
   ],
   hoursToLookBack: 24,
   outputDir: path.join(__dirname, '..', 'src', 'content', 'blog'),
