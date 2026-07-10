@@ -13,8 +13,21 @@ type Props = CollectionEntry<'blog'>;
 
 const post = Astro.props;
 const { Content } = await render(post);
+
+// Find related articles by shared tags
+const allPosts = await getCollection('blog');
+const currentTags = post.data.tags || [];
+const related = allPosts
+  .filter(p => p.id !== post.id)
+  .map(p => ({
+    ...p,
+    _score: (p.data.tags || []).filter(t => currentTags.includes(t)).length,
+  }))
+  .filter(p => p._score > 0)
+  .sort((a, b) => b._score - a._score)
+  .slice(0, 4);
 ---
 
-<BlogPost {...post.data}>
+<BlogPost {...post.data} slug={post.id} relatedPosts={related}>
 	<Content />
 </BlogPost>
