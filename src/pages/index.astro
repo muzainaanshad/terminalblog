@@ -2,70 +2,135 @@
 import Layout from '../layouts/Layout.astro';
 import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
 import { getCollection } from 'astro:content';
+import agents from '../data/agents.json';
 
-const posts = (await getCollection('blog')).sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+const posts = (await getCollection('blog')).sort(
+  (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
+);
+const tools = ['all', ...new Set(posts.filter(p => p.data.tool).map(p => p.data.tool))];
 
-const years: Record<string, typeof posts> = {};
-for (const p of posts) {
-  const y = new Date(p.data.pubDate).getFullYear().toString();
-  if (!years[y]) years[y] = [];
-  years[y].push(p);
-}
-const sortedYears = Object.keys(years).sort((a, b) => Number(b) - Number(a));
-
-const tools = [
-  { id: 'hermes', name: 'Hermes Agent', desc: 'Full-featured autonomous agent with MOA, cron, memory, skills', color: '#e85d2a' },
-  { id: 'opencode', name: 'OpenCode', desc: 'Skill-driven coding agent with slash command workflows', color: '#6366f1' },
-  { id: 'mimo', name: 'Mimo Code', desc: 'OpenCode fork with vision and reasoning support', color: '#8b5cf6' },
-  { id: 'kilo', name: 'Kilo Code CLI', desc: 'Lightweight LLM orchestrator for quick tasks', color: '#059669' },
-  { id: 'pi-dot-dev', name: 'pi.dev', desc: 'Long-running agents with persistent knowledge graphs', color: '#0891b2' },
-  { id: 'claude-code', name: 'Claude Code', desc: "Anthropic's official terminal coding agent", color: '#d97706' },
-  { id: 'oh-my-pi', name: 'Oh My Pi', desc: 'Hash-anchored coding agent with LSP, browser, subagents', color: '#f59e0b' },
-  { id: 'gitlawb-zero', name: 'Gitlawb Zero', desc: 'Decentralized terminal agent you fully own', color: '#dc2626' },
-];
+const featureLabels: Record<string, string> = {
+  vision: 'Vision', cron: 'Cron/Schedule', multiProvider: 'Multi-provider',
+  gitIntegration: 'Git', pluginSystem: 'Plugins', subagents: 'Subagents',
+  bgTasks: 'Background tasks', localFirst: 'Local-first'
+};
 ---
 
 <Layout title={SITE_TITLE} description={SITE_DESCRIPTION}>
   <div class="content">
-    <section style="margin-bottom:3.5rem;">
-      <h1 style="font-size:2.5rem;margin-bottom:0.75rem;letter-spacing:-0.03em;">{SITE_TITLE}</h1>
-      <p style="font-size:1.15rem;color:var(--muted-foreground);line-height:1.6;max-width:32rem;">
-        In-depth analysis of autonomous coding assistants,
-        AI workflow automation, and the future of software development.
+    <section style="margin-bottom:3.5rem;text-align:center;">
+      <h1 style="font-size:2.8rem;margin-bottom:0.5rem;letter-spacing:-0.03em;line-height:1.1;">
+        Find Your Coding Agent
+      </h1>
+      <p style="font-size:1.15rem;color:var(--muted-foreground);max-width:32rem;margin:0 auto 0.5rem;line-height:1.6;">
+        Unbiased comparison of every major AI coding agent — Claude Code, Hermes, Cursor, Codex, OpenCode, and more. Updated weekly.
+      </p>
+      <p style="font-size:0.85rem;color:var(--muted-foreground);">
+        <a href="/blog" style="color:var(--primary);">Browse {posts.length} articles</a>
+        <span style="margin:0 0.5rem;">·</span>
+        <a href="/about" style="color:var(--primary);">About this site</a>
       </p>
     </section>
 
     <section style="margin-bottom:3rem;">
-      <h2 style="font-family:var(--font-lipi-sans);font-size:0.85rem;font-weight:500;color:var(--muted-foreground);margin-bottom:1rem;text-transform:uppercase;letter-spacing:0.05em;">Tools</h2>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:0.75rem;">
-        {tools.map(t => (
-          <a href={`/tool/${t.id}/`} style="display:flex;flex-direction:column;gap:0.25rem;padding:1rem;border:1px solid var(--border);border-radius:6px;text-decoration:none;color:var(--foreground);transition:all 0.15s;" onmouseover="this.style.borderColor=this.style.backgroundColor='var(--muted)'" onmouseout="this.style.borderColor=''">
-            <span style="font-family:var(--font-lipi-sans);font-weight:600;font-size:0.9rem;">{t.name}</span>
-            <span style="font-size:0.8rem;color:var(--muted-foreground);line-height:1.4;">{t.desc}</span>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;">
+        {agents.map(agent => (
+          <a href={`/tool/${agent.id}/`} style="text-decoration:none;color:inherit;">
+            <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.25rem;transition:transform 0.15s,box-shadow 0.15s;box-shadow:0 1px 3px rgba(0,0,0,0.04),inset 0 1px 0 rgba(255,255,255,0.5);"
+                 onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,0.08)'"
+                 onmouseout="this.style.transform='';this.style.boxShadow=''">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.5rem;">
+                <strong style="font-size:1.1rem;">{agent.name}</strong>
+                <span style="font-size:0.7rem;padding:0.15rem 0.45rem;border-radius:4px;background:{agent.openSource ? '#dcfce7' : '#fef3c7'};color:{agent.openSource ? '#166534' : '#92400e'};white-space:nowrap;">
+                  {agent.openSource ? 'Open source' : 'Commercial'}
+                </span>
+              </div>
+              <div style="font-size:0.8rem;color:var(--muted-foreground);margin-bottom:0.75rem;">
+                {agent.type}
+              </div>
+              <div style="display:flex;gap:1rem;margin-bottom:0.75rem;font-size:0.85rem;">
+                <div>
+                  <div style="font-size:0.65rem;color:var(--muted-foreground);text-transform:uppercase;letter-spacing:0.05em;">Pricing</div>
+                  <div style="font-weight:600;">{agent.pricing}</div>
+                </div>
+                {agent.sweBench !== '-' ? (
+                  <div>
+                    <div style="font-size:0.65rem;color:var(--muted-foreground);text-transform:uppercase;letter-spacing:0.05em;">SWE-bench</div>
+                    <div style="font-weight:600;">{agent.sweBench}</div>
+                  </div>
+                ) : null}
+              </div>
+              <div style="font-size:0.75rem;color:var(--muted-foreground);line-height:1.4;">
+                {agent.bestFor}
+              </div>
+            </div>
           </a>
         ))}
       </div>
     </section>
 
-    {sortedYears.map(year => (
-      <section style="margin-bottom:2.5rem;">
-        <h2 style="font-family:var(--font-lipi-sans);font-size:0.85rem;font-weight:500;color:var(--muted-foreground);margin-bottom:1.25rem;text-transform:uppercase;letter-spacing:0.05em;">{year}</h2>
-        <div style="display:flex;flex-direction:column;">
-          {years[year].map(post => (
-            <a href={`/blog/${post.id}/`} style="display:flex;gap:1rem;padding:0.75rem 0;border-bottom:1px solid var(--border);text-decoration:none;color:var(--foreground);transition:opacity 0.15s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">
-              <time style="flex-shrink:0;width:3rem;font-family:var(--font-lipi-sans);font-size:0.8rem;color:var(--muted-foreground);padding-top:0.15rem;">
+    <section style="margin-bottom:3rem;">
+      <h2 style="font-size:1.3rem;margin-bottom:1rem;">Feature Comparison</h2>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:separate;border-spacing:0;font-size:0.8rem;border-radius:12px;overflow:hidden;border:1px solid var(--border);">
+          <thead>
+            <tr style="background:var(--muted);">
+              <th style="text-align:left;padding:0.7rem 0.8rem;font-weight:600;">Feature</th>
+              {agents.map(a => (
+                <th style="text-align:center;padding:0.7rem 0.4rem;font-weight:600;white-space:nowrap;font-size:0.75rem;">{a.name}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {Object.entries(featureLabels).map(([key, label]) => (
+              <tr style="border-top:1px solid var(--border);">
+                <td style="padding:0.5rem 0.8rem;white-space:nowrap;">{label}</td>
+                {agents.map(a => (
+                  <td style="text-align:center;padding:0.5rem;color:{a.features[key] ? '#22c55e' : '#d1d5db'};">
+                    {a.features[key] ? '✓' : '—'}
+                  </td>
+                ))}
+              </tr>
+            ))}
+            <tr style="border-top:1px solid var(--border);">
+              <td style="padding:0.5rem 0.8rem;font-weight:600;">SWE-bench</td>
+              {agents.map(a => (
+                <td style="text-align:center;padding:0.5rem;font-size:0.8rem;">{a.sweBench}</td>
+              ))}
+            </tr>
+            <tr style="border-top:1px solid var(--border);">
+              <td style="padding:0.5rem 0.8rem;font-weight:600;">Pricing</td>
+              {agents.map(a => (
+                <td style="text-align:center;padding:0.5rem;font-size:0.75rem;">{a.pricing}</td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:0.75rem;color:var(--muted-foreground);margin-top:0.5rem;">
+        SWE-bench scores from official vendor reports. Check individual articles for methodology.
+      </p>
+    </section>
+
+    <section>
+      <h2 style="font-size:1.3rem;margin-bottom:1rem;">Latest Analysis</h2>
+      <div style="display:flex;flex-direction:column;gap:0.75rem;">
+        {posts.slice(0, 10).map(post => (
+          <a href={`/blog/${post.id}/`} style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 0;text-decoration:none;border-bottom:1px solid var(--border);color:inherit;">
+            <div>
+              <div style="font-size:0.9rem;font-weight:500;">{post.data.title}</div>
+              <div style="font-size:0.75rem;color:var(--muted-foreground);margin-top:0.2rem;">
                 {new Date(post.data.pubDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </time>
-              <div style="display:flex;flex-wrap:wrap;gap:0.3rem;align-items:baseline;">
-                <span style="font-family:var(--font-lipi-sans);font-weight:500;font-size:0.95rem;line-height:1.4;">
-                  {post.data.title}
-                </span>
-                {post.data.tool && <span style="font-family:var(--font-lipi-sans);font-size:0.7rem;background:var(--muted);color:var(--muted-foreground);padding:0.1rem 0.4rem;border-radius:2px;">{post.data.tool}</span>}
+                {post.data.tool ? <span style="margin-left:0.5rem;padding:0.1rem 0.4rem;background:var(--muted);border-radius:3px;font-size:0.7rem;">{post.data.tool}</span> : null}
               </div>
-            </a>
-          ))}
-        </div>
-      </section>
-    ))}
+            </div>
+            <span style="font-size:0.75rem;color:var(--primary);white-space:nowrap;">Read →</span>
+          </a>
+        ))}
+      </div>
+      <div style="text-align:center;margin-top:1.5rem;">
+        <a href="/blog" style="font-size:0.85rem;color:var(--primary);">View all {posts.length} articles →</a>
+      </div>
+    </section>
   </div>
 </Layout>
