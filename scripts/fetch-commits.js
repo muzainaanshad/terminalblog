@@ -12,8 +12,6 @@ const REPOS = [
   { owner: 'anthropics', name: 'claude-code', label: 'Claude Code' },
   { owner: 'aaif-goose', name: 'goose', label: 'Goose' },
   { owner: 'openclaw', name: 'openclaw', label: 'OpenClaw' },
-  { owner: 'ogulcancelik', name: 'herdr', label: 'Herdr' },
-  { owner: 'iOfficeAI', name: 'AionUi', label: 'AionUi' },
   { owner: 'CodebuffAI', name: 'codebuff', label: 'Codebuff' },
 ];
 
