@@ -1,0 +1,34 @@
+---
+title: "Zero Just Prevented a Windows Taskkill Hijack — And You Didn't Even Know It Was Possible"
+description: "Gitlawb Zero resolved an absolute path for taskkill on Windows to prevent binary hijacking. A security fix that protects your entire system."
+pubDate: "2026-07-10T06:00:00Z"
+tags: ["gitlawb-zero", "windows", "security", "taskkill", "hijack", "viral"]
+tool: "gitlawb-zero"
+---
+
+There's a class of security vulnerability that's particularly insidious: binary hijacking on Windows. If a tool calls `taskkill` without an absolute path, an attacker can place a malicious `taskkill.exe` in a directory that's searched before the system directory. The tool runs the attacker's binary instead.
+
+Gitlawb Zero just fixed this.
+
+## The Bug
+
+Zero's process management code on Windows called `taskkill` without specifying the full path. On Windows, the PATH search order means the first matching binary in any PATH directory wins. If an attacker placed a malicious `taskkill.exe` in a directory that's earlier in PATH than `C:\Windows\System32`, Zero would execute the attacker's code.
+
+## The Fix
+
+`fix(windows): resolve absolute path for taskkill to prevent hijacking (#617)`
+
+The fix resolves `taskkill` to its absolute path (`C:\Windows\System32\taskkill.exe`) before executing it. This eliminates the PATH search entirely — the correct binary is always used.
+
+## Why This Matters
+
+Binary hijacking is a well-known Windows vulnerability, but it's surprisingly common in open-source tools. Most developers test on macOS or Linux, where the PATH search is less exploitable. On Windows, it's a real attack vector.
+
+Zero's fix is the right approach:
+- Always use absolute paths for system utilities
+- Don't rely on PATH for security-critical operations
+- Validate binary locations before execution
+
+## What This Means
+
+Zero on Windows is now more secure. The fix protects against a class of attacks that most users never think about — but that attackers definitely do. It's the kind of security hardening that separates a tool you trust from a tool you hope works.

@@ -1,0 +1,38 @@
+---
+title: "Zero's Stale Lock File Fix Just Prevented Permanent Denial of Service"
+description: "Gitlawb Zero now reclaims stale lock files instead of failing permanently. Sessions that used to require manual intervention now self-heal."
+pubDate: "2026-07-10T05:00:00Z"
+tags: ["gitlawb-zero", "lock-files", "dos", "self-heal", "viral"]
+tool: "gitlawb-zero"
+---
+
+Lock files are necessary for preventing concurrent access to shared resources. But when a lock file is left behind after a crash, it prevents future access permanently. Gitlawb Zero just fixed this.
+
+## The Bug
+
+Zero uses lock files (via `O_EXCL`) to prevent multiple instances from accessing the same resource simultaneously. But when Zero crashed or was killed, the lock file remained. Future instances would detect the lock, assume another instance was running, and refuse to start.
+
+The result: you had to manually delete the lock file before Zero would work again.
+
+## The Fix
+
+`fix(securefile): reclaim stale lock files to prevent permanent DOS (#615)`
+
+The fix detects stale locks by checking if the process that created the lock is still running. If the process is dead, the lock is reclaimed. The sequence:
+
+1. Try to create the lock file with `O_EXCL`
+2. If it exists, check if the owning process is alive
+3. If the process is dead, delete the lock and retry
+4. If the process is alive, wait or fail
+
+## Why This Matters
+
+Lock file management is a classic systems programming problem. The naive approach (just use `O_EXCL`) works until the first crash. Then you have a manual cleanup step that nobody documents.
+
+Zero's approach — detect stale locks and reclaim them — is the right solution. It's the same pattern used by package managers (apt, npm) and database systems (PostgreSQL).
+
+## What This Means
+
+Zero is now more resilient to crashes. If Zero is killed (by the user, by the OS, by a power failure), the next instance cleans up automatically. No manual intervention needed. No stale lock files cluttering your system.
+
+This is the kind of reliability improvement that doesn't make headlines but makes the tool dependable.

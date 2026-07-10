@@ -1,0 +1,40 @@
+---
+title: "Hermes Desktop Got a Bootstrap Repin Fix — Your Agent Won't Break on Update Anymore"
+description: "Hermes desktop app now prevents stale commit repins when existing checkouts are detected. Updates that used to break your config now work smoothly."
+pubDate: "2026-07-10T09:00:00Z"
+tags: ["desktop", "bootstrap", "update", "config", "viral"]
+tool: "hermes"
+---
+
+Hermes Desktop's update process has a subtle bug that was silently breaking existing installations. When you updated Hermes Desktop, it would sometimes pin to a stale commit — a commit that no longer existed in the latest release.
+
+## The Problem
+
+The bootstrap process (what happens when Hermes Desktop starts or updates) would detect an existing checkout and pin to whatever commit was current during that checkout. But if the repository had been updated since, the pinned commit was stale. This caused:
+
+- Config options that didn't exist in the pinned version
+- Missing features that were added after the pin
+- Confusing error messages when the agent tried to use capabilities that weren't in the pinned commit
+
+## The Fix
+
+`fix(desktop): prevent bootstrap stale commit repin on existing checkouts`
+
+The fix detects when an existing checkout is already at a valid commit and skips the repin entirely. It only repins when:
+
+- The checkout is genuinely stale (behind the latest release)
+- The checkout is corrupted or incomplete
+- The user explicitly requests an update
+
+This means existing installations keep their working commit until a real update is needed.
+
+## Why This Matters
+
+Desktop apps for AI agents are relatively new. The update process is one of the trickiest parts — you need to handle:
+
+- Existing installations that work
+- Fresh installations that need full setup
+- Partial installations from failed updates
+- Downgrades for compatibility
+
+Hermes Desktop's bootstrap repin fix shows attention to the existing user experience. It's not enough to make new installations work — you need to make existing installations survive updates.

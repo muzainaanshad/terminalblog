@@ -1,0 +1,35 @@
+---
+title: "Zero Now Detects Git Branches Even When You Start From a Subdirectory"
+description: "Gitlawb Zero fixed git branch detection when starting from subdirectories. Your session context is correct no matter where you launch Zero."
+pubDate: "2026-07-10T04:00:00Z"
+tags: ["gitlawb-zero", "git", "branch-detection", "subdirectory", "bugfix", "viral"]
+tool: "gitlawb-zero"
+---
+
+Here's a subtle bug that affects every developer who works from subdirectories. If you start Zero from inside a subdirectory of a git repository, it might not detect the correct branch.
+
+## The Bug
+
+Zero's git integration detects the current branch to provide context — "you're on feature/auth, working on the login module." But when launched from a subdirectory, the branch detection was looking in the wrong place. It checked the current directory for `.git` instead of walking up to the repository root.
+
+The result: Zero would report "detached HEAD" or "no branch" when you were clearly on a branch. This affected:
+
+- Commit context (Zero didn't know which branch you were committing to)
+- Diff context (Zero showed diffs relative to the wrong base)
+- Session metadata (the session was tagged with incorrect branch information)
+
+## The Fix
+
+`fix(agent,tui): resolve git branch detection when starting Zero in subdirectories (#613)`
+
+The fix uses `git rev-parse --show-toplevel` to find the repository root before detecting the branch. This works regardless of where Zero is launched from.
+
+## Why This Matters
+
+Developers don't always launch tools from the repository root. You might be in `src/components/` or `lib/utils/` when you start your coding agent. The agent should handle this gracefully.
+
+Zero's fix ensures that the session context is correct no matter where you launch from. This is the kind of attention to developer workflow that makes a tool feel polished.
+
+## What This Means
+
+Zero now works correctly from any directory in your repository. No more "detached HEAD" confusion. No more incorrect branch context. Just accurate information, wherever you are.

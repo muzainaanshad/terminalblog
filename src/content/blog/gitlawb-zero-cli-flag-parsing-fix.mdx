@@ -1,0 +1,37 @@
+---
+title: "Gitlawb Zero Stopped Letting Flags Eat Your Filenames — And It's a Relief"
+description: "Zero fixed a CLI parsing bug where flag values were consuming positional arguments. Your filenames won't get swallowed by flags anymore."
+pubDate: "2026-07-10T07:00:00Z"
+tags: ["gitlawb-zero", "cli", "flag-parsing", "bugfix", "viral"]
+tool: "gitlawb-zero"
+---
+
+Every CLI tool has this problem at some point: the parser eats an argument that was meant for something else. Gitlawb Zero just fixed one of the most annoying instances of this.
+
+## The Bug
+
+When you ran Zero with a flag that takes a value, the parser would sometimes consume the next positional argument as the flag's value.
+
+Example:
+```
+zero --model gpt-4 myfile.txt
+```
+
+Before the fix, `myfile.txt` might get consumed as part of `--model`'s value instead of being treated as a positional argument. The result: the file never gets processed.
+
+## The Fix
+
+`fix(cli): prevent consuming positional arguments as flag values (#619)`
+
+The fix adds proper boundary detection between flag values and positional arguments. The parser now correctly distinguishes between:
+- `--flag value` (flag with value)
+- `--flag value positional` (flag with value + positional)
+- `value positional` (two positionals)
+
+## Why This Matters
+
+CLI parsing bugs are frustrating because they break the most basic workflows. You type a command exactly as documented, and it does something unexpected. The fix is invisible — commands now do what you typed. But that's exactly the point: good infrastructure is invisible.
+
+## What This Means
+
+Zero's CLI is now more reliable. Flag-heavy commands (which Zero has many of) work as expected. For users scripting Zero or integrating it into workflows, this eliminates a class of silent bugs.
