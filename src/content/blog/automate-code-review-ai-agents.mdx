@@ -1,0 +1,61 @@
+---
+title: "How I Automate My Entire Code Review Process With AI Agents"
+description: "Code review is the bottleneck that agents are perfectly suited to solve. Here's a concrete workflow that runs every day without human intervention."
+pubDate: "2026-07-10T21:00:00Z"
+tags: ["guide", "code-review", "automation", "workflow", "cron-jobs"]
+image: "/api/og?title=AI+Code+Review+Automation+Workflow&tool=Guide"
+---
+
+Code review is the bottleneck in every engineering team. PRs sit for days waiting for reviews. Reviewers rush through them. Bugs slip through.
+
+I automated mine. Here's the exact setup.
+
+## The Problem
+
+Manual code review has inherent limits:
+- Reviewers can't context-switch efficiently
+- Review quality drops after 30 minutes
+- Subtle bugs are easy to miss in large diffs
+- Architectural issues get lost in style comments
+
+Agents don't have these limitations. They read every line, they never get tired, and they can check against your entire codebase.
+
+## The Setup
+
+I use Hermes Agent for this because it has cron support. Three scheduled tasks run every day:
+
+**Morning review (9 AM):** Hermes checks the repo for PRs opened in the last 24 hours. For each PR, it:
+1. Reads the diff
+2. Analyzes the change in context of the full codebase
+3. Runs a checklist: test coverage, security concerns, style compliance, architecture impact
+4. Posts a summary with findings
+
+**Midday check (1 PM):** Same process for new PRs since 9 AM. This catches anything opened after the morning run.
+
+**Evening summary (6 PM):** Reviews the day's merged PRs. Generates a changelog-style summary for the team Slack channel.
+
+## The Checklist
+
+Each review covers:
+1. **Functionality** — does the code do what it's supposed to?
+2. **Security** — any credential exposure, SQL injection risk, auth bypasses?
+3. **Test coverage** — are the new paths tested? Are the tests meaningful?
+4. **Style** — does it match the project conventions?
+5. **Architecture** — does it fit the existing design or introduce debt?
+6. **Performance** — any obvious inefficiencies?
+
+## The Results
+
+In practice, the automated review catches about 30% of issues that would otherwise need a human re-review. The remaining 70% are architectural or design decisions that benefit from human judgment.
+
+The 30% means fewer review rounds, faster merges, and fewer production incidents from obvious mistakes.
+
+## How to Set This Up
+
+Hermes cron is the simplest path. A single cron entry:
+- A cron job running `node scripts/review-prs.js`
+- Output is posted to your team channel
+
+If you're not using Hermes, Claude Code's Routines feature does similar work. Or you can use GitHub Actions with a daily schedule and any coding agent CLI.
+
+The setup takes an afternoon. The time saved is permanent.

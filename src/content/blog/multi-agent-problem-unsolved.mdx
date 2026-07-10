@@ -1,0 +1,44 @@
+---
+title: "The Multi-Agent Problem Nobody's Solved Yet"
+description: "Running multiple coding agents on the same codebase sounds efficient. In practice, it breaks in ways that surprise everyone. Here's the real bottleneck."
+pubDate: "2026-07-10T10:00:00Z"
+tags: ["opinion", "multi-agent", "orchestration", "workflow", "deep-dive"]
+image: "/api/og?title=The+Multi-Agent+Problem+Nobody+Solved&tool=Deep+Dive"
+---
+
+The pitch sounds great: spin up 3 Claude Code agents, each working on a different feature. One refactors the auth module. Another adds a new API endpoint. A third fixes a bug in the payment flow. Parallel development. Maximum throughput.
+
+In practice? Two of them edit the same import file. One overwrites another's changes. The third can't find a function the second renamed. You end up spending more time untangling conflicts than you saved.
+
+## Why Parallel Agents Fail
+
+The problem is architectural. Most coding agents were designed for a single human + single AI pairing. The agent reads the codebase, makes changes, and you review. That flow works because there's one writer.
+
+Add a second writer and you need:
+- **File-level locking** — agent A locks `auth.ts` while agent B works on `payments.ts`
+- **Change awareness** — agent B needs to know agent A renamed a function
+- **Merge intelligence** — when both agents touch the same file, who wins?
+
+No major agent handles all three today.
+
+## Who's Closest
+
+Hermes Agent has subagent support — you can delegate tasks and get back results. But subagents don't coordinate. They each work independently and the main thread merges outputs. It's better than nothing, but it's not parallel editing.
+
+Codex CLI uses Git worktrees for isolation. Each agent runs in its own branch. This prevents conflicts but creates a merge problem at the end. And Codex's approach requires branches — not every team works that way.
+
+Devin runs each agent in its own VM with its own filesystem. Zero conflicts. But also zero shared context. Agents don't know what other agents are doing.
+
+## What The Solution Looks Like
+
+A true multi-agent system needs three things:
+
+1. **A shared context layer** — agents read from the same semantic understanding of the codebase, not just the same files
+2. **A coordination protocol** — agents announce their intentions before making changes
+3. **An intelligent merge layer** — not Git merge, but semantic merge that understands what each change does
+
+Nobody has built this yet. Hermes is closest with its subagent system. Codex is closest with its worktree isolation. But the gap between "closest" and "solved" is still wide.
+
+## The Honest Take
+
+For now, the best multi-agent strategy is staging: use one agent for planning, one for implementation, one for review. Not three agents on the same task — three agents in sequence, each with a clear handoff. That works today. True parallel agent coordination is still research.
