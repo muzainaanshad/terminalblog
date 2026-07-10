@@ -7,221 +7,245 @@ import agents from '../data/agents.json';
 const posts = (await getCollection('blog')).sort(
   (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
 );
+const latest = posts[0];
+const second = posts[1];
+const third = posts[2];
 
-// Collect all unique tags with counts
-const tagCounts: Record<string, number> = {};
-posts.forEach(p => {
-  (p.data.tags || []).forEach(t => {
-    tagCounts[t] = (tagCounts[t] || 0) + 1;
-  });
-});
-const allTags = Object.entries(tagCounts)
-  .sort((a, b) => b[1] - a[1])
-  .map(([tag, count]) => ({ tag, count }));
+// Categorize
+const comparisons = posts.filter(p => p.data.tags?.includes('comparison')).slice(0, 6);
+const opinions = posts.filter(p => p.data.tags?.includes('opinion') && p.id !== latest.id).slice(0, 5);
+const trending = posts.slice(0, 5); // Most recent for now
 
-const featureLabels: Record<string, string> = {
-  vision: 'Vision', cron: 'Cron/Schedule', multiProvider: 'Multi-provider',
-  gitIntegration: 'Git', pluginSystem: 'Plugins', subagents: 'Subagents',
-  bgTasks: 'BG tasks', localFirst: 'Local-first'
-};
+const featureLabels = { vision: 'Vision', cron: 'Cron/Schedule', multiProvider: 'Multi-provider', gitIntegration: 'Git', pluginSystem: 'Plugins' };
+const tagCounts = {};
+posts.forEach(p => (p.data.tags || []).forEach(t => tagCounts[t] = (tagCounts[t] || 0) + 1));
+const topTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([tag]) => tag);
+
+function formatDate(d) {
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+function tagClass(tag) {
+  const hash = tag.split('').reduce((s, c) => s + c.charCodeAt(0), 0);
+  const colors = ['#22c55e', '#f59e0b', '#3b82f6', '#a855f7', '#ec4899', '#06b6d4', '#f97316', '#84cc16'];
+  return colors[hash % colors.length];
+}
 ---
 
 <Layout title={SITE_TITLE} description={SITE_DESCRIPTION}>
-  <div class="content" style="max-width:860px;">
+  <div class="home-wrap">
 
-    <!-- Hero -->
-    <section style="text-align:center;padding:2.5rem 0 0.5rem;">
-      <h1 style="font-size:2.5rem;margin:0 0 0.5rem;letter-spacing:-0.02em;">
-        terminalblog<span class="cursor-blink"></span>
-      </h1>
-      <p style="font-size:1rem;color:var(--fg-dim);max-width:32rem;margin:0 auto;line-height:1.6;">
-        Following the AI coding agent ecosystem — Claude Code, Cursor, Hermes, Codex, and everything in between.
-      </p>
-      <div style="display:flex;gap:1.5rem;justify-content:center;margin-top:1rem;font-family:var(--font-mono);font-size:0.75rem;color:var(--fg-dim);">
-        <span><span style="color:var(--green);">{agents.length}</span> agents tracked</span>
-        <span><span style="color:var(--green);">{posts.length}</span> articles</span>
-        <span>updated <span style="color:var(--green);">every 3h</span></span>
+    <!-- Header -->
+    <header class="home-header">
+      <div class="home-header-main">
+        <div>
+          <h1>terminalblog<span class="cursor-blink">▊</span></h1>
+          <p class="home-sub">Following the AI coding agent ecosystem</p>
+        </div>
+        <div class="home-stats">
+          <span><b>{agents.length}</b> agents</span>
+          <span><b>{posts.length}</b> articles</span>
+          <span>every <b>3h</b></span>
+        </div>
       </div>
+    </header>
+
+    <!-- Tag nav -->
+    <nav class="tag-nav">
+      {topTags.slice(0, 12).map(tag => (
+        <a href={`/blog/tag/${tag}/`} class="tag-pill" style={`--tag-color: ${tagClass(tag)};`}>{tag}</a>
+      ))}
+      <a href="/blog/" class="tag-pill all-link">all →</a>
+    </nav>
+
+    <!-- Featured hero -->
+    <section class="hero-section">
+      <a href={`/blog/${latest.id}/`} class="hero-card">
+        <div class="hero-meta">
+          <span class="hero-badge">latest</span>
+          <span>{formatDate(latest.data.pubDate)}</span>
+        </div>
+        <h2 class="hero-title">{latest.data.title}</h2>
+        <p class="hero-desc">{latest.data.description}</p>
+        <div class="hero-tags">
+          {(latest.data.tags || []).slice(0, 4).map(t => <span class="mini-tag">{t}</span>)}
+        </div>
+      </a>
     </section>
 
-    <!-- Tag filter bar -->
-    <section style="margin:1.5rem 0;position:sticky;top:0;z-index:10;background:var(--bg);padding:0.5rem 0;border-bottom:1px solid var(--border);">
-      <div style="display:flex;gap:0.4rem;overflow-x:auto;padding-bottom:0.3rem;scrollbar-width:none;" id="tag-bar">
-        <button class="tag-btn active" data-tag="all">all <span style="opacity:0.5;">{posts.length}</span></button>
-        {allTags.slice(0, 20).map(t => (
-          <button class="tag-btn" data-tag={t.tag}>{t.tag} <span style="opacity:0.5;">{t.count}</span></button>
-        ))}
-      </div>
+    <!-- Spotlight grid -->
+    <section class="spotlight">
+      <a href={`/blog/${second.id}/`} class="spotlight-card">
+        <div class="spotlight-meta">
+          {(second.data.tags || []).filter(t => t !== 'opinion').slice(0, 2).map(t => <span class="mini-tag">{t}</span>)}
+          <span class="spotlight-date">{formatDate(second.data.pubDate)}</span>
+        </div>
+        <h3>{second.data.title}</h3>
+      </a>
+      <a href={`/blog/${third.id}/`} class="spotlight-card">
+        <div class="spotlight-meta">
+          {(third.data.tags || []).filter(t => t !== 'opinion').slice(0, 2).map(t => <span class="mini-tag">{t}</span>)}
+          <span class="spotlight-date">{formatDate(third.data.pubDate)}</span>
+        </div>
+        <h3>{third.data.title}</h3>
+      </a>
+      <a href="/agent-not-ready-shared-infrastructure/" class="spotlight-card highlight">
+        <div class="spotlight-meta">
+          <span class="mini-tag">trending</span>
+        </div>
+        <h3>Agents aren't ready to be shared infrastructure</h3>
+        <p>The trust model under coding agents is still built for one person.</p>
+      </a>
     </section>
 
-    <!-- Latest / Filtered posts -->
-    <section style="margin:1.5rem 0;" id="posts-section">
-      <div id="posts-list">
-        {posts.map(post => (
-          <a href={`/blog/${post.id}/`} class="post-item" data-tags={(post.data.tags || []).join(',')}>
-            <div style="flex:1;min-width:0;">
-              <div class="post-title">{post.data.title}</div>
-              <div class="post-meta">
-                {new Date(post.data.pubDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                {(post.data.tags || []).slice(0, 3).map(t => (
-                  <span class="post-tag">{t}</span>
-                ))}
-              </div>
+    <!-- Comparisons section -->
+    <section class="section-group">
+      <div class="section-header">
+        <h2>Comparisons</h2>
+        <a href="/blog/tag/comparison/" class="section-more">all →</a>
+      </div>
+      <div class="mini-grid">
+        {comparisons.slice(0, 4).map(p => (
+          <a href={`/blog/${p.id}/`} class="mini-card">
+            <div class="mini-meta">
+              {formatDate(p.data.pubDate)}
             </div>
-            <span class="post-arrow">→</span>
+            <div class="mini-title">{p.data.title}</div>
           </a>
         ))}
       </div>
-      <div id="no-results" style="display:none;text-align:center;padding:2rem;color:var(--fg-dim);font-family:var(--font-mono);font-size:0.85rem;">
-        No articles match this filter.
-      </div>
     </section>
 
-    <!-- Agent comparison table (collapsed by default) -->
-    <details style="margin:2rem 0;">
-      <summary style="cursor:pointer;font-size:1.1rem;font-weight:600;color:var(--fg-bright);padding:0.5rem 0;list-style:none;">
-        <span style="color:var(--green);font-family:var(--font-mono);margin-right:0.5rem;">#</span> Agent comparison table
-        <span style="float:right;font-size:0.75rem;color:var(--fg-dim);font-weight:normal;">click to expand</span>
-      </summary>
+    <!-- Opinion + Trending two-col -->
+    <div class="two-col">
+      <section class="section-group">
+        <div class="section-header">
+          <h2>Opinion</h2>
+          <a href="/blog/tag/opinion/" class="section-more">all →</a>
+        </div>
+        <div class="compact-list">
+          {opinions.slice(0, 4).map(p => (
+            <a href={`/blog/${p.id}/`} class="compact-item">
+              <span class="compact-date">{formatDate(p.data.pubDate)}</span>
+              <span class="compact-title">{p.data.title}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <section class="section-group">
+        <div class="section-header">
+          <h2>Trending</h2>
+        </div>
+        <div class="compact-list numbered">
+          {trending.slice(0, 5).map((p, i) => (
+            <a href={`/blog/${p.id}/`} class="compact-item">
+              <span class="compact-num">{i + 1}</span>
+              <span class="compact-title">{p.data.title}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+    </div>
+
+    <!-- Agents section (collapsible) -->
+    <details class="agents-section">
+      <summary><span style="color:var(--green);font-family:var(--font-mono);margin-right:0.5rem;">#</span> {agents.length} Agents tracked <span class="collapse-hint">expand</span></summary>
       <div style="overflow-x:auto;margin-top:1rem;">
         <table class="compare-table">
-          <thead>
+          <thead><tr><th>Agent</th><th>Type</th><th>Price</th><th>SWE-b</th>{Object.values(featureLabels).slice(0,4).map(l => <th>{l}</th>)}</tr></thead>
+          <tbody>{agents.map(a => (
             <tr>
-              <th>Agent</th>
-              <th>Type</th>
-              <th>Price</th>
-              <th>SWE-b</th>
-              {Object.values(featureLabels).slice(0,5).map(l => <th>{l}</th>)}
+              <td><a href={`/tool/${a.id}/`} class="agent-link">{a.name}</a></td>
+              <td class="td-sm">{a.type}</td>
+              <td class="td-mono td-sm">{a.pricing}</td>
+              <td class="td-mono td-sm">{a.sweBench}</td>
+              {Object.entries(a.features).slice(0,4).map(([k,v]) => <td class={v ? 'yes' : 'no'}>{v ? 'yes' : '—'}</td>)}
             </tr>
-          </thead>
-          <tbody>
-            {agents.map(a => (
-              <tr>
-                <td><a href={`/tool/${a.id}/`} style="font-weight:600;color:var(--fg-bright);font-family:var(--font-mono);font-size:0.78rem;">{a.name}</a></td>
-                <td style="font-size:0.7rem;color:var(--fg-dim);">{a.type}</td>
-                <td style="font-family:var(--font-mono);font-size:0.7rem;">{a.pricing}</td>
-                <td style="font-family:var(--font-mono);font-size:0.7rem;">{a.sweBench}</td>
-                {Object.entries(a.features).slice(0,5).map(([k,v]) => (
-                  <td class={v ? 'yes' : 'no'}>{v ? 'yes' : '—'}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
+          ))}</tbody>
         </table>
       </div>
     </details>
 
-    <!-- Agent grid (collapsed) -->
-    <details style="margin:2rem 0;">
-      <summary style="cursor:pointer;font-size:1.1rem;font-weight:600;color:var(--fg-bright);padding:0.5rem 0;list-style:none;">
-        <span style="color:var(--green);font-family:var(--font-mono);margin-right:0.5rem;">#</span> All agents
-        <span style="float:right;font-size:0.75rem;color:var(--fg-dim);font-weight:normal;">click to expand</span>
-      </summary>
-      <div class="agent-grid" style="margin-top:1rem;">
-        {agents.map(agent => (
-          <a href={`/tool/${agent.id}/`} class="agent-card">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.4rem;">
-              <strong style="font-family:var(--font-mono);font-size:0.9rem;">{agent.name}</strong>
-              <span style="font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:4px;background:{agent.openSource ? '#22c55e22' : '#f59e0b22'};color:{agent.openSource ? 'var(--green)' : 'var(--amber)'};white-space:nowrap;font-family:var(--font-mono);">
-                {agent.openSource ? 'OSS' : 'commercial'}
-              </span>
-            </div>
-            <div style="font-size:0.72rem;color:var(--fg-dim);margin-bottom:0.5rem;font-family:var(--font-mono);">
-              {agent.type} · {agent.pricing}
-            </div>
-            <div style="font-size:0.78rem;color:var(--fg);line-height:1.4;">
-              {agent.bestFor}
-            </div>
-            {agent.sweBench !== '-' ? (
-              <div style="margin-top:0.5rem;font-family:var(--font-mono);font-size:0.7rem;color:var(--green);">
-                SWE-bench: {agent.sweBench}
-              </div>
-            ) : null}
-          </a>
-        ))}
-      </div>
-    </details>
-
-    <!-- CLI tool promotion -->
-    <section style="margin:2.5rem 0;padding:1.5rem;border:1px solid var(--border);border-radius:10px;background:var(--bg-alt);text-align:center;">
-      <p style="font-family:var(--font-mono);font-size:0.8rem;margin:0 0 0.5rem;">
-        <span style="color:var(--green);">$</span> npx terminalblog
-      </p>
-      <p style="font-size:0.85rem;color:var(--fg-dim);margin:0 0 0.8rem;">
-        Get the latest articles from your terminal. Free CLI tool — open source.
-      </p>
-      <a href="https://github.com/Anshad2u/terminalblog-cli" style="font-family:var(--font-mono);font-size:0.78rem;color:var(--green);">
-        github.com/Anshad2u/terminalblog-cli →
-      </a>
+    <!-- CLI -->
+    <section class="cli-box">
+      <code><span class="green">$</span> npx terminalblog</code>
+      <p>Get the latest articles from your terminal. Free &amp; open source.</p>
+      <a href="https://github.com/Anshad2u/terminalblog-cli" class="cli-link">github.com/Anshad2u/terminalblog-cli →</a>
     </section>
 
   </div>
 
-  <style>
-    .tag-btn {
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--fg-dim);
-      padding: 0.25rem 0.6rem;
-      border-radius: 6px;
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: all 0.15s;
-    }
-    .tag-btn:hover {
-      border-color: var(--green);
-      color: var(--fg);
-    }
-    .tag-btn.active {
-      background: var(--green);
-      color: #000;
-      border-color: var(--green);
-      font-weight: 600;
-    }
-    .post-tag {
-      display: inline-block;
-      font-size: 0.6rem;
-      padding: 0.05rem 0.35rem;
-      border-radius: 4px;
-      background: var(--border);
-      color: var(--fg-dim);
-      font-family: var(--font-mono);
-      margin-left: 0.3rem;
-    }
-    .post-item {
-      transition: background 0.1s;
-    }
-    .post-item:hover {
-      background: var(--bg-alt);
-    }
+  <style is:global>
+    @media (max-width: 600px) { .home-wrap { gap: 1.2rem !important; } .spotlight { grid-template-columns: 1fr !important; } .two-col { grid-template-columns: 1fr !important; } .mini-grid { grid-template-columns: 1fr !important; } .home-header-main { flex-direction: column !important; align-items: flex-start !important; gap: 0.5rem !important; } .hero-title { font-size: 1.3rem !important; } }
+
+    .home-wrap { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.8rem; padding: 0 1rem; }
+    .home-header { padding: 2rem 0 0; }
+    .home-header-main { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; }
+    .home-header h1 { font-size: 2rem; margin: 0; letter-spacing: -0.02em; }
+    .home-sub { font-size: 0.85rem; color: var(--fg-dim); margin: 0.2rem 0 0; }
+    .home-stats { display: flex; gap: 1rem; font-family: var(--font-mono); font-size: 0.75rem; color: var(--fg-dim); white-space: nowrap; }
+    .home-stats b { color: var(--green); }
+    .cursor-blink { animation: blink 1s step-end infinite; display: inline-block; color: var(--green); }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .tag-nav { display: flex; gap: 0.4rem; overflow-x: auto; padding: 0.3rem 0; scrollbar-width: none; flex-wrap: nowrap; }
+    .tag-nav::-webkit-scrollbar { display: none; }
+    .tag-pill { padding: 0.2rem 0.6rem; border-radius: 6px; font-family: var(--font-mono); font-size: 0.7rem; border: 1px solid var(--border); color: var(--fg-dim); white-space: nowrap; text-decoration: none; transition: all 0.15s; }
+    .tag-pill:hover { border-color: var(--tag-color, var(--green)); color: var(--tag-color, var(--green)); }
+    .all-link { border-color: var(--green); color: var(--green); }
+
+    .hero-section { margin: 0; }
+    .hero-card { display: block; padding: 1.5rem; border: 1px solid var(--border); border-radius: 10px; background: linear-gradient(135deg, var(--bg-alt) 0%, var(--bg) 100%); text-decoration: none; transition: border-color 0.2s; }
+    .hero-card:hover { border-color: var(--green); }
+    .hero-meta { display: flex; gap: 0.75rem; align-items: center; font-size: 0.72rem; font-family: var(--font-mono); color: var(--fg-dim); margin-bottom: 0.75rem; }
+    .hero-badge { background: var(--green); color: #000; padding: 0.1rem 0.5rem; border-radius: 4px; font-weight: 700; font-size: 0.65rem; text-transform: uppercase; }
+    .hero-title { font-size: 1.5rem; margin: 0 0 0.5rem; line-height: 1.3; color: var(--fg-bright); }
+    .hero-desc { font-size: 0.85rem; color: var(--fg-dim); margin: 0 0 0.75rem; line-height: 1.5; }
+    .hero-tags { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+
+    .spotlight { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+    .spotlight-card { display: block; padding: 1rem; border: 1px solid var(--border); border-radius: 8px; text-decoration: none; transition: border-color 0.2s; background: var(--bg-alt); }
+    .spotlight-card:hover { border-color: var(--green); }
+    .spotlight-card h3 { font-size: 0.9rem; margin: 0.4rem 0 0; line-height: 1.4; color: var(--fg); }
+    .spotlight-card p { font-size: 0.78rem; color: var(--fg-dim); margin: 0.4rem 0 0; line-height: 1.4; }
+    .spotlight-meta { display: flex; gap: 0.3rem; align-items: center; flex-wrap: wrap; }
+    .spotlight-date { font-size: 0.65rem; font-family: var(--font-mono); color: var(--fg-dim); }
+    .highlight { border-color: var(--amber); }
+    .highlight:hover { border-color: var(--green); }
+
+    .section-group { }
+    .section-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.6rem; }
+    .section-header h2 { font-size: 1rem; margin: 0; }
+    .section-more { font-size: 0.72rem; font-family: var(--font-mono); color: var(--green); text-decoration: none; }
+
+    .mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+    .mini-card { display: block; padding: 0.7rem 0.9rem; border: 1px solid var(--border); border-radius: 6px; text-decoration: none; transition: border-color 0.15s; }
+    .mini-card:hover { border-color: var(--green); }
+    .mini-meta { font-size: 0.65rem; font-family: var(--font-mono); color: var(--fg-dim); margin-bottom: 0.3rem; }
+    .mini-title { font-size: 0.78rem; color: var(--fg); line-height: 1.3; }
+
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+
+    .compact-list { display: flex; flex-direction: column; gap: 0.3rem; }
+    .compact-item { display: flex; gap: 0.5rem; align-items: baseline; padding: 0.35rem 0.5rem; border-radius: 4px; text-decoration: none; color: var(--fg); font-size: 0.78rem; transition: background 0.1s; line-height: 1.3; }
+    .compact-item:hover { background: var(--bg-alt); }
+    .compact-date { font-family: var(--font-mono); font-size: 0.65rem; color: var(--fg-dim); white-space: nowrap; min-width: 3.2rem; }
+    .compact-title { }
+    .compact-num { font-family: var(--font-mono); font-size: 0.7rem; color: var(--green); min-width: 1.2rem; text-align: right; font-weight: 600; }
+
+    .mini-tag { display: inline-block; font-size: 0.6rem; padding: 0.05rem 0.35rem; border-radius: 4px; background: var(--border); color: var(--fg-dim); font-family: var(--font-mono); }
+    .green { color: var(--green); }
+
+    .agents-section { margin: 0.5rem 0; }
+    .agents-section summary { cursor: pointer; font-size: 1rem; font-weight: 600; color: var(--fg-bright); padding: 0.4rem 0; list-style: none; }
+    .collapse-hint { float: right; font-size: 0.7rem; color: var(--fg-dim); font-weight: normal; }
+    .agent-link { font-weight: 600; color: var(--fg-bright); font-family: var(--font-mono); font-size: 0.75rem; }
+    .td-sm { font-size: 0.65rem; }
+    .td-mono { font-family: var(--font-mono); }
+
+    .cli-box { padding: 1.5rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-alt); text-align: center; }
+    .cli-box code { font-family: var(--font-mono); font-size: 0.85rem; }
+    .cli-box p { font-size: 0.82rem; color: var(--fg-dim); margin: 0.5rem 0 0.6rem; }
+    .cli-link { font-family: var(--font-mono); font-size: 0.75rem; color: var(--green); }
   </style>
-
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const tagBtns = document.querySelectorAll('.tag-btn');
-      const posts = document.querySelectorAll('#posts-list .post-item');
-      const noResults = document.getElementById('no-results');
-      let activeTag = 'all';
-
-      tagBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-          activeTag = btn.getAttribute('data-tag') || 'all';
-          tagBtns.forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-
-          let visible = 0;
-          posts.forEach(post => {
-            const tags = post.getAttribute('data-tags') || '';
-            const match = activeTag === 'all' || tags.split(',').includes(activeTag);
-            (post as HTMLElement).style.display = match ? '' : 'none';
-            if (match) visible++;
-          });
-
-          if (noResults) noResults.style.display = visible === 0 ? 'block' : 'none';
-        });
-      });
-    });
-  </script>
 </Layout>
