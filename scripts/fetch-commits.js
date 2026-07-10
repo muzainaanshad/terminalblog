@@ -9,18 +9,24 @@ const REPOS = [
   { owner: 'pi-delabs', name: 'pi', label: 'pi.dev' },
   { owner: 'gitlawb', name: 'zero', label: 'Gitlawb Zero' },
   { owner: 'can1357', name: 'oh-my-pi', label: 'Oh My Pi' },
-  { owner: 'anthropics', name: 'claude-code', label: 'Claude Code' }
+  { owner: 'anthropics', name: 'claude-code', label: 'Claude Code' },
+  { owner: 'aaif-goose', name: 'goose', label: 'Goose' },
+  { owner: 'openclaw', name: 'openclaw', label: 'OpenClaw' },
+  { owner: 'ogulcancelik', name: 'herdr', label: 'Herdr' },
+  { owner: 'iOfficeAI', name: 'AionUi', label: 'AionUi' },
+  { owner: 'CodebuffAI', name: 'codebuff', label: 'Codebuff' },
 ];
 
 const HOURS_BACK = 6; // matches 3-hour cron with overlap
 
 async function fetchCommits(owner, repo) {
   const since = new Date(Date.now() - HOURS_BACK * 60 * 60 * 1000).toISOString();
+  const token = process.env.GITHUB_TOKEN;
+  const headers = { 'Accept': 'application/vnd.github+json', 'User-Agent': 'TerminalBlog/1.0' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
   const url = `https://api.github.com/repos/${owner}/${repo}/commits?since=${since}&per_page=10`;
   try {
-    const res = await fetch(url, {
-      headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'CodingAgentsBot/1.0' }
-    });
+    const res = await fetch(url, { headers });
     if (!res.ok) return [];
     const data = await res.json();
     if (!Array.isArray(data)) return [];

@@ -10,14 +10,20 @@ const REPOS = [
   { owner: 'kilocode', name: 'cli', label: 'Kilo Code CLI' },
   { owner: 'mimo-code', name: 'mimo', label: 'Mimo Code' },
   { owner: 'pi-delabs', name: 'pi', label: 'pi.dev' },
+  { owner: 'aaif-goose', name: 'goose', label: 'Goose' },
+  { owner: 'openclaw', name: 'openclaw', label: 'OpenClaw' },
+  { owner: 'ogulcancelik', name: 'herdr', label: 'Herdr' },
+  { owner: 'iOfficeAI', name: 'AionUi', label: 'AionUi' },
+  { owner: 'CodebuffAI', name: 'codebuff', label: 'Codebuff' },
 ];
 
 async function fetchReleases(owner, repo, label) {
   const url = `https://api.github.com/repos/${owner}/${repo}/releases?per_page=3`;
+  const token = process.env.GITHUB_TOKEN;
+  const headers = { 'Accept': 'application/vnd.github+json', 'User-Agent': 'TerminalBlog/1.0' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
   try {
-    const res = await fetch(url, {
-      headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'TerminalBlog/1.0' }
-    });
+    const res = await fetch(url, { headers });
     if (!res.ok) return [];
     const data = await res.json();
     if (!Array.isArray(data)) return [];
