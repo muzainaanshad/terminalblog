@@ -1,15 +1,15 @@
 // OG Image Generator — pure SVG, works everywhere
 // Endpoint: /api/og?title=...&tool=...
 
-export async function GET({ request }: { request: Request }) {
-  const url = new URL(request.url);
+import type { APIRoute } from 'astro';
+
+export const GET: APIRoute = async ({ url }) => {
   const rawTitle = url.searchParams.get('title') || 'Coding Agents';
   const tool = url.searchParams.get('tool') || '';
   const desc = 'Deep dives into autonomous coding assistants';
 
   const title = escapeXml(rawTitle);
   const toolLine = tool ? escapeXml(tool.toUpperCase()) : '';
-
   const lines = wrapText(title, 10);
   const titleSvg = lines.slice(0, 3).map((line, i) =>
     `    <tspan x="70" dy="${i === 0 ? 0 : 58}">${line}</tspan>`
@@ -32,13 +32,13 @@ ${titleSvg}
 </svg>`;
 
   return new Response(svg, {
+    status: 200,
     headers: {
       'Content-Type': 'image/svg+xml',
       'Cache-Control': 'public, max-age=3600, s-maxage=3600',
     },
-    status: 200,
   });
-}
+};
 
 function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
