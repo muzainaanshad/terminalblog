@@ -1,8 +1,8 @@
-name: Daily SEO Article Publish
+name: Auto Article Publish
 
 on:
   schedule:
-    - cron: '0 2 * * *'   # Daily at 2:00 AM UTC
+    - cron: '0 */3 * * *'   # Every 3 hours
   workflow_dispatch:
 
 permissions:
@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -25,9 +27,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run AI Content Engine
+      - name: Run AI Content Engine (Gemini)
         env:
-          BYNARA_API_KEY: ${{ secrets.BYNARA_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/ai-content-engine.js
 
@@ -46,11 +48,19 @@ jobs:
       - name: Configure Git
         if: steps.check.outputs.changed == 'true'
         run: |
-          git config user.name "AI Content Bot"
-          git config user.email "bot@ai-workflow-insights.com"
+          git config user.name "Coding Agents Bot"
+          git config user.email "bot@codingagents.dev"
 
       - name: Commit and push
         if: steps.check.outputs.changed == 'true'
         run: |
-          git commit -m "chore: auto-generate daily SEO article [skip ci]"
+          FILENAME=$(git diff --cached --name-only src/content/blog/ | head -1 | xargs basename)
+          git commit -m "chore: auto-publish article [skip ci]"
           git push
+
+      - name: Trigger Vercel deployment
+        if: steps.check.outputs.changed == 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          curl -s -X POST "https://api.vercel.com/v1/integrations/deploy/prj_${{ secrets.VERCEL_PROJECT_ID }}?vercel_token=${{ secrets.VERCEL_TOKEN }}" || true
