@@ -12,7 +12,7 @@ const REPOS = [
   { owner: 'anthropics', name: 'claude-code', label: 'Claude Code' }
 ];
 
-const HOURS_BACK = 48;
+const HOURS_BACK = 6; // matches 3-hour cron with overlap
 
 async function fetchCommits(owner, repo) {
   const since = new Date(Date.now() - HOURS_BACK * 60 * 60 * 1000).toISOString();

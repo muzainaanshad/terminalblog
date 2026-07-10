@@ -2,7 +2,7 @@
 // Fetches recent discussions about coding agents from HN and Reddit
 // Outputs structured JSON with quotes, context, and metadata
 
-const HOURS_BACK = 48;
+const HOURS_BACK = 6; // matches 3-hour cron with overlap
 const SITE = "https://seo-ai-blog-nu.vercel.app";
 
 async function searchHN() {
