@@ -5,6 +5,8 @@ import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
 const { title, description, image } = Astro.props as any;
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 const ogImage = image || `/api/og?title=${encodeURIComponent(title)}&description=${encodeURIComponent(description || '')}`;
+const isArticle = Astro.url.pathname.startsWith('/blog/');
+const pubDate = (Astro.props as any).pubDate;
 ---
 
 <!doctype html>
@@ -15,12 +17,14 @@ const ogImage = image || `/api/og?title=${encodeURIComponent(title)}&description
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="sitemap" href="/sitemap-index.xml" />
     <link rel="alternate" type="application/rss+xml" title={SITE_TITLE} href={new URL('rss.xml', Astro.site)} />
+    <link rel="author" href="https://github.com/Anshad2u" />
     <meta name="generator" content={Astro.generator} />
     <link rel="canonical" href={canonicalURL} />
     <title>{title === SITE_TITLE ? SITE_TITLE : `${title} — ${SITE_TITLE}`}</title>
     <meta name="description" content={description} />
     <meta name="robots" content="index, follow" />
-    <meta property="og:type" content="website" />
+    <meta name="google-site-verification" content="" />
+    <meta property="og:type" content={isArticle ? 'article' : 'website'} />
     <meta property="og:url" content={Astro.url} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
@@ -30,6 +34,65 @@ const ogImage = image || `/api/og?title=${encodeURIComponent(title)}&description
     <meta name="twitter:image" content={new URL(ogImage, Astro.site)} />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
+    {isArticle && pubDate && <meta property="article:published_time" content={new Date(pubDate).toISOString()} />}
+
+    <!-- JSON-LD: Organization -->
+    <script type="application/ld+json">
+      {JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'Organization',
+        name: SITE_TITLE,
+        url: Astro.site?.href,
+        logo: new URL('/favicon.svg', Astro.site).href,
+        sameAs: [
+          'https://github.com/Anshad2u/terminalblog',
+          'https://github.com/Anshad2u/terminalblog-cli',
+        ],
+      })}
+    </script>
+
+    <!-- JSON-LD: BreadcrumbList -->
+    <script type="application/ld+json">
+      {JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: Astro.site?.href },
+          ...(isArticle ? [
+            { '@type': 'ListItem', position: 2, name: 'Articles', item: new URL('/blog/', Astro.site).href },
+            { '@type': 'ListItem', position: 3, name: title, item: canonicalURL.href },
+          ] : []),
+          ...(Astro.url.pathname.startsWith('/tool/') ? [
+            { '@type': 'ListItem', position: 2, name: 'Tools', item: new URL('/about/', Astro.site).href },
+            { '@type': 'ListItem', position: 3, name: title, item: canonicalURL.href },
+          ] : []),
+        ],
+      })}
+    </script>
+
+    <!-- JSON-LD: Article (for blog posts) -->
+    {isArticle && pubDate ? (
+      <script type="application/ld+json">
+        {JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'Article',
+          headline: title,
+          description: description,
+          datePublished: new Date(pubDate).toISOString(),
+          author: {
+            '@type': 'Person',
+            name: 'Anshad',
+            url: 'https://github.com/Anshad2u',
+          },
+          publisher: {
+            '@type': 'Organization',
+            name: SITE_TITLE,
+          },
+          mainEntityOfPage: { '@type': 'WebPage', '@id': canonicalURL.href },
+        })}
+      </script>
+    ) : null}
+
     <style is:global>
       html, body { min-height: 100vh; }
       body { display: flex; flex-direction: column; }
@@ -54,8 +117,12 @@ const ogImage = image || `/api/og?title=${encodeURIComponent(title)}&description
     </main>
     <footer style="border-top:1px solid var(--border);background:var(--bg-alt);padding:1.5rem;text-align:center;">
       <p style="font-family:var(--font-mono);font-size:0.7rem;color:var(--fg-dim);margin:0;">
-        {SITE_TITLE} — honest reviews, no sponsorships<br/>
-        <a href="https://github.com/Anshad2u/seo-ai-blog" style="color:var(--fg-dim);">source</a>
+        {SITE_TITLE} — honest coding agent ecosystem coverage<br/>
+        <a href="https://github.com/Anshad2u/terminalblog" style="color:var(--fg-dim);">source</a>
+        <span style="margin:0 0.5rem;">·</span>
+        <a href="/rss.xml" style="color:var(--fg-dim);">rss</a>
+        <span style="margin:0 0.5rem;">·</span>
+        <a href="/llms.txt" style="color:var(--fg-dim);">llms.txt</a>
       </p>
     </footer>
   </body>
