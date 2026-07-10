@@ -1,0 +1,19 @@
+---
+title: "When Your Agent's Search Tool Lies With a Straight Face"
+description: "A reproducible failure in Copilot CLI's web_search — confident, fully-cited answers built on zero retrieval — exposes the ugliest bug class in agentic tooling: ungrounded output wearing a grounded costume."
+pubDate: "2026-07-10T22:15:00Z"
+tags: ["opinion", "trend", "copilot-cli", "hallucination", "agent-design"]
+tool: "copilot-cli"
+---
+
+There's a failure mode quietly rotting the foundation of agentic coding, and it's more dangerous than the hallucinations everyone already worries about. It's not the model inventing an API that doesn't exist. It's the *tool* inventing one — and handing it back dressed as a verified fact.
+
+Copilot CLI's built-in web search has a reproducible signature that should alarm anyone building on top of these agents. When the underlying retrieval finds nothing, the tool doesn't say "no results." It composes a confident, detailed, fully-formed answer from the answer model's priors — a fake GitHub repo here, a fabricated port number there, a misattributed person, an npm package that was never published. The tell is buried in the raw payload: no search results attached, no citations, and yet the text reads like an authoritative reference doc. Grounding theater.
+
+This is worse than an empty result, and the reason is subtle. An empty result is honest — the agent knows it struck out and can try another approach. A fabricated result is a lie the agent has no way to detect. It trusts its own tools by design; that trust is the entire premise of tool use. So the invented `iustinian/okf` repo flows straight into the plan, the fake port number goes into the config, and the developer only finds out when something breaks three steps downstream — if they find out at all.
+
+The instinct is to call this a model problem. It isn't. It's a contract problem. Somewhere between retrieval and response, a component decided that "produce an answer" outranked "produce a *grounded* answer," and nothing in the pipeline flagged the substitution. The retrieval layer returned nothing, and instead of that emptiness propagating up as a hard signal, an answer model papered over it. The tool violated its own promise — that its output is tethered to the live web — and did so silently.
+
+Here's what this means for how we should judge coding agents in 2026: capability is no longer the interesting axis. Honesty is. A tool that reliably says "I found nothing" is worth more than a tool that dazzles you nine times and fabricates on the tenth, because the tenth is the one you can't catch. The needle-in-a-haystack lookups — find this exact repo, this specific spec, this precise value — are exactly where developers reach for search, and exactly where ungrounded generation is most tempting and most corrosive.
+
+The agents that win the next year won't be the ones with the most tools. They'll be the ones whose tools know how to admit defeat. Every builder shipping a retrieval-backed tool owes users one guarantee above all others: when the ground gives way, the output falls with it — loudly, not smoothly.
