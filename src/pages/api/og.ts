@@ -4,9 +4,9 @@
 import type { APIRoute } from 'astro';
 
 export const GET: APIRoute = async ({ url }) => {
-  const rawTitle = url.searchParams.get('title') || 'Coding Agents';
+  const rawTitle = url.searchParams.get('title') || 'terminalblog';
   const tool = url.searchParams.get('tool') || '';
-  const desc = 'Deep dives into autonomous coding assistants';
+  const desc = 'Honest reviews of AI coding tools';
 
   const title = escapeXml(rawTitle);
   const toolLine = tool ? escapeXml(tool.toUpperCase()) : '';
@@ -28,7 +28,7 @@ export const GET: APIRoute = async ({ url }) => {
   <text x="70" y="${toolLine ? 220 : 200}" font-family="system-ui,sans-serif" font-size="52" font-weight="800" fill="#ffffff">
 ${titleSvg}
   </text>
-  <text x="70" y="520" font-family="system-ui,sans-serif" font-size="20" fill="#94a3b8">Coding Agents &middot; ${escapeXml(desc)}</text>
+  <text x="70" y="520" font-family="system-ui,sans-serif" font-size="20" fill="#94a3b8">terminalblog &middot; ${escapeXml(desc)}</text>
 </svg>`;
 
   return new Response(svg, {

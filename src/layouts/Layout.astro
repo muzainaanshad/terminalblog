@@ -8,7 +8,7 @@ const ogImage = image || `/api/og?title=${encodeURIComponent(title)}&description
 ---
 
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -17,7 +17,7 @@ const ogImage = image || `/api/og?title=${encodeURIComponent(title)}&description
     <link rel="alternate" type="application/rss+xml" title={SITE_TITLE} href={new URL('rss.xml', Astro.site)} />
     <meta name="generator" content={Astro.generator} />
     <link rel="canonical" href={canonicalURL} />
-    <title>{title}</title>
+    <title>{title === SITE_TITLE ? SITE_TITLE : `${title} — ${SITE_TITLE}`}</title>
     <meta name="description" content={description} />
     <meta name="robots" content="index, follow" />
     <meta property="og:type" content="website" />
@@ -30,46 +30,33 @@ const ogImage = image || `/api/og?title=${encodeURIComponent(title)}&description
     <meta name="twitter:image" content={new URL(ogImage, Astro.site)} />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
-    <script is:inline>
-      (() => {
-        try {
-          const stored = localStorage.getItem('theme');
-          const theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-          document.documentElement.setAttribute('data-theme', theme);
-          document.documentElement.style.colorScheme = theme;
-        } catch (_) {}
-      })();
-    </script>
+    <style is:global>
+      html, body { min-height: 100vh; }
+      body { display: flex; flex-direction: column; }
+      main { flex: 1; }
+    </style>
   </head>
   <body>
-    <header style="border-bottom:1px solid var(--border);background:var(--background);position:sticky;top:0;z-index:50;backdrop-filter:blur(8px);">
-      <nav style="display:flex;align-items:center;justify-content:space-between;max-width:42rem;margin:0 auto;padding:0 1.5rem;height:56px;">
-        <a href="/" style="font-family:var(--font-lipi-sans);font-weight:600;color:var(--foreground);text-decoration:none;font-size:0.95rem;">{SITE_TITLE}</a>
-        <div style="display:flex;align-items:center;gap:0.25rem;">
-          <a href="/" class="nav-link" style="padding:0.4rem 0.6rem;">Home</a>
-          <a href="/blog" class="nav-link" style="padding:0.4rem 0.6rem;">Articles</a>
-          <a href="/about" class="nav-link" style="padding:0.4rem 0.6rem;">About</a>
-          <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" style="margin-left:0.5rem;">&#9681;</button>
+    <header style="border-bottom:1px solid var(--border);background:var(--bg-alt);">
+      <nav style="max-width:860px;margin:0 auto;padding:0 1.5rem;display:flex;align-items:center;gap:1.5rem;height:48px;">
+        <a href="/" style="font-family:var(--font-mono);font-size:0.9rem;font-weight:700;color:var(--fg-bright);text-decoration:none;letter-spacing:-0.02em;">
+          ~/<span style="color:var(--green);">{SITE_TITLE}</span>
+        </a>
+        <div style="display:flex;gap:1rem;margin-left:auto;">
+          <a href="/" style="font-family:var(--font-mono);font-size:0.78rem;color:var(--fg-dim);text-decoration:none;">home</a>
+          <a href="/blog" style="font-family:var(--font-mono);font-size:0.78rem;color:var(--fg-dim);text-decoration:none;">articles</a>
+          <a href="/about" style="font-family:var(--font-mono);font-size:0.78rem;color:var(--fg-dim);text-decoration:none;">about</a>
         </div>
       </nav>
     </header>
-    <main style="padding:3rem 0 4rem;">
+    <main>
       <slot />
     </main>
-    <footer style="border-top:1px solid var(--border);padding:2.5rem 1.5rem;text-align:center;font-family:var(--font-lipi-sans);font-size:0.85rem;color:var(--muted-foreground);">
-      &copy; {new Date().getFullYear()} <a href="/">{SITE_TITLE}</a>. All rights reserved.<br />
-      Deep dives into autonomous coding assistants and the future of software development.<br />
-      <a href="https://github.com/NousResearch/hermes-agent" target="_blank" style="color:var(--muted-foreground);">GitHub</a>
+    <footer style="border-top:1px solid var(--border);background:var(--bg-alt);padding:1.5rem;text-align:center;">
+      <p style="font-family:var(--font-mono);font-size:0.7rem;color:var(--fg-dim);margin:0;">
+        {SITE_TITLE} — honest reviews, no sponsorships<br/>
+        <a href="https://github.com/Anshad2u/seo-ai-blog" style="color:var(--fg-dim);">source</a>
+      </p>
     </footer>
-    <script>
-      document.getElementById('theme-toggle')?.addEventListener('click', () => {
-        const html = document.documentElement;
-        const current = html.getAttribute('data-theme');
-        const next = current === 'dark' ? 'light' : 'dark';
-        html.setAttribute('data-theme', next);
-        html.style.colorScheme = next;
-        localStorage.setItem('theme', next);
-      });
-    </script>
   </body>
 </html>
