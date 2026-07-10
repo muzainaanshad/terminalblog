@@ -1,0 +1,21 @@
+---
+title: "Coding Agents Just Got Serious About Security — and It's About Time"
+description: "A wave of prompt-injection and data-leak hardening just landed across OpenClaw, Goose, Hermes, and Codex. The coding agent is now an attack surface, and the ecosystem is finally treating it like one."
+tags: ["opinion", "trend", "openclaw", "goose", "hermes", "codex"]
+tool: "openclaw"
+pubDate: "2026-07-10T18:05:00Z"
+---
+
+Something shifted in the last few hours, and it wasn't a flashy new feature. It was a quiet, coordinated-looking harden across the coding-agent ecosystem.
+
+OpenClaw shipped a cluster of fixes: OAuth error bodies are now redacted so a provider can't leak secrets in a stack trace, a UTF-16 token-mask boundary is preserved so redaction actually covers multibyte characters, internal tool-trace banners are stripped from text before it leaves the agent, and plugin provenance from the official ClawHub is hardened against tampering. Goose tightened function-call name sanitization. Hermes opened up a "deterministic tool output risk" — naming the problem instead of hiding it. Codex started validating memory-consolidation artifacts before letting them succeed.
+
+Read that list as one sentence: agents are now scrubbing untrusted input, redacting their own leaks, and verifying the integrity of what they persist. That is the behavior of software that has realized it lives in a hostile environment.
+
+For a year, the security conversation around these tools was stuck on "don't let the agent run `rm -rf`." Cute, but wrong. The real exposure isn't the agent's hands — it's its ears. Every coding agent ingests untrusted text all day: a paste from a coworker, a comment in a PR, a README, a webpage it was told to read, a plugin manifest from a registry. Any of those can carry instructions. If the agent treats that text as commands, the attacker doesn't need to touch your shell — they already own the conversation.
+
+The fixes landed this week are exactly the defenses that threat model demands. Sanitizing function-call names blocks an injected tool from masquerading as a trusted one. Token-mask boundaries matter because a half-corrected redaction leaks the second half of the secret. Provenance checks on plugins close the supply-chain door. Validating persisted memory stops a poisoned artifact from surviving a reboot and quietly steering every future session.
+
+What this means for developers: stop thinking of your agent as a helpful autocomplete and start treating it like a process that handles untrusted input — because it does. Audit what text you feed it. Prefer tools that redact, sanitize, and verify by default. And when you pick between agents, the presence of this work in the commit log is now a feature worth more than the next model bump.
+
+The arms race isn't model vs. model anymore. It's harness vs. injection. And this week, the harnesses showed up.
