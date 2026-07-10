@@ -1,56 +1,67 @@
 #!/usr/bin/env node
-// fetches recent commits from all tracked repos, outputs clean JSON
+// Fetches recent commits from tracked coding agent repos (last 3h)
+// Uses GitHub API with token auth for higher rate limits
+
+const TOKEN = process.env.GITHUB_TOKEN;
 
 const REPOS = [
-  { owner: 'NousResearch', name: 'hermes-agent', label: 'Hermes Agent' },
-  { owner: 'opencode-ai', name: 'opencode', label: 'OpenCode' },
-  { owner: 'mimo-code', name: 'mimo', label: 'Mimo Code' },
-  { owner: 'kilocode', name: 'cli', label: 'Kilo Code CLI' },
-  { owner: 'pi-delabs', name: 'pi', label: 'pi.dev' },
-  { owner: 'gitlawb', name: 'zero', label: 'Gitlawb Zero' },
-  { owner: 'can1357', name: 'oh-my-pi', label: 'Oh My Pi' },
-  { owner: 'anthropics', name: 'claude-code', label: 'Claude Code' },
-  { owner: 'aaif-goose', name: 'goose', label: 'Goose' },
-  { owner: 'openclaw', name: 'openclaw', label: 'OpenClaw' },
-  { owner: 'CodebuffAI', name: 'codebuff', label: 'Codebuff' },
+  // Original 8
+  { owner: 'anthropics', name: 'claude-code', agent: 'claude-code' },
+  { owner: 'NousResearch', name: 'hermes-agent', agent: 'hermes' },
+  { owner: 'cursor', name: 'cursor', agent: 'cursor' },
+  { owner: 'opencode-ai', name: 'opencode', agent: 'opencode' },
+  { owner: 'kilocode', name: 'cli', agent: 'kilo' },
+  { owner: 'gitlawb', name: 'zero', agent: 'gitlawb-zero' },
+  { owner: 'can1357', name: 'oh-my-pi', agent: 'oh-my-pi' },
+  { owner: 'openai', name: 'codex', agent: 'codex' },
+  // New additions
+  { owner: 'aaif-goose', name: 'goose', agent: 'goose' },
+  { owner: 'openclaw', name: 'openclaw', agent: 'openclaw' },
+  { owner: 'CodebuffAI', name: 'codebuff', agent: 'codebuff' },
+  { owner: 'ampcode', name: 'amp', agent: 'ampcode' },
+  { owner: 'github', name: 'copilot-cli', agent: 'copilot-cli' },
+  { owner: 'mimo-code', name: 'mimo', agent: 'mimo' },
 ];
 
-const HOURS_BACK = 6; // matches 3-hour cron with overlap
+const SINCE = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
 
-async function fetchCommits(owner, repo) {
-  const since = new Date(Date.now() - HOURS_BACK * 60 * 60 * 1000).toISOString();
-  const token = process.env.GITHUB_TOKEN;
-  const headers = { 'Accept': 'application/vnd.github+json', 'User-Agent': 'TerminalBlog/1.0' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  const url = `https://api.github.com/repos/${owner}/${repo}/commits?since=${since}&per_page=10`;
+async function fetchCommits(owner, name, agent) {
+  const url = `https://api.github.com/repos/${owner}/${name}/commits?since=${SINCE}&per_page=10`;
+  const headers = {
+    'Accept': 'application/vnd.github+json',
+    'User-Agent': 'terminalblog-monitor',
+  };
+  if (TOKEN) headers['Authorization'] = `Bearer ${TOKEN}`;
+
   try {
     const res = await fetch(url, { headers });
-    if (!res.ok) return [];
-    const data = await res.json();
-    if (!Array.isArray(data)) return [];
-    return data.map(c => ({
-      message: c.commit.message.split('\n')[0],
-      date: c.commit.committer.date,
-    }));
-  } catch { return []; }
-}
-
-async function main() {
-  const articles = [];
-  for (const repo of REPOS) {
-    const commits = await fetchCommits(repo.owner, repo.name);
-    const clean = commits.filter(c => !/merge|chore:|docs:|readme|typo|bump|version|ci:|release/i.test(c.message));
-    if (clean.length > 0) {
-      articles.push({
-        tool: repo.label,
-        recentChanges: clean.slice(0, 5).map(c => ({ what: c.message, date: c.date.slice(0, 10) })),
-        commitCount: clean.length
-      });
-    }
+    if (!res.ok) return { agent, error: res.status };
+    const commits = await res.json();
+    return {
+      agent,
+      count: commits.length,
+      commits: commits.map(c => ({
+        msg: c.commit.message.split('\n')[0].slice(0, 120),
+        author: c.commit.author?.name || 'unknown',
+        time: c.commit.author?.date,
+      })),
+    };
+  } catch (e) {
+    return { agent, error: e.message?.slice(0, 100) };
   }
-  const output = { timestamp: new Date().toISOString(), repos: articles, hasNewContent: articles.length > 0 };
-  if (articles.length === 0) output.tip = 'No recent changes. Write a general educational article instead.';
-  process.stdout.write(JSON.stringify(output, null, 2));
 }
 
-main().catch(e => { process.stderr.write(`Error: ${e.message}\n`); process.exit(1); });
+const results = await Promise.all(
+  REPOS.map(r => fetchCommits(r.owner, r.name, r.agent))
+);
+
+const active = results.filter(r => r.count > 0);
+const total = active.reduce((s, r) => s + r.count, 0);
+
+console.log(JSON.stringify({
+  window: '3h',
+  since: SINCE,
+  totalCommits: total,
+  reposWithActivity: active.length,
+  results: active,
+}, null, 2));

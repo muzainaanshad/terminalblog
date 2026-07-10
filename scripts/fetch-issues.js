@@ -1,89 +1,67 @@
 #!/usr/bin/env node
-// Fetches recent GitHub issues from tracked coding agent repos
-// Outputs structured JSON for article generation
+// Fetches recent GitHub issues from tracked coding agent repos (last 3h)
+
+const TOKEN = process.env.GITHUB_TOKEN;
 
 const REPOS = [
-  { owner: 'NousResearch', name: 'hermes-agent', label: 'Hermes Agent' },
-  { owner: 'opencode-ai', name: 'opencode', label: 'OpenCode' },
-  { owner: 'mimo-code', name: 'mimo', label: 'Mimo Code' },
-  { owner: 'kilocode', name: 'cli', label: 'Kilo Code CLI' },
-  { owner: 'pi-delabs', name: 'pi', label: 'pi.dev' },
-  { owner: 'gitlawb', name: 'zero', label: 'Gitlawb Zero' },
-  { owner: 'can1357', name: 'oh-my-pi', label: 'Oh My Pi' },
-  { owner: 'anthropics', name: 'claude-code', label: 'Claude Code' },
-  { owner: 'aaif-goose', name: 'goose', label: 'Goose' },
-  { owner: 'openclaw', name: 'openclaw', label: 'OpenClaw' },
-  { owner: 'CodebuffAI', name: 'codebuff', label: 'Codebuff' },
+  { owner: 'anthropics', name: 'claude-code', agent: 'claude-code' },
+  { owner: 'NousResearch', name: 'hermes-agent', agent: 'hermes' },
+  { owner: 'opencode-ai', name: 'opencode', agent: 'opencode' },
+  { owner: 'openai', name: 'codex', agent: 'codex' },
+  { owner: 'cursor', name: 'cursor', agent: 'cursor' },
+  { owner: 'kilocode', name: 'cli', agent: 'kilo' },
+  { owner: 'gitlawb', name: 'zero', agent: 'gitlawb-zero' },
+  { owner: 'can1357', name: 'oh-my-pi', agent: 'oh-my-pi' },
+  { owner: 'aaif-goose', name: 'goose', agent: 'goose' },
+  { owner: 'openclaw', name: 'openclaw', agent: 'openclaw' },
+  { owner: 'CodebuffAI', name: 'codebuff', agent: 'codebuff' },
+  { owner: 'ampcode', name: 'amp', agent: 'ampcode' },
+  { owner: 'github', name: 'copilot-cli', agent: 'copilot-cli' },
 ];
 
-const HOURS_BACK = 48; // look at last 48h of issues
+const SINCE = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
 
-function parseIssue(body = '') {
-  if (!body) return '';
-  return body.replace(/```[\s\S]*?```/g, '').replace(/!\[.*?\]\(.*?\)/g, '').replace(/#{1,6}\s/g, '').trim().slice(0, 300);
-}
+async function fetchIssues(owner, name, agent) {
+  const url = `https://api.github.com/repos/${owner}/${name}/issues?state=all&since=${SINCE}&per_page=10&sort=created&direction=desc`;
+  const headers = {
+    'Accept': 'application/vnd.github+json',
+    'User-Agent': 'terminalblog-monitor',
+  };
+  if (TOKEN) headers['Authorization'] = `Bearer ${TOKEN}`;
 
-async function fetchIssues(owner, repo, label) {
-  const since = new Date(Date.now() - HOURS_BACK * 60 * 60 * 1000).toISOString();
-  const token = process.env.GITHUB_TOKEN;
-  const headers = { 'Accept': 'application/vnd.github+json', 'User-Agent': 'TerminalBlog/1.0' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  // Fetch recent issues (not PRs) + high-engagement open issues
-  const urls = [
-    `https://api.github.com/repos/${owner}/${repo}/issues?since=${since}&state=all&per_page=15&sort=updated`,
-  ];
-
-  const results = [];
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, { headers });
-      if (!res.ok) continue;
-      const data = await res.json();
-      if (!Array.isArray(data)) continue;
-
-      for (const issue of data) {
-        if (issue.pull_request) continue; // skip PRs
-        results.push({
-          number: issue.number,
-          title: issue.title,
-          state: issue.state,
-          labels: issue.labels?.map(l => l.name) || [],
-          comments: issue.comments,
-          created: issue.created_at,
-          updated: issue.updated_at,
-          body: parseIssue(issue.body),
-          url: issue.html_url,
-        });
-      }
-    } catch { /* skip */ }
+  try {
+    const res = await fetch(url, { headers });
+    if (!res.ok) return { agent, error: res.status };
+    const issues = await res.json();
+    return {
+      agent,
+      count: issues.length,
+      issues: issues.map(i => ({
+        title: i.title,
+        number: i.number,
+        url: i.html_url,
+        state: i.state,
+        comments: i.comments,
+        labels: i.labels?.map(l => l.name) || [],
+        time: i.created_at,
+      })),
+    };
+  } catch (e) {
+    return { agent, error: e.message?.slice(0, 100) };
   }
-
-  return { repo: `${owner}/${repo}`, label, issues: results };
 }
 
-async function main() {
-  const results = await Promise.all(
-    REPOS.map(r => fetchIssues(r.owner, r.name, r.label))
-  );
+const results = await Promise.all(
+  REPOS.map(r => fetchIssues(r.owner, r.name, r.agent))
+);
 
-  const totalIssues = results.reduce((s, r) => s + r.issues.length, 0);
+const active = results.filter(r => r.count > 0);
+const total = active.reduce((s, r) => s + r.count, 0);
 
-  // Sort by engagement (comments) and recency
-  const allIssues = results.flatMap(r =>
-    r.issues.map(i => ({ ...i, repo: r.repo, repoLabel: r.label }))
-  ).sort((a, b) => b.comments - a.comments);
-
-  process.stdout.write(JSON.stringify({
-    fetchedAt: new Date().toISOString(),
-    windowHours: HOURS_BACK,
-    totalIssues,
-    repos: results.map(r => ({ repo: r.repo, label: r.label, count: r.issues.length })),
-    topIssues: allIssues.slice(0, 20),
-  }, null, 2));
-}
-
-main().catch(e => {
-  process.stderr.write(`Error: ${e.message}\n`);
-  process.exit(1);
-});
+console.log(JSON.stringify({
+  window: '3h',
+  since: SINCE,
+  totalIssues: total,
+  reposWithActivity: active.length,
+  results: active,
+}, null, 2));
