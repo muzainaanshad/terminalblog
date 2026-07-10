@@ -8,6 +8,17 @@ const posts = (await getCollection('blog')).sort(
   (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
 );
 
+// Collect all unique tags with counts
+const tagCounts: Record<string, number> = {};
+posts.forEach(p => {
+  (p.data.tags || []).forEach(t => {
+    tagCounts[t] = (tagCounts[t] || 0) + 1;
+  });
+});
+const allTags = Object.entries(tagCounts)
+  .sort((a, b) => b[1] - a[1])
+  .map(([tag, count]) => ({ tag, count }));
+
 const featureLabels: Record<string, string> = {
   vision: 'Vision', cron: 'Cron/Schedule', multiProvider: 'Multi-provider',
   gitIntegration: 'Git', pluginSystem: 'Plugins', subagents: 'Subagents',
@@ -19,31 +30,60 @@ const featureLabels: Record<string, string> = {
   <div class="content" style="max-width:860px;">
 
     <!-- Hero -->
-    <section style="text-align:center;padding:3rem 0 1rem;">
+    <section style="text-align:center;padding:2.5rem 0 0.5rem;">
       <h1 style="font-size:2.5rem;margin:0 0 0.5rem;letter-spacing:-0.02em;">
         terminalblog<span class="cursor-blink"></span>
       </h1>
       <p style="font-size:1rem;color:var(--fg-dim);max-width:32rem;margin:0 auto;line-height:1.6;">
         Following the AI coding agent ecosystem — Claude Code, Cursor, Hermes, Codex, and everything in between.
       </p>
-    </section>
-
-    <!-- Quick stats -->
-    <section class="stat-grid" style="grid-template-columns:repeat(2,1fr);max-width:24rem;margin:1.5rem auto;">
-      <div class="stat-box">
-        <div class="stat-num">{agents.length}</div>
-        <div class="stat-label">Agents tracked</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-num">3h</div>
-        <div class="stat-label">Blog updated every</div>
+      <div style="display:flex;gap:1.5rem;justify-content:center;margin-top:1rem;font-family:var(--font-mono);font-size:0.75rem;color:var(--fg-dim);">
+        <span><span style="color:var(--green);">{agents.length}</span> agents tracked</span>
+        <span><span style="color:var(--green);">{posts.length}</span> articles</span>
+        <span>updated <span style="color:var(--green);">every 3h</span></span>
       </div>
     </section>
 
-    <!-- Agent comparison table -->
-    <section style="margin:2.5rem 0;">
-      <h2 style="font-size:1.2rem;margin-bottom:1rem;">Agent comparison</h2>
-      <div style="overflow-x:auto;">
+    <!-- Tag filter bar -->
+    <section style="margin:1.5rem 0;position:sticky;top:0;z-index:10;background:var(--bg);padding:0.5rem 0;border-bottom:1px solid var(--border);">
+      <div style="display:flex;gap:0.4rem;overflow-x:auto;padding-bottom:0.3rem;scrollbar-width:none;" id="tag-bar">
+        <button class="tag-btn active" data-tag="all">all <span style="opacity:0.5;">{posts.length}</span></button>
+        {allTags.slice(0, 20).map(t => (
+          <button class="tag-btn" data-tag={t.tag}>{t.tag} <span style="opacity:0.5;">{t.count}</span></button>
+        ))}
+      </div>
+    </section>
+
+    <!-- Latest / Filtered posts -->
+    <section style="margin:1.5rem 0;" id="posts-section">
+      <div id="posts-list">
+        {posts.map(post => (
+          <a href={`/blog/${post.id}/`} class="post-item" data-tags={(post.data.tags || []).join(',')}>
+            <div style="flex:1;min-width:0;">
+              <div class="post-title">{post.data.title}</div>
+              <div class="post-meta">
+                {new Date(post.data.pubDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                {(post.data.tags || []).slice(0, 3).map(t => (
+                  <span class="post-tag">{t}</span>
+                ))}
+              </div>
+            </div>
+            <span class="post-arrow">→</span>
+          </a>
+        ))}
+      </div>
+      <div id="no-results" style="display:none;text-align:center;padding:2rem;color:var(--fg-dim);font-family:var(--font-mono);font-size:0.85rem;">
+        No articles match this filter.
+      </div>
+    </section>
+
+    <!-- Agent comparison table (collapsed by default) -->
+    <details style="margin:2rem 0;">
+      <summary style="cursor:pointer;font-size:1.1rem;font-weight:600;color:var(--fg-bright);padding:0.5rem 0;list-style:none;">
+        <span style="color:var(--green);font-family:var(--font-mono);margin-right:0.5rem;">#</span> Agent comparison table
+        <span style="float:right;font-size:0.75rem;color:var(--fg-dim);font-weight:normal;">click to expand</span>
+      </summary>
+      <div style="overflow-x:auto;margin-top:1rem;">
         <table class="compare-table">
           <thead>
             <tr>
@@ -69,12 +109,15 @@ const featureLabels: Record<string, string> = {
           </tbody>
         </table>
       </div>
-    </section>
+    </details>
 
-    <!-- All agents grid -->
-    <section style="margin:2.5rem 0;">
-      <h2 style="font-size:1.2rem;margin-bottom:1rem;">All agents</h2>
-      <div class="agent-grid">
+    <!-- Agent grid (collapsed) -->
+    <details style="margin:2rem 0;">
+      <summary style="cursor:pointer;font-size:1.1rem;font-weight:600;color:var(--fg-bright);padding:0.5rem 0;list-style:none;">
+        <span style="color:var(--green);font-family:var(--font-mono);margin-right:0.5rem;">#</span> All agents
+        <span style="float:right;font-size:0.75rem;color:var(--fg-dim);font-weight:normal;">click to expand</span>
+      </summary>
+      <div class="agent-grid" style="margin-top:1rem;">
         {agents.map(agent => (
           <a href={`/tool/${agent.id}/`} class="agent-card">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.4rem;">
@@ -97,29 +140,7 @@ const featureLabels: Record<string, string> = {
           </a>
         ))}
       </div>
-    </section>
-
-    <!-- Latest posts -->
-    <section style="margin:2.5rem 0;">
-      <h2 style="font-size:1.2rem;margin-bottom:1rem;">Latest</h2>
-      <div>
-        {posts.slice(0, 10).map(post => (
-          <a href={`/blog/${post.id}/`} class="post-item">
-            <div>
-              <div class="post-title">{post.data.title}</div>
-              <div class="post-meta">
-                {new Date(post.data.pubDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                {post.data.tags?.includes('opinion') ? <span style="margin-left:0.5rem;color:var(--amber);">opinion</span> : null}
-              </div>
-            </div>
-            <span class="post-arrow">→</span>
-          </a>
-        ))}
-      </div>
-      <div style="text-align:center;margin-top:1.5rem;">
-        <a href="/blog" style="font-family:var(--font-mono);font-size:0.8rem;color:var(--green);">view all {posts.length} articles →</a>
-      </div>
-    </section>
+    </details>
 
     <!-- CLI tool promotion -->
     <section style="margin:2.5rem 0;padding:1.5rem;border:1px solid var(--border);border-radius:10px;background:var(--bg-alt);text-align:center;">
@@ -135,4 +156,72 @@ const featureLabels: Record<string, string> = {
     </section>
 
   </div>
+
+  <style>
+    .tag-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--fg-dim);
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .tag-btn:hover {
+      border-color: var(--green);
+      color: var(--fg);
+    }
+    .tag-btn.active {
+      background: var(--green);
+      color: #000;
+      border-color: var(--green);
+      font-weight: 600;
+    }
+    .post-tag {
+      display: inline-block;
+      font-size: 0.6rem;
+      padding: 0.05rem 0.35rem;
+      border-radius: 4px;
+      background: var(--border);
+      color: var(--fg-dim);
+      font-family: var(--font-mono);
+      margin-left: 0.3rem;
+    }
+    .post-item {
+      transition: background 0.1s;
+    }
+    .post-item:hover {
+      background: var(--bg-alt);
+    }
+  </style>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const tagBtns = document.querySelectorAll('.tag-btn');
+      const posts = document.querySelectorAll('#posts-list .post-item');
+      const noResults = document.getElementById('no-results');
+      let activeTag = 'all';
+
+      tagBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeTag = btn.getAttribute('data-tag') || 'all';
+          tagBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+
+          let visible = 0;
+          posts.forEach(post => {
+            const tags = post.getAttribute('data-tags') || '';
+            const match = activeTag === 'all' || tags.split(',').includes(activeTag);
+            (post as HTMLElement).style.display = match ? '' : 'none';
+            if (match) visible++;
+          });
+
+          if (noResults) noResults.style.display = visible === 0 ? 'block' : 'none';
+        });
+      });
+    });
+  </script>
 </Layout>
