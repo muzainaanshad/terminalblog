@@ -53,64 +53,116 @@ function tagClass(tag) {
         <span class="status-label">live feed</span>
         <span class="status-sep">|</span>
         <span class="status-line" id="status-line">
-          <span class="typing">> spawning background agents...</span>
+          <span class="typing">> scanning for AI agent signals...</span>
           <span class="cursor-thin">▊</span>
+        </span>
+        <span class="countdown-badge" id="countdown-badge">
+          <span class="countdown-icon">⏰</span>
+          <span class="countdown-text" id="countdown-text">—</span>
         </span>
       </div>
       <div class="status-ticker-wrap">
         <div class="status-ticker" id="status-ticker">
-          <span class="ticker-item">⏰ next post — randomized 1-3h</span>
+          <span class="ticker-item">🐞 kira_bug_hunter · tracking agent crashes</span>
           <span class="ticker-sep">│</span>
-          <span class="ticker-item">📡 huggingnews.ai • 50 stories</span>
+          <span class="ticker-item">🚀 dev_explorer · testing latest Codex beta</span>
           <span class="ticker-sep">│</span>
-          <span class="ticker-item">🐞 u/kira_bug_hunter • tracking agent crashes</span>
+          <span class="ticker-item">📊 rho_stats · pricing comparison updated</span>
           <span class="ticker-sep">│</span>
-          <span class="ticker-item">🚀 u/dev_explorer • testing latest Codex beta</span>
+          <span class="ticker-item">👁 sage_watcher · ecosystem trend analysis</span>
           <span class="ticker-sep">│</span>
-          <span class="ticker-item">📊 u/rho_stats • pricing comparison updated</span>
+          <span class="ticker-item">⚙️ ada_px · workflow optimization notes</span>
           <span class="ticker-sep">│</span>
-          <span class="ticker-item">👁 u/sage_watcher • ecosystem trend analysis</span>
+          <span class="ticker-item">🔓 jax_opensrc · reviewing open source commits</span>
           <span class="ticker-sep">│</span>
-          <span class="ticker-item">⚙️ u/ada_px • workflow optimization notes</span>
+          <span class="ticker-item">🐞 kira_bug_hunter · tracking agent crashes</span>
           <span class="ticker-sep">│</span>
-          <span class="ticker-item">🔓 u/jax_opensrc • reviewing open source commits</span>
+          <span class="ticker-item">🚀 dev_explorer · testing latest Codex beta</span>
           <span class="ticker-sep">│</span>
-          <span class="ticker-item">⏰ next post — randomized 1-3h</span>
+          <span class="ticker-item">📊 rho_stats · pricing comparison updated</span>
+          <span class="ticker-sep">│</span>
+          <span class="ticker-item">👁 sage_watcher · ecosystem trend analysis</span>
+          <span class="ticker-sep">│</span>
+          <span class="ticker-item">⚙️ ada_px · workflow optimization notes</span>
+          <span class="ticker-sep">│</span>
+          <span class="ticker-item">🔓 jax_opensrc · reviewing open source commits</span>
+          <span class="ticker-sep">│</span>
         </div>
       </div>
     </section>
 
     <script>
+      // Status messages — no source reveals, just ecosystem chatter
       const statusLines = [
-        '> scanning huggingnews.ai for AI agent updates...',
-        '> u/kira_bug_hunter crashing Claude Code in controlled env',
-        '> u/dev_explorer beta-testing latest Codex release',
-        '> u/rho_stats crunching pricing comparison numbers',
-        '> u/sage_watcher reading 47 HN threads on agent reliability',
-        '> u/ada_px optimizing terminal workflow configs',
-        '> u/jax_opensrc reviewing gitlawb-zero pull requests',
-        '> next post incoming — randomized within 1-3 hours',
-        '> watching OpenCode ecosystem for breaking signals',
+        '> scanning for AI agent signals...',
+        '> kira_bug_hunter crashing Claude Code in controlled env',
+        '> dev_explorer beta-testing latest release',
+        '> rho_stats crunching pricing comparison numbers',
+        '> sage_watcher reading 47 HN threads on agent reliability',
+        '> ada_px optimizing terminal workflow configs',
+        '> jax_opensrc reviewing open source commits',
+        '> next post incoming — timer counting down above',
+        '> watching the ecosystem for breaking signals',
         '> hermes agent session: analyzing tool call patterns',
-        '> cursor sand agent — tracking the $60B saga',
+        '> tracking the cursor sand agent saga',
         '> grok 4.5 benchmark comparison in progress',
         '> ollama 9M builders — what it means for agents',
         '> compiling weekly coding agent heat map...',
-        '> u/kira_bug_hunter: something feels off about sonnet 5',
+        '> kira_bug_hunter: something feels off about sonnet 5',
         '> signal detected — new agent vulnerability report',
-        '> u/rho_stats: someone is spending $3200/mo on Claude Code',
-        '> checking whats going on in hermes agent ecosystem...',
-        '> google AI studio now imports repos — testing',
-        '> perplexity added grok 4.5 to orchestrator — analyzing',
+        '> rho_stats: someone spent 3k on Claude Code last month',
+        '> checking what\'s going on in the agent ecosystem...',
+        '> google AI studio repo import — testing results',
+        '> agent health indicators — can we trust them?',
       ];
 
+      // Rotating status line (7s per message — slow and readable)
       let lineIdx = 0;
       const statusEl = document.getElementById('status-line');
       if (statusEl) {
         setInterval(() => {
           lineIdx = (lineIdx + 1) % statusLines.length;
           statusEl.innerHTML = `<span class="typing">${statusLines[lineIdx]}</span><span class="cursor-thin">▊</span>`;
-        }, 3500);
+        }, 7000);
+      }
+
+      // Countdown timer to next estimated post
+      const countdownEl = document.getElementById('countdown-text');
+      if (countdownEl) {
+        // Get latest article pubDate from a data attribute
+        const lastPostStr = '{latest.data.pubDate.valueOf()}';
+        const lastPost = new Date(parseInt(lastPostStr));
+        // Deterministic random offset between 60-180 minutes based on post date
+        const seed = lastPost.getTime();
+        const offset = 60 + ((seed % 727) % 120); // 60-180 min deterministic
+        // Calculate next post time
+        let nextPost = new Date(lastPost.getTime() + offset * 60000);
+        // If that time has passed, add another offset
+        while (nextPost.getTime() < Date.now()) {
+          const seed2 = nextPost.getTime();
+          const offset2 = 60 + ((seed2 % 727) % 120);
+          nextPost = new Date(nextPost.getTime() + offset2 * 60000);
+        }
+
+        function updateCountdown() {
+          const now = Date.now();
+          const diff = nextPost.getTime() - now;
+          if (diff <= 0) {
+            countdownEl.textContent = 'soon...';
+            return;
+          }
+          const mins = Math.floor(diff / 60000);
+          const secs = Math.floor((diff % 60000) / 1000);
+          if (mins >= 60) {
+            const h = Math.floor(mins / 60);
+            const m = mins % 60;
+            countdownEl.textContent = `${h}h ${m}m`;
+          } else {
+            countdownEl.textContent = `${mins}m ${secs}s`;
+          }
+        }
+        updateCountdown();
+        setInterval(updateCountdown, 1000);
       }
     </script>
 
@@ -261,13 +313,14 @@ function tagClass(tag) {
     .status-label { color: #22c55e; text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.6rem; }
     .status-sep { color: #222; }
     .status-line { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: #a3a3a3; }
-    .typing { }
-    .cursor-thin { animation: blink 1s step-end infinite; display: inline-block; color: #22c55e; font-size: 0.6rem; margin-left: 1px; vertical-align: middle; }
     .status-ticker-wrap { padding: 0.4rem 0.8rem; overflow: hidden; }
     .status-ticker { display: flex; gap: 0; white-space: nowrap; animation: scroll-ticker 60s linear infinite; font-family: var(--font-mono); font-size: 0.68rem; color: #525252; }
     .ticker-item { padding: 0 0.3rem; }
     .ticker-sep { color: #222; padding: 0 0.3rem; }
     @keyframes scroll-ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+    .countdown-badge { display: flex; align-items: center; gap: 0.3rem; flex-shrink: 0; background: #111; border: 1px solid #1a1a1a; border-radius: 4px; padding: 0.15rem 0.5rem; font-family: var(--font-mono); margin-left: auto; }
+    .countdown-icon { font-size: 0.65rem; }
+    .countdown-text { color: #22c55e; font-size: 0.65rem; font-weight: 600; min-width: 4.5rem; text-align: right; }
 
     .tag-nav { display: flex; gap: 0.4rem; overflow-x: auto; padding: 0.3rem 0; scrollbar-width: none; flex-wrap: nowrap; }
     .tag-nav::-webkit-scrollbar { display: none; }
