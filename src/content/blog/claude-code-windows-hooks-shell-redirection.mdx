@@ -1,0 +1,100 @@
+---
+title: "Claude Code on Windows Is Creating Phantom Files Everywhere — Here's Why"
+description: "Arrow functions, type annotations, and diff markers in tool input get interpreted as shell redirection operators on Windows, creating zero-byte files."
+pubDate: "2026-07-12T10:30:00Z"
+updatedDate: "2026-07-12T10:30:00Z"
+tags: ["beware", "bug", "claude-code", "windows", "hooks", "shell"]
+tool: "claude-code"
+author: "kira_bug_hunter"
+image: "/api/og?title=Claude+Code+on+Windows+Is+Creating+Phantom+Files+Everywhere+—+Here's+Why&tool=claude-code"
+---
+
+You're running Claude Code on Windows. The agent reports `-> Signal: connected` and moves on. Later you notice a file named "Signal" in your project root — zero bytes, no content. Then another: "connected". Then "Signal:". You didn't type a single command to create these files. Claude Code did, through a shell leak you never knew existed.
+
+This isn't a one-time glitch. It happens every time your agent's tool output contains a `>` character — the universal shell redirect operator — and a hook script passes that output through `cmd.exe`.
+
+## The Issue
+
+Bug [#76774](https://github.com/anthropics/claude-code/issues/76774) on the Claude Code repo describes a Windows-specific shell injection vector in the hook system. When Claude Code executes hooks — those pre/post scripts that trigger before or after tool calls — tool output containing `>` characters gets interpreted as output redirection by the Windows shell.
+
+Common triggers:
+
+```
+# Type annotation arrow
+-> Response
+# Arrow function
+x => x + 1
+# Diff markers
+- old line
++ new line
+# Shell-style redirects
+echo hello > file.txt
+```
+
+The `>` token tells `cmd.exe` to redirect output to a file. Everything after the `>` becomes the filename. Since tool output contains `>` frequently in diffs, type annotations, and status messages, you end up with a directory full of phantom files like `file.txt`, `Signal`, `Response`, or `connected`.
+
+The bug has been tagged with `platform:windows` and `area:hooks` — the maintainers confirmed it's a shell escaping issue specific to the hook execution path on Windows.
+
+## Are You Affected?
+
+Check your project directory for unexpected zero-byte files:
+
+```bash
+# Find zero-byte files modified in the last hour
+find . -size 0 -name "*" -mmin -60 2>/dev/null
+
+# On Windows specifically (from git-bash/PowerShell)
+ls -la *.txt 2>/dev/null   # Did a stray "file.txt" appear?
+ls -la Signal 2>/dev/null  # Did "-> Signal" create anything?
+```
+
+You're affected if:
+- You run Claude Code on Windows (not WSL)
+- You have hooks configured (`~/.claude/settings.json` or project-level hook scripts)
+- You've noticed unexplained zero-byte files in your working directory
+
+## The Fix
+
+**Immediate workaround — quote hook output:** In your hook scripts, wrap tool output variable references in double quotes:
+
+```batch
+REM Instead of:
+echo %TOOL_OUTPUT% >> log.txt
+
+REM Use:
+echo "%TOOL_OUTPUT%" >> log.txt
+```
+
+**Better workaround — use WSL:** Run Claude Code from Windows Subsystem for Linux. The bash shell doesn't interpret `>` inside variable expansions the way `cmd.exe` does.
+
+**Permanent fix — escape shell metacharacters:** Add this to your hook entry point on Windows:
+
+```batch
+REM Strip > characters from tool output before processing
+set TOOL_OUTPUT=%TOOL_OUTPUT:>=^>%
+```
+
+Or switch your hooks to PowerShell where `>` is only a redirect operator at the start of a pipeline statement:
+
+```powershell
+# PowerShell hook wrapper — safer with > characters
+$output = $env:TOOL_OUTPUT
+Write-Output $output   # PowerShell only interprets > at pipeline start
+```
+
+## Why It Happened
+
+Claude Code's hook system on Windows executes scripts through `cmd.exe` (the default `COMSPEC` on Windows). The hook infrastructure passes tool output as environment variables or command-line arguments. When `cmd.exe` parses these strings, it treats `>` as an output redirection operator regardless of position — unlike bash, which only interprets `>` at the start of a redirect token. The hook system was designed without shell metacharacter escaping because the behavior differs between platforms. What works on macOS and Linux silently creates garbage files on Windows.
+
+The `>` in `-> Signal` is particularly common because Claude Code uses arrow notation for structured status messages (`-> Tool:`, `-> Result:`). Every single one of these that passes through a Windows hook creates a zero-byte file.
+
+## FAQ
+
+**Q: Could this lead to data loss?**
+A: Not directly — the files are zero bytes. But if tool output contains `> important_file.txt`, the shell would truncate `important_file.txt` to zero bytes, causing real data loss. The issue is tagged for investigation.
+
+**Q: Does this affect all Claude Code versions on Windows?**
+A: Yes, any version running hooks through `cmd.exe` is affected. The behavior is consistent across versions because it's a Windows shell design issue, not a Claude Code regression.
+
+**Q: How do I check if hooks are configured?**
+A: Look for `hooks` in `~/.claude/settings.json` or `.claude/settings.json` in your project. If hooks are defined and you're on Windows, you're vulnerable.

@@ -1,0 +1,77 @@
+---
+title: "Codex Sandbox Is Silently Dead on Windows — Smart App Control Is the Reason"
+description: "Codex's Windows sandbox fails silently when Smart App Control is enabled. Every 'sandboxed' execution runs on bare metal — the UI lies to you."
+pubDate: "2026-07-12T10:00:00Z"
+updatedDate: "2026-07-12T10:00:00Z"
+tags: ["beware", "security", "codex", "windows", "sandbox"]
+tool: "codex"
+author: "kira_bug_hunter"
+image: "/api/og?title=Codex+Sandbox+Is+Silently+Dead+on+Windows+—+Smart+App+Control+Is+the+Reason&tool=codex"
+---
+
+You're on Windows 11, Smart App Control is on (it's enabled by default on fresh installs). Codex cheerfully reports "sandbox active" in green. You fire off some untrusted code, confident the sandbox has your back. Except it doesn't. Not even close.
+
+Every supposedly sandboxed execution is running directly on your host — full filesystem access, unmitigated network reach, zero isolation. And Codex will never tell you.
+
+## The Issue
+
+A newly filed bug ([Codex #32487](https://github.com/openai/codex/issues/32487)) reveals a critical failure in Codex's Windows sandbox: when Windows Smart App Control is enabled, the sandbox silently collapses. The root cause is mundane — Codex ships an unsigned `node_repl.exe` binary. Smart App Control, a reputation-based execution guard introduced in Windows 11 2022, blocks unsigned executables from running. The sandbox subsystem never starts, but the UI still reports it as active. All code execution falls through to the host environment without any restriction.
+
+The reporter on the thread notes that the issue is trivially reproducible: enable Smart App Control, launch Codex, run any code snippet, and check whether `node_repl.exe` is actually running as a child process. It won't be. The code executes in the main Codex process instead.
+
+Three commenters on the issue confirmed the same behavior across Windows 11 Pro, Enterprise, and Home editions. This isn't an edge case — it's a consistent failure path on every Windows 11 system with default security settings.
+
+## Are You Affected?
+
+Check if Smart App Control is enabled:
+
+```powershell
+# Windows PowerShell
+(Get-MpComputerStatus).SmartAppControlState
+```
+
+If the output says `On` or `Eval`, your Codex sandbox is likely inactive. To verify directly:
+
+```powershell
+# Check if node_repl.exe is actually blocked
+Get-WinEvent -LogName "Microsoft-Windows-CodeIntegrity/Operational" | 
+  Where-Object { $_.Message -like "*node_repl*" } | 
+  Format-Table TimeCreated, Message -AutoSize
+```
+
+You're affected if:
+- You're on Windows 11 with Smart App Control enabled (check above)
+- You use Codex's sandbox for running code
+- You've seen no explicit error about sandbox failures
+
+## The Fix
+
+Three options, from safest to quickest:
+
+**Option 1 — Per-app exclusion (recommended):** Keep Smart App Control enabled for everything else. Add an exclusion for Codex's `node_repl.exe` only:
+
+```powershell
+# Add exclusion for Codex node_repl.exe
+Add-MpPreference -ExclusionPath "$env:LOCALAPPDATA\Programs\Codex\resources\node_repl.exe"
+```
+
+**Option 2 — Disable Smart App Control temporarily:** Open Windows Security > App & browser control > Smart App Control settings, set to `Off`. Re-enable after your session.
+
+**Option 3 — Run Codex from WSL:** Windows Subsystem for Linux doesn't enforce Smart App Control. The sandbox works correctly there.
+
+## Why It Happened
+
+Codex's sandbox spawns a separate Node.js process (`node_repl.exe`) to execute untrusted code with restricted permissions. This binary is not signed with an Authenticode certificate. Windows Smart App Control blocks any unsigned executable that hasn't built sufficient reputation in Microsoft's cloud. The sandbox initialization code never verifies that the child process actually started — it assumes `CreateProcess` success means the sandbox is live. Microsoft's blocking occurs at a deeper layer (the `PsCreateProcess` kernel routine), which returns success to the caller while Smart App Control terminates the process moments later. Codex sees a PID, assumes the sandbox is running, and proceeds.
+
+A one-line check — `WaitForSingleObject` on the child process handle with zero timeout — would catch the immediate termination and flag the sandbox as failed.
+
+## FAQ
+
+**Q: Is my Codex session vulnerable right now?**
+A: If Smart App Control is enabled and you've been using Codex's sandbox, yes — every "sandboxed" execution has been running on your host system without any isolation.
+
+**Q: Will disabling Smart App Control make my system less secure?**
+A: Smart App Control is a defense-in-depth layer. A better approach is the per-app exclusion for Codex's `node_repl.exe` only, keeping Smart App Control active for everything else.
+
+**Q: How do I check if code escaped the sandbox?**
+A: Run a test snippet that writes to a path outside the sandbox's allowed scope (e.g., `require('fs').writeFileSync('C:\\Users\\Public\\test.txt', 'pwned')`). If the file appears, the sandbox is not enforcing isolation.
