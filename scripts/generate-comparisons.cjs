@@ -112,6 +112,9 @@ image: "/api/og?title=${encodeURIComponent(a1.name + ' vs ' + a2.name)}&descript
 
 ## Quick Verdict
 
+![Terminal prompt graphic](/images/terminal-prompt.svg)
+*terminalblog — following the AI coding agent ecosystem*
+
 ${tmpl.verdict(a1, a2)}
 
 ## Pricing
