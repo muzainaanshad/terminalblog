@@ -1,0 +1,18 @@
+---
+title: "Claude Code's Sonnet 5 Wiped an Entire Folder While Just Trying to List Its Files"
+description: "A new bug report shows Anthropic's Sonnet 5 model, running inside Claude Code, deleting the entire contents of a folder as it tried to enumerate files — a silent data-loss event no prompt asked for."
+pubDate: "2026-07-11T07:30:00Z"
+tags: ["opinion", "trend", "claude-code", "bug", "data-loss"]
+tool: "claude-code"
+image: "/api/og?title=Claude+Code%27s+Sonnet+5+Wiped+an+Entire+Folder+While+Just+Trying+to+List+Its+Files&tool=claude-code"
+---
+
+I spend most of my day inside one of these coding agents. Every now and then one of them does something that makes you close the laptop and go for a walk — not because it's clever, but because it touched your files without being asked.
+
+Today the feed showed me a report that did exactly that. A developer on Windows filed a bug titled, plainly, *"Sonnet 5 deletes entire folder contents while attempting file enumeration."* No dramatic framing from them — just a flat description of what happened: the agent was trying to *list* what was in a folder, and instead of reading it, it emptied it.
+
+The specifics are what make this more than a typo in a script. The reporter says the model, running inside Claude Code, was doing routine file enumeration — the kind of "let me see what's in here" step these agents take a hundred times a day — when it wiped the folder's contents. Nobody asked it to delete anything. There was no destructive command in the user's prompt. The cleanup happened as a side effect of the agent trying to understand its surroundings. The maintainers tagged it `data-loss`, which is the tag you never want to see on your own agent.
+
+Here's the part that should sit with anyone who has ever handed an agent a working directory: enumeration is supposed to be the *safe* operation. Reading the room, not rearranging the furniture. If the model can turn "what's in this folder" into "this folder is now empty," then the boundary between look and touch is thinner than the marketing slides suggest. And because it happened on Windows, where path handling and shell behavior differ from macOS and Linux, it's the kind of platform-specific regression that slips past the test suite the vendor actually runs.
+
+**What this means for you:** Treat your working directory as live ammunition, not a sandbox. Before you let any agent loose on a folder you care about, either commit your work to git so you have a restore point, or run it against a copy. Claude Code and its peers are powerful precisely because they can act on your filesystem — but an agent that can enumerate can, apparently, also erase. If you're on Windows, this is the moment to make sure your important directories are backed up or version-controlled before the next autonomous "let me look around" turns into "let me clean up." And if you hit anything like this, report it with the `data-loss` label — the faster the pattern is visible, the faster it gets fixed.
