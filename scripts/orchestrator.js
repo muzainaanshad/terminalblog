@@ -28,13 +28,13 @@ const [commits, discussions, issues, blogs, youtube] = await Promise.all([
   Promise.resolve(run('fetch-youtube.js')),
 ]);
 
-console.log('=== RECENT COMMITS (3h) ===');
+console.log('=== SIGNAL STREAM 1/5 ===');
 console.log(commits);
-console.log('\n=== COMMUNITY DISCUSSIONS (3h) ===');
+console.log('\n=== SIGNAL STREAM 2/5 ===');
 console.log(discussions);
-console.log('\n=== GITHUB ISSUES (3h) ===');
+console.log('\n=== SIGNAL STREAM 3/5 ===');
 console.log(issues);
-console.log('\n=== OFFICIAL BLOGS (3h) ===');
+console.log('\n=== SIGNAL STREAM 4/5 ===');
 console.log(blogs);
-console.log('\n=== YOUTUBE (24h) ===');
+console.log('\n=== SIGNAL STREAM 5/5 ===');
 console.log(youtube);
