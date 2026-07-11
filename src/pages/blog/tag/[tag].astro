@@ -3,6 +3,24 @@ import Layout from '../../../layouts/Layout.astro';
 import { SITE_TITLE } from '../../../consts';
 import { getCollection } from 'astro:content';
 
+const toolNames: Record<string, string> = {
+  hermes: 'Hermes Agent',
+  opencode: 'OpenCode',
+  mimo: 'Mimo Code',
+  kilo: 'Kilo Code CLI',
+  'pi-dot-dev': 'pi.dev',
+  'gitlawb-zero': 'Gitlawb Zero',
+  'oh-my-pi': 'Oh My Pi',
+  'claude-code': 'Claude Code',
+  goose: 'Goose',
+  openclaw: 'OpenClaw',
+  codebuff: 'Codebuff',
+  cursor: 'Cursor',
+  codex: 'OpenAI Codex',
+  ampcode: 'AmpCode',
+  'copilot-cli': 'GitHub Copilot CLI',
+};
+
 export async function getStaticPaths() {
   const posts = await getCollection('blog');
   const tags = new Set<string>();
@@ -16,23 +34,31 @@ export async function getStaticPaths() {
 }
 
 const { tag } = Astro.props;
+
+// If tag is a known tool, redirect to the tool page
+const toolTag = toolNames[tag];
+if (toolTag) {
+  Astro.response.status = 302;
+  Astro.response.headers.set('Location', `/tool/${tag}/`);
+}
+
 const allPosts = (await getCollection('blog'))
   .filter(p => (p.data.tags || []).includes(tag))
   .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
 ---
 
 <Layout title={`#${tag} — ${SITE_TITLE}`} description={`Articles tagged with #${tag}`}>
-  <div class="content">
-    <h1 style="font-size:1.75rem;margin-bottom:0.5rem;">#<span style="color:var(--primary);">{tag}</span></h1>
-    <p style="color:var(--muted-foreground);margin-bottom:2.5rem;font-size:0.9rem;">{allPosts.length} article{allPosts.length !== 1 ? 's' : ''}</p>
+  <div class="content" style="max-width:860px;margin:0 auto;padding:0 1.5rem;">
+    <h1 style="font-size:1.75rem;margin-bottom:0.5rem;">#<span style="color:var(--green);">{tag}</span></h1>
+    <p style="color:var(--fg-dim);margin-bottom:2.5rem;font-size:0.85rem;font-family:var(--font-mono);">{allPosts.length} article{allPosts.length !== 1 ? 's' : ''}</p>
 
     <div style="display:flex;flex-direction:column;">
       {allPosts.map(post => (
-        <a href={`/blog/${post.id}/`} style="display:grid;grid-template-columns:6rem 1fr;gap:1rem;padding:0.75rem 0;text-decoration:none;color:var(--foreground);border-bottom:1px solid var(--border);transition:opacity 0.15s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">
-          <time style="font-family:var(--font-lipi-sans);font-size:0.8rem;color:var(--muted-foreground);padding-top:0.15rem;">{new Date(post.data.pubDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</time>
+        <a href={`/blog/${post.id}/`} style="display:grid;grid-template-columns:6rem 1fr;gap:1rem;padding:0.75rem 0;text-decoration:none;color:var(--fg);border-bottom:1px solid var(--border);transition:background 0.1s;" onmouseover="this.style.background='var(--bg-alt)'" onmouseout="this.style.background='transparent'">
+          <time style="font-family:var(--font-mono);font-size:0.75rem;color:var(--fg-dim);padding-top:0.1rem;">{new Date(post.data.pubDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</time>
           <div>
-            <span style="font-family:var(--font-lipi-sans);font-weight:500;font-size:0.95rem;line-height:1.4;">{post.data.title}</span>
-            <p style="margin:0.25rem 0 0;font-size:0.85rem;color:var(--muted-foreground);line-height:1.4;">{post.data.description?.substring(0, 150)}{post.data.description?.length > 150 ? '…' : ''}</p>
+            <span style="font-family:var(--font-mono);font-weight:600;font-size:0.85rem;line-height:1.4;color:var(--fg-bright);">{post.data.title}</span>
+            <p style="margin:0.25rem 0 0;font-size:0.8rem;color:var(--fg-dim);line-height:1.4;">{post.data.description?.substring(0, 130)}{post.data.description?.length > 130 ? '…' : ''}</p>
           </div>
         </a>
       ))}
