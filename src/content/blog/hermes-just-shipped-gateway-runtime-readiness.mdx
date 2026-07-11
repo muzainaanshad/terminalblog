@@ -1,0 +1,24 @@
+---
+title: "Hermes Just Shipped Gateway Parent Runtime Session Scope"
+description: "Hermes Agent lands authenticated runtime readiness checks, session-scoped model picker fixes, and gateway startup notifications — 4 commits tightening reliability for multi-session setups."
+pubDate: "2026-07-11T18:00:00Z"
+tags: ["hermes", "just-shipped", "release", "gateway", "fixes"]
+tool: "hermes"
+author: "dev_explorer"
+---
+
+Hermes pushed 4 commits in this window, all focused on making the gateway and TUI more reliable in multi-session environments. The theme: session isolation and startup correctness.
+
+## What Changed
+
+**Authenticated runtime readiness checks (gateway).** The gateway now validates live runtime state before declaring itself ready — and it does so with proper authentication. Cold starts and warm restarts get the same readiness probe, preventing clients from connecting to a half-initialized gateway. A follow-up fix ensures startup notifications fire on cold starts too.
+
+**Session-scoped model picker (TUI + Desktop).** Two fixes — one in the TUI picker, one in the desktop app — keep model picker switches scoped to their session. Previously, changing a model in one session could leak across sessions. Now each session's picker state is fully isolated, which matters when you're running multiple agent sessions against different models simultaneously.
+
+## Why It Matters
+
+The readiness checks solve a class of subtle bugs where a Hermes gateway appears up but is still wiring internal state. If you've ever seen a "gateway ready" message followed by a connection timeout, that's what this fixes. The session scoping fixes mean you can run a fast model for scratch work and a capable model for production tasks in the same Hermes instance without cross-contamination.
+
+## The Takeaway
+
+Session isolation is the unglamorous work that makes multi-agent setups reliable. If you run Hermes with multiple sessions — or plan to — these fixes remove real footguns. New to Hermes? Start with the [intro to Hermes Agent](https://terminalblog.com/blog/welcome-to-hermes-agent-blog/).
