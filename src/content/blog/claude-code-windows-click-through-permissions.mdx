@@ -1,0 +1,81 @@
+---
+title: "Your Claude Code May Be Silently Approving Permissions — Here's How to Check"
+description: "A Windows click-to-focus bug in Claude Code causes the first click on a de-focused window to activate a pending permission dialog, submitting an unintended answer without the user knowing."
+pubDate: "2026-07-12T00:00:00Z"
+updatedDate: "2026-07-12T00:00:00Z"
+tags: ["security", "bug", "claude-code", "windows", "permissions"]
+tool: "claude-code"
+author: "kira_bug_hunter"
+image: "/api/og?title=Your+Claude+Code+May+Be+Silently+Approving+Permissions&tool=claude-code"
+---
+
+Come back from a coffee break, click on your Claude Code window to resume working, and — without touching the keyboard — you've just approved (or rejected) a permission prompt you never read.
+
+That's not a hypothetical. That's issue #76743, filed against Claude Code on Windows 11, and the implications for safety are immediate.
+
+## What's Happening
+
+When Claude Code is running with a **permission prompt pending** and the window does not have focus, the user's first click on the window — intended only to give it focus — lands on the permission dialog and **submits an answer**. Approve, reject, or even "always allow" — whichever button was under the cursor when you clicked.
+
+The reporter describes this happening repeatedly in a long-running orchestration session. Each time they returned to their machine and clicked into the window, the pending permission question was answered by the focus click itself. The session interpreted the resulting rejections as deliberate user "stop" commands and paused an autonomous overnight run — multiple times.
+
+A related incident in the same session: with UI latency, rapid clicks and keystrokes applied to a different prompt than the one visible when the input was made. The user typed an answer meant for option 1, which landed as option 2 on a permission prompt.
+
+The maintainers labeled it `bug`, `has repro`, `platform:windows`, `area:tui`, and `area:permissions` — covering both the rendering layer and the authorization layer.
+
+## Are You Affected?
+
+You're affected if you:
+
+1. Run Claude Code on Windows 11
+2. Use sessions that trigger permission prompts (tool calls requiring approval)
+3. Ever leave a Claude Code session idle and come back to it
+
+To reproduce:
+
+1. Start a task that triggers a permission prompt (e.g., a Bash tool call needing approval)
+2. While the prompt is pending, click away so the Claude Code window loses focus (Alt+Tab to another app)
+3. Click once anywhere on the Claude Code window to bring it back into focus
+4. Observe: the click is delivered to the permission dialog and an answer is registered
+
+Check your session history for unintended approvals or rejections:
+
+```bash
+# Look for permission decisions you don't remember making
+claude log --recent
+```
+
+If you're running autonomous overnight jobs on Windows, check whether your runs were paused by unexpected "user stop" commands.
+
+## The Fix (Until Anthropic Patches It)
+
+There's no official fix yet. The issue was filed on July 11, 2026. Until Anthropic ships a patch, your options are:
+
+1. **Always ensure the window has focus before clicking.** Click the title bar or a non-interactive area first, then interact with permission dialogs.
+2. **Use keyboard shortcuts for permission dialogs.** Press 1/2/3 or Enter instead of clicking — these aren't affected by the click-through bug.
+3. **Don't walk away from pending prompts.** If you need to leave your machine, allow or dismiss any pending permission dialogs first.
+4. **For long-running autonomous sessions**, consider running Claude Code in background mode where there's no TUI to click into.
+
+The ideal fix from Anthropic: the first click that gives the window focus should be consumed as focus-only (standard "click-through suppression"), never delivered to a button. Alternatively, permission prompts could require an explicit keypress rather than accepting a possibly-accidental pointer click, or debounce input for a short interval after window activation.
+
+## Why It Happened
+
+This is a classic **click-through** bug. Windows delivers the click to whatever UI element is under the cursor at the moment of the click — and the permission dialog is rendered as an overlay on Claude Code's TUI. When the window doesn't have focus, the pending dialog is still rendered there, waiting for input. The click that gives the window focus passes through to whatever element is at that coordinate.
+
+Standard Windows UI guidelines recommend consuming the first click after focus activation (WM_ACTIVATE) without passing it to child controls. Claude Code's TUI layer, running in a terminal/ConPTY context, doesn't have access to that native window message handling — it simulates a GUI inside a terminal, so it needs to implement click-through suppression manually.
+
+The reporter notes that accidental **grants** via focus clicks are the more concerning direction for safety. An "always allow" or "approve" that you didn't intend could let an agent execute operations you'd normally want to review.
+
+## FAQ
+
+**Q: Does this affect Claude Code on macOS or Linux?**
+
+A: The issue is filed for Windows 11 specifically. The click-through mechanism is related to how Windows delivers mouse events to terminal applications. macOS and Linux have different window management behavior and are not known to be affected.
+
+**Q: Can this accidentally approve dangerous operations?**
+
+A: Yes — that's the safety concern. If a permission prompt for a file-write or network operation is pending, clicking to focus the window could inadvertently approve it. The reporter explicitly flagged accidental grants as "the more concerning direction for safety."
+
+**Q: What if I already had unintended approvals?**
+
+A: Review your Claude Code session logs for unexpected permission decisions. Check whether your agent ran commands you didn't explicitly authorize. If you're concerned about a specific session, the `claude log` command can help you trace what happened.

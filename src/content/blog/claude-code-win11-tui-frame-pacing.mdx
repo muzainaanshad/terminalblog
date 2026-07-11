@@ -1,0 +1,100 @@
+---
+title: "Claude Code Is Crashing Your Frame Rate on Windows 11 — The Fix"
+description: "A bisected regression shows Claude Code's TUI render loop dropped from 16 fps to ~9-10 fps on Windows 11 between versions 2.1.159 and 2.1.207. Here's how to check and fix the stutter."
+pubDate: "2026-07-12T00:00:00Z"
+updatedDate: "2026-07-12T00:00:00Z"
+tags: ["bug", "performance", "claude-code", "windows", "tui"]
+tool: "claude-code"
+author: "kira_bug_hunter"
+image: "/api/og?title=Claude+Code+Is+Crashing+Your+Frame+Rate+on+Windows+11&tool=claude-code"
+---
+
+You know the feeling — you submit a prompt, the spinner starts, and instead of smooth animation you get a choppy, stuttering mess. You check your CPU. It's idle. You check RAM. Half empty. You toggle every terminal setting you can find. Nothing helps.
+
+If you're on Windows 11 and Claude Code feels like it's running through molasses, you're not alone. A detailed issue report (#76745) with instrumented bisection data confirms the TUI render loop has degraded **~2×** between versions 2.1.159 and 2.1.207. The median frame cadence dropped from a smooth 62 ms (~16 fps) to 99–109 ms (~9–10 fps) — and that's just the spinner. During token streaming it's worse.
+
+## The Regression in Numbers
+
+The reporter, running Windows 11 Pro on a Ryzen 7 7800X3D with an RTX 4080 SUPER, built a ConPTY harness to timestamp every output chunk. The data shows three distinct degradation stages:
+
+| Version | Median frame time | p95 | Stalls >100ms (per 3.5s) |
+|---------|------------------|-----|--------------------------|
+| 2.1.159 | **62 ms (16 fps)** | 140 ms | 7 |
+| 2.1.160 | 62 ms | **299–376 ms** | 8–9 (2–3 >250ms) |
+| 2.1.183 | 63 ms | 127–266 ms | 8–10 |
+| 2.1.207 | **99–109 ms (~9–10 fps)** | 218–235 ms | 16–17 |
+
+The streaming phase is worse: median inter-token gap went from 62 ms to **108 ms** by version 2.1.183. By 2.1.207, everything is degraded — including the idle spinner that should have zero frame-scheduling overhead.
+
+The reporter ruled out every environmental variable: RivaTuner, MSI Afterburner, G-Sync, background load — none affected the numbers. They also confirmed the ~108 ms tick is terminal-independent (Windows Terminal, no WT_SESSION, no terminal choice makes a difference).
+
+## Are You Affected?
+
+If you use Claude Code on Windows 11, check your version:
+
+```bash
+claude --version
+```
+
+Then run this quick perceptual test:
+
+1. Open Claude Code and submit any prompt
+2. Watch the spinner animation during the 0.5–4s window before the first token arrives
+3. Does it hitch or stutter visibly?
+
+For a quantitative check, run the same prompt side by side:
+
+```bash
+claude install 2.1.159
+# Run a prompt, observe smoothness
+claude install 2.1.207
+# Run the same prompt, compare
+```
+
+The difference is most obvious on high-refresh monitors (120 Hz+). The 60 Hz laptop panel might not show it as clearly, but the numbers degrade identically.
+
+## The Fix (For Now)
+
+The only verified workaround is pinning to the last-known-good version:
+
+```bash
+claude install 2.1.159
+```
+
+This restores the 62 ms (16 fps) tick across both the spinner and streaming phases. You lose newer features like background subagents and workflows — but the rendering is smooth again.
+
+If you want to stay on the latest, the reporter suggests Anthropic should expose a render-FPS knob:
+
+```
+CLAUDE_CODE_MAX_FPS=16
+```
+
+That doesn't exist yet, but leaving a +1 on issue #76745 helps prioritize it.
+
+## Why It Happened
+
+The regression is **staged across three releases**, suggesting cumulative code changes rather than one bad commit:
+
+1. **2.1.160**: Long frame hitches appear (p95 explodes to 300–376 ms). Changelog dominated by background-daemon and agent-view infrastructure.
+2. **2.1.183**: Streaming-phase tick rate halves (62 → ~108 ms median). Likely from CPU-optimization work that reduced per-frame rendering work.
+3. **2.1.207**: Even the idle spinner degrades to ~100 ms.
+
+The reporter notes typing echo (event-driven, not frame-scheduled) is a perfect 30 ms on all versions — so raw output throughput is fine. The regression is specifically in **frame scheduling**. Synchronized-output markers (`ESC[?2026h/l`) were already emitted 1 pair/frame in 2.1.159, so marker emission isn't the variable.
+
+Changelog entries like "Reduced CPU usage ~37% during streaming" (2.1.191) and "Reduced per-frame rendering work" (2.1.196) suggest the ~10 fps tick may be a deliberate CPU/battery trade-off — but it's invisible on 60 Hz panels while very visible on high-refresh desktop monitors.
+
+The related issue #67406 was auto-closed as "Completed" while the stutter was still reproducible, leaving users without a resolution path.
+
+## FAQ
+
+**Q: Does this affect Claude Code on macOS or Linux?**
+
+A: No — this is Windows-specific. The regression was reproduced on Windows 11 Pro (build 26200) with Windows Terminal. The ConPTY path is Windows-only.
+
+**Q: Will pinning to 2.1.159 break my workflow?**
+
+A: You lose features added after 2.1.159 — background subagents, workflow improvements, and the "Fixed terminal freezing during streaming of very long lists" from 2.1.207. It's a trade-off between smooth rendering and newer features.
+
+**Q: Is this caused by my antivirus or GPU drivers?**
+
+A: The reporter ruled out RivaTuner, MSI Afterburner, G-Sync settings, and background CPU/RAM load. The claude process tree uses <1% of one core on all versions. The regression is internal to Claude Code's render loop.
