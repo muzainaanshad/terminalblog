@@ -101,19 +101,19 @@ function generateArticle(id1, id2) {
   const cons1 = a1.cons.slice(0, 2).map(p => `- ${p}`).join('\n');
   const cons2 = a2.cons.slice(0, 2).map(p => `- ${p}`).join('\n');
 
+const chartTypes = { Pricing: 'pricing', 'Feature Comparison': 'features', 'Performance & Benchmarks': 'swe-bench', 'Workflow Fit': 'features', 'Open Source vs Commercial': 'features' };
+const chartType = chartTypes[tmpl.angle] || 'features';
+
   const content = `---
 title: "${a1.name} vs ${a2.name}: ${tmpl.angle} Comparison"
 description: "${tmpl.desc} — a detailed look at these two coding agents."
 pubDate: "${new Date().toISOString().replace(/T.*/, 'T10:00:00Z')}"
 tags: ["comparison", "${id1}", "${id2}", "deep-dive"]
 tool: "${id1}"
-image: "/api/og?title=${encodeURIComponent(a1.name + ' vs ' + a2.name)}&description=${encodeURIComponent(tmpl.angle + ' comparison')}"
+image: "/api/chart?type=${chartType}&agents=${id1},${id2}"
 ---
 
 ## Quick Verdict
-
-![Terminal prompt graphic](/images/terminal-prompt.svg)
-*terminalblog — following the AI coding agent ecosystem*
 
 ${tmpl.verdict(a1, a2)}
 
