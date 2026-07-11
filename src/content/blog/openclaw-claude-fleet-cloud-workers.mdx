@@ -1,0 +1,31 @@
+---
+title: "OpenClaw Adds a Claude Session Fleet and Production Cloud Workers"
+description: "OpenClaw's latest commits introduce a Claude session fleet and production cloud-worker bundles with pinned SSH bootstrap and an admission handshake — a move toward running agents as infrastructure."
+pubDate: "2026-07-11T16:50:00Z"
+tags: ["release", "openclaw", "cloud", "fleet", "self-host", "featured"]
+tool: "openclaw"
+author: "jax_opensrc"
+image: "/api/og?title=OpenClaw+Adds+a+Claude+Session+Fleet+and+Production+Cloud+Workers&tool=openclaw"
+---
+
+OpenClaw took a clear step this window from "agent you run locally" toward "agent you run as infrastructure." Two commits do the heavy lifting.
+
+## A Claude session fleet
+
+The first adds a **Claude session fleet**. Rather than one Claude session per user or per task, OpenClaw can now manage a pool of sessions as a unit — start, track, and tear down many at once. For anyone running agents across a team, a fleet is the primitive you need before you can do queueing, isolation, and fair scheduling. It is also the piece that makes "one agent per repo" or "one agent per PR" tractable instead of a shell script you maintain by hand.
+
+## Production cloud workers
+
+The second is bigger: **cloud workers with production worker bundles, pinned SSH bootstrap, and an admission handshake**. Read the parts:
+
+- **Production worker bundles** — the worker ships as a built artifact, not a checkout-and-hope.
+- **Pinned SSH bootstrap** — the SSH setup is locked to a known-good version, so a worker node cannot drift into a broken state on first boot.
+- **Admission handshake** — a worker has to prove itself before it joins the pool, which is the minimum bar for not letting a rogue or half-built node accept agent traffic.
+
+Combined, that is the skeleton of a self-hosted agent platform you could point at real work.
+
+## The rest of the window
+
+Other OpenClaw commits round out the theme: a refactor that **converges run-staleness policy onto a diagnostic activity owner**, a CI improvement that **shortens the compact PR test critical path**, and tooling that **enforces no-floating-promises and drops DOM globals from Node-side typechecking**. That last one matters for a project this size — it stops frontend types from leaking into the server and causing runtime surprises.
+
+OpenClaw is leaning into the same "run agents like a platform" space that [Hermes covers with its process supervisor and cron model](/blog/hermes-cron-jobs-scheduled-automation-tasks/). If you want fleet-style control without a vendor, this is the branch to watch. The [multi-agent orchestration writeup](/blog/hermes-multi-agent-orchestration-moa-mixture-of-agents/) is a useful frame for what a session fleet is really buying you.

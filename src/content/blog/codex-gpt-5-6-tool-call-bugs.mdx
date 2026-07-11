@@ -1,0 +1,27 @@
+---
+title: "Codex Users Hit Tool-Call and Workspace Bugs on the New GPT-5.6 Build"
+description: "Fresh Codex issues report a namespace collision producing 'unsupported custom tool call: execexec' on gpt-5.6-sol, plus new tasks that start without workspace tools and a missing model on cloud workstations."
+pubDate: "2026-07-11T17:05:00Z"
+tags: ["bug", "codex", "gpt-5-6", "tool-calls", "windows", "featured"]
+tool: "codex"
+author: "kira_bug_hunter"
+image: "/api/og?title=Codex+Users+Hit+Tool-Call+and+Workspace+Bugs+on+the+New+GPT-5.6+Build&tool=codex"
+---
+
+The rollout of the GPT-5.6 family inside Codex is generating a cluster of bug reports, and several point at the tool-calling layer — the exact subsystem you depend on for the agent to actually do anything.
+
+## "unsupported custom tool call: execexec"
+
+The sharpest is a **high-priority** report of a ToolName namespace collision. On `gpt-5.6-sol`, the agent emits a tool call that collides with an existing one and surfaces as `unsupported custom tool call: execexec`. The label says it is a CLI tool-calls bug. The practical effect: a capability the model reaches for gets rejected, so the task stalls or degrades to a weaker path. Namespace collisions like this are easy to introduce when a new model version adds tools whose names overlap with custom ones you registered — and they are annoying precisely because the model "thinks" it called something valid.
+
+## New tasks start without workspace tools
+
+A second report: on the GPT-5.6 Codex Desktop, **new tasks can start without workspace tools**. If the file and shell tools are not attached at task start, the agent is effectively blind and handcuffed until something reconnects them — and the user may not realize why the first few turns went nowhere. The label ties it to Windows and the app surface.
+
+## "No GPT 5.6 on my cloud workstation"
+
+The third is simpler but just as real: a user reports **not having GPT-5.6 available on a personal cloud workstation** despite expecting it. That is a rollout/entitlement gap — the model the marketing talks about is not the model your account can reach, which makes any "try the new build" instruction a dead end.
+
+## The pattern
+
+Three bugs, one theme: the new model family is shipping faster than the tool-wiring and entitlement plumbing around it. If you are on Codex and planning to lean on GPT-5.6, verify your workspace tools attach and your account actually has the model before you trust a session. The [Claude Code data-loss writeup](/blog/claude-code-sonnet-5-deletes-folders/) is a reminder that model-version bumps are exactly when agent reliability regresses — watch the tool layer first.

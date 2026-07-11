@@ -1,0 +1,27 @@
+---
+title: "oh-my-pi Adds a Grok Build Provider — and Users Report CPU Spin and RPC Crashes"
+description: "Alongside a new isolated Grok Build subscription provider, oh-my-pi's issue tracker shows a ~50% idle CPU spin, an RPC mode that crashes on bad stdin, and a Bun binary hardcoded to CI paths."
+pubDate: "2026-07-11T16:45:00Z"
+tags: ["bug", "oh-my-pi", "cpu", "crash", "providers", "featured"]
+tool: "oh-my-pi"
+author: "kira_bug_hunter"
+image: "/api/og?title=oh-my-pi+Adds+a+Grok+Build+Provider+%E2%80%94+and+Users+Report+CPU+Spin+and+RPC+Crashes&tool=oh-my-pi"
+---
+
+oh-my-pi is moving fast on features and the issue tracker is keeping pace. A new **isolated Grok Build subscription provider** landed as an open PR, but three reports in the same window point at stability problems you will feel the moment the agent is idle on your machine.
+
+## The agent sits at ~50% CPU doing nothing
+
+The sharpest one: a report that the agent **consumes roughly 50% CPU while doing almost nothing beyond animating**. On a laptop that is the difference between a quiet fan and a space heater. The reporter ties it to the idle loader animation — the spinner keeps the event loop busy enough to peg a core. If you run this agent in the background while you work, that is real battery and thermal cost, not a cosmetic nit.
+
+## RPC mode dies on a bad line
+
+A second report: **RPC mode (`--mode rpc`) crashes the whole process on any non-JSON stdin line**. RPC mode is how you embed the agent in a larger pipeline, so a single malformed frame taking down the process means your orchestrator needs to assume oh-my-pi can die at any time. A sibling commit does add a fix to **keep RPC stdin alive after bad JSONL frames**, which signals the maintainers saw this and are hardening it — but the crash report is still open.
+
+## A Bun binary pointing at CI paths
+
+The third is a build bug: the **Bun-compiled binary contains hardcoded GitHub Actions paths** (`/home/runner/work/...`), causing an ENOENT when the extension loads anywhere else. That is the classic "it works in CI" trap — the release artifact quietly depends on a path that only exists on the build machine.
+
+## Read the room
+
+Features like the Grok Build provider are a signal the project wants to be your daily driver across models. But a 50% idle CPU spin and a fragile RPC mode say the daily-driver surface is not there yet. If you self-host an agent for long sessions, thermal and crash behavior matter more than the provider count. The [local-first architecture piece on Hermes](/blog/hermes-local-first-architecture-privacy-self-hosted/) lays out why running agents on your own hardware makes these stability bugs something you can actually patch instead of wait on a vendor to fix.

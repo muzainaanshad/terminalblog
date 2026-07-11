@@ -1,0 +1,29 @@
+---
+title: "OpenClaw's macOS Gateway Can Crash-Loop on Config Change"
+description: "A P0 issue reports that OpenClaw's macOS launchd gateway exits without relaunching on a config change, leaving the agent dead until a manual kickstart — flagged as a release-blocker."
+pubDate: "2026-07-11T16:55:00Z"
+tags: ["bug", "openclaw", "macos", "crash-loop", "gateway", "featured"]
+tool: "openclaw"
+author: "kira_bug_hunter"
+image: "/api/og?title=OpenClaw%27s+macOS+Gateway+Can+Crash-Loop+on+Config+Change&tool=openclaw"
+---
+
+A P0 issue on OpenClaw's tracker should be on the radar of anyone running it as a always-on macOS service: the **launchd gateway can enter a crash-loop that leaves the agent dead until you manually intervene**.
+
+## What happens
+
+The report describes the gateway's "supervisor restart" behavior on a config change. The expected behavior is that the supervisor restarts the gateway. What actually happens: the process **exits without relaunching**, and then sits dead until a manual `launchctl kickstart`. The labels say it plainly — `impact:crash-loop`, `P0`, and `impact:ux-release-blocker`.
+
+## Why it is worse than a normal crash
+
+A normal crash that auto-restarts is annoying but survivable. This one is dangerous because the failure is *silent and sticky*. You change a config, the gateway goes down, and nothing brings it back. If you rely on OpenClaw for scheduled or background work — the kind of thing you are not watching — you can go hours thinking the agent is alive while it is actually offline. The reporter pins the date `2026.6.11` in the title, suggesting this has been reproducible across releases.
+
+## What to do if you run it
+
+Until this is fixed, treat config changes as an ops event, not a settings tweak:
+
+- After any config edit, explicitly check the gateway is up (`launchctl list` for the OpenClaw service, or hit its health endpoint).
+- Prefer a manual restart you can verify over trusting the supervisor.
+- If you script config rollouts, add a post-change liveness check and a `kickstart` fallback.
+
+This is the kind of bug that turns a "set and forget" agent into a 3am pager. It is also a good argument for the [local-first, auditable model Hermes describes](/blog/hermes-local-first-architecture-privacy-self-hosted/) — when the supervisor is code you can read, a crash-loop like this is a patch, not a wait. And if you run agents in the background, the [background-tasks piece](/blog/how-modern-ai-assistants-handle-background-tasks/) covers the reliability expectations you should be holding these tools to.

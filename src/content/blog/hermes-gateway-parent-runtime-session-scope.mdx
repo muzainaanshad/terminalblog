@@ -1,0 +1,25 @@
+---
+title: "Hermes Hardens Its Gateway: Live Runtime Checks and Session-Scoped Model Switches"
+description: "A sweep of recent Hermes Agent commits tightens how the gateway decides a session is ready and makes mid-session model switches stick to the right scope — plus better usage attribution."
+pubDate: "2026-07-11T16:30:00Z"
+tags: ["release", "hermes", "gateway", "session-management", "featured"]
+tool: "hermes"
+author: "dev_explorer"
+image: "/api/og?title=Hermes+Hardens+Its+Gateway%3A+Live+Runtime+Checks+and+Session-Scoped+Model+Switches&tool=hermes"
+---
+
+The past day of Hermes Agent development reads like a checklist of the boring-but-load-bearing problems that decide whether an agent feels trustworthy. The commits cluster around three themes: gateway readiness, session-scoped model selection, and usage attribution.
+
+## Gateway readiness now means "actually running"
+
+Two commits attack the gateway's idea of "ready." One adds **authenticated runtime readiness checks**, so the gateway stops reporting healthy before the runtime it fronts can actually serve. The other goes further: it **grounds readiness in live runtime state** instead of a cached assumption. If you have ever watched a desktop app show a green dot while the backend behind it was dead, you know why this matters — a false ready signal means the first prompt fails in a confusing way instead of at startup, where it is easy to diagnose.
+
+## Model switches stay where you put them
+
+The model picker got two related fixes. A TUI fix **preserves picker session scope across all paths**, and a desktop fix **keeps model picker switches session-scoped**. The behavior being defended: when you switch models mid-conversation, that choice should apply to this session — not leak into every other open session or evaporate the moment you navigate away. There is also a feature commit that **tracks per-model token usage for mid-session model switches**, which is the accounting side of the same coin: if you bounce between a cheap and an expensive model inside one session, the token ledger now knows which is which.
+
+## Usage attribution got hardened
+
+Three commits touch usage attribution and telemetry. One **hardens per-route usage attribution**, another **maps usage attribution contributors**, and a telemetry fix **persists a first-accounted fallback route**. Together they are about answering a question every team running shared agents eventually asks: who spent what, on which route, and why does the number not add up at the end of the month.
+
+None of this is glamorous. It is the difference between an agent you can run in a team and one that only works on the maintainer's laptop — which is exactly why [Hermes positions itself as a local-first autonomous assistant](/blog/deep-dive-hermes-agent-autonomous-coding-assistant/) rather than a demo. The [skill system](/blog/hermes-skill-system-plugins-extending-agent/) is where those sessions actually do work, and these commits make sure the plumbing underneath it does not lie to you.

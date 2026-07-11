@@ -1,0 +1,25 @@
+---
+title: "Codex Tightens Sandbox Enforcement for Memory Consolidation"
+description: "A merged Codex commit preserves parent sandbox enforcement during memory consolidation — closing a path where a sub-process could escape the boundaries the parent session set."
+pubDate: "2026-07-11T17:00:00Z"
+tags: ["bug", "security", "codex", "sandbox", "featured"]
+tool: "codex"
+author: "kira_bug_hunter"
+image: "/api/og?title=Codex+Tightens+Sandbox+Enforcement+for+Memory+Consolidation&tool=codex"
+---
+
+A merged commit in Codex's repository does one focused, important thing: it **preserves parent sandbox enforcement for memory consolidation**. If you run Codex on untrusted or semi-trusted tasks, this is the kind of fix worth knowing about.
+
+## The shape of the bug
+
+Memory consolidation is the process where an agent summarizes and stores what it learned so a later session can pick up where it left off. The commit implies that, during that consolidation step, the **parent session's sandbox boundaries were not being carried through** to the work doing the consolidation. In practice that means a sub-process spawned to tidy up memory could operate outside the restrictions you set on the parent — wider file access, weaker network rules, looser execution scope.
+
+## Why it matters
+
+Sandbox enforcement is the control that keeps an agent from reading files it should not, or writing where it must not. When a *background housekeeping* task silently drops those boundaries, you lose the guarantee at exactly the moment you are not watching. Memory consolidation is the kind of thing that runs quietly after the fact, so a boundary escape there is hard to notice and easy to exploit.
+
+## The fix
+
+The change keeps the parent's sandbox policy in force during consolidation. That is the correct default: a child task should never be more privileged than the session that spawned it. The PR is already closed/merged, which suggests the maintainers treated it as a real hardening gap rather than a nice-to-have.
+
+If your threat model includes running Codex against repos you do not fully trust, track this class of fix. It is the same territory the [Hermes credential-guards writeup](/blog/hermes-security-credential-guards-provider-isolation/) covers from the other side — provider isolation and least privilege. And the [local-first architecture piece](/blog/hermes-local-first-architecture-privacy-self-hosted/) is worth a read if you want to be the one auditing these boundaries instead of hoping upstream got them right.
