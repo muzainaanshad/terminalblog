@@ -2,6 +2,7 @@
 import Layout from '../../layouts/Layout.astro';
 import { SITE_TITLE } from '../../consts';
 import { getCollection } from 'astro:content';
+import agents from '../../data/agents.json';
 
 export async function getStaticPaths() {
   const posts = await getCollection('blog');
@@ -36,24 +37,135 @@ const toolNames: Record<string, string> = {
   ampcode: 'AmpCode',
   'copilot-cli': 'GitHub Copilot CLI',
 };
+
 const toolName = toolNames[tool] || tool;
+const agentData = agents.find((a: any) => a.id === tool);
+
+// Count article types
+const tags: Record<string, number> = {};
+for (const p of allPosts) {
+  for (const t of (p.data.tags || [])) {
+    tags[t] = (tags[t] || 0) + 1;
+  }
+}
+const topTags = Object.entries(tags).sort((a, b) => b[1] - a[1]).slice(0, 6);
+
+function formatDate(d: Date) {
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 ---
 
-<Layout title={`${toolName} — ${SITE_TITLE}`} description={`Articles about ${toolName}, the open-source coding agent.`}>
-  <div class="content">
-    <h1 style="font-size:1.75rem;margin-bottom:0.5rem;">{toolName}</h1>
-    <p style="color:var(--muted-foreground);margin-bottom:2.5rem;font-size:0.9rem;">{allPosts.length} article{allPosts.length !== 1 ? 's' : ''}</p>
+<Layout title={`${toolName} articles — ${SITE_TITLE}`} description={`Articles about ${toolName}, the ${agentData?.type || 'coding agent'}. ${allPosts.length} articles covering features, bugs, pricing, comparisons.`}>
+  <div class="content" style="max-width:900px;margin:0 auto;padding:0 1.5rem;">
 
-    <div style="display:flex;flex-direction:column;">
+    <!-- Agent Header -->
+    <div class="tool-header">
+      <div>
+        <h1 style="font-size:1.75rem;margin-bottom:0.25rem;">{toolName}</h1>
+        {agentData && (
+          <div class="tool-meta">
+            <span class="tool-meta-item">
+              <span class="meta-lbl">Type</span>
+              <span>{agentData.type}</span>
+            </span>
+            <span class="tool-meta-item">
+              <span class="meta-lbl">Pricing</span>
+              <span class="meta-val">{agentData.pricing}</span>
+            </span>
+            <span class="tool-meta-item">
+              <span class="meta-lbl">Open Source</span>
+              <span class={agentData.openSource ? 'yes-text' : 'no-text'}>{agentData.openSource ? 'Yes' : 'No'}</span>
+            </span>
+            {agentData.stars && <span class="tool-meta-item">
+              <span class="meta-lbl">Stars</span>
+              <span>{(agentData.stars / 1000).toFixed(1)}K</span>
+            </span>}
+          </div>
+        )}
+        <p class="tool-count">{allPosts.length} article{allPosts.length !== 1 ? 's' : ''}</p>
+      </div>
+    </div>
+
+    <!-- Feature Strip -->
+    {agentData?.features && (
+      <div class="feature-strip">
+        {Object.entries(agentData.features).slice(0, 8).map(([key, val]: [string, any]) => (
+          <div class={`feature-pill ${val ? 'has' : 'no'}`} title={key}>
+            <span class="feature-icon">{val ? '✓' : '—'}</span>
+            <span class="feature-name">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
+          </div>
+        ))}
+      </div>
+    )}
+
+    <!-- Tag filter -->
+    {topTags.length > 0 && (
+      <div class="tag-filter">
+        <span class="filter-lbl">Topics:</span>
+        {topTags.map(([tag, count]: [string, number]) => (
+          <a href={`/blog/tag/${tag}/`} class="filter-tag">{tag}<span class="tag-count">{count}</span></a>
+        ))}
+      </div>
+    )}
+
+    <!-- Article List -->
+    <div class="article-list">
       {allPosts.map(post => (
-        <a href={`/blog/${post.id}/`} style="display:grid;grid-template-columns:6rem 1fr;gap:1rem;padding:0.75rem 0;text-decoration:none;color:var(--foreground);border-bottom:1px solid var(--border);transition:opacity 0.15s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">
-          <time style="font-family:var(--font-lipi-sans);font-size:0.8rem;color:var(--muted-foreground);padding-top:0.15rem;">{new Date(post.data.pubDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</time>
-          <div>
-            <span style="font-family:var(--font-lipi-sans);font-weight:500;font-size:0.95rem;line-height:1.4;">{post.data.title}</span>
-            <p style="margin:0.25rem 0 0;font-size:0.85rem;color:var(--muted-foreground);line-height:1.4;">{post.data.description?.substring(0, 150)}{post.data.description?.length > 150 ? '…' : ''}</p>
+        <a href={`/blog/${post.id}/`} class="article-row">
+          <div class="article-date">{formatDate(post.data.pubDate)}</div>
+          <div class="article-main">
+            <div class="article-title">{post.data.title}</div>
+            <div class="article-desc">{post.data.description?.substring(0, 130)}{post.data.description?.length > 130 ? '…' : ''}</div>
+            <div class="article-tags">
+              {(post.data.tags || []).slice(0, 3).map(t => <span class="mini-tag">#{t}</span>)}
+            </div>
           </div>
         </a>
       ))}
     </div>
+
+    <!-- Cross-links -->
+    <div class="cross-links">
+      <a href="/blog/" class="cross-link">All articles →</a>
+      <a href="/writers/" class="cross-link">Our writers →</a>
+    </div>
+
   </div>
+
+  <style is:global>
+    .tool-header { padding: 2rem 0 1rem; }
+    .tool-meta { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.75rem 0; }
+    .tool-meta-item { font-family: var(--font-mono); font-size: 0.75rem; padding: 0.3rem 0.6rem; border: 1px solid var(--border); border-radius: 6px; display: flex; gap: 0.4rem; align-items: center; }
+    .meta-lbl { color: var(--fg-dim); font-size: 0.65rem; text-transform: uppercase; }
+    .meta-val { color: var(--fg-bright); }
+    .yes-text { color: var(--green); }
+    .no-text { color: var(--fg-dim); }
+    .tool-count { font-family: var(--font-mono); font-size: 0.8rem; color: var(--fg-dim); margin: 0; }
+
+    .feature-strip { display: flex; gap: 0.3rem; flex-wrap: wrap; padding: 0.8rem 0; margin-bottom: 0.5rem; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .feature-pill { display: flex; align-items: center; gap: 0.25rem; font-family: var(--font-mono); font-size: 0.6rem; padding: 0.2rem 0.45rem; border-radius: 4px; border: 1px solid var(--border); }
+    .feature-pill.has { border-color: var(--green); color: var(--green); }
+    .feature-pill.no { border-color: var(--border); color: var(--fg-dim); opacity: 0.6; }
+    .feature-icon { font-size: 0.55rem; }
+    .feature-name { white-space: nowrap; }
+
+    .tag-filter { display: flex; align-items: center; gap: 0.4rem; padding: 0.6rem 0; flex-wrap: wrap; }
+    .filter-lbl { font-family: var(--font-mono); font-size: 0.7rem; color: var(--fg-dim); }
+    .filter-tag { font-family: var(--font-mono); font-size: 0.65rem; padding: 0.15rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; color: var(--fg-dim); text-decoration: none; display: flex; align-items: center; gap: 0.3rem; transition: border-color 0.15s; }
+    .filter-tag:hover { border-color: var(--green); color: var(--green); }
+    .tag-count { background: var(--border); padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.55rem; color: var(--fg-dim); }
+
+    .article-list { display: flex; flex-direction: column; }
+    .article-row { display: grid; grid-template-columns: 5.5rem 1fr; gap: 1rem; padding: 0.75rem 0; text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border); transition: background 0.1s; }
+    .article-row:hover { background: var(--bg-alt); margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; border-radius: 4px; }
+    .article-date { font-family: var(--font-mono); font-size: 0.72rem; color: var(--fg-dim); padding-top: 0.1rem; }
+    .article-title { font-family: var(--font-mono); font-size: 0.88rem; font-weight: 600; line-height: 1.3; color: var(--fg-bright); margin-bottom: 0.2rem; }
+    .article-desc { font-size: 0.78rem; color: var(--fg-dim); line-height: 1.4; margin-bottom: 0.3rem; }
+    .article-tags { display: flex; gap: 0.25rem; flex-wrap: wrap; }
+    .mini-tag { font-size: 0.58rem; padding: 0.05rem 0.35rem; border-radius: 3px; background: var(--border); color: var(--fg-dim); font-family: var(--font-mono); }
+
+    .cross-links { display: flex; gap: 1rem; padding: 1.5rem 0; }
+    .cross-link { font-family: var(--font-mono); font-size: 0.78rem; color: var(--green); text-decoration: none; }
+    .cross-link:hover { text-decoration: underline; }
+  </style>
 </Layout>
