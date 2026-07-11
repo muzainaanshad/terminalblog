@@ -1,0 +1,42 @@
+---
+title: "Claude Code's Grep Tool Is Blue-Screening Windows With Orphaned ripgrep Children"
+description: "Issue #76654 shows the Claude Code Grep tool abandoning rg.exe processes with unread stdout pipes, flooding Windows with blocked kernel threads until the DPC watchdog fires a 0x133 BSOD. Here's the mechanism — and why every agent harness should fear it."
+pubDate: "2026-07-11T12:45:00Z"
+tags: ["security", "bug", "claude-code", "windows", "opinion"]
+tool: "claude-code"
+author: "kira"
+image: "/api/og?title=Claude+Code+Grep+Tool+Blue-Screens+Windows+With+Orphaned+ripgrep+Children&tool=claude-code"
+---
+
+A search command should not take down your operating system.
+
+That's the headline from issue #76654, filed against Claude Code on July 11 at 11:48 UTC. Labeled `high-priority` and `has-repro`, it describes a failure mode I didn't think a user-space coding agent could reach: the Grep tool spawns `rg.exe` (ripgrep) children, then abandons them with their stdout pipes unread. The result is a "live-blocked process flood" that drives a kernel timer storm and ends in a hard crash — `0x133 (DPC_WATCHDOG_VIOLATION)`. A blue screen. From a search.
+
+I have opinions about this, and they're not the polite ones.
+
+The common take is "Windows is just fragile, what do you expect." I disagree, loudly. A coding agent that can blue-screen the host has crossed a line that even most commodity malware respects. This isn't a Windows quirk. It's a sandbox-boundary failure — the agent reached through user space and panicked the kernel. If your assistant can do that, the "it's just a terminal app" comfort story is over.
+
+I learned the shape of this bug the dumb way. Two years ago I wrote a shell loop that fired a subprocess per file and forgot to drain stdout. It never BSOD'd, but my terminal froze for twenty solid minutes under a pile of zombie processes I couldn't kill. The fans roared. The cursor blinked and nothing responded. That's the same instinct failing at scale: a child's output is a contract, and if you walk away without reading it, the child waits forever — and it is not free.
+
+So here's the mental model worth keeping, because the incident is just the entry point.
+
+**The Spawn Contract.** Three things must hold every time your agent runs a tool, or you drift toward a kernel panic:
+
+1. **Every child owns a kernel object.** A Grep across a repo is not one process. It's N — one ripgrep per matched directory, or per invocation, depending on how the harness fans out. On a large monorepo that's thousands of kernel objects spun up in seconds.
+
+2. **A child writing stdout blocks when the pipe fills.** On Windows the pipe buffer is roughly 64KB. The moment a child writes past that and nobody reads, it sleeps — parked on a kernel wait. It is alive, blocked, and holding its object.
+
+3. **If the parent exits before reaping, the objects pile up.** The agent's Grep wrapper is supposed to read output, then wait on the handle. If it bails early — timeout, exception, a logic bug — those blocked children stay parked. Thousands of parked threads is exactly the load that starves the deferred procedure call (DPC) queue. The watchdog timer stops getting serviced. `0x133`. Black screen.
+
+The reporter's wording — "unread stdout pipes - live-blocked process flood causes kernel timer storm" — is a precise description of stages 2 and 3 firing together. This is reproducible, which is the scary part. It's not a cosmic-ray crash on exotic hardware.
+
+What this means for you, today, before a patch lands:
+
+- **Watch your process count, not just your token count.** Open Task Manager while your agent greps a big tree. If `rg.exe` instances pile up faster than they vanish, you're one large directory away from a reboot.
+- **Cap grep scope.** Point the tool at the subdirectory you actually mean. "Search the whole repo" is the exact input that maximizes N in stage 1.
+- **Prefer streaming output.** A harness that reads stdout incrementally can't strand a child on a full pipe. One that buffers-then-reads can.
+- **If you're on Windows, treat a hung agent as a live risk.** Don't just wait it out. Kill the parent process tree from Task Manager before the watchdog does it for you.
+
+The fix is unglamorous: reap what you spawn, read what you pipe, and never let a tool wrapper die with children still parked on the kernel. Every coding-agent team should be auditing this right now — not just Claude Code. If your harness talks to ripgrep, or any subprocess with stdout, the same contract applies.
+
+A search that blue-screens the machine is the clearest possible reminder: your agent does not live in a sandbox. It lives in your kernel.
