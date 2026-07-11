@@ -1,0 +1,59 @@
+---
+title: "Oh My Pi Is Crashing macOS With Native Grep — The Fix"
+description: "Oh My Pi's native grep can crash the entire agent process when a file changes during search. Here's how to check if you're affected and what to do about it."
+pubDate: "2026-07-11T17:20:00Z"
+tags: ["bug", "crash", "oh-my-pi", "macos", "grep", "featured"]
+tool: "oh-my-pi"
+author: "dev_explorer"
+image: "/api/og?title=Oh+My+Pi+Is+Crashing+macOS+With+Native+Grep+%E2%80%94+The+Fix&tool=oh-my-pi"
+---
+
+Oh My Pi is one of the most capable coding agents for the terminal. But if you're on macOS and running native grep, there's a crash waiting to happen — and it can take your entire session with it.
+
+A newly filed issue ([#5205](https://github.com/can1357/oh-my-pi/issues/5205)) with **prio:p1** reveals that Oh My Pi's native `pi_natives` grep implementation uses memory-mapped file I/O for files above a threshold. When another process rewrites or truncates the same file while grep is searching it — during a build, a log rotation, or a concurrent write — the mapped page can point past the file's new end. macOS responds with `SIGKILL (Code Signature Invalid)`, and the entire Oh My Pi process dies.
+
+The macOS crash report reads: `Exception Type: EXC_CRASH (SIGKILL)`, `Termination Reason: Namespace CODESIGNING, Code 2 Invalid Page`, with the faulting thread inside the `Bun Pool` at the first byte of a 4 MiB file-backed mapping. The reporter confirmed it with a stress test: a 5 MiB rewrite/search loop crashed on run 4 with `Bus error / exit 133`.
+
+## Are you affected?
+
+You're affected if you run Oh My Pi **16.4.4 or earlier** on **macOS** and use native grep on files **larger than 4 MiB** that could be written to concurrently — log files, build artifacts, temp files, anything another process modifies.
+
+```bash
+# Check your version
+omp --version
+
+# Quick stress test (WARNING: will crash your session)
+dd if=/dev/urandom of=/tmp/stressfile bs=1048576 count=5
+omp exec -- grep -r "test" /tmp/stressfile &
+# In another terminal: head -c 5M /dev/urandom > /tmp/stressfile
+```
+
+## The fix
+
+A fix is already submitted in [PR #5210](https://github.com/can1357/oh-my-pi/pull/5210) — `fix(native): read grep files into stable snapshots`. The patch replaces both mmap paths with bounded owned reads:
+
+- At most 4 MiB + 1 byte for file classification
+- At most 4 MiB for the oversized searchable prefix
+- Removes the now-unused `memmap2` dependency
+- Adds a stable-snapshot regression test
+
+Verification on the fixed build: 20/20 clean exits on the concurrent rewrite/search stress test, all 164 native tests passing. Once merged, `omp update` gets you the fix.
+
+In the meantime, avoid concurrent writes to files you're searching with native grep, or use the system grep (`/usr/bin/grep`) as a workaround.
+
+## Why it happened
+
+The native grep tool memory-maps regular files above a small-file threshold for performance. The `mmap` call gives you a live window into the file on disk, not a stable copy. When the underlying file shrinks or gets rewritten, the mapped region can reference pages past the current file boundary. On macOS the kernel flags this as a code-signing violation (invalid page reference). On Linux and other POSIX systems the same pattern triggers `SIGBUS`.
+
+The root assumption — that a file won't change during a fast grep — doesn't hold in an active development environment where builds, watchers, and other agents touch the same files.
+
+## FAQ
+
+**Q: Does this affect Linux too?**
+A: Yes. The same mmap pattern can raise SIGBUS on Linux when a mapped page is accessed beyond the current end of the backing file, though macOS reports it as a code-signing failure instead.
+
+**Q: Is my session recoverable after the crash?**
+A: No. The crash terminates the entire oh-my-pi process with SIGKILL. There's no recovery path — you lose any unsaved state and must restart the agent.
+
+**Q: Will the bounded-read fix hurt performance?**
+A: Negligible impact for typical grep workloads. The 4 MiB cap covers the vast majority of search operations. The trade-off — stable snapshots instead of live mmap windows — eliminates an entire class of crash bugs at essentially zero cost for most users.
