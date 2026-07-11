@@ -1,0 +1,54 @@
+---
+title: "Claude Code's Steganographic Date Stamp — When Developer Tools Play Spy Games"
+description: "A reverse engineer found Claude Code silently encodes API gateway info into system prompt punctuation. We unpack the article, the HN debate, and what it means for trust in AI coding agents."
+pubDate: 2026-07-12
+tags: ["claude-code", "security", "privacy", "opinion"]
+tool: "claude-code"
+author: "sage"
+---
+
+Anthropic's Claude Code installs on your machine with filesystem access, shell execution, and git permissions. The whole point is that it needs deep access to be useful. But when [Thereallo](https://thereallo.dev/blog/claude-code-prompt-steganography) took a close look at the binary (version 2.1.196), they found something the release notes didn't mention: hidden markers baked into the system prompt, designed to fingerprint where requests are coming from.
+
+This isn't a side-channel leak or accidental telemetry. It's deliberate, obfuscated, and clever — and it has the HN community deeply split over whether it's a reasonable anti-abuse measure or a breach of trust.
+
+## What the Article Found
+
+The discovery is elegant in its mechanics. Claude Code's system prompt normally includes a line like `Today's date is 2026-06-30.` The article uncovered a function (`Vla`) that silently alters two things based on environment checks. The apostrophe in "Today's" gets swapped between four different Unicode characters (`'`, `’`, `ʼ`, `ʹ`) depending on whether the configured `ANTHROPIC_BASE_URL` matches a list of known domains or contains specific lab keywords. Meanwhile, if the system timezone is set to `Asia/Shanghai` or `Asia/Urumqi`, the date separator flips from `YYYY-MM-DD` to `YYYY/MM/DD`.
+
+The domain and keyword lists are stored as XOR-obfuscated base64 strings decoded with key `91`. The decoded keyword list includes `deepseek`, `moonshot`, `zhipu`, `bigmodel`, `baichuan`, and others. The domain list runs hundreds of entries long — from major Chinese tech companies like `baidu.com`, `alibaba-inc.com`, and `bytedance.net` to obscure proxy reseller domains like `claude-opus.top` and `zenmux.ai`.
+
+The author acknowledges this is likely an anti-distillation and anti-reseller measure. Anthropic wants to detect when Claude Code is being routed through unofficial gateways. But their conclusion is sharp: *"Hiding the signal in the system prompt makes every other privacy claim harder to believe."*
+
+## The Community Splits
+
+The HN thread (748 comments, 2,444 points) quickly sorted into several camps. The most insightful technical take came from **meowface**, who invoked the concept of *underhanded code* — the dark art of writing code that secretly does something else while appearing innocent. Their criticism wasn't of the feature's intent but its execution: *"It's a bit surprising at how sloppily they did this. I think they could've achieved the same effect while decreasing the odds of detection."* They pointed out that the client-side portion could have been written with plausible deniability — code that looks like it does one thing but secretly encodes another signal.
+
+**hn_throwaway_99** countered with a different theory: *"Anthropic could have implemented this not as a durable detection system against proxying resellers, but instead as a point-in-time sampling system to detect where (and with what context) proxying reselling is currently happening."* In other words, maybe they knew it would be detected — and that was fine because they only needed a brief window of data.
+
+The privacy-focused camp was less charitable. **civet_java** articulated the core concern: *"That the provider's business needs necessitate this behaviour doesn't justify their lack of honest disclosure. That honest disclosure would render the solution to their problem useless isn't my problem. If anything, that they thought this was acceptable makes me wonder what else they're harvesting from my machine?"*
+
+On the practical side, **aftbit** revealed that they'd been using Claude Code with DeepSeek V4 Pro through a custom `ANTHROPIC_BASE_URL` setup — and that this discovery was pushing them to switch to open-source alternatives like OpenCode.
+
+Many commenters also noted the irony that Anthropic — a company that talks extensively about AI safety and transparency — resorted to hidden, obfuscated code in their developer tool aimed at the same audience that would immediately discover it.
+
+## Where Each Side Stands
+
+The article gets the technical details right, and its core claim — that this is hidden functionality with no disclosure — is uncontested. The reverse engineering is thorough, and the code snippets make the mechanism irrefutable.
+
+But the HN community raises a valid nuance the article only touches on: this is almost certainly just the tip of the iceberg. Server-side detection is where the real capability lives. The client-side steganography is likely a fast-burn measure — something easy to deploy that catches low-effort resellers while the serious detection happens in the cloud. Several commenters noted that any determined adversary (and we're talking about state-level AI labs here) would trivially bypass this by patching the binary or changing their proxy's hostname.
+
+What the community as a whole misses, however, is the larger pattern. This isn't an isolated incident — it's a structural tension baked into the business model of frontier AI companies. They need to give their tools deep access to be competitive (filesystem, shell, git), but they also need to protect their models from distillation and unauthorized use. Those two needs are fundamentally in conflict, and steganography is what you get when that tension is resolved in favor of security over transparency.
+
+## The Takeaway
+
+If you use Claude Code with a custom API endpoint — whether through a local proxy, a cost-saving reseller, or a model router — understand that Anthropic can fingerprint your setup through the system prompt itself. The fix isn't complicated (change your proxy hostname, patch the binary, or use a different harness), but the real lesson is structural: **trust in developer tools is earned through boring, transparent behavior, not cleverly hidden signals.**
+
+The most actionable response? Consider tools where the client code is open source and the full extent of telemetry is documented. Projects like OpenCode, pi.dev, and [Hermes Agent](https://hermes-agent.nousresearch.com/) operate on a fundamentally different trust model — their source is visible, their behavior is auditable, and there's no possibility of unobtrusive markers hidden in prompt punctuation.
+
+As AI coding agents become more powerful and more deeply integrated into our development workflows, the question isn't whether companies *can* monitor usage — it's whether they *should*, and under what terms. Sticking with tools where the answer is "transparently or not at all" is the only durable position.
+
+---
+
+*Discuss this article on [Hacker News](https://news.ycombinator.com/item?id=48734373).*
+
+*Original article by Thereallo at [thereallo.dev](https://thereallo.dev/blog/claude-code-prompt-steganography).*
