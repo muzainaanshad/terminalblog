@@ -1,0 +1,65 @@
+---
+title: "Claude Code Sends 33k Tokens Before Your Prompt; OpenCode Sends 7k"
+description: "A new benchmark put Claude Code and OpenCode on the same model and measured exactly what each harness ships before your prompt arrives. Claude Code's fixed overhead is ~33,000 tokens vs OpenCode's ~7,000 — and the cache-write gap is where your bill actually spikes."
+pubDate: "2026-07-13T11:00:00Z"
+updatedDate: "2026-07-13T11:00:00Z"
+tags: ["claude-code", "opencode", "comparison", "cost", "token", "benchmark", "prompt-caching"]
+tool: "claude-code"
+author: "rho"
+image: "/api/og?title=Claude%20Code%20vs%20OpenCode%20Token%20Overhead&tool=Claude%20Code"
+---
+
+A new side-by-side measurement shows Claude Code ships roughly 33,000 tokens of system prompt, tool schemas, and scaffolding before your prompt even arrives — about 4.7x the ~7,000 tokens OpenCode sends on the same setup. The bigger cost surprise is next: Claude Code re-wrote up to 54x more prompt-cache tokens per session, and cache writes bill at a premium.
+
+## How the test was run
+
+The benchmark (published by Systima) spliced a logging proxy between each harness and the model endpoint, capturing the exact request payload and the API's usage block. Both harnesses were pinned to the same conditions:
+
+- **Claude Code 2.1.207** and **OpenCode 1.17.18**, both pointed at `claude-sonnet-4-5`
+- Fresh config directories, empty workspace, no MCP servers, no instruction files, permissions bypassed
+- Tasks ranged from "reply with OK" (isolating fixed overhead) to a write-run-test-fix loop against FizzBuzz
+- A zero-tools variant separated system-prompt weight from tool-schema weight
+
+The payload captures are exact; the only adjustment was subtracting a constant ~6,200-token gateway envelope that wrapped every request in the test setup.
+
+## The fixed floor
+
+| Harness | Fixed overhead before your prompt | Cache-write behavior |
+| --- | --- | --- |
+| Claude Code 2.1.207 | ~33,000 tokens | Re-wrote tens of thousands of cache tokens per run; up to 54x OpenCode |
+| OpenCode 1.17.18 | ~7,000 tokens | Byte-identical prefix each run; cached once, read back cheaply |
+
+OpenCode's request prefix was byte-identical in every captured run, so it paid to cache its payload once per session and read it back for pennies. Claude Code re-wrote large amounts of prompt-cache tokens mid-session, run after run — and because cache writes bill at a premium, one usage dashboard climbs while the other stays flat.
+
+## Where it piles on in real setups
+
+The harness floor is only the start. The benchmark added variables one at a time:
+
+- A production repository's **72KB instruction file** added an average of ~20,000 tokens to every request.
+- **Five modest MCP servers** added 5,000–7,000 more.
+- By the time a real working setup sends its first request, it is **75,000–85,000 tokens deep before you type a word**.
+
+Behavior multiplies it further. A small task that cost 121,000 tokens done directly cost 513,000 tokens when fanned out to two subagents, because every subagent pays its own bootstrap and the parent then swallows the transcript.
+
+## The nuance that cuts the other way
+
+One result favors Claude Code. On a multi-step task, its whole-task total came out *lower* than OpenCode's, because it batches tool calls into fewer requests while OpenCode re-pays its smaller baseline turn after turn. The meter starts higher for Claude Code; how the session unfolds decides who actually spends more. Overhead is not destiny — session shape matters.
+
+## What you should do
+
+If you run agentic AI in production, the benchmark's core advice applies: you should be able to answer "what exactly did we send to the model?" with data, not folklore. Point `ANTHROPIC_BASE_URL` at a logging proxy, give the harness a fresh config and empty workspace for the floor, then add your instruction file, MCP servers, and workflows one at a time and watch the boundary. If your traffic passes through a gateway, measure its envelope with a bare request first.
+
+For the wider open-source-vs-paid trade-off behind these two harnesses, see our [OpenCode vs Claude Code free-agent face-off](/blog/opencode-vs-claude-code-free-agent/), and for how model choice interacts with this overhead, our [Claude Code vs Codex comparison](/blog/claude-code-vs-codex/) breaks down the underlying models.
+
+---
+
+**Q1: Is Claude Code always more expensive than OpenCode because of the token overhead?**
+Not necessarily. Claude Code starts with a much higher fixed overhead (~33k vs ~7k tokens) and writes far more cache tokens, which can spike cost. But on multi-step tasks it batches tool calls into fewer requests, and in the benchmark its whole-task total came out lower than OpenCode's. Session shape decides the final bill.
+
+**Q2: Why do cache writes matter so much for cost?**
+Prompt-cache *writes* bill at a premium compared to cache *reads*. OpenCode cached its prefix once and reused it cheaply; Claude Code re-wrote large cache payloads repeatedly, so the same logical content cost more per turn.
+
+**Q3: How can I measure my own agent's token overhead?**
+Put a logging proxy between your harness and the model endpoint, start with a fresh config and empty workspace to isolate the floor, then add your instruction file, MCP servers, and workflows one variable at a time. Subtract any gateway envelope you measure with a bare request first.
+
+*Sometimes Claude writes better code. Sometimes GPT does. [aiFiesta](https://aifiesta.link/muhammed-anshad) lets you compare both instantly in one chat for $12/mo — plus 7 more premium models.*
