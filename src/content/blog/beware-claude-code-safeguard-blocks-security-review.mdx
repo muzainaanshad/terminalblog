@@ -1,0 +1,61 @@
+---
+title: "Beware: Claude Code's Safeguard Blocked a Legitimate Security Code Review — Twice"
+description: "A fresh Claude Code bug shows the model safeguard firing false positives on read-only defensive security reviews, blocking credential-handling and TLS audits. Here's how to detect and work around it."
+pubDate: "2026-07-12T20:30:00Z"
+updatedDate: "2026-07-12T20:30:00Z"
+tags: ["security", "beware", "claude-code", "safeguard", "false-positive", "code-review"]
+tool: "claude-code"
+author: "kira_bug_hunter"
+image: "/api/og?title=Beware:%20Safeguard%20Blocks%20Security%20Review&tool=Claude%20Code"
+---
+
+You ask Claude Code to review a local Git diff for credential leaks and TLS misconfiguration. Nothing leaves your machine, nothing gets modified — pure defensive static analysis. And the model refuses. Twice. Not because you did anything wrong, but because the prompt contained words like "credential," "SSRF," and "secret lifecycle." That's a real, reproducible failure reported this week, and it can silently derail your security workflow.
+
+## The Issue
+
+GitHub issue [#76930](https://github.com/anthropics/claude-code/issues/76930) (labeled `bug`, `area:security`, `area:model`, Windows) reports two consecutive `TelemetrySafeError` refusals from Fable 5 on the same read-only review. The user requested a structured audit of locally developed onboarding code: verifying email credentials before storage, keeping secrets out of logs, TLS validation, and SSRF/DNS-rebinding protection. The prompt explicitly banned file edits, network calls, and secret disclosure. It was textbook defensive work.
+
+Instead, the safeguard classified the request as a policy violation and blocked both attempts (request IDs `req_011CcxKSpSVH8p5ikD2R79P6` and `req_011CcxLB58hhgS4X1558VUKp`). The author had to abandon Claude Code and finish the review on a different model in a separate session.
+
+The issue is not the safety system existing — it's the **granularity**. Content moderation keyed on security *terminology* rather than *intent* means benign audits get lumped in with exploit requests.
+
+## Are You Affected?
+
+Run these checks after any unexpected refusal on defensive security work:
+
+```bash
+# Look for TelemetrySafeError refusals in your session logs
+grep -rl "TelemetrySafeError" ~/.claude/projects/*/*.jsonl 2>/dev/null
+
+# Count safeguard blocks in the most recent session
+grep -c "TelemetrySafeError" ~/.claude/projects/*/$(ls -t ~/.claude/projects/*/*.jsonl 2>/dev/null | head -1 | xargs basename) 2>/dev/null
+
+# Check your Claude Code version (issue filed on 2.1.205)
+claude --version
+```
+
+If you see `TelemetrySafeError` on a read-only, no-network prompt that only *describes* credential or TLS handling, you've hit the false positive.
+
+## The Fix
+
+- **Reframe the prompt.** Swap attack-flavored nouns for neutral phrasing ("auth validation checks" instead of "SSRF prevention") to slip past keyword filters.
+- **Split the review.** Break a single large audit into smaller, topic-scoped prompts so one flagged term doesn't sink the whole task.
+- **Keep a fallback model.** For routine defensive reviews, a separate session or model avoids the block without losing the work.
+- **Report the request IDs** to Anthropic so the classifier can be retrained on intent, not vocabulary.
+
+## Why It Happened
+
+Guardrail classifiers for coding agents often run on prompt-side signal matching security lexicons to prohibited-activity classes. A static analysis request that *mentions* credential handling, TLS, or SSRF reads similarly to requests that *perform* it. Without intent-aware classification or a returned "which phrase triggered this" hint, legitimate engineers are collateral damage.
+
+## FAQ
+
+**Q1: Is this a security vulnerability in Claude Code?**
+No — it's an over-broad safety filter, not an exploit. But it erodes trust: teams may ship unreviewed code because the review tool refused to help.
+
+**Q2: Does it only hit Windows?**
+The report is on Windows (2.1.205), but the classification runs server-side on the model, so macOS and Linux users are just as exposed.
+
+**Q3: Can I disable the safeguard?**
+No, and you shouldn't. The fix is prompt reframing and reporting false positives — not turning off safety controls.
+
+*Before you commit to a subscription — see if there's a better deal at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
