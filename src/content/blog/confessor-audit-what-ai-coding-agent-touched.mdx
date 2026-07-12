@@ -1,0 +1,84 @@
+---
+title: "Confessor: A Local Tool That Replays What Your AI Coding Agent Actually Read"
+description: "Confessor reconstructs what your AI coding agent did from Claude Code's own session logs — every sensitive file it opened and every read-then-network-call chain — with zero network calls of its own."
+pubDate: "2026-07-12T14:00:00Z"
+updatedDate: "2026-07-12T14:00:00Z"
+tags: ["security", "claude-code", "audit", "privacy", "tools"]
+tool: "claude-code"
+author: "kira_bug_hunter"
+image: "/api/og?title=Confessor:+Replay+What+Your+AI+Coding+Agent+Actually+Read&tool=claude-code"
+---
+
+Confessor is a new open-source tool that shows you what your AI coding agent actually did on your machine. It reads Claude Code's existing session logs, reconstructs every file the agent opened and every command it ran, and flags the pattern that matters most: a sensitive file read followed by a network call in the same session. It runs entirely locally and makes zero network calls itself.
+
+It surfaced on Hacker News as a Show HN, and it targets a gap most of us have quietly ignored: you let an agent run, it finished the task, and you never actually confirmed what it touched along the way.
+
+## The Problem It Solves
+
+You've been letting an AI coding agent run with your user account's permissions. Claude Code and tools like it can read anything you can — your `.env`, your `~/.ssh` keys, your browser's saved passwords, a folder of tax PDFs — and they can also run shell commands and reach the network. Most of the time they do exactly what you asked. But you don't *know* that. You know the task finished.
+
+This is the same trust gap we covered when [Gitlawb Zero's sandbox was found inheriting environment variables verbatim](/blog/zero-sandbox-credential-leak/). The difference is the angle: that was a leak in the agent. Confessor is a way to look *back* at any agent run and ask the question you can't answer today — *did my stuff leave?*
+
+## How It Works
+
+Claude Code writes every session to `~/.claude/projects/**/*.jsonl` — one JSON event per line, including each tool call and its result. Confessor replays those events in order and extracts four things:
+
+- **Files** the agent read, wrote, or edited — from `Read`/`Write`/`Edit` tool calls and from `cat`/`cp` and similar commands inside `Bash`. Each path is classified against a ruleset covering `.env`, `~/.ssh/id_rsa`, `.aws/credentials`, browser password stores, shell history, and financial or medical documents by name.
+- **Secrets in context** — the detection engine runs over each tool *result*, meaning the text that actually entered the model's context window. A `cat .env` that returned three keys is counted as three keys the agent saw.
+- **Sinks** — every way off the machine: `WebFetch`, `WebSearch`, network shell commands like `curl`, `wget`, `scp`, `nc`, and `git push`, plus MCP tool calls to outside servers.
+- **Exposure paths** — within a single session, a sensitive read (or a secret in a result) followed by an external sink, paired with the time gap between the two.
+
+That last one is the headline. The tool's own example describes an agent reading `.env` with three live keys inside, then fifteen seconds later running a `curl -X POST` with the file contents to a host that wasn't the user's. As the author is careful to say, that is a lead, not a verdict — the agent may have had a legitimate reason. Confessor shows you the pattern and the timing and lets you judge.
+
+## Detection Details
+
+According to the project, detection runs on three layers of plain rules, not machine learning:
+
+| Layer | What it catches | Count |
+|---|---|---|
+| Secret patterns | Vendor tokens, key blocks, DB URIs, JWTs | 30 patterns |
+| Structured PII | Emails, cards (with a Luhn check), SSNs gated on nearby context | 13 patterns |
+| Topic lexicons | Sensitive subjects like medical, financial, legal | 7 lexicons |
+
+Because it's rules and not a model, every flag points at the exact rule that fired — and, the author notes, a novel secret format can slip through. Secret values are routed through a redactor before anything is stored, so the report shows something like `sk_live_…MPLE`, never the full key.
+
+## The Privacy Guarantees
+
+A tool whose whole job is auditing your secrets has no business being trusted on faith, and the author leans into that. The stated guarantees are mechanical, not promises:
+
+- **Zero network calls.** No code in `src/` may import a network module or call `fetch`, and a static check enforces it in CI on every commit.
+- **Zero runtime dependencies.** The same check fails if `package.json` grows one. The zip reader for chat exports is written from scratch on `node:zlib`.
+- **No full secret in the output.** A test renders a report from planted fixtures and asserts that not one of them appears.
+- **The report is one offline HTML file** — no CDN, no fonts, no fetches, with a Content-Security-Policy that blocks external loads.
+
+You can run it with your wifi off. That's the point.
+
+## Running It
+
+The project lists Node 18.17 or newer as the requirement. With no arguments, it finds your local Claude Code logs, reconstructs what the agent did, scans the content, and writes `confessor-report.html`:
+
+```bash
+npx confessor
+```
+
+It also scans chat exports from ChatGPT, Claude, and Gemini if you point it at a downloaded export, and it grades how much you've handed to each provider. Flags include `--json` for machine-readable output, `--out`, `--no-open`, `--quiet`, and `--fail-on critical|high|medium`, which exits non-zero — useful to drop into CI so a build fails if a secret leaked into a log or a chat.
+
+## The Honest Limitations
+
+The author is refreshingly direct about what this is not. An exposure path is a lead, not proof of theft. Detection is rules-based, so novel formats or cleverly-worded disclosures can slip through. The agent reconstruction currently understands Claude Code's log format only; other agents are described as on the roadmap. And it's retrospective — it reports what already happened, it does not intercept in real time.
+
+That framing is the right one. This isn't a shield. It's a way to go back and read the receipts your agent has been leaving on disk the whole time — receipts most people never open. If you've been running an agent with broad permissions and have never once looked at what it read, that's worth a few seconds of `npx`. For the flip side — how an agent *should* isolate secrets in the first place — see our [look at Hermes Agent's credential guard system](/blog/hermes-security-credential-guards-provider-isolation/).
+
+## FAQ
+
+**Q: Does Confessor need to run alongside my agent?**
+A: No. It's retrospective and reads the session logs already on your disk after the fact. There's no daemon, nothing to install alongside the agent, and nothing running during your sessions.
+
+**Q: Which agents does it support?**
+A: The agent-reconstruction feature currently understands Claude Code's `~/.claude/projects` log format. The project describes support for other agents as being on the roadmap. Its chat-history scanning separately covers ChatGPT, Claude, and Gemini exports.
+
+**Q: If Confessor flags a read-then-network-call, does that mean my data was stolen?**
+A: No. The author is explicit that an exposure path is a lead, not a verdict — the agent may have had a legitimate reason for both actions. Confessor shows you the pattern and the timing so you can investigate; if you're concerned, rotate the affected credentials, since passive exfiltration can't be detected after the fact.
+
+---
+*Maximize your AI toolkit budget. Compare prices and find deals at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
