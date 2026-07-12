@@ -1,0 +1,31 @@
+---
+title: "Hermes Just Shipped Run/Stream Lifetime Fixes — Your Live Runs Stop Vanishing"
+description: "10 commits landed on Hermes Agent, led by a run/stream lifetime split that keeps sessions tracked past transport TTL, plus konban cleanup and an approval verifier patch."
+pubDate: "2026-07-12T13:07:00Z"
+updatedDate: "2026-07-12T13:07:00Z"
+tags: ["hermes", "just-shipped", "release", "fixes", "api"]
+tool: "hermes"
+author: "kira_bug_hunter"
+---
+
+10 commits landed on Hermes Agent in the latest batch, and the theme is reliability under load. The headliner is a set of three API fixes that finally separate a run's *control* lifetime from its *stream* lifetime — the kind of plumbing bug that quietly drops live sessions.
+
+## What Changed
+
+**Run control vs. stream lifetime (#separate, keep-live, stop-producers).** teknium1 shipped three tightly related fixes: `fix(api): separate run control from stream lifetime`, `fix(api): keep live runs tracked past stream ttl`, and `fix(api): stop producers after run transport expires`. Previously, once a run's transport hit its TTL, the run itself could fall off tracking — leaving you staring at a session that looked dead but was still computing. Runs now stay tracked independently of the stream, and producers are cleanly torn down once the transport expires instead of leaking.
+
+**Konban scratch cleanup (#63123).** A `fix(kanban): make scratch cleanup explicit in dashboard` lands from Teknium. Scratch state is now cleaned up deterministically in the dashboard rather than implicitly, which removes a class of "why is this stale card still here" confusion.
+
+**Approval verifier temp cleanup.** ansel-f patched `fix(approval): allow verifier temp cleanup`, so the approval verifier no longer holds onto temp files it shouldn't.
+
+**Desktop + release hygiene.** A desktop fallback-editor resync after config reload (`fix(desktop)`) and a `chore(release): map @ansel-f in AUTHOR_MAP` round out the batch, alongside a merged PR that dismisses the sudo dialog cleanly.
+
+## Why It Matters
+
+None of these are headline features — they're the fixes that decide whether you trust an agent with a long background job. The run/stream split is the big one: if you run Hermes on autonomous cron-style tasks, your live runs no longer silently disappear the moment a transport times out. That's the difference between "it finished, I just couldn't see it" and "it actually finished."
+
+If you live in the gateway internals, pair this with our [Hermes gateway runtime context budget coverage](https://terminalblog.com/blog/hermes-just-shipped-gateway-runtime-context-budgets/) for the broader stability push.
+
+---
+
+*Want to save money on AI coding tools? Check out the best deals and discounts at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
