@@ -17,14 +17,12 @@ const prevAgents = prevSnapshot?.agents || [];
 
 // Helper to get metric from either v1 or v2 format
 function getMetric(agent, key) {
-  // v2 format: agent.metrics.key
   if (agent.metrics && agent.metrics[key] !== undefined) return agent.metrics[key];
-  // v1 format: agent.key
   if (agent[key] !== undefined) return agent[key];
   return null;
 }
 
-// Calculate trends
+// Calculate trends + populate missing fields
 agents.forEach(agent => {
   const prev = prevAgents.find(p => p.id === agent.id);
   const npmNow = getMetric(agent, 'npm_downloads');
@@ -32,15 +30,11 @@ agents.forEach(agent => {
   const starsNow = getMetric(agent, 'github_stars');
   const starsPrev = prev ? getMetric(prev, 'github_stars') : null;
   
-  agent.npm_change = (npmNow || 0) - (npmPrev || 0);
-  agent.star_change = (starsNow || 0) - (starsPrev || 0);
-  agent.score_change = agent.growth_score - (prev?.growth_score || 0);
-  
   // Only show change if we have previous data
-  if (!prev || npmPrev === null || npmPrev === undefined) agent.npm_change = null;
-  if (!prev || starsPrev === null || starsPrev === undefined) agent.star_change = null;
+  agent.npm_change = (prev && npmPrev !== null) ? (npmNow || 0) - npmPrev : null;
+  agent.star_change = (prev && starsPrev !== null) ? (starsNow || 0) - starsPrev : null;
   
-  // Ensure metrics object exists for template
+  // Ensure metrics object exists
   if (!agent.metrics) {
     agent.metrics = {
       npm_downloads: agent.npm_downloads,
@@ -50,85 +44,109 @@ agents.forEach(agent => {
       homebrew_installs: agent.homebrew_installs
     };
   }
-  // Ensure data_reasons exists
-  if (!agent.data_reasons) {
-    agent.data_reasons = {
-      npm: agent.metrics.npm_downloads === null || agent.metrics.npm_downloads === undefined ? 'No npm package' : null,
-      github: agent.metrics.github_stars === null || agent.metrics.github_stars === undefined ? (agent.github ? 'Fetch failed' : 'No public repo') : null,
-      pypi: agent.metrics.pypi_downloads === null || agent.metrics.pypi_downloads === undefined ? 'No PyPI package' : null,
-      homebrew: agent.metrics.homebrew_installs === null || agent.metrics.homebrew_installs === undefined ? 'No Homebrew cask' : null
-    };
-  }
-  // Ensure data_coverage exists
-  if (!agent.data_coverage) {
-    const coverage = [];
-    if (agent.metrics.npm_downloads !== null && agent.metrics.npm_downloads !== undefined) coverage.push('npm');
-    if (agent.metrics.github_stars !== null && agent.metrics.github_stars !== undefined) coverage.push('github');
-    if (agent.metrics.pypi_downloads !== null && agent.metrics.pypi_downloads !== undefined) coverage.push('pypi');
-    if (agent.metrics.homebrew_installs !== null && agent.metrics.homebrew_installs !== undefined) coverage.push('brew');
-    agent.data_coverage = coverage;
-  }
+  
+  // Compute hype ratio for display
+  const stars = agent.metrics.github_stars || 0;
+  const downloads = agent.metrics.npm_downloads || 0;
+  agent.hype_ratio_calc = downloads > 0 ? (stars / downloads * 1000).toFixed(1) : null;
 });
 
+// Sort by GitHub stars (primary) then npm downloads (secondary)
+agents.sort((a, b) => {
+  const starsA = getMetric(a, 'github_stars') || 0;
+  const starsB = getMetric(b, 'github_stars') || 0;
+  if (starsB !== starsA) return starsB - starsA;
+  return (getMetric(b, 'npm_downloads') || 0) - (getMetric(a, 'npm_downloads') || 0);
+});
+agents.forEach((a, i) => { a.rank = i + 1; });
+
 function formatNumber(n) {
-  if (n === null || n === undefined) return 'n/a';
+  if (n === null || n === undefined) return '—';
   if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
   if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
   return n.toLocaleString();
 }
 
 function formatChange(n) {
+  if (n === null || n === undefined) return '';
   if (n > 0) return `+${formatNumber(n)}`;
   if (n < 0) return formatNumber(n);
-  return '—';
+  return '';
 }
 
-function getDataReason(agent, source) {
-  return agent.data_reasons?.[source] || null;
-}
+// Agent install hints
+const installHints = {
+  'claude-code': { install: 'npm i -g @anthropic-ai/claude-code', type: 'CLI', price: 'Paid ($20/mo)' },
+  'gemini-cli': { install: 'npm i -g @anthropic-ai/claude-code', type: 'CLI', price: 'Free tier' },
+  'codex': { install: 'npm i -g @openai/codex-sdk', type: 'CLI', price: 'Paid (API usage)' },
+  'copilot-cli': { install: 'npm i -g @github/copilot', type: 'CLI', price: 'Paid ($10/mo)' },
+  'openclaw': { install: 'npm i -g openclaw', type: 'CLI', price: 'Free' },
+  'hermes': { install: 'curl -fsSL https://hermes.nousresearch.com/install | bash', type: 'CLI', price: 'Free' },
+  'cline': { install: 'VS Code extension', type: 'IDE', price: 'Free (bring your own key)' },
+  'goose': { install: 'brew install block-goose-cli', type: 'CLI', price: 'Free' },
+  'kilo-code': { install: 'VS Code extension', type: 'IDE', price: 'Free' },
+  'opencode': { install: 'npm i -g opencode', type: 'CLI', price: 'Free' },
+  'mimo-code': { install: 'npm i -g @mimo-ai/cli', type: 'CLI', price: 'Free' },
+  'ampcode': { install: 'npm i -g @sourcegraph/amp', type: 'CLI', price: 'Free (bring your own key)' },
+  'codebuff': { install: 'npm i -g codebuff', type: 'CLI', price: 'Free' },
+  'cursor': { install: 'Download from cursor.com', type: 'IDE', price: 'Freemium ($20/mo pro)' },
+  'pi-dev': { install: 'pip install pi-agent', type: 'CLI', price: 'Free' },
+  'gitlawb-zero': { install: 'Go binary', type: 'CLI', price: 'Free' },
+  'oh-my-pi': { install: 'pip install oh-my-pi', type: 'CLI', price: 'Free' }
+};
 ---
 
 <Layout title={`Agent Adoption Leaderboard — ${SITE_TITLE}`} description="Track real usage and community interest for every AI coding agent. npm downloads, GitHub stars, and growth scores — updated daily.">
 
-<main style="max-width:1000px;margin:0 auto;padding:2rem 1rem;">
+<main style="max-width:1100px;margin:0 auto;padding:2rem 1rem;">
   <div style="text-align:center;margin-bottom:2rem;">
     <h1 style="font-family:var(--font-mono);font-size:1.5rem;color:var(--green);margin-bottom:0.5rem;">
-      Agent Adoption Leaderboard
+      AI Coding Agent Leaderboard
     </h1>
     <p style="font-family:var(--font-mono);font-size:0.8rem;color:var(--fg-dim);">
-      Real usage data, not hype. Updated daily from npm, GitHub, PyPI, and Homebrew.
+      Ranked by GitHub stars + npm downloads. Updated daily.
     </p>
     <p style="font-family:var(--font-mono);font-size:0.7rem;color:var(--fg-dim);margin-top:0.5rem;">
-      Last updated: {lastUpdated} · {agents.length} agents tracked · Methodology v2
+      Last updated: {lastUpdated} · {agents.length} agents tracked
     </p>
   </div>
 
-  {/* Hype vs Reality Section */}
+  {/* Quick comparison — Hype vs Reality */}
   <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:1.5rem;margin-bottom:2rem;">
     <h2 style="font-family:var(--font-mono);font-size:1rem;color:var(--amber);margin-bottom:1rem;">
       Hype vs Reality
     </h2>
     <p style="font-family:var(--font-mono);font-size:0.75rem;color:var(--fg-dim);margin-bottom:1rem;">
-      High hype ratio = lots of GitHub stars but fewer actual users. Low ratio = widely used but less hyped.
+      Stars measure hype. Downloads measure usage. The gap tells the real story.
     </p>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;">
-      {agents.filter(a => {
-        const hr = a.hype_ratio || (a.metrics?.github_stars && (a.metrics.npm_downloads || a.metrics.pypi_downloads || a.metrics.homebrew_installs) ? (a.metrics.github_stars / ((a.metrics.npm_downloads || 0) + (a.metrics.pypi_downloads || 0) + (a.metrics.homebrew_installs || 0)) * 1000).toFixed(2) : null);
-        return hr && parseFloat(hr) > 0;
-      }).slice(0, 6).map(agent => {
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;">
+      {agents.filter(a => a.hype_ratio_calc && parseFloat(a.hype_ratio_calc) > 0).slice(0, 6).map(agent => {
         const stars = getMetric(agent, 'github_stars');
-        const npm = getMetric(agent, 'npm_downloads');
-        const hr = agent.hype_ratio || (stars && npm ? (stars / npm * 1000).toFixed(2) : '0');
+        const downloads = getMetric(agent, 'npm_downloads');
+        const ratio = parseFloat(agent.hype_ratio_calc);
+        const label = ratio > 50 ? 'more starred than used' : ratio < 2 ? 'more used than starred' : 'balanced';
+        const labelColor = ratio > 50 ? 'var(--amber)' : ratio < 2 ? 'var(--green)' : 'var(--fg-dim)';
         return (
           <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:1rem;">
-            <div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--green);margin-bottom:0.5rem;">
-              {agent.name}
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+              <a href={`/tool/${agent.id}`} style="font-family:var(--font-mono);font-size:0.8rem;color:var(--green);text-decoration:none;font-weight:600;">
+                {agent.name}
+              </a>
+              <span style={`font-family:var(--font-mono);font-size:0.65rem;color:${labelColor};`}>{label}</span>
             </div>
-            <div style="font-family:var(--font-mono);font-size:1.2rem;color:var(--fg);margin-bottom:0.5rem;">
-              {hr}x
-            </div>
-            <div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--fg-dim);">
-              {formatNumber(stars)} stars / {formatNumber(npm)} downloads
+            <div style="display:flex;gap:1.5rem;font-family:var(--font-mono);font-size:0.75rem;">
+              <div>
+                <div style="color:var(--amber);font-size:1.1rem;font-weight:600;">{formatNumber(stars)} ★</div>
+                <div style="color:var(--fg-dim);font-size:0.6rem;">GitHub stars</div>
+              </div>
+              <div>
+                <div style="color:var(--green);font-size:1.1rem;font-weight:600;">{formatNumber(downloads)}</div>
+                <div style="color:var(--fg-dim);font-size:0.6rem;">npm / week</div>
+              </div>
+              <div style="margin-left:auto;text-align:right;">
+                <div style="color:var(--fg);font-size:0.9rem;">{agent.hype_ratio_calc}x</div>
+                <div style="color:var(--fg-dim);font-size:0.6rem;">star/dl ratio</div>
+              </div>
             </div>
           </div>
         );
@@ -141,144 +159,95 @@ function getDataReason(agent, source) {
     <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:0.75rem;">
       <thead>
         <tr style="background:var(--bg);border-bottom:1px solid var(--border);">
-          <th style="padding:0.75rem;text-align:left;color:var(--fg-dim);">#</th>
-          <th style="padding:0.75rem;text-align:left;color:var(--fg-dim);">Agent</th>
-          <th style="padding:0.75rem;text-align:right;color:var(--fg-dim);cursor:pointer;" data-sort="npm">npm/week</th>
-          <th style="padding:0.75rem;text-align:right;color:var(--fg-dim);cursor:pointer;" data-sort="stars">GitHub ★</th>
-          <th style="padding:0.75rem;text-align:right;color:var(--fg-dim);cursor:pointer;" data-sort="brew">Brew 30d</th>
-          <th style="padding:0.75rem;text-align:right;color:var(--fg-dim);cursor:pointer;" data-sort="pypi">PyPI</th>
-          <th style="padding:0.75rem;text-align:right;color:var(--green);cursor:pointer;" data-sort="score">Score</th>
-          <th style="padding:0.75rem;text-align:center;color:var(--fg-dim);">Sources</th>
+          <th style="padding:0.75rem 0.5rem;text-align:left;color:var(--fg-dim);width:2rem;">#</th>
+          <th style="padding:0.75rem 0.5rem;text-align:left;color:var(--fg-dim);">Agent</th>
+          <th style="padding:0.75rem 0.5rem;text-align:left;color:var(--fg-dim);">Type</th>
+          <th style="padding:0.75rem 0.5rem;text-align:right;color:var(--fg-dim);" data-sort="stars">GitHub ★</th>
+          <th style="padding:0.75rem 0.5rem;text-align:right;color:var(--fg-dim);" data-sort="forks">Forks</th>
+          <th style="padding:0.75rem 0.5rem;text-align:right;color:var(--fg-dim);" data-sort="npm">npm / week</th>
+          <th style="padding:0.75rem 0.5rem;text-align:center;color:var(--fg-dim);">Price</th>
+          <th style="padding:0.75rem 0.5rem;text-align:left;color:var(--fg-dim);">Install</th>
         </tr>
       </thead>
       <tbody>
-        {agents.map((agent, i) => (
-          <tr style="border-bottom:1px solid var(--border);transition:background 0.15s;" 
-              onmouseover="this.style.background='var(--bg)'" 
-              onmouseout="this.style.background='transparent'">
-            <td style="padding:0.75rem;color:var(--fg-dim);">{agent.rank}</td>
-            <td style="padding:0.75rem;color:var(--fg);font-weight:600;">
-              <a href={`/tool/${agent.id}`} style="color:var(--fg);text-decoration:none;">
-                {agent.name}
-              </a>
-            </td>
-            <td style="padding:0.75rem;text-align:right;color:var(--fg);">
-              {agent.metrics?.npm_downloads !== null && agent.metrics?.npm_downloads !== undefined ? (
-                <>
-                  {formatNumber(agent.metrics.npm_downloads)}
-                  {agent.npm_change !== null && agent.npm_change !== 0 && (
-                    <span style={`font-size:0.6rem;margin-left:0.25rem;color:${agent.npm_change > 0 ? 'var(--green)' : 'var(--red)'}`}>
-                      {formatChange(agent.npm_change)}
-                    </span>
-                  )}
-                </>
-              ) : (
-                <span style="color:var(--fg-dim);font-size:0.65rem;" title={getDataReason(agent, 'npm')}>
-                  n/a
-                </span>
-              )}
-            </td>
-            <td style="padding:0.75rem;text-align:right;color:var(--fg);">
-              {agent.metrics?.github_stars !== null && agent.metrics?.github_stars !== undefined ? (
-                <>
-                  {formatNumber(agent.metrics.github_stars)}
-                  {agent.star_change !== null && agent.star_change !== 0 && (
-                    <span style={`font-size:0.6rem;margin-left:0.25rem;color:${agent.star_change > 0 ? 'var(--green)' : 'var(--red)'}`}>
-                      {formatChange(agent.star_change)}
-                    </span>
-                  )}
-                </>
-              ) : (
-                <span style="color:var(--fg-dim);font-size:0.65rem;" title={getDataReason(agent, 'github')}>
-                  n/a
-                </span>
-              )}
-            </td>
-            <td style="padding:0.75rem;text-align:right;color:var(--fg);">
-              {agent.metrics?.homebrew_installs !== null && agent.metrics?.homebrew_installs !== undefined ? (
-                formatNumber(agent.metrics.homebrew_installs)
-              ) : (
-                <span style="color:var(--fg-dim);font-size:0.65rem;" title={getDataReason(agent, 'homebrew')}>
-                  n/a
-                </span>
-              )}
-            </td>
-            <td style="padding:0.75rem;text-align:right;color:var(--fg);">
-              {agent.metrics?.pypi_downloads !== null && agent.metrics?.pypi_downloads !== undefined ? (
-                formatNumber(agent.metrics.pypi_downloads)
-              ) : (
-                <span style="color:var(--fg-dim);font-size:0.65rem;" title={getDataReason(agent, 'pypi')}>
-                  n/a
-                </span>
-              )}
-            </td>
-            <td style="padding:0.75rem;text-align:right;color:var(--green);font-weight:600;">
-              {agent.growth_score}
-            </td>
-            <td style="padding:0.75rem;text-align:center;color:var(--fg-dim);font-size:0.65rem;">
-              {agent.data_coverage?.length || 0}/{4}
-            </td>
-          </tr>
-        ))}
+        {agents.map((agent, i) => {
+          const hint = installHints[agent.id] || {};
+          const stars = getMetric(agent, 'github_stars');
+          const forks = getMetric(agent, 'github_forks');
+          const npm = getMetric(agent, 'npm_downloads');
+          return (
+            <tr style="border-bottom:1px solid var(--border);transition:background 0.15s;" 
+                onmouseover="this.style.background='var(--bg)'" 
+                onmouseout="this.style.background='transparent'">
+              <td style="padding:0.6rem 0.5rem;color:var(--fg-dim);">{agent.rank}</td>
+              <td style="padding:0.6rem 0.5rem;">
+                <a href={`/tool/${agent.id}`} style="color:var(--fg);text-decoration:none;font-weight:600;">
+                  {agent.name}
+                </a>
+              </td>
+              <td style="padding:0.6rem 0.5rem;color:var(--fg-dim);font-size:0.65rem;">
+                {hint.type || '—'}
+              </td>
+              <td style="padding:0.6rem 0.5rem;text-align:right;color:var(--amber);font-weight:600;">
+                {stars !== null && stars !== undefined ? formatNumber(stars) : '—'}
+                {agent.star_change !== null && agent.star_change !== 0 && (
+                  <span style={`font-size:0.55rem;margin-left:0.2rem;color:${agent.star_change > 0 ? 'var(--green)' : 'var(--red)'}`}>
+                    {formatChange(agent.star_change)}
+                  </span>
+                )}
+              </td>
+              <td style="padding:0.6rem 0.5rem;text-align:right;color:var(--fg-dim);">
+                {forks !== null && forks !== undefined ? formatNumber(forks) : '—'}
+              </td>
+              <td style="padding:0.6rem 0.5rem;text-align:right;color:var(--green);font-weight:600;">
+                {npm !== null && npm !== undefined ? formatNumber(npm) : '—'}
+                {agent.npm_change !== null && agent.npm_change !== 0 && (
+                  <span style={`font-size:0.55rem;margin-left:0.2rem;color:${agent.npm_change > 0 ? 'var(--green)' : 'var(--red)'}`}>
+                    {formatChange(agent.npm_change)}
+                  </span>
+                )}
+              </td>
+              <td style="padding:0.6rem 0.5rem;text-align:center;color:var(--fg-dim);font-size:0.65rem;">
+                {hint.price || '—'}
+              </td>
+              <td style="padding:0.6rem 0.5rem;color:var(--fg-dim);font-size:0.6rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title={hint.install}>
+                {hint.install || '—'}
+              </td>
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   </div>
 
-  {/* Data Coverage Legend */}
-  <div style="margin-top:1rem;padding:0.75rem;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;">
-    <p style="font-family:var(--font-mono);font-size:0.65rem;color:var(--fg-dim);margin:0;">
-      <strong style="color:var(--fg);">Data Sources:</strong> 
-      npm = weekly package downloads · GitHub = stars + forks · Brew = Homebrew cask installs (30d) · PyPI = weekly Python downloads
-    </p>
-    <p style="font-family:var(--font-mono);font-size:0.65rem;color:var(--fg-dim);margin:0.3rem 0 0;">
-      <strong style="color:var(--fg);">n/a</strong> = data not available for this source (hover for reason) · 
-      <strong style="color:var(--fg);">Sources</strong> column = how many of 4 sources have data
-    </p>
-  </div>
-
-  {/* Methodology */}
+  {/* How to read this */}
   <div style="margin-top:1.5rem;padding:1rem;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;">
     <h3 style="font-family:var(--font-mono);font-size:0.8rem;color:var(--amber);margin-bottom:0.5rem;">
-      Methodology v2
+      How to read this
     </h3>
-    <p style="font-family:var(--font-mono);font-size:0.65rem;color:var(--fg-dim);line-height:1.6;">
-      <strong>Growth Score (0-100):</strong> Average of available source scores (npm, GitHub, PyPI, Homebrew), each normalized 0-100.
-      No composite weighting — raw averages until we have 4+ weeks of history.
-    </p>
-    <p style="font-family:var(--font-mono);font-size:0.65rem;color:var(--fg-dim);line-height:1.6;margin-top:0.5rem;">
-      <strong>Hype Ratio:</strong> stars / (downloads × 1000). Higher = more starred than used.
-      Flag when >5× median ("more starred than used") or <0.2× ("more used than starred").
-    </p>
-    <p style="font-family:var(--font-mono);font-size:0.65rem;color:var(--fg-dim);line-height:1.6;margin-top:0.5rem;">
-      <strong>Data Sources:</strong> npm registry (no auth), GitHub REST API (token), PyPI stats (rate-limited), Homebrew formulae API (no auth).
-      CI systems inflate npm counts — methodology page notes this.
-    </p>
-  </div>
-
-  {/* Download Data */}
-  <div style="margin-top:1rem;text-align:center;">
-    <a href="/api/leaderboard.json" style="font-family:var(--font-mono);font-size:0.75rem;color:var(--green);text-decoration:none;">
-      Download latest snapshot (JSON) →
-    </a>
+    <div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--fg-dim);line-height:1.8;">
+      <p><strong style="color:var(--amber);">GitHub stars</strong> — community interest and hype. High stars = people are watching.</p>
+      <p><strong style="color:var(--green);">npm downloads</strong> — actual usage. People installing and running it weekly.</p>
+      <p><strong style="color:var(--fg);">Star/dl ratio</strong> — the gap between hype and usage. High = more talked about than used. Low = quietly popular.</p>
+      <p><strong style="color:var(--fg-dim);">—</strong> = data not available (closed source, no npm package, or private repo).</p>
+    </div>
   </div>
 </main>
 
 <script>
-// Simple client-side sorting
 document.querySelectorAll('th[data-sort]').forEach(th => {
   th.addEventListener('click', () => {
     const sort = th.dataset.sort;
     const tbody = document.querySelector('tbody');
     const rows = Array.from(tbody.querySelectorAll('tr'));
+    const colMap = { stars: 3, forks: 4, npm: 5 };
+    const colIndex = colMap[sort] || 3;
     
     rows.sort((a, b) => {
-      const colIndex = sort === 'npm' ? 2 : sort === 'stars' ? 3 : sort === 'brew' ? 4 : sort === 'pypi' ? 5 : 6;
       const aVal = a.cells[colIndex]?.textContent.trim() || '0';
       const bVal = b.cells[colIndex]?.textContent.trim() || '0';
-      
       const aNum = parseFloat(aVal.replace(/[^0-9.]/g, '')) || 0;
       const bNum = parseFloat(bVal.replace(/[^0-9.]/g, '')) || 0;
-      
       return bNum - aNum;
     });
     
