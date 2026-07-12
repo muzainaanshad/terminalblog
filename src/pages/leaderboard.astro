@@ -1,0 +1,177 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { SITE_TITLE } from '../consts';
+import fs from 'fs';
+import path from 'path';
+
+// Read latest snapshot
+const snapshotsDir = path.join(process.cwd(), 'src', 'data', 'adoption', 'snapshots');
+const snapshots = fs.readdirSync(snapshotsDir).filter(f => f.endsWith('.json')).sort().reverse();
+const latest = snapshots.length > 0 ? JSON.parse(fs.readFileSync(path.join(snapshotsDir, snapshots[0]), 'utf-8')) : null;
+const agents = latest?.agents || [];
+const lastUpdated = latest?.date || 'N/A';
+
+// Read previous snapshot for trend data
+const prevSnapshot = snapshots.length > 1 ? JSON.parse(fs.readFileSync(path.join(snapshotsDir, snapshots[1]), 'utf-8')) : null;
+const prevAgents = prevSnapshot?.agents || [];
+
+// Calculate trends
+agents.forEach(agent => {
+  const prev = prevAgents.find(p => p.id === agent.id);
+  if (prev) {
+    agent.npm_change = agent.npm_downloads - (prev.npm_downloads || 0);
+    agent.star_change = agent.github_stars - (prev.github_stars || 0);
+    agent.score_change = agent.growth_score - prev.growth_score;
+  } else {
+    agent.npm_change = 0;
+    agent.star_change = 0;
+    agent.score_change = 0;
+  }
+});
+
+function formatNumber(n) {
+  if (n === null || n === undefined) return '—';
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+  return n.toLocaleString();
+}
+
+function formatChange(n) {
+  if (n > 0) return `+${formatNumber(n)}`;
+  if (n < 0) return formatNumber(n);
+  return '—';
+}
+---
+
+<Layout title={`Agent Adoption Leaderboard — ${SITE_TITLE}`} description="Track real usage and community interest for every AI coding agent. npm downloads, GitHub stars, and growth scores — updated daily.">
+
+<main style="max-width:1000px;margin:0 auto;padding:2rem 1rem;">
+  <div style="text-align:center;margin-bottom:2rem;">
+    <h1 style="font-family:var(--font-mono);font-size:1.5rem;color:var(--green);margin-bottom:0.5rem;">
+      Agent Adoption Leaderboard
+    </h1>
+    <p style="font-family:var(--font-mono);font-size:0.8rem;color:var(--fg-dim);">
+      Real usage data, not hype. Updated daily from npm, GitHub, and PyPI.
+    </p>
+    <p style="font-family:var(--font-mono);font-size:0.7rem;color:var(--fg-dim);margin-top:0.5rem;">
+      Last updated: {lastUpdated}
+    </p>
+  </div>
+
+  {/* Hype vs Reality Section */}
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:1.5rem;margin-bottom:2rem;">
+    <h2 style="font-family:var(--font-mono);font-size:1rem;color:var(--amber);margin-bottom:1rem;">
+      Hype vs Reality
+    </h2>
+    <p style="font-family:var(--font-mono);font-size:0.75rem;color:var(--fg-dim);margin-bottom:1rem;">
+      High star/download ratio = lots of GitHub stars but fewer actual users. Low ratio = widely used but less hyped.
+    </p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;">
+      {agents.filter(a => a.star_download_ratio !== 'N/A' && parseFloat(a.star_download_ratio) > 0).slice(0, 3).map(agent => (
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:1rem;">
+          <div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--green);margin-bottom:0.5rem;">
+            {agent.name}
+          </div>
+          <div style="font-family:var(--font-mono);font-size:1.2rem;color:var(--fg);margin-bottom:0.5rem;">
+            {agent.star_download_ratio}x
+          </div>
+          <div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--fg-dim);">
+            {formatNumber(agent.github_stars)} stars / {formatNumber(agent.npm_downloads)} downloads
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+
+  {/* Main Leaderboard Table */}
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+    <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:0.75rem;">
+      <thead>
+        <tr style="background:var(--bg);border-bottom:1px solid var(--border);">
+          <th style="padding:0.75rem;text-align:left;color:var(--fg-dim);">#</th>
+          <th style="padding:0.75rem;text-align:left;color:var(--fg-dim);">Agent</th>
+          <th style="padding:0.75rem;text-align:right;color:var(--fg-dim);cursor:pointer;" data-sort="npm">npm/week</th>
+          <th style="padding:0.75rem;text-align:right;color:var(--fg-dim);cursor:pointer;" data-sort="stars">GitHub ★</th>
+          <th style="padding:0.75rem;text-align:right;color:var(--fg-dim);cursor:pointer;" data-sort="pypi">PyPI</th>
+          <th style="padding:0.75rem;text-align:right;color:var(--green);cursor:pointer;" data-sort="score">Score</th>
+        </tr>
+      </thead>
+      <tbody>
+        {agents.map((agent, i) => (
+          <tr style="border-bottom:1px solid var(--border);transition:background 0.15s;" 
+              onmouseover="this.style.background='var(--bg)'" 
+              onmouseout="this.style.background='transparent'">
+            <td style="padding:0.75rem;color:var(--fg-dim);">{agent.rank}</td>
+            <td style="padding:0.75rem;color:var(--fg);font-weight:600;">
+              <a href={`/tool/${agent.id}`} style="color:var(--fg);text-decoration:none;">
+                {agent.name}
+              </a>
+            </td>
+            <td style="padding:0.75rem;text-align:right;color:var(--fg);">
+              {formatNumber(agent.npm_downloads)}
+              {agent.npm_change !== 0 && (
+                <span style={`font-size:0.6rem;margin-left:0.25rem;color:${agent.npm_change > 0 ? 'var(--green)' : 'var(--red)'}`}>
+                  {formatChange(agent.npm_change)}
+                </span>
+              )}
+            </td>
+            <td style="padding:0.75rem;text-align:right;color:var(--fg);">
+              {formatNumber(agent.github_stars)}
+              {agent.star_change !== 0 && (
+                <span style={`font-size:0.6rem;margin-left:0.25rem;color:${agent.star_change > 0 ? 'var(--green)' : 'var(--red)'}`}>
+                  {formatChange(agent.star_change)}
+                </span>
+              )}
+            </td>
+            <td style="padding:0.75rem;text-align:right;color:var(--fg);">
+              {formatNumber(agent.pypi_downloads)}
+            </td>
+            <td style="padding:0.75rem;text-align:right;color:var(--green);font-weight:600;">
+              {agent.growth_score}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  {/* Methodology */}
+  <div style="margin-top:2rem;padding:1rem;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;">
+    <h3 style="font-family:var(--font-mono);font-size:0.8rem;color:var(--amber);margin-bottom:0.5rem;">
+      Methodology
+    </h3>
+    <p style="font-family:var(--font-mono);font-size:0.65rem;color:var(--fg-dim);line-height:1.6;">
+      Growth Score (0-100) is a weighted composite: 40% npm downloads, 30% GitHub stars, 20% PyPI downloads, 10% star/download ratio. 
+      Data refreshed daily from npm registry, GitHub API, and PyPI stats. 
+      Only agents with at least one data source contribute to rankings.
+    </p>
+  </div>
+</main>
+
+<script>
+// Simple client-side sorting
+document.querySelectorAll('th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const sort = th.dataset.sort;
+    const tbody = document.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    rows.sort((a, b) => {
+      const aVal = a.cells[sort === 'npm' ? 2 : sort === 'stars' ? 3 : sort === 'pypi' ? 4 : 5]?.textContent.trim() || '0';
+      const bVal = b.cells[sort === 'npm' ? 2 : sort === 'stars' ? 3 : sort === 'pypi' ? 4 : 5]?.textContent.trim() || '0';
+      
+      const aNum = parseFloat(aVal.replace(/[^0-9.]/g, '')) || 0;
+      const bNum = parseFloat(bVal.replace(/[^0-9.]/g, '')) || 0;
+      
+      return bNum - aNum;
+    });
+    
+    rows.forEach((row, i) => {
+      row.cells[0].textContent = i + 1;
+      tbody.appendChild(row);
+    });
+  });
+});
+</script>
+
+</Layout>

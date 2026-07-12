@@ -245,6 +245,45 @@ function tagClass(tag) {
       </div>
     </details>
 
+    {/* Top 3 by Usage Widget */}
+    <section class="top-agents-widget">
+      <div class="section-header">
+        <h2>Top by Usage</h2>
+        <a href="/leaderboard/" class="section-more">full leaderboard →</a>
+      </div>
+      <div class="top-agents-grid">
+        {(() => {
+          // Read adoption data
+          const fs = require('fs');
+          const path = require('path');
+          const snapshotsDir = path.join(process.cwd(), 'src', 'data', 'adoption', 'snapshots');
+          const snapshots = fs.readdirSync(snapshotsDir).filter(f => f.endsWith('.json')).sort().reverse();
+          const latest = snapshots.length > 0 ? JSON.parse(fs.readFileSync(path.join(snapshotsDir, snapshots[0]), 'utf-8')) : null;
+          const agents = latest?.agents || [];
+          const top3 = agents.slice(0, 3);
+          
+          function formatNum(n) {
+            if (n === null || n === undefined) return '—';
+            if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+            if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+            return n.toLocaleString();
+          }
+          
+          return top3.map((agent, i) => (
+            <a href={`/tool/${agent.id}/`} class="top-agent-card">
+              <div class="top-agent-rank">#{i + 1}</div>
+              <div class="top-agent-name">{agent.name}</div>
+              <div class="top-agent-stats">
+                <span class="npm-stat">{formatNum(agent.npm_downloads)} npm/wk</span>
+                <span class="star-stat">{formatNum(agent.github_stars)} ★</span>
+              </div>
+              <div class="top-agent-score">Score: {agent.growth_score}</div>
+            </a>
+          ));
+        })()}
+      </div>
+    </section>
+
     <section class="cli-box">
       <code><span class="green">$</span> npx terminalblog</code>
       <p>Get the latest articles from your terminal. Free &amp; open source.</p>
@@ -351,5 +390,18 @@ function tagClass(tag) {
     .badge-link { opacity: 0.7; transition: opacity 0.2s; line-height: 0; }
     .badge-link:hover { opacity: 1; }
     .badge-img { border-radius: 4px; }
+
+    /* Top Agents Widget */
+    .top-agents-widget { margin: 0.5rem 0; }
+    .top-agents-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; }
+    @media (max-width: 600px) { .top-agents-grid { grid-template-columns: 1fr; } }
+    .top-agent-card { display: block; padding: 1rem; border: 1px solid var(--border); border-radius: 8px; text-decoration: none; transition: border-color 0.2s; background: var(--bg-alt); }
+    .top-agent-card:hover { border-color: var(--green); }
+    .top-agent-rank { font-family: var(--font-mono); font-size: 0.7rem; color: var(--amber); margin-bottom: 0.3rem; }
+    .top-agent-name { font-family: var(--font-mono); font-size: 0.85rem; color: var(--fg); font-weight: 600; margin-bottom: 0.5rem; }
+    .top-agent-stats { display: flex; gap: 0.8rem; font-family: var(--font-mono); font-size: 0.7rem; color: var(--fg-dim); margin-bottom: 0.3rem; }
+    .npm-stat { color: var(--green); }
+    .star-stat { color: var(--amber); }
+    .top-agent-score { font-family: var(--font-mono); font-size: 0.65rem; color: var(--fg-dim); }
   </style>
 </Layout>
