@@ -1,0 +1,55 @@
+---
+title: "Beware: Your Coding Agent Is Silently Burning Quota on the Wrong Model"
+description: "Two fresh GitHub issues show coding agents quietly multiplying your usage and ignoring your model settings. Here's how to catch the silent bleed before your plan maxes out."
+pubDate: "2026-07-12T19:30:00Z"
+updatedDate: "2026-07-12T19:30:00Z"
+tags: ["security", "beware", "claude-code", "codex", "cost", "model"]
+tool: "claude-code"
+author: "kira_bug_hunter"
+image: "/api/og?title=Beware:%20Silent%20Quota%20%26%20Model%20Bleed&tool=Claude%20Code"
+---
+
+You upgraded your plan to get more headroom — and instead watched your weekly usage meter slam to 100% in minutes. That isn't bad luck. Two new GitHub issues this week show coding agents quietly doing the opposite of what you told them: multiplying your consumption and spawning children on the wrong model. No error, no warning, just a drained quota.
+
+## The issues we found
+
+**1. Claude Code multiplies usage by 4 on a plan upgrade (issue #76927).** A user on the Max 5× plan upgraded to Max 20× when they hit their hourly cap. Their Fable weekly usage was ~20% and All-Models ~13% *before* the switch. After upgrading, Fable read 100% and All-Models ~55%. The reporter's own words: "My weekly usages should have been divided by 4 instead of multiplied by 4 when moving from max 5x to max 20x." The higher tier appears to scale the displayed consumption the wrong way, burning the most expensive allocation on the last day it was usable.
+
+**2. Codex tool-backed subagents silently inherit the parent's model (issue #32587).** A parent session running `gpt-5.6-sol / ultra` spawns every tool-backed multi-agent v2 child with the *same* model and effort — even when the intended custom agent is configured differently. A read-only `explorer` agent set to `gpt-5.6-luna` with `high` effort still rolled out on Sol Ultra. The `spawn_agent` tool only exposes `task_name`, `message`, and `fork_turns`; it never exposes `model` or `reasoning_effort`, so the override is impossible from the tool surface.
+
+## Are you affected?
+
+Run these checks against your own sessions:
+
+```bash
+# Claude Code: compare usage ratio before/after any plan change
+claude usage --since 7d | grep -iE "fable|all.models|weekly"
+
+# Codex: inspect a child session's model vs. the custom agent's config
+grep -iE "model|reasoning_effort" ~/.codex/agents/explorer.toml
+cat ~/.codex/sessions/<child-id>/rollout.json | grep -i "model"
+```
+
+If the child's `model` field doesn't match your `agents/*.toml`, you're bleeding onto the wrong tier.
+
+## The fix
+
+- **Claude Code:** Don't trust the in-app meter right after a tier upgrade. Screenshot your usage % *before* switching, open a support ticket immediately if the number jumps, and avoid a same-day upgrade when a model's weekly window is about to close.
+- **Codex:** Until `spawn_agent` exposes `model`/`reasoning_effort`, pin cheap agents to a separate non-ultra parent, or avoid tool-backed multi-agent v2 for budget-sensitive work. Audit `~/.codex/sessions` rollouts after each run.
+
+## Why it happened
+
+Both are bookkeeping bugs, not model failures. The Claude Code issue is a unit-conversion error when remapping a 5× baseline onto a 20× scale — multiply instead of divide. Codex's is a missing field pass-through: the orchestrator clones the parent's rollout config into children and never re-reads the custom agent's `model` block. In both cases the agent *looks* like it's doing what you asked while the meter tells a different story.
+
+## FAQ
+
+**Q1: Is this a prompt-injection or security breach?**
+No. Both are internal accounting/configuration bugs in the agents themselves — not external attacks. But silent quota burn on the most expensive tier is a real cost-security risk worth tracking.
+
+**Q2: Will downgrading the Codex parent fix the model bleed?**
+Not reliably. The child inherits the parent's model at spawn time; downgrading the parent just moves the bleed to a cheaper tier. Wait for the `spawn_agent` field fix.
+
+**Q3: How do I prove the Claude Code 4× bug to support?**
+Export your usage page before and after the upgrade and cite issue #76927. The pre/post ratio is the evidence — the meter itself is the symptom.
+
+*Running multiple AI agents? Save on API costs and subscriptions at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
