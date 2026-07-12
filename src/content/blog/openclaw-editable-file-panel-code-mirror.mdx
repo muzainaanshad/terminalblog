@@ -1,0 +1,36 @@
+---
+title: "OpenClaw Just Shipped an Editable File Panel Cloud Workers & Session Overhaul"
+description: "OpenClaw landed 10 commits in 3 hours — an editable CodeMirror file panel, durable cloud worker transcripts, and unified external session pagination."
+pubDate: "2026-07-12T06:00:00Z"
+updatedDate: "2026-07-12T06:00:00Z"
+tags: ["openclaw", "code-mirror", "cloud-workers", "sessions", "ui", "shipped"]
+tool: "openclaw"
+author: "dev_explorer"
+image: "/api/chart?type=features&agents=openclaw"
+---
+
+OpenClaw pushed **10 commits** in the last 3 hours — a burst of UI, infrastructure, and reliability work that touches the editor, cloud worker sessions, external integrations, and Android companion app.
+
+## What changed
+
+**Editable file panel with CodeMirror** — The biggest feature. OpenClaw now ships a full CodeMirror-based file editor inside its UI panel, backed by `sessions.files.set` with hash-CAS (compare-and-swap) writes. This means you can edit files directly in the agent UI with proper syntax highlighting, undo history, and conflict-free saves. The hash-CAS mechanism prevents overwriting a file that changed underneath you — a smart guard for agent-assisted editing sessions.
+
+**Durable transcript commit protocol for cloud workers** — Worker sessions now get a proper commit protocol for their transcripts. Previously, worker session transcripts could be lost on crash or network failure. The new protocol ensures durable storage before acknowledging completion, making background and cloud worker executions reliable enough for production use.
+
+**Unified external sessions with catalog pagination** — External sessions (from web UI, mobile, or API integrations) now share the same pagination and catalog system as native sessions. No more separate browsing paths or broken "load more" — all sessions from every source appear consistently in one view.
+
+**Other fixes** — Capped usage cost RPC timeouts to prevent stalls, aligned supported message actions across platforms, configured WebSocket ping timeouts for Feishu integration, bounded short-lived OAuth requests via MCP, quieted expected live updater warnings, and added a materialized cache for zstd transcript archives.
+
+**Improvement for Android** — The Android companion now shows provider-configured model details, giving mobile users visibility into which model variant is active.
+
+## Why it matters
+
+The CodeMirror panel alone changes the editing workflow. Instead of toggling between agent output and an external editor, you stay inside OpenClaw with a real code editor. The hash-CAS writes mean you won't lose work in race conditions with the agent.
+
+The cloud worker transcript durability fix is the kind of infrastructure change you don't notice until it saves your session. For anyone running long background tasks through OpenClaw's cloud workers, this is the difference between a flaky experiment and a reliable tool.
+
+## The takeaway
+
+OpenClaw is investing heavily in the editor experience and session reliability simultaneously. If you've been waiting for a more polished in-agent editing experience, this release delivers it. Update and try the editable file panel directly from your next OpenClaw session.
+
+Internal link: [Why Your Agent's Status Indicators Lie](/blog/claude-code-rc-norton-360-silent-kill/)
