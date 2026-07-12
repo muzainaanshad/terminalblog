@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Agent Adoption Tracker — Data Fetcher
- * Fetches npm downloads, GitHub stars, PyPI downloads for all agents
- * Saves daily snapshots to src/data/adoption/snapshots/
+ * Agent Adoption Tracker — Data Fetcher v2
+ * Fetches npm, GitHub, PyPI, Homebrew data for all agents
+ * Shows "n/a" with reasons instead of 0
  */
 
 const fs = require('fs');
@@ -12,7 +12,6 @@ const https = require('https');
 const CONFIG_PATH = path.join(__dirname, '..', 'src', 'data', 'adoption', 'config.json');
 const SNAPSHOTS_DIR = path.join(__dirname, '..', 'src', 'data', 'adoption', 'snapshots');
 
-// Ensure snapshots directory exists
 if (!fs.existsSync(SNAPSHOTS_DIR)) {
   fs.mkdirSync(SNAPSHOTS_DIR, { recursive: true });
 }
@@ -20,7 +19,6 @@ if (!fs.existsSync(SNAPSHOTS_DIR)) {
 function fetchJSON(url) {
   return new Promise((resolve, reject) => {
     const headers = { 'User-Agent': 'terminalblog-adoption-tracker' };
-    // Use GitHub token if available
     if (url.includes('api.github.com') && process.env.GITHUB_TOKEN) {
       headers['Authorization'] = `token ${process.env.GITHUB_TOKEN}`;
     }
@@ -28,11 +26,8 @@ function fetchJSON(url) {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
-        try {
-          resolve(JSON.parse(data));
-        } catch (e) {
-          reject(new Error(`Parse error for ${url}: ${e.message}`));
-        }
+        try { resolve(JSON.parse(data)); }
+        catch (e) { reject(new Error(`Parse error: ${e.message}`)); }
       });
     });
     req.on('error', reject);
@@ -41,68 +36,110 @@ function fetchJSON(url) {
 }
 
 async function getNpmDownloads(pkg) {
-  if (!pkg) return null;
+  if (!pkg) return { value: null, reason: 'No npm package' };
   try {
     const data = await fetchJSON(`https://api.npmjs.org/downloads/point/last-week/${pkg}`);
-    return data.downloads || 0;
+    return { value: data.downloads || 0, reason: null };
   } catch (e) {
-    console.error(`  npm error for ${pkg}: ${e.message}`);
-    return 0;
+    return { value: null, reason: `Fetch failed: ${e.message}` };
   }
 }
 
-async function getGitHubStars(repo) {
-  if (!repo) return { stars: 0, forks: 0 };
+async function getGitHubData(repo) {
+  if (!repo) return { stars: null, forks: null, openIssues: null, reason: 'No public repo (closed source)' };
   try {
     const data = await fetchJSON(`https://api.github.com/repos/${repo}`);
-    return { stars: data.stargazers_count || 0, forks: data.forks_count || 0 };
+    if (data.message === 'Not Found') {
+      return { stars: null, forks: null, openIssues: null, reason: 'Repo not found' };
+    }
+    return {
+      stars: data.stargazers_count || 0,
+      forks: data.forks_count || 0,
+      openIssues: data.open_issues_count || 0,
+      reason: null
+    };
   } catch (e) {
-    console.error(`  GitHub error for ${repo}: ${e.message}`);
-    return { stars: 0, forks: 0 };
+    return { stars: null, forks: null, openIssues: null, reason: `Fetch failed: ${e.message}` };
   }
 }
 
 async function getPyPIDownloads(pkg) {
-  if (!pkg) return null;
+  if (!pkg) return { value: null, reason: 'No PyPI package' };
   try {
+    // Add delay to avoid rate limiting
+    await new Promise(r => setTimeout(r, 2000));
     const data = await fetchJSON(`https://pypistats.org/api/packages/${pkg}/recent`);
-    return data.data?.last_week || 0;
+    if (data.data) {
+      return { value: data.data.last_week || 0, reason: null };
+    }
+    return { value: null, reason: 'No data in response' };
   } catch (e) {
-    console.error(`  PyPI error for ${pkg}: ${e.message}`);
-    return 0;
+    if (e.message.includes('429') || e.message.includes('RATE LIMIT')) {
+      return { value: null, reason: 'Rate limited - try again later' };
+    }
+    return { value: null, reason: `Fetch failed: ${e.message}` };
   }
 }
 
-function computeGrowthScore(agent) {
-  const npm = agent.npm_downloads || 0;
-  const stars = agent.github_stars || 0;
-  const pypi = agent.pypi_downloads || 0;
+async function getHomebrewInstalls(cask) {
+  if (!cask) return { value: null, reason: 'No Homebrew cask' };
+  try {
+    const data = await fetchJSON(`https://formulae.brew.sh/api/cask/${cask}.json`);
+    if (data.analytics && data.analytics.install && data.analytics.install['30d']) {
+      const installs = data.analytics.install['30d'];
+      // Format: {cask_name: count}
+      const count = typeof installs === 'object' ? Object.values(installs)[0] : installs;
+      return { value: count || 0, reason: null };
+    }
+    return { value: null, reason: 'No analytics data' };
+  } catch (e) {
+    return { value: null, reason: `Fetch failed: ${e.message}` };
+  }
+}
+
+function computeMetrics(agent) {
+  const npm = agent.metrics?.npm_downloads;
+  const stars = agent.metrics?.github_stars;
+  const pypi = agent.metrics?.pypi_downloads;
+  const brew = agent.metrics?.homebrew_installs;
   
-  // Normalize each metric to 0-100 scale
-  const maxNpm = 10000000; // 10M
-  const maxStars = 400000; // 400K
-  const maxPyPI = 100000; // 100K
+  // Normalize to 0-100 scale (only for agents with data)
+  const hasNpm = npm !== null && npm !== undefined;
+  const hasStars = stars !== null && stars !== undefined;
+  const hasPyPI = pypi !== null && pypi !== undefined;
+  const hasBrew = brew !== null && brew !== undefined;
   
-  const npmScore = Math.min(100, (npm / maxNpm) * 100);
-  const starScore = Math.min(100, (stars / maxStars) * 100);
-  const pypiScore = Math.min(100, (pypi / maxPyPI) * 100);
+  const maxNpm = 10000000;
+  const maxStars = 400000;
+  const maxPyPI = 100000;
+  const maxBrew = 5000;
   
-  // Weighted composite
-  const score = (npmScore * 0.4) + (starScore * 0.3) + (pypiScore * 0.2) + 
-                ((starScore > 0 && npmScore > 0) ? Math.min(10, (starScore / npmScore) * 2) : 0);
+  const npmScore = hasNpm ? Math.min(100, (npm / maxNpm) * 100) : 0;
+  const starScore = hasStars ? Math.min(100, (stars / maxStars) * 100) : 0;
+  const pypiScore = hasPyPI ? Math.min(100, (pypi / maxPyPI) * 100) : 0;
+  const brewScore = hasBrew ? Math.min(100, (brew / maxBrew) * 100) : 0;
   
-  // Star/download ratio (hype vs reality)
-  const totalDownloads = npm + pypi;
-  const starDownloadRatio = totalDownloads > 0 ? (stars / totalDownloads * 1000).toFixed(2) : 'N/A';
+  // Weighted composite (only count sources that have data)
+  const sources = [hasNpm ? npmScore : null, hasStars ? starScore : null, hasPyPI ? pypiScore : null, hasBrew ? brewScore : null].filter(x => x !== null);
+  const score = sources.length > 0 ? sources.reduce((a, b) => a + b, 0) / sources.length : 0;
+  
+  // Hype ratio
+  const totalDownloads = (npm || 0) + (pypi || 0) + (brew || 0);
+  const hypeRatio = totalDownloads > 0 ? ((stars || 0) / totalDownloads * 1000).toFixed(2) : null;
+  
+  // Data coverage
+  const coverage = [hasNpm ? 'npm' : null, hasStars ? 'github' : null, hasPyPI ? 'pypi' : null, hasBrew ? 'brew' : null].filter(Boolean);
   
   return {
     growth_score: Math.round(score * 10) / 10,
-    star_download_ratio: starDownloadRatio
+    hype_ratio: hypeRatio,
+    data_coverage: coverage,
+    data_sources_count: coverage.length
   };
 }
 
 async function main() {
-  console.log('Agent Adoption Tracker — Fetching data...');
+  console.log('Agent Adoption Tracker v2 — Fetching data...');
   console.log(`Time: ${new Date().toISOString()}`);
   
   const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
@@ -111,57 +148,78 @@ async function main() {
   for (const agent of config.agents) {
     console.log(`\nFetching: ${agent.name}`);
     
-    const [npm, github, pypi] = await Promise.all([
+    const [npm, github, pypi, brew] = await Promise.all([
       getNpmDownloads(agent.npm),
-      getGitHubStars(agent.github),
-      getPyPIDownloads(agent.pypi)
+      getGitHubData(agent.github),
+      getPyPIDownloads(agent.pypi),
+      getHomebrewInstalls(agent.homebrew)
     ]);
     
-    const computed = computeGrowthScore({
-      npm_downloads: npm,
+    const metrics = {
+      npm_downloads: npm.value,
       github_stars: github.stars,
-      pypi_downloads: pypi
-    });
+      github_forks: github.forks,
+      github_open_issues: github.openIssues,
+      pypi_downloads: pypi.value,
+      homebrew_installs: brew.value
+    };
+    
+    const computed = computeMetrics({ metrics });
     
     const entry = {
       id: agent.id,
       name: agent.name,
-      npm_downloads: npm,
-      github_stars: github.stars,
-      github_forks: github.forks,
-      pypi_downloads: pypi,
+      metrics,
+      data_reasons: {
+        npm: npm.reason,
+        github: github.reason,
+        pypi: pypi.reason,
+        homebrew: brew.reason
+      },
       ...computed
     };
     
     agents.push(entry);
-    console.log(`  npm: ${npm?.toLocaleString() || 'N/A'} | GitHub: ${github.stars.toLocaleString()} stars | PyPI: ${pypi?.toLocaleString() || 'N/A'} | Score: ${computed.growth_score}`);
     
-    // Rate limiting - GitHub API
+    const npmStr = npm.value !== null ? npm.value.toLocaleString() : 'n/a';
+    const starsStr = github.stars !== null ? github.stars.toLocaleString() : 'n/a';
+    const pypiStr = pypi.value !== null ? pypi.value.toLocaleString() : 'n/a';
+    const brewStr = brew.value !== null ? brew.value.toLocaleString() : 'n/a';
+    
+    console.log(`  npm: ${npmStr} | GitHub: ${starsStr} ★ | PyPI: ${pypiStr} | Brew: ${brewStr} | Score: ${computed.growth_score}`);
+    
+    // Rate limiting
     await new Promise(r => setTimeout(r, 1000));
   }
   
   // Sort by growth score
   agents.sort((a, b) => b.growth_score - a.growth_score);
-  
-  // Add ranks
   agents.forEach((a, i) => { a.rank = i + 1; });
   
   const snapshot = {
     date: new Date().toISOString().split('T')[0],
     fetched_at: new Date().toISOString(),
+    methodology_version: 'v2',
     agents: agents
   };
   
-  // Save snapshot
   const filename = `${snapshot.date}.json`;
   const filepath = path.join(SNAPSHOTS_DIR, filename);
-  fs.writeFileSync(filepath, JSON.stringify(snapshot, null, 2));
   
+  // Immutability check
+  if (fs.existsSync(filepath)) {
+    console.log(`\nSnapshot for ${snapshot.date} already exists. Skipping.`);
+    return;
+  }
+  
+  fs.writeFileSync(filepath, JSON.stringify(snapshot, null, 2));
   console.log(`\nSnapshot saved: ${filepath}`);
   console.log(`Total agents: ${agents.length}`);
-  console.log(`Top 3:`);
-  agents.slice(0, 3).forEach(a => {
-    console.log(`  ${a.rank}. ${a.name} — Score: ${a.growth_score} | npm: ${a.npm_downloads?.toLocaleString() || 'N/A'} | Stars: ${a.github_stars.toLocaleString()}`);
+  console.log(`Top 5:`);
+  agents.slice(0, 5).forEach(a => {
+    const npmStr = a.metrics.npm_downloads !== null ? a.metrics.npm_downloads.toLocaleString() : 'n/a';
+    const starsStr = a.metrics.github_stars !== null ? a.metrics.github_stars.toLocaleString() : 'n/a';
+    console.log(`  ${a.rank}. ${a.name} — Score: ${a.growth_score} | npm: ${npmStr} | Stars: ${starsStr} | Coverage: ${a.data_coverage.join(', ') || 'none'}`);
   });
 }
 
