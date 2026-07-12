@@ -1,0 +1,29 @@
+---
+title: "gitlawb-zero Just Shipped Credstore and Plugin-Path Fixes, Plus a Go 1.26 Security Bump"
+description: "gitlawb-zero (gitlawb/zero) landed three commits in the last 3 hours: a securefile fsync-before-rename fix, relative plugin executable path resolution, and new Go code-quality and security checks with a Go 1.26+ bump."
+pubDate: "2026-07-12T15:47:00Z"
+updatedDate: "2026-07-12T15:47:00Z"
+tags: ["gitlawb-zero", "just-shipped", "release", "fixes", "security"]
+tool: "gitlawb-zero"
+author: "kira_bug_hunter"
+---
+
+Three commits landed on gitlawb-zero (gitlawb/zero) in the last 3 hours, all from euxaristia. The batch is small but pointed: two correctness fixes around file and plugin handling, plus a documentation and toolchain upgrade that raises the project's security baseline.
+
+## What Changed
+
+**fsync before rename for secure files (#631).** `fix(securefile,credstore): call Sync on temp file before close and rename` makes the credential store durable. Before, a temp file could be renamed without being flushed to disk — meaning a crash or power loss between write and rename could leave you with a truncated or half-written credential file. Calling `Sync` first guarantees the bytes are on disk before the atomic rename swaps it into place. That's the difference between "credentials survived the reboot" and "credentials silently corrupted."
+
+**Relative plugin executable paths resolved correctly (#627).** `fix(plugins): resolve relative executable paths against plugin root` fixes a class of "plugin won't launch" bugs. When a plugin declared a relative path to its executable, the resolver now anchors it to the plugin root instead of the current working directory — so plugins load from wherever they actually live, not wherever the process happened to be invoked.
+
+**Go 1.26+ and security checks (#635).** `docs: add Go code quality & security checks and bump Go version to 1.26+` documents new code-quality and security linting and raises the minimum Go toolchain to 1.26. It's a docs commit on the surface, but it formalizes the project's quality gate and nudges contributors onto a newer, safer compiler baseline.
+
+## Why It Matters
+
+gitlawb-zero is the kind of agent tooling where "it worked on my machine" isn't good enough — credentials and plugin loading are exactly the unglamorous paths that decide whether you trust it with sensitive workflow state. The fsync fix is the headline: credential stores that don't flush before rename are a latent data-loss bug waiting for the wrong moment. The plugin-path fix removes a real friction point for anyone running plugins outside the default layout.
+
+For the broader reliability picture across the coding-agent ecosystem, our [Hermes run/stream lifetime fix coverage](https://terminalblog.com/blog/hermes-just-shipped-run-stream-lifetime-fixes/) shows the same "trust the long-running job" theme playing out elsewhere.
+
+---
+
+*Don't overpay for AI tools. Check [aiFiesta](https://aifiesta.link/muhammed-anshad) for exclusive pricing on coding agents.*

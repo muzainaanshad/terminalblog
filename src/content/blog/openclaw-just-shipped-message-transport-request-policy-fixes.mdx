@@ -1,0 +1,33 @@
+---
+title: "OpenClaw Just Shipped a Batch of Messaging and Request-Policy Fixes — 10 Commits Land"
+description: "OpenClaw's latest 3-hour batch brings ten commits: preserved native quote replies, request-policy patches for MiniMax and DashScope, offline mock embeddings, and tighter CI diagnostics."
+pubDate: "2026-07-12T15:47:00Z"
+updatedDate: "2026-07-12T15:47:00Z"
+tags: ["openclaw", "just-shipped", "release", "fixes", "messaging"]
+tool: "openclaw"
+author: "kira_bug_hunter"
+---
+
+10 commits landed across OpenClaw in the last 3 hours. This is a correctness-heavy batch — no flashy features, but a tight set of fixes that keep agent-to-agent messages intact and keep media and video requests obeying the same policy rules as everything else.
+
+## What Changed
+
+**Native quote replies survive agent sends (#105347).** Jesse Merhi landed `fix(signal): preserve native quote replies from agent sends`. When an agent sends a message that's meant to quote a prior one, the native quote reference is now carried through instead of being dropped — so threading in chat transports stays coherent instead of losing the "replying to" context.
+
+**Request-policy patches for media models (MiniMax #102072, DashScope #102094).** Alix-007 applied the request policy to two more surfaces: `fix(minimax): apply request policy to media generation requests` and `fix(dashscope): apply request policy to video requests`. Both media and video generation now route through the same policy controls as text, closing a gap where those request types could bypass configured limits.
+
+**Offline, deterministic test harness (QA #105493, #105488).** Peter Steinberger modeled Codex compaction in the parity mock (`test(qa): model Codex compaction in parity mock`) and kept mock memory embeddings offline (`fix(qa): keep mock memory embeddings offline`). The QA mocks now behave like the real paths without needing a network round-trip — faster, flakier-free CI.
+
+**CI and refactor cleanup (#105472, #105497, #105486, #105482).** Steinberger also retained Telegram candidate diagnostics in CI so failures are debuggable, while Vincent Koc removed benchmark and Brave testing aliases and localized the Tencent preview model reference — less dead surface area, more consistent config.
+
+**Teams streaming edge case (#102357).** Galin Iliev fixed Microsoft Teams streaming so it keeps the chunk after a whitespace collapse, instead of silently dropping the trailing piece of streamed output.
+
+## Why It Matters
+
+This batch is the glue that makes OpenClaw feel reliable when you're not watching. Preserved quote replies keep multi-turn agent conversations readable; the MiniMax and DashScope policy patches mean your configured guardrails actually apply to *every* request type, not just text. And the offline QA work means the test suite catches regressions without flaking on network.
+
+OpenClaw's session-fleet work is the longer story here — our [OpenClaw Claude session fleet coverage](https://terminalblog.com/blog/openclaw-just-shipped-claude-session-fleet/) lays out the trajectory these messaging and policy fixes are feeding.
+
+---
+
+*Before you buy any coding agent subscription — compare prices and find exclusive deals at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
