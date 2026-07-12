@@ -1,0 +1,91 @@
+---
+title: "Your Hermes Agent Is Silently Dropping Files Over 8 KB — write_file Returns Success, Writes Nothing"
+description: "Hermes Agent's write_file silently fails when content exceeds ~8 KB. The tool returns an empty success, your agent thinks the file was saved — and your work vanishes into a black hole."
+pubDate: "2026-07-12T11:00:00Z"
+updatedDate: "2026-07-12T11:00:00Z"
+tags: ["beware", "data-loss", "hermes", "file-tools", "bug"]
+tool: "hermes"
+author: "kira_bug_hunter"
+image: "/api/og?title=Your+Hermes+Agent+Is+Silently+Dropping+Files+Over+8+KB&tool=hermes"
+---
+
+You just spent twenty minutes iterating on a Python script with your agent. You see it call `write_file`, see it confirm "File written successfully," and move on to the next task. Forty minutes later, you realize the file on disk is empty — zero bytes. Every minute of that session is gone.
+
+A P1 bug in Hermes Agent ([#62948](https://github.com/NousResearch/hermes-agent/issues/62948)) reveals that `write_file` silently fails when content exceeds roughly 8 KB of serialized JSON. The tool reports success. The file lands as an empty 0-byte stub. Your agent has no idea it failed.
+
+## The Issue
+
+When Hermes calls `write_file` with large content, the message sanitizer's streaming JSON repair system encounters truncated or structurally broken arguments. The multi-pass repair — designed to fix control characters, trailing commas, unclosed braces, and similar streaming artifacts — hits its limit on genuinely truncated JSON. Its last-resort fallback replaces the entire tool call with an empty `{}` object.
+
+The tool receives empty arguments, writes nothing, and returns success. The model sees `{}` parsed as valid empty arguments and reports "File written successfully." Seven occurrences across three production sessions have been documented — all involving Python scripts over ~8 KB (a travel orchestrator, a parser, a vault health scanner, and test files).
+
+The bug is tracked as **P1** (highest priority) and marked as a duplicate of the canonical issue [#35151](https://github.com/NousResearch/hermes-agent/issues/35151) covering the same root cause in the message sanitizer.
+
+## Are You Affected?
+
+Check your sessions for silent write failures:
+
+```bash
+# Scan for 0-byte files your agent recently wrote
+find . -name "*.py" -size 0 -newer "$(date -d '1 day ago' '+%Y-%m-%d')" 2>/dev/null
+
+# Check Hermes agent logs for the telltale warning
+grep "Unrepairable tool_call arguments" ~/.hermes/logs/agent.log 2>/dev/null
+```
+
+```bash
+# If you use Zsh/Bash with Hermes, test write_file behavior:
+# Write a 10 KB test file
+python3 -c "
+import json
+with open('/tmp/test_write.json', 'w') as f:
+    f.write(json.dumps({'data': 'A' * 10000}))
+echo 'Wrote 10KB JSON. Check /tmp/test_write.json size:'
+wc -c /tmp/test_write.json
+"
+```
+
+You're affected if:
+- You use Hermes Agent (any profile: Builder, Infrastructure, Research, Prime)
+- Your agent writes files larger than ~8 KB
+- You've seen "File written successfully" but the file was empty later
+- You're on `main` as of 2026-07-12 or earlier
+
+## The Fix
+
+**Short-term workaround:** Add a prompt-level instruction telling the agent to use `cat` with heredoc for files over ~7 KB instead of `write_file`:
+
+```
+For files larger than 7 KB, use terminal with heredoc syntax:
+cat > path/to/file << 'EOF' ...content... EOF
+```
+
+**Long-term fix:** Watch for the proposed upstream fix that replaces the silent `{}` fallback with a clear error object the model can detect and retry:
+
+```json
+{"error": "write_file arguments could not be parsed — content may exceed the size limit. Use terminal with heredoc for large files."}
+```
+
+**Verify writes after the fix lands:**
+
+```bash
+# After each write_file call, check the file has content
+test -s path/to/file && echo "OK" || echo "EMPTY — write_file may have failed"
+```
+
+## Why It Happened
+
+The root cause lives in `agent/message_sanitization.py` lines 272–279. When the model emits a `write_file` call with a large string argument, streaming JSON can arrive truncated — unclosed strings, missing braces. The sanitizer runs multiple repair passes, but genuinely fragmented JSON can't be reconstructed. The last-resort fallback returns `"{}"` so the session doesn't crash. The problem: `{}` is valid empty arguments, so the tool runs with no content and the model thinks nothing is wrong.
+
+The intent of the fallback — prevent a malformed tool call from crashing the entire session — is correct. The failure is returning `{}` as a successful parse rather than an explicit error that the model can act on.
+
+## FAQ
+
+**Q: Which files are most at risk?**
+A: Any file over ~8 KB — typically Python scripts, configuration files, markdown documentation, SQL migrations, and similar text assets that agents commonly generate.
+
+**Q: How do I know if my data was lost?**
+A: Check `~/.hermes/logs/agent.log` for "Unrepairable tool_call arguments for write_file". If present, the file was not written. Check the file on disk — if it's 0 bytes, your data is gone and the agent must re-generate it.
+
+**Q: Does this affect other tools besides write_file?**
+A: The sanitizer fallback covers all tool calls, but in practice `write_file` is the most affected because it commonly receives large string payloads. Other tools with large arguments could also be silently dropped.

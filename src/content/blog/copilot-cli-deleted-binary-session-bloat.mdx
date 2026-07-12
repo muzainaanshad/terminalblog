@@ -1,0 +1,88 @@
+---
+title: "One Deleted Binary Permanently Breaks Your Copilot Session — apply_patch Stores 22 Million Characters"
+description: "Deleting a binary file with Copilot CLI's apply_patch stores the entire blob in session history. Your session permanently exceeds GitHub's 5 MB CAPI limit and becomes unrecoverable."
+pubDate: "2026-07-12T11:30:00Z"
+updatedDate: "2026-07-12T11:30:00Z"
+tags: ["beware", "bug", "copilot-cli", "session", "data-loss"]
+tool: "copilot-cli"
+author: "kira_bug_hunter"
+image: "/api/og?title=One+Deleted+Binary+Permanently+Breaks+Your+Copilot+Session&tool=copilot-cli"
+---
+
+Picture this: you ask Copilot to delete a compiled binary you no longer need. It runs `apply_patch`, reports success, everything looks fine. Then your next query fails with a terse message: *"The request is too large to send through CAPI Responses. (5.0 MB request; 5.0 MB limit)"* You run `/compact` — same error. Your session is dead, and there's no way to bring it back through the CLI.
+
+A newly filed bug in GitHub Copilot CLI ([#4097](https://github.com/github/copilot-cli/issues/4097)) reveals that `apply_patch` stores the entire deleted binary as a textual diff in session history. Delete one ELF executable, and your `events.jsonl` balloons from a few megabytes to over 118 MB.
+
+## The Issue
+
+When `apply_patch` deletes a binary file, the resulting `tool.execution_complete` event records the **entire deleted binary** as a textual patch in `result.detailedContent`. In the reported case, a single deleted ELF executable produced:
+
+- `result.detailedContent`: **22,810,594 characters**
+- Serialized JSONL record: **72,155,553 bytes**
+- Tool telemetry: 111,879 removed lines
+- Total `events.jsonl` growth: **118,622,622 bytes** (118 MB)
+
+Every subsequent request to GitHub's Copilot API (CAPI) fails because the payload exceeds the 5 MB transport limit. The `/compact` command — the only in-band recovery mechanism — fails with the same error because it must also process the oversized history. The session is permanently unrecoverable through the CLI.
+
+The only workaround required manual surgery: replace the oversized `detailedContent` with a short marker, which reduced the event log from 118.6 MB to 46.5 MB and restored functionality.
+
+## Are You Affected?
+
+Check if your Copilot sessions have been bloated by binary artifacts:
+
+```bash
+# Check total session event history size
+ls -lh ~/.copilot-cli/sessions/*/events.jsonl 2>/dev/null | awk '{print $5, $NF}'
+
+# Find sessions over 5 MB (the CAPI limit)
+find ~/.copilot-cli/sessions -name "events.jsonl" -size +5M 2>/dev/null
+```
+
+```bash
+# Check for oversized detailedContent entries
+find ~/.copilot-cli/sessions -name "events.jsonl" -exec grep -l "detailedContent" {} \; 2>/dev/null
+```
+
+You're affected if:
+- You use GitHub Copilot CLI v1.0.71-0 or earlier
+- You've used `apply_patch` to delete a binary file (ELF, DLL, .so, JAR, .class, .pyc, images, or any non-text asset)
+- You've encountered CAPI request-size failures and couldn't recover with `/compact`
+- You use GPT-5.6 Sol with large context (1.1M) — more history accumulates before compaction triggers
+
+## The Fix
+
+**Manual recovery (if your session is already broken):**
+
+```bash
+# Back up your broken session first
+cp -r ~/.copilot-cli/sessions/<broken-session-id> ~/copilot-session-backup/
+
+# Find and replace oversized detailedContent
+sed -i 's/"detailedContent":"[^"]\{100000,\}"/"detailedContent":"[binary truncated]"/g' \
+  ~/.copilot-cli/sessions/<broken-session-id>/events.jsonl
+```
+
+**Prevention:**
+
+- Avoid using `apply_patch` to delete binary files. Use `terminal` with `rm` instead.
+- If a session starts feeling sluggish or requests start failing, check event log size immediately.
+- Watch for a fix upstream that caps `detailedContent` for binary patches and implements automatic eviction of oversized tool output on request-size failures.
+
+## Why It Happened
+
+`apply_patch` generates a unified diff between the original and patched file content. For text files this is efficient — only the changed lines are stored. For binary files deleted entirely, the "diff" is the entire original binary encoded as a text patch. The `tool.execution_complete` event serializes this into `result.detailedContent` as a plain string in JSONL — no size cap, no binary detection, no truncation. Since session history is append-only, this single oversized record becomes permanent baggage on every subsequent API call.
+
+GitHub's CAPI Responses layer enforces a hard 5 MB transport limit. Once the serialized history exceeds this, the session is effectively bricked. The `/compact` endpoint runs compaction server-side, but it must also receive the full history before it can trim it — a chicken-and-egg problem when the history is already over the limit.
+
+The previous related issue [#3767](https://github.com/github/copilot-cli/issues/3767) (inline attachments causing similar bloat) was fixed in v1.0.62, but this `apply_patch` variant was missed.
+
+## FAQ
+
+**Q: Can I recover a bricked session without manual editing?**
+A: Currently, no. Automatic and manual `/compact` both fail with the same 5 MB limit error. Manual JSONL surgery is the only recovery path.
+
+**Q: Does deleting any file cause this, or only specific types?**
+A: Only binary/non-text files. Deleting a small text file produces a negligible diff. But compiled binaries, archives, images, or any file over a few hundred KB will produce a multi-megabyte diff. The reported case was a 22 MB ELF executable.
+
+**Q: Will switching models prevent this?**
+A: It may delay it — models with smaller context windows trigger compaction sooner, which can prune history before it grows past the limit. But the core issue (unbounded binary diffs in session history) affects all models. The real fix is a size cap on `detailedContent`.
