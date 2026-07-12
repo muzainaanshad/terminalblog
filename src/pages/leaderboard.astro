@@ -36,6 +36,10 @@ agents.forEach(agent => {
   agent.star_change = (starsNow || 0) - (starsPrev || 0);
   agent.score_change = agent.growth_score - (prev?.growth_score || 0);
   
+  // Only show change if we have previous data
+  if (!prev || npmPrev === null || npmPrev === undefined) agent.npm_change = null;
+  if (!prev || starsPrev === null || starsPrev === undefined) agent.star_change = null;
+  
   // Ensure metrics object exists for template
   if (!agent.metrics) {
     agent.metrics = {
@@ -111,7 +115,7 @@ function getDataReason(agent, source) {
       {agents.filter(a => {
         const hr = a.hype_ratio || (a.metrics?.github_stars && (a.metrics.npm_downloads || a.metrics.pypi_downloads || a.metrics.homebrew_installs) ? (a.metrics.github_stars / ((a.metrics.npm_downloads || 0) + (a.metrics.pypi_downloads || 0) + (a.metrics.homebrew_installs || 0)) * 1000).toFixed(2) : null);
         return hr && parseFloat(hr) > 0;
-      }).slice(0, 3).map(agent => {
+      }).slice(0, 6).map(agent => {
         const stars = getMetric(agent, 'github_stars');
         const npm = getMetric(agent, 'npm_downloads');
         const hr = agent.hype_ratio || (stars && npm ? (stars / npm * 1000).toFixed(2) : '0');
@@ -162,7 +166,7 @@ function getDataReason(agent, source) {
               {agent.metrics?.npm_downloads !== null && agent.metrics?.npm_downloads !== undefined ? (
                 <>
                   {formatNumber(agent.metrics.npm_downloads)}
-                  {agent.npm_change !== 0 && (
+                  {agent.npm_change !== null && agent.npm_change !== 0 && (
                     <span style={`font-size:0.6rem;margin-left:0.25rem;color:${agent.npm_change > 0 ? 'var(--green)' : 'var(--red)'}`}>
                       {formatChange(agent.npm_change)}
                     </span>
@@ -178,7 +182,7 @@ function getDataReason(agent, source) {
               {agent.metrics?.github_stars !== null && agent.metrics?.github_stars !== undefined ? (
                 <>
                   {formatNumber(agent.metrics.github_stars)}
-                  {agent.star_change !== 0 && (
+                  {agent.star_change !== null && agent.star_change !== 0 && (
                     <span style={`font-size:0.6rem;margin-left:0.25rem;color:${agent.star_change > 0 ? 'var(--green)' : 'var(--red)'}`}>
                       {formatChange(agent.star_change)}
                     </span>
