@@ -1,0 +1,85 @@
+---
+title: "Your Codex Hook's Sanitized Denial May Still Leak Your Raw Command — Here's How to Check"
+description: "A verified Codex CLI security issue shows a PreToolUse hook that correctly denies and redacts a shell command or patch still has the raw input appended to the denial message — defeating hook-side redaction and exposing secrets in the visible transcript."
+pubDate: "2026-07-12T18:50:00Z"
+updatedDate: "2026-07-12T18:50:00Z"
+tags: ["bug", "codex", "security", "hooks", "cli", "windows", "featured"]
+tool: "codex"
+author: "kira_bug_hunter"
+image: "/api/og?title=Your+Codex+Hook%27s+Sanitized+Denial+May+Still+Leak+Your+Raw+Command+%E2%80%94+Here%27s+How+to+Check&tool=codex"
+---
+
+You built a `PreToolUse` hook to act as your last line of defense: it denies risky shell commands and patches, and it returns only a safe reason code plus a 12-character SHA-256 fingerprint. No raw path, no command argument, no patch body. That should be enough to keep secrets out of your logs, right? A freshly filed, reproducible Codex security issue says otherwise.
+
+## The issue
+
+Codex CLI `0.144.1` on Windows can correctly honor a `PreToolUse` deny — but then **append the original raw command or patch to the visible denial message** anyway ([#32573](https://github.com/openai/codex/issues/32573)).
+
+The hook exits successfully and returns only sanitized JSON:
+
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "deny",
+    "permissionDecisionReason": "reason=secret-read.shell; command_hash=0123456789ab"
+  }
+}
+```
+
+Yet the user-visible result comes out as:
+
+```text
+Command blocked by PreToolUse hook: reason=...; command_hash=.... Command: <original raw command or patch>
+```
+
+Execution is blocked — good. But the disclosure still happens, *after* the hook's redaction. For `functions.apply_patch` the runtime can also hand the hook an input shape it doesn't recognize, return `reason=missing-path`, and then append the full raw patch anyway. A security hook can prevent execution while still leaking the exact input that triggered the block into the transcript.
+
+The report is labeled **bug**, **windows-os**, **CLI**, and **hooks**, and includes a full reproduction with no real secret required.
+
+## Are you affected?
+
+You're affected if you run the Codex CLI on Windows (or any platform where the denial message renders raw tool arguments) and rely on hooks to redact sensitive commands, paths, or patches.
+
+```bash
+# 1. Trigger any denied command in Codex CLI, then inspect the denial text:
+codex --version  # confirm the CLI version
+# In a session, attempt a command your PreToolUse hook denies.
+# If the block message ends with "Command: <your actual command>" or
+# "Command: <your raw patch>", your hook's redaction is being bypassed.
+
+# 2. Audit existing transcripts for leaked inputs:
+grep -RIn "Command:" ~/.codex 2>/dev/null | grep -v "command_hash" || echo "no raw disclosure found"
+```
+
+If you find a raw command or patch body sitting next to a `command_hash`, your redaction is not holding.
+
+## The fix
+
+There's no official patch yet. Until then, stop trusting hook-level redaction as your only control:
+
+1. **Never pass secrets as command arguments.** Move tokens, paths, and credentials into environment variables or a secrets manager the shell reads directly — arguments are the easiest thing to leak verbatim.
+2. **Sanitize at the source.** Keep sensitive values out of the command string the model generates; inject them via env so nothing sensitive ever enters the tool argument.
+3. **Scrub the transcript.** Treat the Codex denial output as untrusted and strip raw inputs before any log leaves your machine.
+4. **Track the upstream issue** ([#32573](https://github.com/openai/codex/issues/32573), plus related routing bug [#26751](https://github.com/openai/codex/issues/26751)) for a runtime-side fix that suppresses appended arguments end to end.
+
+## Why it happened
+
+The denial *decision* and the denial *display* are two separate stages. Codex honors the hook's `permissionDecision=deny`, but the UI/runtime layer re-attaches the original tool arguments to the visible message regardless of what the hook returned. The hook's `permissionDecisionReason` drives the block; the raw input is appended for display. Because the redaction lives only in the hook response and not in the runtime's rendering path, any input the hook tried to hide can still surface once the denial reaches the transcript.
+
+## FAQ
+
+**Q: Doesn't `deny` mean the command never runs, so what's the risk?**
+A: Correct — it never executes. The risk is disclosure, not execution. A denied command containing a private path, a dummy token, or a secret-shaped argument still lands, verbatim, in the user-visible transcript and any logs you ship.
+
+**Q: Is this Windows-only?**
+A: The verified reproduction is on Codex CLI `0.144.1` / Windows 11 PowerShell, but the defect is in how the runtime renders denials. Other platforms should be tested; the disclosure happens in the UI layer, not the OS.
+
+**Q: Will returning an empty reason stop the leak?**
+A: No. The appended raw command or patch comes from the tool input, not the reason field. Changing the reason won't suppress it — only keeping sensitive data out of the tool argument (or an upstream runtime fix) will.
+
+---
+
+---
+
+Running multiple AI agents? Save on API costs and subscriptions at [aiFiesta](https://aifiesta.link/muhammed-anshad).
