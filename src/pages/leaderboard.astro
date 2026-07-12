@@ -15,17 +15,54 @@ const lastUpdated = latest?.date || 'N/A';
 const prevSnapshot = snapshots.length > 1 ? JSON.parse(fs.readFileSync(path.join(snapshotsDir, snapshots[1]), 'utf-8')) : null;
 const prevAgents = prevSnapshot?.agents || [];
 
+// Helper to get metric from either v1 or v2 format
+function getMetric(agent, key) {
+  // v2 format: agent.metrics.key
+  if (agent.metrics && agent.metrics[key] !== undefined) return agent.metrics[key];
+  // v1 format: agent.key
+  if (agent[key] !== undefined) return agent[key];
+  return null;
+}
+
 // Calculate trends
 agents.forEach(agent => {
   const prev = prevAgents.find(p => p.id === agent.id);
-  if (prev) {
-    agent.npm_change = (agent.metrics?.npm_downloads || 0) - (prev.metrics?.npm_downloads || 0);
-    agent.star_change = (agent.metrics?.github_stars || 0) - (prev.metrics?.github_stars || 0);
-    agent.score_change = agent.growth_score - prev.growth_score;
-  } else {
-    agent.npm_change = 0;
-    agent.star_change = 0;
-    agent.score_change = 0;
+  const npmNow = getMetric(agent, 'npm_downloads');
+  const npmPrev = prev ? getMetric(prev, 'npm_downloads') : null;
+  const starsNow = getMetric(agent, 'github_stars');
+  const starsPrev = prev ? getMetric(prev, 'github_stars') : null;
+  
+  agent.npm_change = (npmNow || 0) - (npmPrev || 0);
+  agent.star_change = (starsNow || 0) - (starsPrev || 0);
+  agent.score_change = agent.growth_score - (prev?.growth_score || 0);
+  
+  // Ensure metrics object exists for template
+  if (!agent.metrics) {
+    agent.metrics = {
+      npm_downloads: agent.npm_downloads,
+      github_stars: agent.github_stars,
+      github_forks: agent.github_forks,
+      pypi_downloads: agent.pypi_downloads,
+      homebrew_installs: agent.homebrew_installs
+    };
+  }
+  // Ensure data_reasons exists
+  if (!agent.data_reasons) {
+    agent.data_reasons = {
+      npm: agent.metrics.npm_downloads === null || agent.metrics.npm_downloads === undefined ? 'No npm package' : null,
+      github: agent.metrics.github_stars === null || agent.metrics.github_stars === undefined ? (agent.github ? 'Fetch failed' : 'No public repo') : null,
+      pypi: agent.metrics.pypi_downloads === null || agent.metrics.pypi_downloads === undefined ? 'No PyPI package' : null,
+      homebrew: agent.metrics.homebrew_installs === null || agent.metrics.homebrew_installs === undefined ? 'No Homebrew cask' : null
+    };
+  }
+  // Ensure data_coverage exists
+  if (!agent.data_coverage) {
+    const coverage = [];
+    if (agent.metrics.npm_downloads !== null && agent.metrics.npm_downloads !== undefined) coverage.push('npm');
+    if (agent.metrics.github_stars !== null && agent.metrics.github_stars !== undefined) coverage.push('github');
+    if (agent.metrics.pypi_downloads !== null && agent.metrics.pypi_downloads !== undefined) coverage.push('pypi');
+    if (agent.metrics.homebrew_installs !== null && agent.metrics.homebrew_installs !== undefined) coverage.push('brew');
+    agent.data_coverage = coverage;
   }
 });
 
@@ -71,19 +108,27 @@ function getDataReason(agent, source) {
       High hype ratio = lots of GitHub stars but fewer actual users. Low ratio = widely used but less hyped.
     </p>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;">
-      {agents.filter(a => a.hype_ratio && parseFloat(a.hype_ratio) > 0).slice(0, 3).map(agent => (
-        <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:1rem;">
-          <div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--green);margin-bottom:0.5rem;">
-            {agent.name}
+      {agents.filter(a => {
+        const hr = a.hype_ratio || (a.metrics?.github_stars && (a.metrics.npm_downloads || a.metrics.pypi_downloads || a.metrics.homebrew_installs) ? (a.metrics.github_stars / ((a.metrics.npm_downloads || 0) + (a.metrics.pypi_downloads || 0) + (a.metrics.homebrew_installs || 0)) * 1000).toFixed(2) : null);
+        return hr && parseFloat(hr) > 0;
+      }).slice(0, 3).map(agent => {
+        const stars = getMetric(agent, 'github_stars');
+        const npm = getMetric(agent, 'npm_downloads');
+        const hr = agent.hype_ratio || (stars && npm ? (stars / npm * 1000).toFixed(2) : '0');
+        return (
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:1rem;">
+            <div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--green);margin-bottom:0.5rem;">
+              {agent.name}
+            </div>
+            <div style="font-family:var(--font-mono);font-size:1.2rem;color:var(--fg);margin-bottom:0.5rem;">
+              {hr}x
+            </div>
+            <div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--fg-dim);">
+              {formatNumber(stars)} stars / {formatNumber(npm)} downloads
+            </div>
           </div>
-          <div style="font-family:var(--font-mono);font-size:1.2rem;color:var(--fg);margin-bottom:0.5rem;">
-            {agent.hype_ratio}x
-          </div>
-          <div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--fg-dim);">
-            {formatNumber(agent.metrics?.github_stars)} stars / {formatNumber(agent.metrics?.npm_downloads)} downloads
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   </div>
 
