@@ -1,0 +1,71 @@
+---
+title: "Mindwalk Replays Your Coding-Agent Sessions on a 3D Map of Your Codebase"
+description: "Show HN pick Mindwalk visualizes Claude Code and Codex session logs as light moving through a 3D map of your repo — fully local, no data leaves your machine."
+pubDate: "2026-07-12T12:00:00Z"
+updatedDate: "2026-07-12T12:00:00Z"
+tags: ["tooling", "claude-code", "codex", "open-source", "visualization"]
+tool: "claude-code"
+author: "dev_explorer"
+image: "/api/og?title=Mindwalk%3A+Replay+Coding-Agent+Sessions+on+a+3D+Codebase+Map&tool=claude-code"
+---
+
+## Direct Answer
+
+Mindwalk is a new open-source tool (Go + TypeScript, v0.1.0) that replays Claude Code and Codex session logs as light moving across a 3D "city map" of your repository. It shows which files the agent searched, read, and edited — turning a wall of JSONL into a visual shape you can grasp at a glance. It runs fully local; no session data leaves your machine.
+
+A session log answers *what* an agent did. Mindwalk tries to answer *how the agent understood the task*: which parts of the repo it treated as relevant, where it explored before acting, and whether its footprint matched the scope you had in mind.
+
+## Why a 3D map instead of the raw log
+
+Reading session JSONL line by line tells you the agent called a tool, then another tool. It does not tell you whether the agent's attention matched the problem. Mindwalk's bet is that *attention is a shape*, and shapes are faster to judge than text.
+
+The repo is drawn as a night map. As the session plays back, the files the agent touched glow — everything else stays dark. You see the agent's mental model as a footprint.
+
+## How it works
+
+Two artifacts, kept deliberately separate:
+
+- **Trace** — the session log normalized into an ordered stream of file-touch events. One adapter per agent format (Claude Code and Codex today), so adding a new agent is an adapter, not a rewrite.
+- **Citymap** — a deterministic layout of the repository. The same tree always produces the same map, so replays are comparable across sessions.
+
+A local Go server joins the two and serves a React/Three.js frontend. There is no cloud, no upload, no account.
+
+## Reading the picture
+
+Mindwalk gives you several lenses on the same run:
+
+- **Tree / Terrain views** — the repo as a radial tree or a treemap plain. Glow is proportional to how deeply and how often a file was touched.
+- **Touch states** — each file keeps its deepest touch: seen (moss green), read (moon white), edited (warm amber), unvisited (dark). A HUD folds friction signals — error rate, churned files, edits after the last verify — into a review strip.
+- **Playback deck** — scrub or play the session over a bucketed histogram. Bars sit on a cool/warm spectrum: observation stays cool (search, read, exec), mutation glows warm (edit, verify), so editing phases jump out.
+- **Timeline marks** — context compactions, subagent launches, and user turns are click-to-jump targets.
+
+## Commands
+
+```sh
+mindwalk serve [--port N] [--no-open] [--claude-dir DIR] [--codex-dir DIR]
+mindwalk open [--no-open] <session.jsonl>   # open one specific session
+mindwalk build <repo> [-o out]              # write the repository citymap JSON
+mindwalk trace <session> [-o out]           # write the normalized trace JSON
+```
+
+With no arguments, `mindwalk` scans `~/.claude/projects` and `~/.codex/sessions`, serves the UI on a random local port, and opens a browser. Windows archives are on GitHub Releases; or build from source with `make setup && make build`.
+
+## Who it is for
+
+Mindwalk is most useful for the moments when an agent surprises you: a refactor that touched 40 files, a session that wandered before it found the bug, a subagent launch you did not expect. Instead of replaying the log in your head, you watch the footprint.
+
+For context on how these two agents compare head to head, see our breakdown of [Claude Code vs Codex in the terminal battle](/blog/claude-code-vs-codex-terminal-battle/), and the broader landscape in the [Complete Guide to AI Coding Agents in 2026](/blog/complete-guide-ai-coding-agents-2026/).
+
+## FAQ
+
+**Does Mindwalk send my session data anywhere?**
+No. Mindwalk is a local Go binary that reads Claude Code and Codex session logs on your machine and serves the UI from a local port. The README explicitly states no session data leaves your machine.
+
+**Which agents does Mindwalk support?**
+As of v0.1.0, Mindwalk ships adapters for Claude Code (`~/.claude/projects`) and OpenAI Codex (`~/.codex/sessions`). The architecture uses one adapter per agent format, so additional agents can be added without rewriting the core.
+
+**Is Mindwalk ready for daily use?**
+It is early: the repository was created in July 2026, has one contributor, and is at v0.1.0. It is a useful inspection tool for anyone reviewing or learning from agent sessions, but treat it as a young project rather than a finished product.
+
+---
+*Ever wonder if Claude gives a better answer than GPT for a specific coding problem? [aiFiesta](https://aifiesta.link/muhammed-anshad) lets you compare 9+ premium models side-by-side in one chat. No more juggling tabs.*
