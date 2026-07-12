@@ -1,0 +1,49 @@
+---
+title: "Three Show HN Tools That Show Where Coding Agents Are Headed: Memory, Sandboxes, and Reusable Context"
+description: "This week's Hacker News surfaced three developer-built tools — capn-hook, agent-run, and Kote — that tackle the real pain points of AI coding agents: memory that doesn't go stale, safe sandboxed execution, and capturing engineering context across sessions."
+pubDate: "2026-07-13T15:30:00Z"
+updatedDate: "2026-07-13T15:30:00Z"
+tags: ["ecosystem", "tools", "show-hn", "memory", "sandbox", "context"]
+tool: "dev"
+author: "dev"
+image: "/api/og?title=Three%20Show%20HN%20Tools%20for%20Coding%20Agents&tool=dev"
+---
+
+Three new Show HN projects this week point at the same truth: the frontier-model race gets the headlines, but the real work in AI coding is building the harness around the model. capn-hook gives agents memory that deletes itself when the code changes; agent-run sandboxes a coding agent in a single tiny binary; and Kote captures engineering context from AI chats and Git so it stays searchable. Each attacks a different failure mode of today's agents.
+
+## capn-hook: memory that expires when the code does
+
+capn-hook (MIT-licensed, ~17 stars) is "dynamic memory for coding agents." The problem it solves is familiar: an agent spends ten minutes figuring out where payment webhooks live, then forgets it all when the session ends — and pays to rediscover it tomorrow. capn installs a session-start hook for Claude Code and Codex that injects one rule: ask capn before searching the codebase, and chart what you learn afterward.
+
+The clever part is staleness handling. Every saved answer is fingerprinted by the sha256 of the files that back it. If any of those files changes, the answer deletes itself before it can mislead the agent. The author reports a benchmark across 60 real developer questions on five production codebases where recall from capn used 77% fewer tokens than cold exploration, with every answer correct in both arms. That's a meaningful, measurable win for anyone running an agent on a large repo day after day.
+
+## agent-run: a sub-1MB sandbox for your agent
+
+agent-run (GPL-3.0, written in Rust) runs a coding agent inside a bubble using `bwrap` (bubblewrap). It's a single standalone binary under 1MB that supports Claude, Codex, OpenCode, and Pi, with a simple TOML config and per-tool mount rules. The threat model is explicit and honest: it's built to catch *mistakes* an agent makes, not to defend against arbitrary malicious code. The host filesystem is mounted read-only; only the paths you list (project dir, tool caches) are writable.
+
+For developers who'd rather not give an autonomous loop full run of their home directory, that's a pragmatic middle ground — lighter than a microVM, stricter than "just trust it." Its motivation line says it well: "I want the agent to do anything it wants as long as it can't touch non-project files."
+
+## Kote: a memory layer for engineering context
+
+Kote is a developer memory layer that passively captures AI sessions, Git history, and environment notes into a searchable knowledge base. It ships as a VS Code extension, a CLI, a web app, and a Docker self-host stack. The pitch is that the rationale behind architectural decisions — the "why" omitted from short commit messages — rarely survives into documentation, and agents repeat the same exploration because nothing persists it.
+
+Kote differs from capn-hook in scope: where capn is about fast, disposable, file-backed recall of "where does X live," Kote is about longer-lived organizational knowledge — querying past decisions, surfacing related notes via VS Code CodeLens, and flagging environment issues found in diffs. Both are answers to the same question: how do we stop agents from starting from zero every session?
+
+## Why this cluster matters
+
+None of these three are model companies. They're harness companies — and that's where the durable value in the agent ecosystem is accumulating. As we argued in [your coding agent is a harness, the model is the commodity](/blog/your-coding-agent-is-a-harness-the-model-is-the-commodity/), the differentiator is increasingly the scaffolding, not the weights. Tools like these are exactly what make an agent reliable enough to run unattended.
+
+For the wider field of what's being built around these agents, the [state of open-source coding agents in 2026](/blog/state-of-open-source-coding-agents-2026/) covers the landscape these projects plug into.
+
+## FAQ
+
+**Q1: Do capn-hook and Kote replace each other?**
+Not really. capn-hook is lightweight, file-hash-backed recall of "which files answer this question," designed to stay correct as code changes. Kote is a broader knowledge base for decisions, Git context, and notes. Teams often want both: fast recall plus long-term memory.
+
+**Q2: Is agent-run a full security sandbox?**
+No, and its author is explicit about that. It catches agent mistakes by restricting filesystem writes and network, but it is not a hardened boundary against deliberately malicious code. For that threat model, a microVM is the better tool.
+
+**Q3: Can these tools be used with multiple agents at once?**
+capn-hook is agent-agnostic at its core (the CLI is wrapped by thin hooks), and agent-run already supports Claude, Codex, OpenCode, and Pi from one binary. Kote captures sessions from several tools including Claude Code, Codex, and OpenCode.
+
+*You already use AI agents for coding. Why limit yourself to one model? [aiFiesta](https://aifiesta.link/muhammed-anshad) ($12/mo) gives you every premium model in one dashboard — Claude, GPT, Gemini, Grok and more.*
