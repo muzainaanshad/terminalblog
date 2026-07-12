@@ -1,0 +1,69 @@
+---
+title: "OpenAI Just Shipped an Official Codex Plugin for Claude Code — Here's What It Does"
+description: "OpenAI's open-source codex-plugin-cc brings Codex code reviews and task delegation directly into Claude Code through slash commands. Here's how it works and why it matters for the agent ecosystem."
+pubDate: "2026-07-12T10:00:00Z"
+updatedDate: "2026-07-12T10:00:00Z"
+tags: ["claude-code", "openai", "codex", "integration", "ecosystem", "featured"]
+tool: "claude-code"
+author: "dev"
+image: "/api/og?title=OpenAI%20Shipped%20an%20Official%20Codex%20Plugin%20for%20Claude%20Code&tool=claude-code"
+---
+
+OpenAI has published an official, open-source plugin that lets you run Codex directly from inside Claude Code. The `codex-plugin-cc` repository (Apache-2.0, maintained by OpenAI) adds slash commands like `/codex:review` and `/codex:rescue` so you can get a Codex code review or hand a task to Codex without leaving your Claude Code session. It's a rare example of one major lab building first-party tooling for a rival's product.
+
+The plugin isn't a separate runtime. It wraps the Codex CLI already on your machine, so it reuses your existing Codex login, config, and the same checkout you're working in. That makes it closer to a "remote control" for Codex than a competing agent.
+
+## What you actually get
+
+The plugin installs a small set of slash commands into Claude Code:
+
+| Command | What it does |
+|---|---|
+| `/codex:review` | Read-only Codex review of your current or branch changes |
+| `/codex:adversarial-review` | Steerable review that challenges design and tradeoffs |
+| `/codex:rescue` | Hands a task to Codex via a subagent to investigate or fix |
+| `/codex:transfer` | Exports the current session into a persistent Codex thread |
+| `/codex:status` / `/codex:result` / `/codex:cancel` | Manage background Codex jobs |
+| `/codex:setup` | Checks Codex is installed and authenticated; can gate reviews |
+
+The review commands are explicitly read-only and won't modify your code. The delegation commands (`/codex:rescue`) are the ones that let Codex actually attempt a fix, and the docs recommend running those in the background because they can take a while.
+
+## How to install it
+
+From inside a Claude Code session:
+
+```bash
+/plugin marketplace add openai/codex-plugin-cc
+/plugin install codex@openai-codex
+/reload-plugins
+/codex:setup
+```
+
+`/codex:setup` tells you whether Codex is ready and, if the binary is missing and npm is available, can offer to install it for you. You need either a ChatGPT subscription (Free tier included) or an OpenAI API key, plus Node.js 18.18 or later.
+
+## A "review gate" you should turn on carefully
+
+The plugin supports an optional review gate: a `Stop` hook that runs a Codex review on Claude's response before it's accepted, blocking the stop if issues are found so Claude can fix them first. OpenAI's own docs warn this can create a long-running Claude/Codex loop and drain usage limits quickly — only enable it when you're actively watching the session.
+
+## Why this is an ecosystem signal
+
+For most of the agent wars, vendors have pushed users to pick a side: Claude Code *or* Codex *or* Cursor. A first-party OpenAI plugin that improves Claude Code specifically is the opposite instinct. It signals that multi-agent, multi-model workflows are becoming the default expectation — users want the best model for each sub-task, not one agent to rule them all.
+
+If you're evaluating where the two tools fit, our [Claude Code vs. Codex comparison](/blog/claude-code-vs-codex/) breaks down how they differ in practice, and the [Complete Guide to AI Coding Agents](/blog/complete-guide-ai-coding-agents-2026/) maps the wider landscape these plugins plug into.
+
+## FAQ
+
+**Q: Do I need a separate Codex account to use the plugin?**
+A: No separate account is required if you're already signed into Codex on the same machine — the plugin reuses your local CLI authentication. If you've never used Codex, you'll need to sign in with a ChatGPT account or an OpenAI API key.
+
+**Q: Does the plugin run a second copy of Codex?**
+A: No. It delegates through the global `codex` binary and Codex app server already on your machine, so it shares the same install, login state, repository checkout, and configuration.
+
+**Q: Can I continue a task in Codex after starting it in Claude Code?**
+A: Yes. `/codex:transfer` exports the current Claude Code session into a persistent Codex thread and prints a `codex resume` command, so you can keep working in the Codex App or TUI with the same context.
+
+---
+
+---
+
+*Sometimes Claude writes better code. Sometimes GPT does. [aiFiesta](https://aifiesta.link/muhammed-anshad) lets you compare both instantly in one chat for $12/mo — plus 7 more premium models.*
