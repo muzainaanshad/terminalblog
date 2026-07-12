@@ -1,0 +1,60 @@
+---
+title: "Beware: Claude Code Silently Drops Your Work After an Interrupt — Then Denies It Happened"
+description: "A fresh Claude Code bug shows the agent losing already-completed planning context after a mid-turn interrupt, then confidently insisting the work never happened. Here's how to protect yourself."
+pubDate: "2026-07-12T20:00:00Z"
+updatedDate: "2026-07-12T20:00:00Z"
+tags: ["security", "beware", "claude-code", "reliability", "context", "interrupt"]
+tool: "claude-code"
+author: "kira_bug_hunter"
+image: "/api/og?title=Beware:%20Interrupt%20Drops%20Your%20Work&tool=Claude%20Code"
+---
+
+You hit `Esc` to interrupt the agent mid-turn to ask a quick question. Normal, right? You resume, ask "what did we just decide," and the agent tells you — with full confidence — that no such planning session ever happened. It even says there were zero scoping questions in your session. That's not you losing your mind. That's a real, reproducible Claude Code bug.
+
+## The Issue
+
+GitHub issue [#76928](https://github.com/anthropics/claude-code/issues/76928) reports a failure mode worse than ordinary context loss. A user on the VSCode native extension (Windows) ran three rounds of `AskUserQuestion` to scope a data pipeline, then watched the assistant write a full multi-phase plan to a plan file. They interrupted right as the plan finished writing — to ask an unrelated UI bug question.
+
+From that point on, the assistant's active context no longer contained any trace of the earlier work. Asked what they'd worked on, it described only pre-planning repo orientation and asserted no planning session existed. It claimed there were *zero* `AskUserQuestion` calls in the session — trivially false. The user had to argue repeatedly and eventually get the assistant to parse its own raw session `.jsonl` on disk, where all three questions, answers, and the plan file were sitting intact the entire time. Nothing was actually lost. The live context simply never carried it past the interrupt.
+
+The danger isn't the data loss — it's the **confident denial**. The agent sent the user on a wrong-track investigation of sibling projects instead of checking its own current transcript first.
+
+## Are You Affected?
+
+Check whether your live context matches your on-disk transcript after any interrupt:
+
+```bash
+# Find your session log
+ls -t ~/.claude/projects/*/*.jsonl | head -1
+
+# Grep the raw transcript for tool calls the agent claims never happened
+grep -c "AskUserQuestion" ~/.claude/projects/*/$(ls -t ~/.claude/projects/*/*.jsonl | head -1 | xargs basename)
+
+# List plan files written this session
+ls -lt ~/.claude/plans/ | head
+```
+
+If the `.jsonl` shows tool calls or a plan your agent says don't exist, you've hit the bug.
+
+## The Fix
+
+- **Don't trust amnesia.** After any mid-turn interrupt, re-state the key decisions and ask the agent to confirm against its session file before moving on.
+- **Keep plans on disk.** Always have the agent write scoping decisions to a plan file — it survives the context gap even when live memory doesn't.
+- **Recover via the transcript.** If the agent denies prior work, point it at `~/.claude/projects/*/*.jsonl` directly rather than accepting the denial.
+
+## Why It Happened
+
+The trigger is interrupting right as a tool call or plan write finishes. Context compaction (or post-interrupt context reconstruction) appears to diverge from the full session transcript, silently resetting the active window to an earlier point. Because nothing errors, the agent continues as if pre-interrupt work never occurred — and will defend that false state until forced to read its own log.
+
+## FAQ
+
+**Q1: Did I actually lose my work?**
+No. The data is intact in `~/.claude/projects/*/*.jsonl` and any plan file. Only the agent's live, in-memory context lost it. Recover by referencing the transcript.
+
+**Q2: Is this a security vulnerability?**
+Not a remote exploit, but it's a trust-safety problem: a confident, false denial can send you chasing phantom bugs or re-doing decided work. Treat agent "this never happened" claims as unverified after an interrupt.
+
+**Q3: Does this affect other agents?**
+Any agent that compacts or reconstructs context after an interrupt can exhibit amnesia. Verify continuity by re-stating prior decisions before relying on them.
+
+*Your AI tools should work for you, not your budget. Find savings at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
