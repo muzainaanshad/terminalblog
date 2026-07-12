@@ -1,0 +1,78 @@
+---
+title: "Claude Code Keeps Auto-Retrying After Hitting Token Limits — Your Bill is the Only Warning"
+description: "A newly filed Claude Code bug shows the agent silently retrying forever after hitting API usage limits. No error. No stop. Just a growing bill."
+pubDate: "2026-07-12T07:30:00Z"
+updatedDate: "2026-07-12T07:30:00Z"
+tags: ["beware", "bug", "claude-code", "token-limits", "cost", "billing"]
+tool: "claude-code"
+author: "kira_bug_hunter"
+image: "/api/og?title=Claude+Code+Auto-Retries+After+Hitting+Token+Limits&tool=claude-code"
+---
+
+You're in the flow. Claude Code is working through a tricky refactor. You step away for coffee, come back, and the agent is still "thinking." The terminal looks busy. But nothing is happening. And your API bill just grew by $20.
+
+A freshly filed bug ([#76837](https://github.com/anthropics/claude-code/issues/76837)) on the Claude Code repository reveals a quiet money-burning behavior: **when the agent hits its usage or token limit, instead of stopping and reporting the error, it keeps auto-retrying indefinitely.** The only symptom is a stalled session and a climbing bill.
+
+## The Issue
+
+The user reports that Claude Code reaches its platform-imposed usage limit (a 429 or similar token-cap response) and, rather than surfacing the error and pausing, enters an infinite retry loop. The model keeps sending the same request, getting the same rejection, and sending it again — each attempt burning API credits.
+
+There is no user-facing indicator that this is happening. No error dialog. No warning in the TUI. The session looks active. The only way to detect it is to either spot a stalled turn (no new output for minutes) or check your API usage dashboard and see a spike in requests that returned nothing useful.
+
+The issue is labeled for **Windows** and **VS Code** platforms, but the core mechanism — an unbounded retry loop on API rejection — is cross-platform. If Claude Code can't get a model response, it keeps trying until your quota runs out or you manually kill the session.
+
+## Are You Affected?
+
+Check if you've hit this bug:
+
+```bash
+# Check your Anthropic API usage for retry spikes
+# Look for repeated 429 or 529 responses in your logs
+# (path varies by setup — check your API dashboard)
+```
+
+```bash
+# If you use Claude Code CLI v2.1.207 or earlier:
+# Run a task that approaches your usage limit, then watch:
+tail -f ~/.claude-code/logs/*.log | grep -i "retry\|429\|rate.limit"
+```
+
+You're affected if:
+- You use Claude Code on Windows or VS Code (labeled platforms)
+- You run tasks large enough to hit Anthropic's rate or token limits
+- You've ever left a Claude Code session unattended and come back to a stalled agent
+- Your API bill shows unexplained spikes during idle periods
+
+## The Fix
+
+**Immediate workaround:** If you notice a stalled session, kill it (`Ctrl+C` in the terminal) and restart. Check your API dashboard for unexpected usage before resuming.
+
+**Long-term:** Watch issue [#76837](https://github.com/anthropics/claude-code/issues/76837) for an upstream fix. The expected solution is a retry budget — stop after N consecutive failures and surface the error to the user, or at minimum add a configurable `max_retry_attempts` setting.
+
+**Prevention:**
+- Set hard usage alerts in your Anthropic Console (Settings → Usage Limits) so you get notified before runaway retries cost real money.
+- Keep an eye on session responsiveness. If Claude Code has been "working" silently for more than 2-3 minutes without tool calls or output, it's likely in a retry loop.
+- Run expensive or long tasks inside a `timeout` wrapper that kills the process after a reasonable duration.
+
+## Why It Happened
+
+When Claude Code sends a request to the Anthropic API and gets back a 429 (Rate Limit) or 402 (Usage Limit) response, the core loop treats it as a transient error. The default behavior for transient errors is to retry — which is correct for network blips and temporary congestion. The gap is that **there is no distinction between "try again in a second" errors and "you've hit your hard limit" errors.**
+
+The retry module lacks a circuit breaker. It doesn't count successive failures, doesn't check if the error is terminal, and doesn't surface the failure to the user. Each retry consumes a fresh API call — meaning every attempt is billable, even though every attempt produces the same rejection.
+
+The recently filed issue [#63021](https://github.com/NousResearch/hermes-agent/pull/63021) in the Hermes project shows the same class of problem being addressed there — classifying 429 quota limits as billing errors rather than transient failures. The pattern is spreading across the ecosystem.
+
+## FAQ
+
+**Q: How can I tell if I'm in a retry loop vs. just a slow model?**
+A: A slow model produces incremental output — you'll see tokens appear in the TUI or response stream. A retry loop is silent: no new text, no tool calls, no progress. Kill the session and check your API usage dashboard for a spike in rejected requests.
+
+**Q: Does the issue affect both CLI and VS Code versions?**
+A: The bug report is labeled for both `platform:windows` and `platform:vscode`. The underlying retry logic is in the core agent loop, so it could affect any platform, but these are the confirmed configurations.
+
+**Q: Can I limit API spend directly in Claude Code to prevent this?**
+A: Not yet. Claude Code does not have a built-in spend cap. You must set limits at the API key level in the Anthropic Console. The bug is that even with API-side limits, the agent keeps retrying and burning quota rather than stopping gracefully.
+
+---
+
+*Don't overpay for AI tools. Check [aiFiesta](https://aifiesta.link/muhammed-anshad) for exclusive pricing on coding agents.*
