@@ -1,0 +1,60 @@
+---
+title: "Beware: Claude Code's Background Tasks Are Getting SIGKILLed Mid-Run — and Trashing Your Git State"
+description: "A reproducible Claude Code bug is killing long-running background Bash tasks with SIGKILL about 1% of the time, mid-write — and leaving repositories in a corrupted state. Here's how to check and protect yourself."
+pubDate: "2026-07-13T01:00:00Z"
+updatedDate: "2026-07-13T01:00:00Z"
+tags: ["security", "beware", "claude-code", "reliability", "background-tasks", "git"]
+tool: "claude-code"
+author: "kira_bug_hunter"
+image: "/api/og?title=Beware:%20Background%20Tasks%20SIGKILL%20Git&tool=Claude%20Code"
+---
+
+You kick off a long build, test suite, or migration as a background task, walk away, and come back to a half-finished repo and a message that the task "ended unexpectedly." No error, no stack trace — just a dead process and git complaining it can't read its own index. If that sounds familiar, you may have been hit by a freshly reported, reproducible Claude Code crash.
+
+## The Issue
+
+GitHub issue [#76974](https://github.com/anthropics/claude-code/issues/76974) reports that background Bash tasks (`run_in_background=true`) are being sporadically SIGKILLed by the CLI's own task supervision layer — roughly 1% of dispatches, on Linux. The kill happens mid-run, often while the task is writing files or mutating the working tree. Because the process is terminated with SIGKILL (not a graceful shutdown), partial writes are never rolled back. The reporter notes this can corrupt git state: an interrupted `git` operation leaves the index or object database in an inconsistent state that `git status` then flags as broken.
+
+The bug is labeled `bug`, `has repro`, `area:tools`, and `area:core` — meaning the maintainers have confirmed they can reproduce it, and it touches the core task-execution path rather than a peripheral feature.
+
+## Are You Affected?
+
+If you run long or write-heavy background tasks, check your repos for silent corruption:
+
+```bash
+# Inspect git health in any repo where a background task ran
+git status --porcelain --branch
+git fsck --no-dangling 2>&1 | grep -i "error\|corrupt" || echo "git OK"
+
+# Find background task supervisor processes still flagged as running
+ps aux | grep -i "[t]ask" | grep -i "claude"
+
+# Spot half-written files modified in the last 3 hours
+find . -newermt "-3 hours" \( -name "*.tmp" -o -name "*.swp" -o -name "*.lock" \) 2>/dev/null
+```
+
+If `git fsck` reports corruption, or you see lock/`.tmp` files with no process holding them, a task was likely killed mid-write.
+
+## The Fix
+
+- **Avoid long write-heavy background tasks** until a fix lands; run them in a foreground session or a separate `tmux`/`screen` shell the CLI doesn't supervise.
+- **Commit before background work.** A clean commit gives you a safe restore point: `git stash` or `git reset --hard <sha>` recovers a corrupted tree.
+- **Run `git fsck` after every background task** on shared or important repos.
+- **Watch the issue** [#76974](https://github.com/anthropics/claude-code/issues/76974) for the patch.
+
+## Why It Happened
+
+The CLI's task supervisor appears to enforce a timeout or resource cap by sending SIGKILL directly to the background child process. SIGKILL cannot be trapped, so in-flight `git` operations or file writes have no chance to clean up. A graceful SIGTERM (or supervisory hand-off to a detached process group) would let tasks shut down cleanly and avoid leaving the repository in a half-written state.
+
+## FAQ
+
+**Q1: Is my data permanently lost if git gets corrupted?**
+Usually not. `git fsck` identifies the broken objects, and because git is content-addressed, unaffected commits remain intact. Restore from your last good commit (`git reflog` / `git reset --hard <sha>`).
+
+**Q2: Does this affect macOS or Windows users?**
+The report is labeled `platform:linux`, but SIGKILL-style supervision could surface on any OS. Linux users are the confirmed affected group so far.
+
+**Q3: Can I still use background tasks safely?**
+Yes — with guardrails. Commit first, keep tasks read-mostly or short, and verify with `git fsck` afterward. Avoid background tasks that rewrite large trees or run long `git` operations.
+
+*Don't overpay for AI tools. Check [aiFiesta](https://aifiesta.link/muhammed-anshad) for exclusive pricing on coding agents.*
