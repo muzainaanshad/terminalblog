@@ -1,0 +1,61 @@
+---
+title: "AWS Just Made Claude Code Cloud-Native: The Official AWS MCP Server Plugin"
+description: "AWS released an official Agent Toolkit that connects Claude Code, Codex, and Cursor to your AWS account through a single MCP server. One plugin install replaces hand-wired IAM roles, with CloudTrail audit logging built in."
+pubDate: "2026-07-12"
+updatedDate: "2026-07-12"
+tags: ["aws", "mcp", "claude-code", "release", "tooling"]
+tool: "claude-code"
+author: "dev"
+---
+AWS released an official Agent Toolkit that plugs Claude Code, Codex, and Cursor directly into your AWS account through a single MCP server. Instead of wiring up IAM roles and endpoints by hand, you install one plugin and the agent can search AWS docs, run sandboxed Python, and follow curated cloud skills with full CloudTrail audit logging.
+
+## What the AWS Agent Toolkit Actually Is
+
+The Agent Toolkit for AWS is an open-source project (published on GitHub at `aws/agent-toolkit-for-aws`) that bundles two things:
+
+- **The AWS MCP Server** — a managed server that gives agents access to AWS through the Model Context Protocol. Agents can search AWS documentation and pull service information without authentication. To actually execute AWS API calls, run Python in a sandboxed environment, or follow curated skills, the agent authenticates through your existing IAM credentials.
+- **Agent plugins** — single-install packages that bundle the MCP server configuration and a curated set of agent skills, so you don't configure endpoints and install skills one by one.
+
+The point is consolidation. One endpoint, IAM-based access controls, CloudWatch metrics, and CloudTrail logging of every API call for audit visibility.
+
+## Which Agents It Supports
+
+Per AWS's own documentation, plugins ship for **Claude Code, Codex, and Cursor**. Kiro connects to the AWS MCP Server directly without needing a plugin, and any MCP-capable agent can point at the server manually.
+
+The install flow is refreshingly short for Claude Code:
+
+```
+/plugin install aws-core@claude-plugins-official
+/reload-plugins
+```
+
+The `aws-core` plugin is the recommended default — it bundles the MCP server config and skills covering service selection, infrastructure as code (CDK and CloudFormation), serverless, containers, storage, observability, billing, SDK usage, and deployment. A second plugin, `aws-agents`, provides additional agent-oriented capabilities.
+
+## Why This Matters for Coding-Agent Users
+
+Until now, getting an agent to safely touch your cloud account meant hand-rolling IAM policies, managing credential scope, and hoping the agent didn't wander. The AWS toolkit changes the shape of that problem:
+
+- **Auditability by default.** Because CloudTrail logs every API call the agent makes, you get a paper trail of what the agent did in your account — not a black box.
+- **Sandboxed execution.** Python runs in a sandboxed environment rather than with unrestricted shell access to your machine or account.
+- **Curated skills over raw prompting.** The bundled skills encode AWS's recommended workflows, which tends to produce more reliable infrastructure changes than free-form "deploy my app" prompts.
+
+This is the same direction other vendors are moving — giving agents narrow, logged, scoped access to production surfaces instead of all-or-nothing shell control. If you work across multiple clouds or models, the pattern is worth understanding even if you don't use AWS day to day.
+
+For a related look at how agents extend into other ecosystems, see our coverage of the [OpenAI Codex plugin for Claude Code](https://terminalblog.com/blog/openai-codex-plugin-for-claude-code/), and for the broader context on what a coding agent can actually "see" in your repo, read [what a coding agent knows about your codebase](https://terminalblog.com/blog/what-coding-agent-knows-codebase/).
+
+---
+
+### FAQ
+
+**Is the AWS Agent Toolkit free and open source?**
+Yes. AWS publishes the Agent Toolkit for AWS as an open-source project on GitHub. The MCP server and agent plugins are available for Claude Code, Codex, and Cursor, with Kiro and other MCP-capable agents able to connect to the server directly.
+
+**Does the AWS MCP Server need my AWS credentials to search docs?**
+No. Agents can search AWS documentation and retrieve service information without authentication. Executing AWS API calls, running sandboxed Python, or following curated skills requires authentication through your existing IAM credentials.
+
+**Which plugin should I install for Claude Code?**
+AWS recommends `aws-core` for all AWS developers — it includes the MCP server configuration and default skills for common workflows like infrastructure as code, serverless, containers, storage, and observability. An `aws-agents` plugin provides additional agent-focused capabilities.
+
+---
+
+*Running Claude Code or Cursor but still paying separately for ChatGPT Plus? [aiFiesta](https://aifiesta.link/muhammed-anshad) gives you GPT, Claude, Gemini, and 6 more premium models for $12/mo — pick the best model for every task without paying for 9 subscriptions.*
