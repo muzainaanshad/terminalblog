@@ -1,0 +1,55 @@
+---
+title: "Beware: One Browser Tab Can Kill Your Entire Coding-Agent Process Tree"
+description: "A P1 crash in oh-my-pi destroys a whole multi-agent session on a single browser race, and a confirmed Claude Code bug silently splits your Windows MCP config. Here's how to detect and survive both."
+pubDate: "2026-07-13T03:30:00Z"
+updatedDate: "2026-07-13T03:30:00Z"
+tags: ["security", "beware", "oh-my-pi", "claude-code", "crash", "mcp", "windows"]
+tool: "oh-my-pi"
+author: "kira_bug_hunter"
+image: "/api/og?title=Beware:%20One%20Tab%20Kills%20the%20Session&tool=oh-my-pi"
+---
+
+You're running a parent agent with seven subagents, all quietly grinding through a browser-automation task. A single page navigation races mid-flight, a CDP (Chrome DevTools Protocol) call hiccups — and the entire process tree dies. Parent, all seven children, every pending tool call, gone. That's not a hypothetical. It's a freshly filed P1 crash in the oh-my-pi agent. And it has a quieter cousin in Claude Code that can silently fork your Windows config.
+
+## The issues we found
+
+**1. oh-my-pi: a browser stealth patch crashes the whole process (issue #5296).** OMP's patched `puppeteer-core@25.3.0` stealth layer calls a debug helper named `debugError` in its frame-acquisition catch paths. That helper is not defined unless the `puppeteer:error` debug channel is explicitly enabled — which it never is by default. So when a routine, recoverable CDP error hits during world re-acquisition, the logger itself throws a `TypeError` instead of the real error. That secondary throw escapes as an `unhandledRejection`, trips OMP's postmortem handler, and calls `process.exit(1)`. Because all sibling agents share the process, one browser tab takes down the lot. The reporter documented a comfyui parent plus seven subagents killed in a single shot.
+
+**2. Claude Code: Windows path casing silently splits your config (issue #76994).** `~/.claude.json` keys per-project state by raw directory path, compared byte-for-byte. On Windows — case-insensitive — the CLI launches with an uppercase drive letter (`C:/...`) while VSCode-spawned sessions lowercase it (`c:/...`). The same folder becomes two different keys. Result: MCP servers you registered from the CLI never load in VSCode, and vice versa, with zero error. The bug is labeled `has repro` and the reporter lost weeks to intermittent "where did my MCP server go" confusion.
+
+## Are you affected?
+
+Run these quick checks:
+
+```bash
+# oh-my-pi: did a browser task kill the whole process tree?
+grep -i "unhandled_rejection" ~/.omp/logs/*.jsonl | tail -5
+grep -i "debugError is not a function" ~/.omp/logs/*.jsonl | tail -5
+
+# Claude Code / VSCode: do you have case-variant duplicate keys?
+grep -ioE "\"c?:/users/[^\"]+\"" ~/.claude.json | sort -u | uniq -d
+```
+
+If you see fatal `unhandled_rejection` entries after browser use, or duplicate path spellings in `~/.claude.json`, you're hit.
+
+## The fix
+
+- **oh-my-pi:** Until upstream patches the stealth layer, avoid long-running multi-agent browser sweeps on the stock build, or pin a patched `FrameManager.js` that routes catch handlers through the safe `debugCatchError` helper (the maintainer already proposed the one-line swap). Restart affected sessions — there is no live in-place recovery once the process exits.
+- **Claude Code:** Canonicalize your working directory casing across clients. Launch VSCode and CLI from the same path spelling, or register MCP servers at user scope (`--scope user`) instead of project scope so the key collision can't hide them.
+
+## Why it happened
+
+Both are defensive-coding misses, not model failures. OMP's patch reimplemented frame acquisition without reusing Puppeteer's existing safe logger, so the disabled channel returns nothing and the catch block calls a non-existent function. Claude Code never canonicalizes paths on a case-insensitive filesystem, so two legitimate spellings of one folder become two permanent, divergent configs.
+
+## FAQ
+
+**Q1: Is the oh-my-pi crash a security exploit?**
+No — it's an internal crash from a missing function reference, not an external attack. But it is a reliability emergency: one transient browser error can wipe real work.
+
+**Q2: Will restarting Claude Code fix the Windows MCP split?**
+Restarting won't merge the duplicate keys — they're already written. You must delete the stray case-variant entry (or switch to user-scope servers) so both clients read the same record.
+
+**Q3: Can I prevent the oh-my-pi process kill today?**
+Partially. Set `NODE_DEBUG=puppeteer:error` to define the helper (trade-off: very noisy logs), or apply the proposed patch locally. The real fix ships with the stealth layer update.
+
+*Before you buy any coding agent subscription — compare prices and find exclusive deals at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
