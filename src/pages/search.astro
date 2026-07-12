@@ -1,0 +1,91 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { SITE_TITLE } from '../consts';
+---
+
+<Layout title={`Search — ${SITE_TITLE}`} description="Search terminalblog articles about AI coding agents.">
+  <div class="content" style="max-width:700px;margin:0 auto;padding:0 1.5rem 3rem;">
+
+    <div class="search-header">
+      <h1 style="font-size:1.3rem;font-family:var(--font-mono);">Search <span style="color:var(--green);">articles</span></h1>
+      <p style="color:var(--fg-dim);font-size:0.82rem;margin:0.3rem 0 0;">Search across all articles about coding agents.</p>
+    </div>
+
+    <div class="search-wrap">
+      <div class="search-input-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-input" class="search-input" placeholder="e.g. Claude Code, Cursor, pricing..." autofocus />
+        <kbd class="search-hint">/</kbd>
+      </div>
+      <div id="search-results" class="search-results"></div>
+    </div>
+
+  </div>
+
+  <link rel="preload" href="/pagefind/pagefind-ui.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+  <link rel="preload" href="/pagefind/pagefind-ui.js" as="script" />
+
+  <script is:inline>
+    document.addEventListener('DOMContentLoaded', () => {
+      const input = document.getElementById('search-input');
+      const results = document.getElementById('search-results');
+      if (!input || !results) return;
+
+      // Keyboard shortcut: "/" to focus search
+      document.addEventListener('keydown', (e) => {
+        if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
+          e.preventDefault();
+          input.focus();
+        }
+      });
+
+      // Dynamically load pagefind JS then init
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = '/pagefind/pagefind-ui.css';
+      document.head.appendChild(link);
+
+      const script = document.createElement('script');
+      script.src = '/pagefind/pagefind-ui.js';
+      script.onload = () => {
+        if (window.PagefindUI) {
+          new window.PagefindUI({
+            element: '#search-results',
+            showImages: false,
+            showSubResults: true,
+            excerptLength: 20,
+            resetStyles: true,
+            autofocus: false,
+          });
+          // Wire custom input to pagefind
+          setTimeout(() => {
+            const pfInput = document.querySelector('.pagefind-ui__search-input');
+            if (pfInput && input) {
+              input.addEventListener('input', (e) => {
+                pfInput.value = e.target.value;
+                pfInput.dispatchEvent(new Event('input', { bubbles: true }));
+              });
+            }
+          }, 100);
+        }
+      };
+      document.body.appendChild(script);
+    });
+  </script>
+
+  <style is:global>
+    .search-header { padding: 2rem 0 1rem; }
+    .search-input-wrap { display: flex; align-items: center; gap: 0.5rem; background: #0c0c0c; border: 1px solid #1a1a1a; border-radius: 6px; padding: 0.5rem 0.8rem; }
+    .search-icon { font-size: 0.85rem; }
+    .search-input { flex: 1; background: none; border: none; outline: none; color: var(--fg-bright); font-family: var(--font-mono); font-size: 0.9rem; }
+    .search-input::placeholder { color: var(--fg-dim); }
+    .search-hint { font-family: var(--font-mono); font-size: 0.6rem; padding: 0.15rem 0.4rem; border: 1px solid #222; border-radius: 3px; color: #555; }
+    .search-results { margin-top: 1rem; }
+
+    .pagefind-ui { --pagefind-ui-font: var(--font-mono); --pagefind-ui-primary: var(--green); --pagefind-ui-text: var(--fg-bright); --pagefind-ui-background: var(--bg-alt); --pagefind-ui-border: var(--border); --pagefind-ui-tag: var(--border); --pagefind-ui-scale: 0.85; }
+    .pagefind-ui__search-input { display: none !important; }
+    .pagefind-ui__search-clear { display: none !important; }
+    .pagefind-ui__result-title { font-family: var(--font-mono); }
+    .pagefind-ui__result-excerpt { color: var(--fg-dim); }
+  </style>
+</Layout>
