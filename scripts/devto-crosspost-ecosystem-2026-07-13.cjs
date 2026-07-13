@@ -1,75 +1,62 @@
-#!/usr/bin/env node
-// Cross-post the 2026-07-13 ecosystem articles to Dev.to
+// Cross-post the four new ecosystem articles to dev.to
+// Robust: write each payload to a temp JSON file, POST with --data @file
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const { execSync } = require('child_process');
 
 const BLOG = path.join(__dirname, '..', 'src', 'content', 'blog');
-const API = 'https://dev.to/api/articles';
-const KEY = '9Kw5MgKzMvJ2g1G8TCUoR3un';
-
 const slugs = [
-  'anthropic-extends-fable-5-access-july-19',
-  'show-hn-coding-agent-memory-sandbox-tools',
-  'ai-customers-small-models-beautiful',
+  'coding-agents-that-see-the-browser',
+  'coding-agents-as-teammates-onedev',
+  'rust-guardrail-tool-ai-agent-code',
+  'claude-code-rate-limit-utilization',
 ];
 
-function parseFront(content) {
-  const m = content.match(/^---\n([\s\S]*?)\n---/);
-  const fm = m[1];
-  const fields = {};
-  for (const line of fm.split('\n')) {
-    const mm = line.match(/^(\w+):\s*"([^"]*)"$/);
-    if (mm) fields[mm[1]] = mm[2];
-    const arr = line.match(/^tags:\s*\[(.*)\]$/);
-    if (arr) fields.tags = arr[1].split(',').map(s => s.trim().replace(/"/g, ''));
-  }
-  const body = content.slice(m[0].length).trim();
-  return { fields, body };
+const tagMap = {
+  'coding-agents-that-see-the-browser': ['ai', 'webdev', 'productivity', 'beginners'],
+  'coding-agents-as-teammates-onedev': ['ai', 'productivity', 'devops', 'career'],
+  'rust-guardrail-tool-ai-agent-code': ['rust', 'security', 'ai', 'tutorial'],
+  'claude-code-rate-limit-utilization': ['ai', 'productivity', 'cli', 'beginners'],
+};
+
+function stripFrontmatter(md) {
+  const m = md.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  if (!m) return md;
+  return m[2].trim();
 }
 
-function slugTag(t) {
-  return t.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 25);
+function titleFromFrontmatter(md) {
+  const m = md.match(/title:\s*"([^"]*)"/);
+  return m ? m[1] : 'Untitled';
 }
 
-async function post(slug) {
-  const fp = path.join(BLOG, slug + '.mdx');
-  const content = fs.readFileSync(fp, 'utf-8');
-  const { fields, body } = parseFront(content);
-  const title = fields.title;
+for (const slug of slugs) {
+  const file = path.join(BLOG, slug + '.mdx');
+  const raw = fs.readFileSync(file, 'utf8');
+  const body = stripFrontmatter(raw);
+  const title = titleFromFrontmatter(raw);
+  const tags = tagMap[slug] || ['ai', 'productivity'];
   const canonical = `https://terminalblog.com/blog/${slug}/`;
-  const tags = (fields.tags || ['ai', 'coding']).map(slugTag).filter(Boolean).slice(0, 4);
-  const payload = {
-    article: {
-      title,
-      body_markdown: body,
-      published: true,
-      tags,
-      canonical_url: canonical,
-    },
-  };
-  const res = await fetch(API, {
-    method: 'POST',
-    headers: { 'api-key': KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const txt = await res.text();
-  let url = '';
-  try { url = JSON.parse(txt).url || ''; } catch (e) {}
-  console.log(`${res.status} | ${slug} | ${url || txt.slice(0, 120)}`);
-  return url;
-}
 
-(async () => {
-  for (const s of slugs) {
-    let ok = false, tries = 0;
-    while (!ok && tries < 8) {
-      tries++;
-      try {
-        const url = await post(s);
-        if (url) ok = true;
-      } catch (e) { console.log(`ERR ${s}: ${e.message}`); }
-      if (!ok) { console.log(`retry ${s} (${tries})`); await new Promise(r => setTimeout(r, 35000)); }
-      else await new Promise(r => setTimeout(r, 5000));
-    }
+  const payload = {
+    article: { title, body_markdown: body, published: true, tags, canonical_url: canonical },
+  };
+
+  const tmp = path.join(os.tmpdir(), `devto-${slug}.json`);
+  fs.writeFileSync(tmp, JSON.stringify(payload));
+
+  try {
+    const out = execSync(
+      `curl -s -X POST -H "api-key: 9Kw5MgKzMvJ2g1G8TCUoR3un" -H "Content-Type: application/json" --data @${tmp} https://dev.to/api/articles`,
+      { encoding: 'utf8' }
+    );
+    let status = 'unknown';
+    try { const j = JSON.parse(out); status = j.url || (j.error ? JSON.stringify(j.error) : out.slice(0, 200)); } catch { status = out.slice(0, 200); }
+    console.log(`RESULT ${slug} -> ${status}`);
+  } catch (e) {
+    console.error(`FAILED ${slug}: ${e.message}`);
+  } finally {
+    fs.unlinkSync(tmp);
   }
-})();
+}

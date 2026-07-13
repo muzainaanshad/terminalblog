@@ -4,99 +4,88 @@ import { SITE_TITLE } from '../consts';
 import fs from 'fs';
 import path from 'path';
 
-// Read latest snapshot
 const snapshotsDir = path.join(process.cwd(), 'src', 'data', 'adoption', 'snapshots');
 const snapshots = fs.readdirSync(snapshotsDir).filter(f => f.endsWith('.json')).sort().reverse();
 const latest = snapshots.length > 0 ? JSON.parse(fs.readFileSync(path.join(snapshotsDir, snapshots[0]), 'utf-8')) : null;
 const agents = latest?.agents || [];
 const lastUpdated = latest?.date || 'N/A';
 
-// Read previous snapshot for trend data
 const prevSnapshot = snapshots.length > 1 ? JSON.parse(fs.readFileSync(path.join(snapshotsDir, snapshots[1]), 'utf-8')) : null;
 const prevAgents = prevSnapshot?.agents || [];
 
-// Helper to get metric from either v1 or v2 format
 function getMetric(agent, key) {
   if (agent.metrics && agent.metrics[key] !== undefined) return agent.metrics[key];
   if (agent[key] !== undefined) return agent[key];
   return null;
 }
 
-// Calculate trends + populate missing fields
+// Compute Adoption Score: weighted combo of npm (50%) + GitHub stars (30%) + forks (20%)
+// All normalized 0-100 against the max in each category
 agents.forEach(agent => {
   const prev = prevAgents.find(p => p.id === agent.id);
   const npmNow = getMetric(agent, 'npm_downloads');
   const npmPrev = prev ? getMetric(prev, 'npm_downloads') : null;
   const starsNow = getMetric(agent, 'github_stars');
   const starsPrev = prev ? getMetric(prev, 'github_stars') : null;
-  
-  // Only show change if we have previous data
+  const forksNow = getMetric(agent, 'github_forks');
+
   agent.npm_change = (prev && npmPrev !== null) ? (npmNow || 0) - npmPrev : null;
   agent.star_change = (prev && starsPrev !== null) ? (starsNow || 0) - starsPrev : null;
-  
-  // Ensure metrics object exists
+
   if (!agent.metrics) {
     agent.metrics = {
       npm_downloads: agent.npm_downloads,
       github_stars: agent.github_stars,
       github_forks: agent.github_forks,
-      pypi_downloads: agent.pypi_downloads,
-      homebrew_installs: agent.homebrew_installs
     };
   }
-  
-  // Compute hype ratio for display
-  const stars = agent.metrics.github_stars || 0;
-  const downloads = agent.metrics.npm_downloads || 0;
-  agent.hype_ratio_calc = downloads > 0 ? (stars / downloads * 1000).toFixed(1) : null;
 });
 
-// Sort by GitHub stars (primary) then npm downloads (secondary)
-agents.sort((a, b) => {
-  const starsA = getMetric(a, 'github_stars') || 0;
-  const starsB = getMetric(b, 'github_stars') || 0;
-  if (starsB !== starsA) return starsB - starsA;
-  return (getMetric(b, 'npm_downloads') || 0) - (getMetric(a, 'npm_downloads') || 0);
+// Normalize and compute adoption score
+const maxNpm = Math.max(...agents.map(a => getMetric(a, 'npm_downloads') || 0));
+const maxStars = Math.max(...agents.map(a => getMetric(a, 'github_stars') || 0));
+const maxForks = Math.max(...agents.map(a => getMetric(a, 'github_forks') || 0));
+
+agents.forEach(agent => {
+  const npm = getMetric(agent, 'npm_downloads') || 0;
+  const stars = getMetric(agent, 'github_stars') || 0;
+  const forks = getMetric(agent, 'github_forks') || 0;
+  const npmNorm = maxNpm > 0 ? (npm / maxNpm) * 100 : 0;
+  const starsNorm = maxStars > 0 ? (stars / maxStars) * 100 : 0;
+  const forksNorm = maxForks > 0 ? (forks / maxForks) * 100 : 0;
+  agent.adoption_score = Math.round(npmNorm * 0.5 + starsNorm * 0.3 + forksNorm * 0.2);
+  agent.data_sources = [npm > 0, stars > 0, forks > 0].filter(Boolean).length;
 });
+
+// Sort by adoption score
+agents.sort((a, b) => b.adoption_score - a.adoption_score);
 agents.forEach((a, i) => { a.rank = i + 1; });
 
-function formatNumber(n) {
+function fmt(n) {
   if (n === null || n === undefined) return '—';
   if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
   if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
   return n.toLocaleString();
 }
-
-function formatChange(n) {
-  if (n === null || n === undefined) return '';
-  if (n > 0) return `+${formatNumber(n)}`;
-  if (n < 0) return formatNumber(n);
-  return '';
+function fmtChange(n) {
+  if (n === null || n === undefined || n === 0) return '';
+  return n > 0 ? `+${fmt(n)}` : fmt(n);
 }
 
-// Agent install hints
-const installHints = {
-  'claude-code': { install: 'npm i -g @anthropic-ai/claude-code', type: 'CLI', price: 'Paid ($20/mo)' },
-  'gemini-cli': { install: 'npm i -g @anthropic-ai/claude-code', type: 'CLI', price: 'Free tier' },
-  'codex': { install: 'npm i -g @openai/codex-sdk', type: 'CLI', price: 'Paid (API usage)' },
-  'copilot-cli': { install: 'npm i -g @github/copilot', type: 'CLI', price: 'Paid ($10/mo)' },
-  'openclaw': { install: 'npm i -g openclaw', type: 'CLI', price: 'Free' },
-  'hermes': { install: 'curl -fsSL https://hermes.nousresearch.com/install | bash', type: 'CLI', price: 'Free' },
-  'cline': { install: 'VS Code extension', type: 'IDE', price: 'Free (bring your own key)' },
-  'goose': { install: 'brew install block-goose-cli', type: 'CLI', price: 'Free' },
-  'kilo-code': { install: 'VS Code extension', type: 'IDE', price: 'Free' },
-  'opencode': { install: 'npm i -g opencode', type: 'CLI', price: 'Free' },
-  'mimo-code': { install: 'npm i -g @mimo-ai/cli', type: 'CLI', price: 'Free' },
-  'ampcode': { install: 'npm i -g @sourcegraph/amp', type: 'CLI', price: 'Free (bring your own key)' },
-  'codebuff': { install: 'npm i -g codebuff', type: 'CLI', price: 'Free' },
-  'cursor': { install: 'Download from cursor.com', type: 'IDE', price: 'Freemium ($20/mo pro)' },
-  'pi-dev': { install: 'pip install pi-agent', type: 'CLI', price: 'Free' },
-  'gitlawb-zero': { install: 'Go binary', type: 'CLI', price: 'Free' },
-  'oh-my-pi': { install: 'pip install oh-my-pi', type: 'CLI', price: 'Free' }
-};
+// Hype ratio: stars per 1000 downloads
+const hypeAgents = agents.filter(a => {
+  const d = getMetric(a, 'npm_downloads');
+  const s = getMetric(a, 'github_stars');
+  return d && d > 0 && s && s > 0;
+}).map(a => {
+  const d = getMetric(a, 'npm_downloads');
+  const s = getMetric(a, 'github_stars');
+  a.hype_ratio = (s / d * 1000).toFixed(1);
+  return a;
+}).sort((a, b) => parseFloat(b.hype_ratio) - parseFloat(a.hype_ratio));
 ---
 
-<Layout title={`Agent Adoption Leaderboard — ${SITE_TITLE}`} description="Track real usage and community interest for every AI coding agent. npm downloads, GitHub stars, and growth scores — updated daily.">
+<Layout title={`AI Coding Agent Leaderboard — ${SITE_TITLE}`} description="Real adoption data for every AI coding agent. npm downloads, GitHub stars, and forks — updated daily.">
 
 <main style="max-width:1100px;margin:0 auto;padding:2rem 1rem;">
   <div style="text-align:center;margin-bottom:2rem;">
@@ -104,48 +93,45 @@ const installHints = {
       AI Coding Agent Leaderboard
     </h1>
     <p style="font-family:var(--font-mono);font-size:0.8rem;color:var(--fg-dim);">
-      Ranked by GitHub stars + npm downloads. Updated daily.
+      Ranked by real adoption: npm downloads + GitHub stars + forks
     </p>
     <p style="font-family:var(--font-mono);font-size:0.7rem;color:var(--fg-dim);margin-top:0.5rem;">
-      Last updated: {lastUpdated} · {agents.length} agents tracked
+      Last updated: {lastUpdated} · {agents.length} agents tracked · Data from npm + GitHub
     </p>
   </div>
 
-  {/* Quick comparison — Hype vs Reality */}
+  {/* Hype vs Reality */}
   <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:1.5rem;margin-bottom:2rem;">
-    <h2 style="font-family:var(--font-mono);font-size:1rem;color:var(--amber);margin-bottom:1rem;">
+    <h2 style="font-family:var(--font-mono);font-size:1rem;color:var(--amber);margin-bottom:0.5rem;">
       Hype vs Reality
     </h2>
-    <p style="font-family:var(--font-mono);font-size:0.75rem;color:var(--fg-dim);margin-bottom:1rem;">
-      Stars measure hype. Downloads measure usage. The gap tells the real story.
+    <p style="font-family:var(--font-mono);font-size:0.7rem;color:var(--fg-dim);margin-bottom:1rem;">
+      Star/dl ratio = GitHub stars per 1,000 weekly downloads. High = more talked about than used. Low = quietly popular.
     </p>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;">
-      {agents.filter(a => a.hype_ratio_calc && parseFloat(a.hype_ratio_calc) > 0).slice(0, 6).map(agent => {
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0.75rem;">
+      {hypeAgents.slice(0, 6).map(agent => {
         const stars = getMetric(agent, 'github_stars');
         const downloads = getMetric(agent, 'npm_downloads');
-        const ratio = parseFloat(agent.hype_ratio_calc);
-        const label = ratio > 50 ? 'more starred than used' : ratio < 2 ? 'more used than starred' : 'balanced';
+        const ratio = parseFloat(agent.hype_ratio);
+        const label = ratio > 50 ? 'more starred than used' : ratio < 2 ? 'quietly popular' : 'balanced';
         const labelColor = ratio > 50 ? 'var(--amber)' : ratio < 2 ? 'var(--green)' : 'var(--fg-dim)';
         return (
-          <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:1rem;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.75rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
               <a href={`/tool/${agent.id}`} style="font-family:var(--font-mono);font-size:0.8rem;color:var(--green);text-decoration:none;font-weight:600;">
                 {agent.name}
               </a>
-              <span style={`font-family:var(--font-mono);font-size:0.65rem;color:${labelColor};`}>{label}</span>
+              <span style={`font-family:var(--font-mono);font-size:0.6rem;color:${labelColor};`}>{label}</span>
             </div>
-            <div style="display:flex;gap:1.5rem;font-family:var(--font-mono);font-size:0.75rem;">
+            <div style="display:flex;gap:1rem;font-family:var(--font-mono);font-size:0.7rem;">
               <div>
-                <div style="color:var(--amber);font-size:1.1rem;font-weight:600;">{formatNumber(stars)} ★</div>
-                <div style="color:var(--fg-dim);font-size:0.6rem;">GitHub stars</div>
+                <span style="color:var(--amber);font-weight:600;">{fmt(stars)} ★</span>
+                <span style="color:var(--fg-dim);font-size:0.55rem;"> / </span>
+                <span style="color:var(--green);font-weight:600;">{fmt(downloads)}</span>
+                <span style="color:var(--fg-dim);font-size:0.55rem;">/wk</span>
               </div>
-              <div>
-                <div style="color:var(--green);font-size:1.1rem;font-weight:600;">{formatNumber(downloads)}</div>
-                <div style="color:var(--fg-dim);font-size:0.6rem;">npm / week</div>
-              </div>
-              <div style="margin-left:auto;text-align:right;">
-                <div style="color:var(--fg);font-size:0.9rem;">{agent.hype_ratio_calc}x</div>
-                <div style="color:var(--fg-dim);font-size:0.6rem;">star/dl ratio</div>
+              <div style="margin-left:auto;">
+                <span style="color:var(--fg);font-weight:600;">{agent.hype_ratio}x</span>
               </div>
             </div>
           </div>
@@ -154,30 +140,27 @@ const installHints = {
     </div>
   </div>
 
-  {/* Main Leaderboard Table */}
+  {/* Main Table */}
   <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:0.75rem;">
       <thead>
         <tr style="background:var(--bg);border-bottom:1px solid var(--border);">
-          <th style="padding:0.75rem 0.5rem;text-align:left;color:var(--fg-dim);width:2rem;">#</th>
-          <th style="padding:0.75rem 0.5rem;text-align:left;color:var(--fg-dim);">Agent</th>
-          <th style="padding:0.75rem 0.5rem;text-align:left;color:var(--fg-dim);">Type</th>
-          <th style="padding:0.75rem 0.5rem;text-align:right;color:var(--fg-dim);" data-sort="stars">GitHub ★</th>
-          <th style="padding:0.75rem 0.5rem;text-align:right;color:var(--fg-dim);" data-sort="forks">Forks</th>
-          <th style="padding:0.75rem 0.5rem;text-align:right;color:var(--fg-dim);" data-sort="npm">npm / week</th>
-          <th style="padding:0.75rem 0.5rem;text-align:center;color:var(--fg-dim);">Price</th>
-          <th style="padding:0.75rem 0.5rem;text-align:left;color:var(--fg-dim);">Install</th>
+          <th style="padding:0.7rem 0.5rem;text-align:left;color:var(--fg-dim);width:2rem;">#</th>
+          <th style="padding:0.7rem 0.5rem;text-align:left;color:var(--fg-dim);">Agent</th>
+          <th style="padding:0.7rem 0.5rem;text-align:right;color:var(--fg-dim);">GitHub ★</th>
+          <th style="padding:0.7rem 0.5rem;text-align:right;color:var(--fg-dim);">Forks</th>
+          <th style="padding:0.7rem 0.5rem;text-align:right;color:var(--fg-dim);">npm / week</th>
+          <th style="padding:0.7rem 0.5rem;text-align:center;color:var(--fg-dim);">Adoption</th>
         </tr>
       </thead>
       <tbody>
-        {agents.map((agent, i) => {
-          const hint = installHints[agent.id] || {};
+        {agents.map((agent) => {
           const stars = getMetric(agent, 'github_stars');
           const forks = getMetric(agent, 'github_forks');
           const npm = getMetric(agent, 'npm_downloads');
           return (
-            <tr style="border-bottom:1px solid var(--border);transition:background 0.15s;" 
-                onmouseover="this.style.background='var(--bg)'" 
+            <tr style="border-bottom:1px solid var(--border);transition:background 0.15s;"
+                onmouseover="this.style.background='var(--bg)'"
                 onmouseout="this.style.background='transparent'">
               <td style="padding:0.6rem 0.5rem;color:var(--fg-dim);">{agent.rank}</td>
               <td style="padding:0.6rem 0.5rem;">
@@ -185,33 +168,30 @@ const installHints = {
                   {agent.name}
                 </a>
               </td>
-              <td style="padding:0.6rem 0.5rem;color:var(--fg-dim);font-size:0.65rem;">
-                {hint.type || '—'}
-              </td>
               <td style="padding:0.6rem 0.5rem;text-align:right;color:var(--amber);font-weight:600;">
-                {stars !== null && stars !== undefined ? formatNumber(stars) : '—'}
+                {stars !== null && stars !== undefined ? fmt(stars) : '—'}
                 {agent.star_change !== null && agent.star_change !== 0 && (
                   <span style={`font-size:0.55rem;margin-left:0.2rem;color:${agent.star_change > 0 ? 'var(--green)' : 'var(--red)'}`}>
-                    {formatChange(agent.star_change)}
+                    {fmtChange(agent.star_change)}
                   </span>
                 )}
               </td>
               <td style="padding:0.6rem 0.5rem;text-align:right;color:var(--fg-dim);">
-                {forks !== null && forks !== undefined ? formatNumber(forks) : '—'}
+                {forks !== null && forks !== undefined ? fmt(forks) : '—'}
               </td>
               <td style="padding:0.6rem 0.5rem;text-align:right;color:var(--green);font-weight:600;">
-                {npm !== null && npm !== undefined ? formatNumber(npm) : '—'}
+                {npm !== null && npm !== undefined ? fmt(npm) : '—'}
                 {agent.npm_change !== null && agent.npm_change !== 0 && (
                   <span style={`font-size:0.55rem;margin-left:0.2rem;color:${agent.npm_change > 0 ? 'var(--green)' : 'var(--red)'}`}>
-                    {formatChange(agent.npm_change)}
+                    {fmtChange(agent.npm_change)}
                   </span>
                 )}
               </td>
-              <td style="padding:0.6rem 0.5rem;text-align:center;color:var(--fg-dim);font-size:0.65rem;">
-                {hint.price || '—'}
-              </td>
-              <td style="padding:0.6rem 0.5rem;color:var(--fg-dim);font-size:0.6rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title={hint.install}>
-                {hint.install || '—'}
+              <td style="padding:0.6rem 0.5rem;text-align:center;">
+                <div style="display:inline-flex;align-items:center;gap:0.3rem;">
+                  <div style={`width:${Math.max(agent.adoption_score, 3)}px;height:6px;background:var(--green);border-radius:3px;opacity:${0.4 + agent.adoption_score / 140};`}></div>
+                  <span style="font-size:0.6rem;color:var(--fg-dim);">{agent.data_sources}/3</span>
+                </div>
               </td>
             </tr>
           );
@@ -220,43 +200,32 @@ const installHints = {
     </table>
   </div>
 
-  {/* How to read this */}
-  <div style="margin-top:1.5rem;padding:1rem;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;">
-    <h3 style="font-family:var(--font-mono);font-size:0.8rem;color:var(--amber);margin-bottom:0.5rem;">
-      How to read this
-    </h3>
+  {/* Legend */}
+  <div style="margin-top:1rem;padding:0.75rem 1rem;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;">
     <div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--fg-dim);line-height:1.8;">
-      <p><strong style="color:var(--amber);">GitHub stars</strong> — community interest and hype. High stars = people are watching.</p>
-      <p><strong style="color:var(--green);">npm downloads</strong> — actual usage. People installing and running it weekly.</p>
-      <p><strong style="color:var(--fg);">Star/dl ratio</strong> — the gap between hype and usage. High = more talked about than used. Low = quietly popular.</p>
-      <p><strong style="color:var(--fg-dim);">—</strong> = data not available (closed source, no npm package, or private repo).</p>
+      <strong style="color:var(--amber);">Adoption score</strong> = 50% npm downloads + 30% GitHub stars + 20% forks (normalized against the highest agent in each category).
+      <span style="margin-left:0.5rem;">Data sources = how many of 3 metrics have data.</span>
+      <span style="margin-left:0.5rem;color:var(--fg-dim);">— = no data available.</span>
     </div>
   </div>
 </main>
 
 <script>
-document.querySelectorAll('th[data-sort]').forEach(th => {
+document.querySelectorAll('th[data-col]').forEach(th => {
+  th.style.cursor = 'pointer';
   th.addEventListener('click', () => {
-    const sort = th.dataset.sort;
+    const col = th.dataset.col;
     const tbody = document.querySelector('tbody');
     const rows = Array.from(tbody.querySelectorAll('tr'));
-    const colMap = { stars: 3, forks: 4, npm: 5 };
-    const colIndex = colMap[sort] || 3;
-    
+    const colMap = { stars: 2, forks: 3, npm: 4 };
+    const ci = colMap[col] ?? 2;
     rows.sort((a, b) => {
-      const aVal = a.cells[colIndex]?.textContent.trim() || '0';
-      const bVal = b.cells[colIndex]?.textContent.trim() || '0';
-      const aNum = parseFloat(aVal.replace(/[^0-9.]/g, '')) || 0;
-      const bNum = parseFloat(bVal.replace(/[^0-9.]/g, '')) || 0;
-      return bNum - aNum;
+      const av = parseFloat((a.cells[ci]?.textContent || '0').replace(/[^0-9.]/g, '')) || 0;
+      const bv = parseFloat((b.cells[ci]?.textContent || '0').replace(/[^0-9.]/g, '')) || 0;
+      return bv - av;
     });
-    
-    rows.forEach((row, i) => {
-      row.cells[0].textContent = i + 1;
-      tbody.appendChild(row);
-    });
+    rows.forEach((r, i) => { r.cells[0].textContent = i + 1; tbody.appendChild(r); });
   });
 });
 </script>
-
 </Layout>
