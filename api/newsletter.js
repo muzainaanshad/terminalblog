@@ -61,6 +61,7 @@ export default async function handler(req, res) {
       return send(400, { ok: false, error: 'Valid email required' });
     }
 
+    // send_welcome_email: false - cleaner UX; welcome content goes in weekly digests
     const beeRes = await fetch(
       `https://api.beehiiv.com/v2/publications/${publicationId}/subscriptions`,
       {
@@ -72,7 +73,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           email,
           reactivate_existing: true,
-          send_welcome_email: true,
+          send_welcome_email: false,
           utm_source: 'terminalblog',
           utm_medium: 'website',
           utm_campaign: 'homepage_newsletter',
@@ -86,7 +87,7 @@ export default async function handler(req, res) {
     if (beeRes.ok) {
       return send(200, {
         ok: true,
-        message: 'Subscribed — check your inbox to confirm if required.',
+        message: "You're subscribed.",
         status: data?.data?.status || 'active',
       });
     }
@@ -98,7 +99,7 @@ export default async function handler(req, res) {
       'Beehiiv error';
 
     if (beeRes.status === 400 && /already|exist|subscribed/i.test(String(msg))) {
-      return send(200, { ok: true, message: 'You are already subscribed.' });
+      return send(200, { ok: true, message: "You're already subscribed." });
     }
 
     console.error('Beehiiv error', beeRes.status, JSON.stringify(data));

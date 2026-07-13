@@ -1,0 +1,68 @@
+# Weekly Coding Agent digest
+# 1) Writes a site post (RSS-friendly) for free-plan Beehiiv email automation
+# 2) Tries Beehiiv Create/Send API (Enterprise only)
+#
+# Secrets: BEEHIIV_API_KEY, BEEHIIV_PUBLICATION_ID
+# Optional workflow input: send=true to publish via API when on Enterprise
+
+name: Weekly Beehiiv Newsletter
+
+on:
+  schedule:
+    - cron: '0 14 * * 1'
+  workflow_dispatch:
+    inputs:
+      send:
+        description: 'Beehiiv API publish/send (Enterprise only) true/false'
+        required: false
+        default: 'false'
+      days:
+        description: 'Lookback days'
+        required: false
+        default: '7'
+      commit_site_post:
+        description: 'Commit weekly MDX to repo if created true/false'
+        required: false
+        default: 'true'
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build digest (site post + Beehiiv attempt)
+        env:
+          BEEHIIV_API_KEY: ${{ secrets.BEEHIIV_API_KEY }}
+          BEEHIIV_PUBLICATION_ID: ${{ secrets.BEEHIIV_PUBLICATION_ID }}
+          BEEHIIV_SEND: ${{ github.event.inputs.send || 'false' }}
+          BEEHIIV_DAYS: ${{ github.event.inputs.days || '7' }}
+          BEEHIIV_MAX_POSTS: '8'
+        run: node scripts/send-weekly-beehiiv.cjs
+
+      - name: Upload HTML preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: beehiiv-digest-preview
+          path: tmp/beehiiv-digest-*.html
+          if-no-files-found: ignore
+
+      - name: Commit site weekly post
+        if: ${{ (github.event.inputs.commit_site_post || 'true') == 'true' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/content/blog/coding-agent-weekly-*.mdx || true
+          if git diff --staged --quiet; then
+            echo "No new site digest to commit"
+          else
+            git commit -m "chore: weekly coding agent digest"
+            git push
+          fi
