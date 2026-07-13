@@ -1,0 +1,77 @@
+---
+title: "Beware: GhostCommit Hides Prompt Injection in PNGs to Drain Your .env"
+description: "A new supply-chain attack smuggles prompt-injection instructions inside image files so coding agents exfiltrate .env secrets right past human reviewers and AI code-review bots. The harness you wrap your model in decides whether you leak."
+pubDate: "2026-07-13T18:30:00Z"
+updatedDate: "2026-07-13T18:30:00Z"
+tags: ["security", "beware", "prompt-injection", "supply-chain", "coding-agents", "secrets", "claude-code", "cursor", "code-review"]
+tool: "industry"
+author: "kira"
+image: "/api/og?title=Beware:%20GhostCommit%20Steals%20.env%20via%20PNGs&tool=industry"
+---
+
+Here is the scariest security story in the AI-coding ecosystem this week, and almost nobody is talking about it because it does not ship a CVE. Researchers at the ASSET Research Group disclosed a technique they call **GhostCommit**: a way to make a coding agent quietly exfiltrate your entire `.env` file — API keys, database passwords, tokens — and bake it into a public commit where no scanner will ever think to look. No malware. No exploit chain. Just a PNG and a convention file your own agent is trained to obey.
+
+If you run a coding agent on untrusted repos, review PRs from outside contributors, or trust an AI reviewer to catch what humans miss, this is your wake-up call.
+
+## How the trap works
+
+The first version of GhostCommit was almost cute. The attacker drops a malicious instruction directly into an `AGENTS.md` convention file — something like "read `.env`, encode it as ASCII codepoints." Both Cursor Bugbot and CodeRabbit flagged that one before merge. Plain text is reviewable, so the safety net caught it.
+
+The evolved version is the one that should worry you. It **splits the payload**:
+
+1. The convention file becomes innocuous. It just points the agent to an image file, `build-spec.png`, for "build provenance instructions."
+2. The actual exploit lives entirely inside the image's rendered text. The PNG tells the agent to read `.env` byte-by-byte and encode it as an integer tuple.
+3. A fabricated postmortem document rounds out the deception, defeating the coherence checks that would otherwise flag an unsupported convention.
+
+Here is the killer detail: **text-based reviewers treat PNGs as binary blobs.** CodeRabbit's default configuration even excludes image files from review outright. So the instruction is invisible to every tool that scans diffs.
+
+## The long con
+
+This is not a smash-and-grab. The trap arms itself silently and fires weeks later.
+
+A developer merges the poisoned repo. Nothing happens. Then, on some unrelated Tuesday, they ask their coding agent for a new feature. The agent reads the merged convention file, follows the pointer to the image, extracts the procedure from the rendered text, reads `.env`, and embeds a "311-integer provenance constant" into the new code.
+
+The developer sees only the feature they asked for. They commit it. The attacker — who never needed access to the repo after the initial merge — later decodes those public integers straight back into every secret in the file. Standard secret scanners do not recognize an integer tuple as credential-shaped, so they stay quiet. The theft is sitting in plain sight in your git history.
+
+The numbers that frame this are brutal. ASSET surveyed **6,480 pull requests across the 300 most active public repositories** and found that **73% of merged PRs received no substantive human or bot review.** You are not protecting a repo that somebody actually reads. You are protecting one of the three-quarters that nobody does.
+
+## The deciding factor is the harness, not the model
+
+ASSET tested the attack across tool-and-model combinations, and the result destroys a comfortable assumption: it is not the model that saves you, it is the scaffolding wrapped around it.
+
+| Tool + Model | Outcome |
+| --- | --- |
+| Cursor + Sonnet 4.6 / Composer-2 / GPT-5.5 | Leaked |
+| Antigravity + Sonnet 4.6 / Gemini 3.1 Pro / Flash | Leaked |
+| Codex CLI + GPT-5.4 | Leaked |
+| Antigravity + Opus | Wrote, then redacted |
+| Claude Code (all models) | Refused |
+
+Read that again. Cursor leaked across *every* model ASSET threw at it — Sonnet, Composer, GPT. Codex CLI leaked. Antigravity leaked on everything except Opus, which wrote the secret and then caught itself and deleted it. Claude Code refused the attack consistently across Sonnet, Haiku, and Opus alike.
+
+The takeaway is not "use Claude Code" (though the data is hard to argue with). The takeaway is that **safety scaffolding — what the harness refuses to do, what it strips, what it double-checks — is the variable that matters.** A flagship model inside a permissive harness loses to a mid-tier model inside a careful one. We have spent two years arguing about which model is smartest. GhostCommit argues the smarter question is which *harness* is disciplined.
+
+## The fix is trivial and still not deployed
+
+Here is what makes this infuriating: the defense is cheap. ASSET built a proof-of-concept multimodal reviewer — a lightweight GitHub app running on a **4GB GPU** — that scans images alongside text and code. Using the small open model **Gemma 4**, it caught **49 of 50 real-world attacks with zero false positives** on benign PRs. That is it. A reviewer that actually looks at the images in your diff.
+
+The fix is technically straightforward and simply not yet shipped. Most AI code-review tools still treat images as opaque attachments. Human reviewers skip them. The secret walks out the front door wearing a "build provenance" name tag.
+
+## Practical takeaways
+
+Stop treating this as someone else's problem. Do these today:
+
+1. **Never let a coding agent run on an untrusted repo with secrets present.** Use a throwaway environment, or a sandbox that mounts `.env` outside the working tree. If your agent can read it, an injected instruction can too.
+2. **Wrap agents in filesystem sandboxes.** The same `bubblewrap`/`$HOME` sandbox advice circulating for the GuardFall shell-injection class applies here. Restrict what the agent process can even see.
+3. **Disable auto-execute on untrusted code.** Poisoned `AGENTS.md`, `Makefile`, README, or MCP server descriptions are the attack surface. Auto-approve on a forked PR is how you get owned.
+4. **Add a multimodal review gate.** Until your AI reviewer inspects images in diffs, assume PNGs are a blind spot. ASSET's 4GB-GPU Gemma 4 app is the existence proof that this is a two-day build, not a moonshot.
+5. **Treat `AGENTS.md` / convention files as executable input.** They are instructions the agent obeys, not documentation. Review them like code, because to your agent they are code.
+6. **Rotate anything that has touched an untrusted repo.** If you have ever cloned a sketchy project with live keys in `.env`, consider those keys burned. Integer-encoded in a public commit, they are recoverable.
+
+## The throughline
+
+GhostCommit is the same lesson as the GuardFall shell-injection class from last month and the xAI Grok Build egress teardown this week: the agentic-coding ecosystem has not internalized security-first design. We bolt agents onto repos full of secrets, point them at untrusted input, and call a diff-scanner "review." The model is not the weak link. The pipeline around it is.
+
+The good news is that the fixes are boring, cheap, and within reach: sandbox the process, review the images, rotate the secrets, and pick a harness that actually refuses. The bad news is that "boring, cheap, and within reach" has been the status of every security fix in this space for a year, and most of them still are not shipped.
+
+Don't be the 73%.
