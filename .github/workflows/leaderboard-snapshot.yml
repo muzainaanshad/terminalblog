@@ -1,0 +1,50 @@
+# Daily adoption snapshot + Telegram
+name: Leaderboard Snapshot
+
+on:
+  schedule:
+    - cron: '0 12 * * *' # daily 12:00 UTC
+  workflow_dispatch:
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Fetch adoption data
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node scripts/fetch-adoption-data.cjs || node scripts/fetch-adoption-data.cjs 2>&1 | tee tmp/adoption-log.txt || true
+        continue-on-error: true
+      - name: Leaderboard note
+        run: |
+          mkdir -p tmp
+          node scripts/gen-weekly-leaderboard-note.cjs > tmp/leaderboard-note.txt || echo "leaderboard note failed" > tmp/leaderboard-note.txt
+        continue-on-error: true
+      - name: Commit snapshot if any
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/data/adoption/snapshots/*.json 2>/dev/null || true
+          if git diff --staged --quiet; then
+            echo "No snapshot changes"
+          else
+            git commit -m "chore: daily adoption snapshot"
+            git push
+          fi
+        continue-on-error: true
+      - name: Telegram
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          MSG="terminalblog LEADERBOARD $(date -u +%F)
+          $(cat tmp/leaderboard-note.txt 2>/dev/null || echo note unavailable)
+          site: https://terminalblog.com/leaderboard/"
+          node scripts/telegram-notify.cjs "$MSG"

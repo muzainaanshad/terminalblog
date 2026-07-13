@@ -1,0 +1,36 @@
+# Weekly SEO learnings report -> Telegram
+name: SEO Learn
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Mondays 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  learn:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate learnings
+        run: |
+          node scripts/content-gate.cjs || true
+          node scripts/clear-historical-debt.cjs || true
+          node scripts/seo-learn.cjs || true
+        continue-on-error: true
+      - name: Telegram summary
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          DATE=$(date -u +%F)
+          FILE="docs/seo-learnings/${DATE}.md"
+          if [ -f "$FILE" ]; then
+            node scripts/telegram-notify.cjs --file "$FILE"
+          elif [ -f seo-learnings-latest.json ]; then
+            node scripts/telegram-notify.cjs "SEO learn ran ${DATE} — see seo-learnings-latest.json (no md file)"
+          else
+            node scripts/telegram-notify.cjs "SEO learn job ran ${DATE} but produced no report"
+          fi

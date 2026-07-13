@@ -1,10 +1,4 @@
-# Weekly Coding Agent digest
-# 1) Writes a site post (RSS-friendly) for free-plan Beehiiv email automation
-# 2) Tries Beehiiv Create/Send API (Enterprise only)
-#
-# Secrets: BEEHIIV_API_KEY, BEEHIIV_PUBLICATION_ID
-# Optional workflow input: send=true to publish via API when on Enterprise
-
+# Weekly Coding Agent digest + Telegram report
 name: Weekly Beehiiv Newsletter
 
 on:
@@ -38,20 +32,27 @@ jobs:
           node-version: '22'
 
       - name: Build digest (site post + Beehiiv attempt)
+        id: digest
         env:
           BEEHIIV_API_KEY: ${{ secrets.BEEHIIV_API_KEY }}
           BEEHIIV_PUBLICATION_ID: ${{ secrets.BEEHIIV_PUBLICATION_ID }}
           BEEHIIV_SEND: ${{ github.event.inputs.send || 'false' }}
           BEEHIIV_DAYS: ${{ github.event.inputs.days || '7' }}
           BEEHIIV_MAX_POSTS: '8'
-        run: node scripts/send-weekly-beehiiv.cjs
+        run: |
+          set +e
+          node scripts/send-weekly-beehiiv.cjs 2>&1 | tee tmp/newsletter-run.log
+          echo "exit=$?" >> $GITHUB_OUTPUT
+        continue-on-error: true
 
       - name: Upload HTML preview
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: beehiiv-digest-preview
-          path: tmp/beehiiv-digest-*.html
+          path: |
+            tmp/beehiiv-digest-*.html
+            tmp/newsletter-run.log
           if-no-files-found: ignore
 
       - name: Commit site weekly post
@@ -66,3 +67,22 @@ jobs:
             git commit -m "chore: weekly coding agent digest"
             git push
           fi
+        continue-on-error: true
+
+      - name: Telegram report
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          DATE=$(date -u +%F)
+          LOG=$(cat tmp/newsletter-run.log 2>/dev/null | tail -c 2500 || echo "no log")
+          MSG="terminalblog NEWSLETTER ${DATE}
+          run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          schedule: Mondays 14:00 UTC
+
+          ${LOG}
+
+          weekly (if created): https://terminalblog.com/blog/coding-agent-weekly-${DATE}/
+          site: https://terminalblog.com/"
+          node scripts/telegram-notify.cjs "$MSG"

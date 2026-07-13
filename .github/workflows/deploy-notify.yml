@@ -1,0 +1,28 @@
+# On every push to master: wait briefly and Telegram deploy pointer
+name: Deploy Notify
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Telegram push/deploy notice
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          MSG="terminalblog PUSH/DEPLOY
+          sha: ${{ github.sha }}
+          msg: ${{ github.event.head_commit.message }}
+          by: ${{ github.actor }}
+          commit: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
+          site: https://terminalblog.com/
+          (Vercel project: seo-ai-blog — auto-deploys master)"
+          node scripts/telegram-notify.cjs "$MSG"
