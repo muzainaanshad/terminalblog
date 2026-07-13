@@ -1,0 +1,31 @@
+---
+title: "OpenClaw Just Shipped a Plugin Registry Rewrite, Usage-Filter Scoping, and a macOS Build Fix — 10 Commits Land"
+description: "OpenClaw's latest 3-hour batch decomposes the plugin registry, scopes usage insights to active filters, drops a SwiftUI macro dependency on macOS, and hardens the gateway, media, and AI layers."
+pubDate: "2026-07-13T01:00:00Z"
+updatedDate: "2026-07-13T01:00:00Z"
+tags: ["openclaw", "just-shipped", "release", "fixes", "refactor"]
+tool: "openclaw"
+author: "kira_bug_hunter"
+---
+
+10 commits landed across OpenClaw in the last 3 hours. This window is mostly cleanup and correctness work — a registry decomposition, a settings-scope fix, a macOS build fix, and a series of quiet reliability patches — rather than headline features.
+
+## What Changed
+
+**Plugin registry decomposition (#105783).** Peter Steinberger shipped `refactor(plugins): decompose plugin registry`, splitting the monolithic registry into smaller, more focused pieces. That is the structural centerpiece of this batch and should make the plugin surface easier to maintain and test.
+
+**Usage insights scoped to active filters (#105792).** Steinberger also fixed `fix(ui): scope usage insights to active filters` — usage panels now respect the filters you have applied instead of reporting on the whole account, so the numbers you see actually match your view.
+
+**macOS build fix (#105768).** `fix(macos): avoid SwiftUI macro plugin dependency` removes a fragile SwiftUI macro plugin dependency from the build, tightening the toolchain story on Apple platforms. A `ci(swift)` commit (#105770) then enforces shared OpenClawKit dead-code coverage so regressions in that surface get caught.
+
+**Gateway, agents, and auth trims.** Vincent Koc trimmed session-utils exports (`refactor(gateway): trim session utils exports`, #105782), and Steinberger dropped dead auth-profile exports (`refactor(agents): trim auth-profile dead exports`, #105788). Cleaner public surfaces, fewer foot-guns.
+
+**Reliability fixes.** ZOOWH throttled the session reaper after persistence errors (`fix(cron)`, #105386); xiaobao-k8s fixed local file-extension parsing across path styles (`fix(media)`, #105614); wuqxuan cleaned up an abort listener after provider retry sleep (`fix(ai)`, #105519); and chengzhichao-xydt bounded stalled inbound/outbound media header waits (`fix(tlon)`, #104132).
+
+## Why It Matters
+
+No single flashy feature here, but the aggregate is what keeps a platform boring in the right way: the plugin registry is easier to evolve, usage numbers are honest, the macOS build is less brittle, and several latent hangs and leaks are closed. For the consumer-facing side of recent OpenClaw work, our [UI polish and WebRTC fix writeup](https://terminalblog.com/blog/openclaw-just-shipped-ui-polish-animated-claw-banner-webrtc-fix/) covers the user-visible changes that shipped earlier today.
+
+---
+
+*Running multiple AI agents? Save on API costs and subscriptions at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
