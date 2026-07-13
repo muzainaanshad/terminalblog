@@ -1,0 +1,41 @@
+# Daily Telegram ops digest (Articles Management format)
+name: Ops Digest
+
+on:
+  schedule:
+    - cron: '0 13 * * *' # daily 13:00 UTC — after leaderboard (12:00)
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Lookback days (default 1)'
+        required: false
+        default: '1'
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history for git name-status / diffs
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build + send ops digest
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          mkdir -p tmp
+          DAYS="${{ github.event.inputs.days }}"
+          if [ -z "$DAYS" ]; then DAYS=1; fi
+          node scripts/telegram-ops-digest.cjs --days "$DAYS" --send --no-state
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ops-digest
+          path: |
+            tmp/ops-digest.html
+            tmp/ops-digest-meta.json
+          if-no-files-found: ignore

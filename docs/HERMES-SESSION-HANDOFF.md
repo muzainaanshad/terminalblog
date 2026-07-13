@@ -72,8 +72,18 @@ node scripts/orchestrator.js   # prefer issues/discussions over commits
 
 1. Gate passes  
 2. Conventional commit + push `master`  
-3. Optional: Telegram summary if env has bot token  
-4. Report: title, URL, word count, gate result, why it helps long-term traffic  
+3. Prefer **ops digest** Telegram format (not freeform spam):
+
+```bash
+node scripts/telegram-ops-digest.cjs --send
+```
+
+Format expected by operator:
+
+- **Articles Management:** (1) new titles+links (2) updates title+≤7 word note (3) deleted only if any (4) interlinks — list only if &lt;5  
+- **Others:** SEO learnings if new · leaderboard only if changed · automation errors only if any  
+
+4. Report: title, URL, word count, gate result, why it helps long-term traffic
 
 ## Do not
 

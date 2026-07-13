@@ -77,11 +77,32 @@ Project name in Vercel UI: **`seo-ai-blog`**.
 
 ## F) Telegram message types you will receive
 
-1. **Health** — every 6h: OK/FAIL per URL  
-2. **Leaderboard** — daily snapshot blurb  
-3. **SEO learn** — Monday action list  
-4. **Newsletter** — Monday digests + Beehiiv status  
-5. **Deploy** — every git push to master  
+### Primary — **Ops Digest** (daily ~13:00 UTC + on-demand)
+
+Exact format:
+
+```
+Articles Management
+1- N new articles created
+   • title (hyperlink)
+2- N existing articles were updated
+   • title (hyperlink) — short note (≤7 words)
+3- N Articles deleted          ← omitted if 0
+4- N New Interlinks …          ← list only if < 5
+
+Others
+1- new seo learning            ← omitted if none new
+2- leaderboard updates         ← omitted if no change
+3- automation errors           ← omitted if none
+```
+
+Run: `npm run telegram:digest` · script: `scripts/telegram-ops-digest.cjs`
+
+### Secondary (keep for alerts)
+
+1. **Health** — every 6h (or failures)  
+2. **Newsletter** — Monday Beehiiv/site digest status  
+3. **Deploy** — every git push to master  
 
 ---
 
