@@ -1,0 +1,29 @@
+---
+title: "Hermes Just Shipped a Batch of Reliability Fixes — Compression Locks, Gateway Drains, and Auth Normalization"
+description: "Hermes's latest 3-hour batch hardens shutdown behavior with graceful gateway drains, makes compression locks fail closed, centralizes pool auth normalization for Anthropic OAuth creds, and fixes a desktop PTY packaging bug."
+pubDate: "2026-07-14T09:30:00Z"
+updatedDate: "2026-07-14T09:30:00Z"
+tags: ["hermes", "just-shipped", "fixes", "reliability", "auth"]
+tool: "hermes"
+author: "kira_bug_hunter"
+---
+
+10 commits landed across Hermes in the last 3 hours, and this is a correctness-and-durability batch. The throughline is graceful shutdown and safer failure modes: work in flight should not be lost when the gateway reboots, and a lock error should never silently let corrupted state through.
+
+## What Changed
+
+**Compression locks now fail closed.** `fix(agent): distinguish missing from broken compression locks` (kshitijk4poor) stops the agent from treating a merely absent lock file as if it were corrupt — the two cases need different handling. `fix(agent): fail closed on unexpected compression-lock acquisition errors` (Rory Ford) goes further: if acquiring the lock throws something unexpected, Hermes now refuses to proceed rather than risk operating on a bad compression state. Fail-closed is the right default for anything touching on-disk integrity.
+
+**The gateway drains instead of dropping.** Four commits build out clean shutdown: `fix(gateway): complete API-server shutdown drain` and `fix(gateway): drain in-flight api_server runs on shutdown` (Bartok9) make sure in-flight API server work finishes before the process exits. `fix(gateway): quiesce API and cron work during drains` and `fix(api): reserve cron fire work during drain` (kshitijk4poor) keep new API and cron work from starting once a drain is underway. Together these prevent the classic "deploy killed my running task" footgun.
+
+**Auth normalization is centralized.** `fix(auth): centralize pool auth normalization` (kshitijk4poor) pulls credential normalization into one place, and `fix(auth): normalize Anthropic sk-ant-oat pool creds to OAuth` (Manuel Guttmann) specifically maps Anthropic `sk-ant-oat` pool credentials onto the OAuth path. `test(auth): cover sk-ant-oat OAuth normalization (#63737)` (Manuel Guttmann) locks the behavior in with a test so the mapping cannot silently drift.
+
+**Desktop PTY packaging fixed.** `fix(desktop): ensure node-pty spawn-helper is executable` (ethernet) keeps the node-pty spawn-helper marked executable in the desktop build, avoiding a spawn failure when the terminal helper loses its executable bit during packaging. It is the sort of packaging bug that only surfaces on a fresh install, which is the worst time to discover it.
+
+## Why It Matters
+
+None of these are headline features, but they are exactly the fixes that decide whether you trust an agent with long-running work. Graceful gateway drains mean a restart or deploy no longer risks orphaning in-flight tasks; fail-closed locks protect compression integrity; centralized auth normalization makes the Anthropic OAuth credential path predictable and tested. Since the cron-drain work directly touches scheduled automation, our guide to [Hermes cron jobs and scheduled automation tasks](https://terminalblog.com/blog/hermes-cron-jobs-scheduled-automation-tasks/) is the natural next read for operators running background jobs.
+
+---
+
+*Running multiple AI agents? Save on API costs and subscriptions at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
