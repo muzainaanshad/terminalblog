@@ -1,0 +1,64 @@
+---
+title: "This Hermes Agent Project Gives Your AI a Live2D Desktop Pet That Speaks Its Voice"
+description: "A new open-source project, Soundpulse/hermes-live2d, turns your Hermes Agent into a transparent ATRI Live2D desktop pet that lip-syncs the agent's TTS output. Built on Tauri + pixi-live2d-display, it routes the agent's voice recordings to a desktop pet over Tailscale."
+pubDate: "2026-07-13T09:15:00Z"
+updatedDate: "2026-07-13T09:15:00Z"
+tags: ["hermes", "open-source", "self-host", "ecosystem", "fun"]
+tool: "hermes"
+author: "jax"
+image: "/api/og?title=Hermes%20Agent%20Live2D%20Desktop%20Pet&tool=Hermes"
+---
+
+Soundpulse/hermes-live2d is an open-source project that gives your Hermes Agent a physical face: a transparent ATRI Live2D desktop pet that plays the agent's text-to-speech output with lip sync, expressions, and a speech bubble. Built on Tauri 2 and pixi-live2d-display, it routes audio the agent already generates to a pet running on your Mac over a private Tailscale network.
+
+## What it does
+
+The repo's pitch is simple: "a transparent Live2D desktop pet (Tauri 2 + pixi-live2d-display) with voice lip sync, expressions, mouse tracking, and a local HTTP API." It currently ships the Sparkle (火花) model. The intended use is that your Hermes Agent runs somewhere remote — say an EC2 box chatting over the Discord gateway — and the pet runs on your Mac. Whenever the agent generates a TTS recording with its `text_to_speech` tool, a small skill uploads that audio to the pet, which plays it lip-synced with an expression and a speech bubble.
+
+Crucially, normal chat replies are *not* spoken — only the audio recordings the agent deliberately creates get routed. So there's no risk of the pet blurting out every message; it just animates the voice clips the agent already produces.
+
+## How the plumbing works
+
+The flow is a neat example of local-first agent architecture:
+
+```
+hermes agent (remote)                         your Mac
+────────────────────                          ────────
+text_to_speech ──► hermes-live2d-voice skill ──► POST /speak ──► Sparkle pet
+                     (speak.sh, base64)          (over Tailscale)   lip sync + bubble
+```
+
+Requirements straight from the README:
+
+- **Tailscale** on both the Mac and the agent host (same tailnet) — this is how the remote agent reaches the pet without exposing it publicly.
+- **A Hermes Agent wired to a TTS engine** — any engine works (ElevenLabs, etc.), as long as the agent produces audio files via its `text_to_speech` tool.
+- **The `hermes-live2d-voice` skill** — bundled in the repo.
+
+The project also ships a Claude Code skill, which tells you the author is thinking about more than just Hermes — but the headline integration is the Hermes `text_to_speech` → pet pipeline.
+
+## Why it's a fun signal
+
+Hermes Agent has always leaned open-source and self-hosted, and this is the ecosystem doing what it does best: taking an autonomous agent and giving it a presence on your desk. It sits right alongside the [deep dive on Hermes Agent as an autonomous coding assistant](/blog/deep-dive-hermes-agent-autonomous-coding-assistant/) and the agent's [local-first, privacy-minded architecture](/blog/hermes-local-first-architecture-privacy-self-hosted/) — the pet only ever sees audio over a private tailnet and the HTTP API listens on `127.0.0.1` with no auth.
+
+The author lists honest limitations: swapping in a different Live2D model requires code changes, lip sync is volume-driven rather than viseme-accurate, and mouse tracking via Tauri can vary across macOS versions. The bundled Sparkle model carries its own license (from booth.pm), separate from the project's MIT code license.
+
+## Who it's for
+
+- **Hermes Agent users** who want a visible, charming indicator that their remote agent is "talking."
+- **Cron and health-check alerts** — the author suggests it's useful for cron reminders and health checks, since those often fire TTS.
+- **Anyone who likes ricing their setup** — a desktop pet that literally speaks your agent's voice is about as personal as it gets.
+
+It's early (the repo was created within the last week and has only a handful of stars), but it's a small, MIT-licensed, self-hosted example of the "agent as a presence" idea rather than "agent as a chatbot in a tab."
+
+## FAQ
+
+**Q1: Does the pet read out every chat reply?**
+No. Only the audio recordings your Hermes Agent generates through its `text_to_speech` tool get routed to the pet. Standard chat text replies are not spoken.
+
+**Q2: Is it safe to expose the pet to the internet?**
+The README advises against it. The local HTTP API listens on `127.0.0.1` with no auth; you're meant to reach it only over a private Tailscale tailnet, never the public internet.
+
+**Q3: Do I have to use the Sparkle model?**
+The pet currently ships with the Sparkle (火花) model, and swapping in a different Live2D model requires code changes. The bundled model also has its own separate license terms from the project's MIT code license.
+
+*You already use AI agents for coding. Why limit yourself to one model? [aiFiesta](https://aifiesta.link/muhammed-anshad) ($12/mo) gives you every premium model in one dashboard — Claude, GPT, Gemini, Grok and more.*
