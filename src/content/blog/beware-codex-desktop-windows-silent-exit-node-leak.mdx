@@ -1,0 +1,65 @@
+---
+title: "Beware: Codex Desktop on Windows Is Silently Crashing and Leaking 13.9 GiB of Node Processes"
+description: "Freshly reported Codex Desktop bugs on Windows 26.707.8479.0 cause the whole app to silently exit in the in-app browser and retain 147 node.exe processes (13.9 GiB). Here's how to detect and contain it."
+pubDate: "2026-07-13T19:00:00Z"
+updatedDate: "2026-07-13T19:00:00Z"
+tags: ["security", "beware", "codex", "windows", "reliability", "mcp"]
+tool: "codex"
+author: "kira_bug_hunter"
+image: "/api/og?title=Beware:%20Codex%20Desktop%20Win%20Leak&tool=Codex"
+---
+
+You open a link inside Codex Desktop's in-app browser, the page reaches DOM-ready, and the entire application just... vanishes. No error box, no crash report, no process left behind to inspect. If that sounds like your afternoon, you may have been hit by a cluster of freshly filed Codex Desktop bugs on Windows.
+
+## The Issue
+
+Three related reports landed on `openai/codex` against build `26.707.8479.0` (Microsoft Store / MSIX), all still open:
+
+- **[#32798](https://github.com/openai/codex/issues/32798)** — Codex Desktop *silently exits* when its in-app browser hits DOM-ready on an external site (e.g. `research.kmutnb.ac.th`). The desktop log ends abruptly at the `dom-ready` event with no normal shutdown sequence. It reproduces before any credentials are typed, so it isn't an auth failure.
+- **[#32797](https://github.com/openai/codex/issues/32797)** — Under one long-lived app-server, Codex retained **147 `node.exe` / `node_repl.exe`** processes across repeated MCP process batches, holding roughly **13.9 GiB** of memory. Labels include `bug`, `windows-os`, `mcp`, `app`, `performance`.
+- **[#32799](https://github.com/openai/codex/issues/32799)** — A shared encrypted OAuth secrets-store lock blocks new-task creation for up to **60 seconds**, surfacing as `Error creating task: Timeout` and even `agent loop died unexpectedly`.
+
+## Are You Affected?
+
+Run this from PowerShell on Windows to check your Codex-owned process footprint and version:
+
+```powershell
+# List Codex-owned node processes and their working set
+Get-Process node -ErrorAction SilentlyContinue |
+  Where-Object { $_.Path -like "*Codex*" -or $_.CommandLine -like "*app-server*" } |
+  Measure-Object -Property WorkingSet -Sum |
+  Select-Object Count, @{N='MB';E={[math]::Round($_.Sum/1MB)}}
+
+# Confirm the installed build
+Get-AppxPackage -Name "*Codex*" | Select-Object Version
+
+# Hunt for OAuth-lock timeouts in the desktop log
+Get-Content "$env:LOCALAPPDATA\Packages\*Codex*\LocalState\logs\*.log" -ErrorAction SilentlyContinue |
+  Select-String "Timeout|agent loop died|dom-ready" | Select-Object -Last 20
+```
+
+If `Count` is in the dozens or `MB` is in the thousands, you're leaking node processes.
+
+## The Fix
+
+- **Avoid the in-app browser** for external/redirect-heavy sites until #32798 is patched; open them in a real browser instead.
+- **Restart Codex after heavy MCP sessions** to reclaim leaked node processes, or reduce enabled MCP servers (the report ran 36).
+- **For the OAuth lock (#32799),** keep remote MCP servers to a minimum and retry task creation after the 60s window clears.
+- **Watch the three issues** for the patch and update via the Microsoft Store when it ships.
+
+## Why It Happened
+
+The in-app browser in #32798 appears to crash the *host* renderer path rather than isolating the guest, so a renderer fault takes the whole app down. For #32797, MCP server pools are spawned but not reaped when sessions/launchers churn, so node processes accumulate. #32799 points to a single shared secrets-store lock serializing OAuth reads on the critical task-start thread — contention there stalls startup for the full timeout.
+
+## FAQ
+
+**Q1: Is this a Windows-only problem?**
+The three reports are labeled `windows-os`, and all diagnostic traces were captured on Windows 10/11. No macOS or Linux duplicates have been filed for this exact failure pattern yet.
+
+**Q2: Will a reboot clear the leaked memory?**
+Yes — a full restart frees the retained node.exe processes, but they re-accumulate if you keep the app open through many MCP-driven sessions. Treat restart as a workaround, not a cure.
+
+**Q3: Does the silent exit lose my conversation history?**
+The crash kills the desktop process without a clean shutdown, so any unsaved in-memory state for the active session is at risk. Keep important work committed or exported before browsing external links inside Codex.
+
+*Before you buy any coding agent subscription — compare prices and find exclusive deals at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
