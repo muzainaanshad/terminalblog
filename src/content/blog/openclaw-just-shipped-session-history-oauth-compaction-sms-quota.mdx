@@ -1,0 +1,31 @@
+---
+title: "OpenClaw Just Shipped Session-History Reopening, OAuth Compaction Routing, and an SMS Quota Fix — 10 Commits Land"
+description: "OpenClaw's latest 3-hour batch reopens session history around search hits, preserves interrupted turn context, routes unbound OAuth compaction through an auth-aware harness, and protects the SMS webhook callback quota."
+pubDate: "2026-07-13T05:30:00Z"
+updatedDate: "2026-07-13T05:30:00Z"
+tags: ["openclaw", "just-shipped", "release", "fixes", "coding-agent"]
+tool: "openclaw"
+author: "kira_bug_hunter"
+---
+
+10 commits landed across OpenClaw in the last 3 hours. This window is a healthy mix of session-correctness features and quiet reliability fixes — the kind of batch that keeps message history honest and webhooks from burning quota.
+
+## What Changed
+
+**Session history reopening.** Ayaan Zaidi shipped `feat(sessions): reopen history around search hits`, so jumping to a search result drops you into the surrounding context instead of a bare message, and `feat(agent): preserve interrupted turn context` keeps an agent's in-progress thought when a turn gets cut off rather than tossing it.
+
+**OAuth compaction routing fix.** Zaidi also landed `fix(agents): route unbound OAuth compaction through auth-aware harness selection` — when an OAuth session has no bound profile, compaction now goes through a harness that actually knows about auth, avoiding a silent misroute.
+
+**SMS webhook quota protection.** Pavan Kumar Gondhi shipped `fix: protect SMS webhook callback quota [AI]` (#103620), guarding the callback quota so inbound SMS automation doesn't exhaust it.
+
+**Delivery and iMessage reliability.** Peter Steinberger closed two correctness bugs: `fix(cron): avoid ambiguous direct delivery retries` (#105941) stops the cron path from double-delivering when a send is ambiguous, and `fix(imessage): narrow recovered projection before use` (#106022) tightens the recovered iMessage projection so stale data isn't acted on.
+
+**UI and CI trims.** Steinberger refactored the UI surface with `refactor(ui): deduplicate layout, clipboard, and polling scaffolds` (#106003) and `refactor: factor transport stream fixtures` (#106006), then tolerated inherited TypeScript LOC drift (`ci: tolerate inherited TypeScript LOC drift`, #106042) and shrank the LOC guard files (`chore(ci): shrink TypeScript LOC guard files`).
+
+## Why It Matters
+
+No headline feature, but the aggregate is what makes OpenClaw trustworthy: search takes you to real context, interrupted turns survive, OAuth compaction doesn't misroute, and the SMS pipeline won't blow its quota. For the structural work from earlier today, our [plugin registry decomposition and usage-filter writeup](https://terminalblog.com/blog/openclaw-just-shipped-plugin-registry-decompose-usage-filters/) covers the refactors that set this up.
+
+---
+
+*Don't overpay for AI tools. Check [aiFiesta](https://aifiesta.link/muhammed-anshad) for exclusive pricing on coding agents.*
