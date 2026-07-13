@@ -1,0 +1,50 @@
+---
+title: "A New Rust Tool Blocks 50+ Ways Your AI Coding Agent Can Wreck Your Codebase"
+description: "A recently uploaded walkthrough highlights a Rust-based guardrail that intercepts more than 50 failure modes where an AI coding agent can damage a repository. The category matters because agents run with real local access."
+pubDate: "2026-07-13"
+updatedDate: "2026-07-13"
+tags: ["security", "safety", "guardrails", "rust"]
+author: "kira_bug_hunter"
+---
+
+A recently uploaded walkthrough highlights a Rust-based guardrail that blocks more than 50 ways an AI coding agent can damage a repository — from destructive git commands to overwriting files it shouldn't touch. The specific tool is early and low-traffic, but the category it represents is the part worth paying attention to.
+
+**The real risk isn't the model, it's the access**
+
+An agent that can run shell commands and edit files has, by definition, enough local access to do serious damage. A single bad instruction — or a prompt-injection that slips in through a fetched file — can trigger a force-push, a recursive delete, or an overwrite of untracked work. The model isn't the weak point; the unguarded bridge between "the agent decided to do X" and "X actually ran" is.
+
+That's the gap a pre-execution guardrail fills. Instead of trusting the agent to be careful, it sits in front of dangerous operations and blocks or requires approval for the ones most likely to blow up a codebase.
+
+**Why Rust for this**
+
+Rust is a reasonable choice for a guardrail layer: it compiles to a fast, dependency-light binary that can sit between the agent and the system without dragging a runtime along. A guardrail that adds latency or a heavy stack won't get adopted, so the tooling tends toward small, native executables that intercept at the boundary.
+
+This fits the broader [security hardening wave around coding agents](/blog/coding-agents-security-hardening-wave/), where the industry is shifting from "trust the agent" to "verify and constrain the agent." If you want to know what an agent actually touched after the fact, an [audit trail of agent changes](/blog/confessor-audit-what-ai-coding-agent-touched/) is the complementary control — guardrails prevent, audits detect.
+
+**What to actually do**
+
+You don't need to wait for any one tool. The practical posture is layered:
+
+- Run agents in a sandbox or container with scoped filesystem access
+- Use pre-commit and pre-tool hooks to block destructive commands
+- Keep production credentials and tokens out of the agent's environment
+- Audit what changed, as covered in [why safety beats model choice](/blog/stop-worrying-which-agent-start-worrying-safety/)
+
+The takeaway: a coding agent's danger scales with its permissions, not its intelligence. A guardrail that blocks the obvious footguns removes most of the downside while keeping the speed.
+
+---
+
+**FAQ**
+
+**Q: What kinds of damage can an AI coding agent do to a repo?**
+With shell and file access, an agent can run destructive git commands, overwrite or delete files, and push changes it shouldn't. Most incidents come from a single bad instruction or an injected prompt rather than a model failure.
+
+**Q: Why use a Rust-based guardrail specifically?**
+Rust compiles to a small, fast native binary with no heavy runtime, which makes it practical to sit in the execution path without adding meaningful latency — a guardrail people won't disable.
+
+**Q: Do I need a dedicated tool, or can I guardrail with what I have?**
+You can start today with sandboxes, pre-commit/pre-tool hooks, and keeping secrets out of the agent environment. Dedicated guardrails add coverage, but the layered basics already remove most of the risk.
+
+---
+
+*Your coding agent already makes you faster. [aiFiesta](https://aifiesta.link/muhammed-anshad) makes your AI tools cheaper — $12/mo for 9+ premium models instead of $20/mo each.*

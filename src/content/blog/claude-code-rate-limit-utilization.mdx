@@ -1,0 +1,43 @@
+---
+title: "Claude Code Still Hides Your Rate-Limit Headroom — and Developers Want It Exposed"
+description: "A fresh GitHub issue (77018) asks Anthropic to expose rate-limit utilization in headless contexts via stream-json, --output-format json, or a usage subcommand, so non-interactive agents can throttle before they stall."
+pubDate: "2026-07-13"
+updatedDate: "2026-07-13"
+tags: ["claude-code", "rate-limits", "cli", "headless"]
+author: "sage"
+---
+
+A fresh GitHub issue in the Claude Code repository (number 77018) asks Anthropic to expose rate-limit utilization in headless contexts — through `stream-json`, `--output-format json`, or a dedicated usage subcommand. The ask is narrow but the pain is broad: when you run Claude Code non-interactively, you can't easily see how much of your quota you've burned, so you can't throttle agent loops before they stall.
+
+**The problem with invisible limits**
+
+In an interactive session, you get subtle cues — slower responses, a warning, a soft block. In a headless run — a cron job, a CI pipeline, a long background agent — those cues disappear. The agent keeps issuing requests until it hits a hard limit and stops, often mid-task, with no clean signal about how close it was to the edge.
+
+Exposing utilization (the issue proposes a `used_percentage` style field) would let automation make decisions: back off, queue work, or hand a task to a different model when one is saturated. That's exactly the kind of [silent quota burn](/blog/beware-silent-quota-model-burn/) that bites teams running agents all day.
+
+**Why headless matters more now**
+
+Headless and background agents are no longer edge cases. The same workflows that [promote heavier weekly limits](/blog/claude-code-50-percent-weekly-limit-promotion/) also push more work into unattended runs — and unattended runs are precisely where you can't watch the meter. The feature request is really about observability for autonomous use, not a nicety for interactive users.
+
+**What you can do today**
+
+Until Anthropic ships it, the workarounds are crude: wrap calls with your own token/request counting, add artificial pacing between steps, and design agent loops to fail gracefully when a request errors. None of that replaces a real utilization signal, but it keeps unattended runs from silently falling over.
+
+The issue is open and unlabeled beyond the request itself at time of writing — worth tracking if you run Claude Code anywhere it isn't watched.
+
+---
+
+**FAQ**
+
+**Q: What does Claude Code issue 77018 ask for?**
+It requests that Claude Code expose rate-limit utilization in headless contexts, via stream-json, --output-format json, or a usage subcommand, so automation can see how much quota remains.
+
+**Q: Why does this matter more for headless runs than interactive ones?**
+Interactive sessions show soft warnings as you approach limits. Headless runs — cron jobs, CI, background agents — have no visible meter, so they can stall mid-task with no clean signal about how close they were to the limit.
+
+**Q: How can I avoid silent rate-limit stalls today?**
+Wrap agent calls with your own request counting, pace steps artificially, and make loops handle rate-limit errors gracefully. These are stopgaps until a real utilization signal ships.
+
+---
+
+*Tired of deciding which AI subscription to keep? [aiFiesta](https://aifiesta.link/muhammed-anshad) bundles GPT, Claude, Gemini, Grok, DeepSeek, Perplexity and more for $12/mo — less than half of a single premium chat sub.*
