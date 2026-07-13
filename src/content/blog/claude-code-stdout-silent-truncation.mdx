@@ -1,0 +1,58 @@
+---
+title: "Beware: Claude Code's `claude -p` Silently Truncates Output at 65,536 Bytes"
+description: "A confirmed `has repro` bug in Claude Code (issue #77112) drops any `claude -p` stdout past 65,536 bytes when piped. No error, no warning — your automation just loses data on exit."
+pubDate: "2026-07-13T09:45:00Z"
+updatedDate: "2026-07-13T09:45:00Z"
+tags: ["security", "beware", "claude-code", "crash", "cli", "automation", "data-loss"]
+tool: "claude-code"
+author: "kira_bug_hunter"
+image: "/api/og?title=Beware:%20claude%20-p%20Truncates%20Silently&tool=claude-code"
+---
+
+You pipe `claude -p "summarize this 90KB log"` into a script, capture the result, ship it downstream — and never notice that the last 30KB vanished. No error, no stack trace, no exit code. Just missing data. That's exactly what a freshly filed, already-labeled `has repro` bug in Claude Code does to `claude -p` output.
+
+## The issue we found
+
+**Claude Code: `claude -p` stdout silently truncated at 65,536 bytes (issue #77112).** When you run Claude Code in pipe mode (`claude -p`) and the printed result exceeds the pipe buffer, the trailing bytes are dropped on exit. The reporter reproduced it cleanly: any payload larger than 65,536 bytes gets cut off mid-stream because an asynchronous stdout write is still in flight when the process tears down and exits. Node's default pipe buffer is 64 KiB — once Claude's output outruns it, the pending `write()` is abandoned instead of flushed. The process exits `0`, so nothing in your CI or cron job flags the loss. It carries the `bug`, `has repro`, `area:cli` labels and is still open.
+
+This is the nasty kind of bug: it passes in tests (small outputs) and fails in production (large ones), biting you only after you've trusted it at scale.
+
+## Are you affected?
+
+Run these quick checks:
+
+```bash
+# 1. Generate output that exceeds the 64 KiB buffer
+claude -p "$(printf 'repeat this line 5000 times: hello world\n%.0s' {1..5000})" > /tmp/out.txt
+wc -c /tmp/out.txt          # is it exactly 65536 or suspiciously clipped?
+
+# 2. Compare against a non-pipe write (file redirect keeps the full stream)
+claude -p "your real prompt" > /tmp/full.txt
+claude -p "your real prompt" | cat > /tmp/piped.txt
+cmp /tmp/full.txt /tmp/piped.txt && echo "OK: identical" || echo "MISMATCH: pipe truncated"
+```
+
+If the piped file is shorter than the redirected one, you're hit.
+
+## The fix
+
+- **Pin a workaround today:** redirect to a file (`> out.txt`) rather than piping, or wrap the call so the consumer reads from a temp file. File writes flush synchronously on close, dodging the dropped async buffer.
+- **Force a flush barrier:** if you must pipe, append a sink that waits, e.g. `claude -p "..." | tee out.txt` (the `tee` keeps the stream referenced until fully drained) or use a small wrapper that `await`s the pipe's `finish` event.
+- **Upstream:** track issue #77112 for the proper fix (making pipe-mode exit wait on `stdout.write` drain).
+
+## Why it happened
+
+It's a classic Node.js pipe pitfall, not a model failure. `claude -p` writes to `stdout` asynchronously; when output exceeds the ~64 KiB pipe buffer, `process.exit()` fires before the kernel acks the buffered chunk. Because the write is fire-and-forget, the unflushed tail is discarded silently. File descriptors flush on close; pipes don't get that grace period on exit.
+
+## FAQ
+
+**Q1: Does this affect interactive Claude Code in the terminal?**
+No — the truncation is specific to `claude -p` pipe mode, where stdout is a pipe rather than a TTY or file. Interactive sessions render to the TUI and aren't subject to the buffer race.
+
+**Q2: Will my script's exit code catch the data loss?**
+No. The process exits `0` even though bytes were dropped, so naive `if [ $? -eq 0 ]` checks won't save you. You must verify byte counts or avoid piping.
+
+**Q3: Is 65,536 bytes an exact cutoff I can plan around?**
+Treat it as a ceiling, not a promise. The loss triggers whenever buffered data is still in flight at exit, so any large output is at risk — don't assume anything over 64 KiB is safe to pipe.
+
+*Before you buy any coding agent subscription — compare prices and find exclusive deals at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
