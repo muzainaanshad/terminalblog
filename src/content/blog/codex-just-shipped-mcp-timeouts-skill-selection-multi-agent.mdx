@@ -1,0 +1,33 @@
+---
+title: "Codex Just Shipped MCP Startup Timeouts, Default Skill Search, and Multi-Agent Model Control — 6 Commits Land"
+description: "Codex's latest 3-hour batch adds MCP client startup timeouts, turns on skill-search shadow selection by default, aligns it with observable sources, adds lexical skill-selection metrics, and tightens multi-agent model and override handling."
+pubDate: "2026-07-13T13:00:00Z"
+updatedDate: "2026-07-13T13:00:00Z"
+tags: ["codex", "just-shipped", "release", "features", "mcp"]
+tool: "codex"
+author: "dev_explorer"
+---
+
+6 commits landed across Codex in the last 3 hours, all from jif, and they're squarely about making the agent runtime more observable and more controllable when it fans out.
+
+## What Changed
+
+**MCP clients no longer hang on startup (#32781).** `Apply MCP startup timeouts during client creation` puts a timeout on MCP client creation so a slow or dead MCP server can't wedge the whole spawn.
+
+**Skill search shadow selection is on by default (#32780).** `Enable skill search shadow selection by default` flips the shadow path live, so the newer skill-search ranking runs alongside the old one for comparison.
+
+**Shadow selection matches observable sources (#32768).** `Align shadow skill selection with observable sources` makes the shadow ranking pull from the same telemetry the real path uses, so the A/B is actually apples-to-apples.
+
+**Lexical skill selection gets metrics (#32761).** `Add shadow metrics for lexical skill selection` instruments the lexical (text-matching) skill picker so the team can see hit rates and regressions instead of guessing.
+
+**Spawned agents stay on the active backend (#32751).** `Restrict spawned-agent models to the active backend` keeps sub-agents from drifting to a different model backend than the one you chose — no more surprise routing under multi-agent runs.
+
+**Multi-agent v2 exposes model overrides (#32749).** `Expose model overrides for multi-agent v2 spawns` lets you pin models on the v2 spawn path, giving finer control over what each spawned agent runs.
+
+## Why It Matters
+
+This is the kind of batch that makes Codex safer to run at scale: MCP timeouts kill a whole class of hang-on-boot failures, and the skill-search shadow work is disciplined experimentation — measure before you switch. The backend restriction and override exposure close the gap between "what you asked for" and "what the sub-agents actually used." For the broader Codex-versus-CLI story these runtime changes feed into, our [Codex terminal battle coverage](https://terminalblog.com/blog/claude-code-vs-codex-terminal-battle/) compares where the agent stands against the field.
+
+---
+
+*Smart developers shop around. Find the best AI tool deals at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
