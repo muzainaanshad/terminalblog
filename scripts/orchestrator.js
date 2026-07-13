@@ -2,6 +2,11 @@
 // Combined data fetcher for terminalblog cron
 // All sources use 3h window (except YouTube which uses 24h)
 // Runs all fetchers and outputs unified context for article generation
+//
+// POLICY: After generating drafts, always run:
+//   node scripts/content-gate.cjs --strict
+// Caps: ≤3 just-shipped/day, no near-duplicate titles/slugs, batch roundups.
+// See docs/content-policy.md
 
 import { execSync } from 'child_process';
 import { dirname } from 'path';
@@ -28,7 +33,19 @@ const [commits, discussions, issues, blogs, youtube] = await Promise.all([
   Promise.resolve(run('fetch-youtube.js')),
 ]);
 
-console.log('=== SIGNAL STREAM 1/5 ===');
+console.log('=== CONTENT POLICY (READ BEFORE GENERATING) ===');
+console.log(JSON.stringify({
+  maxJustShippedPerDay: 3,
+  maxPostsPerDaySoft: 8,
+  minJustShippedWords: 400,
+  oneStoryOneUrl: true,
+  preferDigestsOverPerRepoPosts: true,
+  offNicheMustUseToolIndustry: true,
+  gateCommand: 'node scripts/content-gate.cjs --strict',
+  policyDoc: 'docs/content-policy.md',
+}, null, 2));
+
+console.log('\n=== SIGNAL STREAM 1/5 ===');
 console.log(commits);
 console.log('\n=== SIGNAL STREAM 2/5 ===');
 console.log(discussions);
@@ -38,3 +55,7 @@ console.log('\n=== SIGNAL STREAM 4/5 ===');
 console.log(blogs);
 console.log('\n=== SIGNAL STREAM 5/5 ===');
 console.log(youtube);
+
+console.log('\n=== AFTER DRAFTS ===');
+console.log('Run: node scripts/content-gate.cjs --strict');
+console.log('Reject any draft that fails. Do not publish near-duplicates.');

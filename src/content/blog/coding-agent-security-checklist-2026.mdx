@@ -1,0 +1,78 @@
+---
+title: "Coding Agent Security Checklist 2026 — What Every Operator Must Lock Down"
+description: "A practical security checklist for Claude Code, Codex, Cursor, Hermes, OpenCode, and other coding agents — session isolation, permissions, secrets, MCP, and supply chain."
+pubDate: 2026-07-13
+updatedDate: 2026-07-13
+tags: ["security", "beware", "guide", "checklist", "pillar"]
+tool: "industry"
+author: "kira"
+---
+
+Coding agents with shell, filesystem, and git access fail differently than chatbots. A bad completion becomes a **real action**. This checklist is the pillar we keep updating as new issues land.
+
+Use it before you grant auto-approve, before you wire MCP servers, and after every major agent upgrade.
+
+## 1. Session & context isolation
+
+- [ ] Never run sensitive work with “resume / remote / sync” features until you trust isolation.
+- [ ] Treat unexplained “you asked me to…” as a **bleed red flag**, not a feature.
+- [ ] One sensitive repo per session; kill the session if context from another machine appears.
+
+**Deep dives:** [Cross-session content bleed](/blog/beware-claude-code-cross-session-content-bleed/) · [MCP response cross-contamination](/blog/claude-code-mcp-response-cross-contamination/) · [Interrupt drops work](/blog/beware-claude-code-interrupt-drops-work/)
+
+## 2. Permissions: deny by default
+
+- [ ] Prefer approval gates over `dangerously-skip-permissions` / full auto-approve.
+- [ ] Deny network by default in sandboxes; allowlist only what you need.
+- [ ] On Windows, verify sandboxes are actually enforced (Smart App Control, click-through dialogs).
+
+**Deep dives:** [Codex sandbox dead on Windows](/blog/codex-smart-app-control-sandbox-fail/) · [Windows click-through permissions](/blog/claude-code-windows-click-through-permissions/) · [Permission prompt flood](/blog/claude-code-permission-prompt-flood/)
+
+## 3. Secrets & environment
+
+- [ ] No AWS/GitHub tokens in the agent’s inherited env when avoidable.
+- [ ] Block `.env` writes/reads in agent allowlists unless required.
+- [ ] Assume prompt injection via images, READMEs, and tool output is possible.
+
+**Deep dives:** [GhostCommit PNG injection](/blog/ghostcommit-png-prompt-injection-env-theft/) · [Zero sandbox credential leak](/blog/zero-sandbox-credential-leak/) · [PreToolUse raw command leak](/blog/codex-pretooluse-hook-raw-command-leak/)
+
+## 4. Git & data-loss blast radius
+
+- [ ] Commit or stash **before** any agent destructive step.
+- [ ] Watch background tasks for SIGKILL mid-write.
+- [ ] Never trust “done” without `git status` / tests.
+
+**Deep dives:** [Background SIGKILL + git corruption](/blog/beware-claude-code-background-task-sigkill-git-corruption/) · [Silent work drop after interrupt](/blog/beware-claude-code-interrupt-drops-work/)
+
+## 5. MCP, plugins, and third-party tools
+
+- [ ] Audit every MCP server: who built it, what network it can hit.
+- [ ] Prefer read-only MCP for untrusted contexts.
+- [ ] Cap parallel tool calls if your agent has cross-wire bugs under load.
+
+**Deep dives:** [MCP response cross-contamination](/blog/claude-code-mcp-response-cross-contamination/) · [AWS Agent Toolkit / MCP](/blog/aws-agent-toolkit-claude-code-mcp/)
+
+## 6. Cost & model routing integrity
+
+- [ ] Log which model actually ran (not only which you selected).
+- [ ] Cap auto-retries after rate limits.
+- [ ] Alert on unexpected token burn.
+
+**Deep dives:** [Silent quota / wrong model](/blog/beware-silent-quota-model-burn/) · [Indefinite auto-retry](/blog/claude-code-indefinite-auto-retry-token-limit/) · [Token overhead Claude Code vs OpenCode](/blog/claude-code-vs-opencode-token-overhead/)
+
+## 7. Operator discipline (non-negotiable)
+
+1. Checkpoint git before agent runs.  
+2. Read the plan before approve.  
+3. Reject any instruction the agent “remembers” that you did not give.  
+4. Rotate secrets if a session looked contaminated.  
+5. Follow [terminalblog Beware tag](/blog/tag/beware/) weekly.
+
+## Related pillars
+
+- [Coding agent pricing guide](/blog/coding-agent-pricing-guide-2026/)  
+- [Feature comparison matrix](/blog/coding-agent-features-comparison-2026/)  
+- [AGENTS.md makes agents 10× smarter](/blog/agents-dot-md-make-coding-agent-10x-smarter/)  
+- [Live adoption leaderboard](/leaderboard/)  
+
+*Last verified: July 2026. When a new security class appears, we add a Beware post and link it here.*

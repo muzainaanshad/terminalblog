@@ -1,3 +1,21 @@
+## Content policy (mandatory for posts)
+
+Read and follow:
+
+- [docs/content-policy.md](docs/content-policy.md) — caps, one story one URL, off-niche rules
+- [docs/distribution-playbook.md](docs/distribution-playbook.md) — X / HN / newsletter
+- [docs/gsc-ops.md](docs/gsc-ops.md) — Search Console & IndexNow
+
+Before publishing any new MDX:
+
+```bash
+npm run content-gate:strict
+# or for one file:
+node scripts/content-gate.cjs src/content/blog/your-post.mdx --strict
+```
+
+Daily caps: **≤3 just-shipped**, soft **≤8 posts/day**. Prefer digests over firehose.
+
 ## Development
 
 When starting the dev server, use background mode:

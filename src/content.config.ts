@@ -14,6 +14,10 @@ const blog = defineCollection({
       tags: z.array(z.string()).default([]),
       tool: z.string().optional(),
       author: z.string().default('kira'),
+      /** Optional OG/path image (string URL or image()) */
+      image: z.string().optional(),
+      /** When true, strengthens affiliate UI (site-wide disclosure always shown) */
+      hasAffiliate: z.boolean().optional(),
     }),
 });
 

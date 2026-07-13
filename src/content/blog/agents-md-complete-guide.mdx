@@ -1,0 +1,115 @@
+---
+title: "AGENTS.md Complete Guide — Make Every Coding Agent Follow Your Repo Rules"
+description: "How to write AGENTS.md (and related instruction files) so Claude Code, OpenCode, Cursor, Codex, and others respect your architecture, tests, and safety rules."
+pubDate: 2026-07-13
+updatedDate: 2026-07-13
+tags: ["agents-dot-md", "guide", "pillar", "best-practices", "workflow"]
+tool: "opencode"
+author: "ada"
+---
+
+Every coding agent can write code. Few will **do what your codebase needs** unless you tell them in a file they actually load. That file is usually `AGENTS.md` (sometimes `CLAUDE.md`, `.cursorrules`, skills, or a mix).
+
+This is the practical guide. For the original thesis see [AGENTS.md makes every coding agent 10× smarter](/blog/agents-dot-md-make-coding-agent-10x-smarter/).
+
+## Why a single instruction file wins
+
+Agents thrash when:
+
+- Build/test commands are tribal knowledge  
+- Architecture rules live only in Slack  
+- Safety (“never force push”, “no prod secrets”) is implied  
+
+`AGENTS.md` is the **always-on brief**. Put it at the repo root. Keep it short enough to load, strict enough to prevent disasters.
+
+## Minimal template
+
+```markdown
+# AGENTS.md
+
+## Product
+One paragraph: what this repo does, who it serves.
+
+## Stack
+- Languages, frameworks, package manager
+- Node/Python version constraints
+
+## Commands
+- Install: …
+- Dev: …
+- Test: …
+- Lint/typecheck: …
+- Build: …
+
+## Architecture
+- Where features live
+- What not to create (no new frameworks without ask)
+- Immutability / layering rules if you have them
+
+## Safety
+- Never commit secrets
+- Never force-push main
+- Prefer small PRs
+- Run tests before claiming done
+
+## Style
+- Naming, file size preferences
+- “Match existing patterns” over inventing new ones
+
+## Definition of done
+- Tests pass
+- Types clean
+- No drive-by refactors
+```
+
+## Agent-specific tips
+
+### Claude Code
+
+- Keep root `AGENTS.md` or `CLAUDE.md` focused; put long skill docs in `skills/*/SKILL.md`.  
+- Assume it will **act** — safety section is mandatory.  
+- See security failures in the [security checklist](/blog/coding-agent-security-checklist-2026/).
+
+### OpenCode / skill-driven agents
+
+- Pair `AGENTS.md` with `skills/<name>/SKILL.md` for workflows.  
+- Intent → skill mapping beats giant prompts.
+
+### Cursor
+
+- `AGENTS.md` + project rules; keep rules **repo-local**, not only user-global.  
+- Point the agent at the files that own invariants.
+
+### Codex / Copilot CLI
+
+- Prefer explicit test and lint commands; cloud agents love “done” without proof.  
+- Sandbox assumptions differ by OS — verify.
+
+## Progressive disclosure (context hygiene)
+
+1. **Root AGENTS.md** — always loaded, &lt; ~200–400 lines ideally  
+2. **docs/** or **skills/** — loaded when the task matches  
+3. **Never** paste entire design history into the root file  
+
+## Anti-patterns
+
+| Don’t | Do |
+|-------|-----|
+| 2,000-line AGENTS.md | Split by feature/skill |
+| Vague “write clean code” | Concrete commands + paths |
+| No safety section | Explicit deny list |
+| Duplicate rules in 5 files | One source of truth + links |
+| Ignore Windows | Note OS-specific pitfalls |
+
+## Pair with security
+
+Instruction files do not replace isolation. After you write `AGENTS.md`, still run the [security checklist](/blog/coding-agent-security-checklist-2026/).
+
+## Related
+
+- [Best coding agents decision guide](/blog/best-coding-agents-2026-decision-guide/)  
+- [Feature every coding agent is missing](/blog/feature-every-coding-agent-missing/)  
+- [Automate code review with agents](/blog/automate-code-review-ai-agents/)  
+- [UI.md design rules](/blog/ui-md-design-rules-coding-agents/)  
+
+*Update this guide when major harnesses change how they load project instructions.*

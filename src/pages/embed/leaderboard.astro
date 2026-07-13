@@ -1,0 +1,151 @@
+---
+/**
+ * Embeddable leaderboard widget for backlinks.
+ * Usage: <iframe src="https://terminalblog.com/embed/leaderboard/" width="100%" height="420" style="border:0"></iframe>
+ */
+import fs from 'fs';
+import path from 'path';
+import { SITE_TITLE } from '../../consts';
+
+const snapshotsDir = path.join(process.cwd(), 'src', 'data', 'adoption', 'snapshots');
+const snapshots = fs.existsSync(snapshotsDir)
+  ? fs.readdirSync(snapshotsDir).filter(f => f.endsWith('.json')).sort().reverse()
+  : [];
+const latest = snapshots.length
+  ? JSON.parse(fs.readFileSync(path.join(snapshotsDir, snapshots[0]), 'utf-8'))
+  : null;
+const agents = [...(latest?.agents || [])];
+const lastUpdated = latest?.date || 'N/A';
+
+function getMetric(agent: any, key: string) {
+  if (agent.metrics && agent.metrics[key] !== undefined) return agent.metrics[key];
+  if (agent[key] !== undefined) return agent[key];
+  return null;
+}
+
+const maxNpm = Math.max(...agents.map(a => getMetric(a, 'npm_downloads') || 0), 1);
+const maxStars = Math.max(...agents.map(a => getMetric(a, 'github_stars') || 0), 1);
+const maxForks = Math.max(...agents.map(a => getMetric(a, 'github_forks') || 0), 1);
+
+agents.forEach(agent => {
+  const npm = getMetric(agent, 'npm_downloads') || 0;
+  const stars = getMetric(agent, 'github_stars') || 0;
+  const forks = getMetric(agent, 'github_forks') || 0;
+  agent.adoption_score = Math.round(
+    (npm / maxNpm) * 50 + (stars / maxStars) * 30 + (forks / maxForks) * 20
+  );
+});
+
+agents.sort((a, b) => (b.adoption_score || 0) - (a.adoption_score || 0));
+const top = agents.slice(0, 10);
+
+function fmt(n: number | null) {
+  if (n == null || n === 0) return '—';
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
+  return String(n);
+}
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>AI Coding Agent Leaderboard Embed — {SITE_TITLE}</title>
+    <style>
+      :root {
+        --bg: #0b0f14;
+        --fg: #e6edf3;
+        --dim: #8b949e;
+        --green: #3fb950;
+        --border: #21262d;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background: var(--bg);
+        color: var(--fg);
+        font-size: 13px;
+      }
+      .wrap { padding: 12px 14px 10px; }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 10px;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      h1 { font-size: 14px; margin: 0; font-weight: 600; }
+      h1 span { color: var(--green); }
+      .meta { color: var(--dim); font-size: 11px; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td {
+        text-align: left;
+        padding: 6px 4px;
+        border-bottom: 1px solid var(--border);
+      }
+      th { color: var(--dim); font-weight: 500; font-size: 11px; }
+      td.num { text-align: right; font-variant-numeric: tabular-nums; }
+      a { color: var(--green); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      footer {
+        margin-top: 10px;
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        flex-wrap: wrap;
+        color: var(--dim);
+        font-size: 11px;
+      }
+      .score { color: var(--green); font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1><span>terminalblog</span> agent leaderboard</h1>
+        <div class="meta">updated {lastUpdated}</div>
+      </header>
+      {top.length === 0 ? (
+        <p class="meta">No snapshot data yet. Run fetch-adoption-data.</p>
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Agent</th>
+              <th class="num">npm/wk</th>
+              <th class="num">★</th>
+              <th class="num">Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            {top.map((a, i) => (
+              <tr>
+                <td>{i + 1}</td>
+                <td>
+                  <a href={`https://terminalblog.com/tool/${a.id}/`} target="_blank" rel="noopener">
+                    {a.name || a.id}
+                  </a>
+                </td>
+                <td class="num">{fmt(getMetric(a, 'npm_downloads'))}</td>
+                <td class="num">{fmt(getMetric(a, 'github_stars'))}</td>
+                <td class="num score">{a.adoption_score}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <footer>
+        <span>npm 50% · stars 30% · forks 20%</span>
+        <a href="https://terminalblog.com/leaderboard/" target="_blank" rel="noopener">
+          Full leaderboard →
+        </a>
+      </footer>
+    </div>
+  </body>
+</html>

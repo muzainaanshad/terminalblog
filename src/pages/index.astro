@@ -1,5 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import Newsletter from '../components/Newsletter.astro';
 import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
 import { getCollection } from 'astro:content';
 import agents from '../data/agents.json';
@@ -18,17 +19,40 @@ function isJustShipped(p: (typeof posts)[number]) {
   );
 }
 
-/** Prefer security, opinion, comparison, and non-roundup news for homepage surface. */
-const featurePosts = posts.filter(p => !isJustShipped(p));
-const homepagePosts = featurePosts.length >= 4 ? featurePosts : posts;
+/** Off-niche industry noise — keep off hero; show under Industry only. */
+function isIndustryOnly(p: (typeof posts)[number]) {
+  const tags = p.data.tags || [];
+  const tool = p.data.tool || '';
+  if (tool === 'industry' && !tags.includes('security') && !tags.includes('beware') && !tags.includes('pillar')) {
+    // pure industry gossip
+    if (tags.includes('news') || tags.includes('launches') || tags.includes('industry')) {
+      // allow if also coding-agent focused tags
+      const agentish = tags.some(t =>
+        ['coding-agents', 'comparison', 'security', 'beware', 'guide', 'pillar', 'mcp', 'agents-dot-md'].includes(t)
+      );
+      if (!agentish) return true;
+    }
+  }
+  // Explicit off-niche slug patterns
+  if (/kraken|seedream|trading-bot|internet-court|bytedance-seedream/i.test(p.id)) return true;
+  return false;
+}
+
+/** Prefer security, opinion, comparison, pillars, and non-roundup news for homepage surface. */
+const featurePosts = posts.filter(p => !isJustShipped(p) && !isIndustryOnly(p));
+const homepagePosts = featurePosts.length >= 4 ? featurePosts : posts.filter(p => !isJustShipped(p));
 
 // Articles shown in hero + spotlight — filter these from other sections
 const heroIds = new Set(homepagePosts.slice(0, 4).map(p => p.id));
 
+const pillars = posts
+  .filter(p => (p.data.tags || []).includes('pillar') && !heroIds.has(p.id))
+  .slice(0, 4);
 const comparisons = posts.filter(p => p.data.tags?.includes('comparison') && !heroIds.has(p.id)).slice(0, 6);
 const opinions = posts.filter(p => p.data.tags?.includes('opinion') && !heroIds.has(p.id)).slice(0, 5);
-// Latest feed still shows everything chronological, but not the four already featured
-const latestFeed = posts.filter(p => !heroIds.has(p.id)).slice(0, 8);
+const industry = posts.filter(p => isIndustryOnly(p) && !heroIds.has(p.id)).slice(0, 4);
+// Latest feed: coding-agent relevant only (still chronological)
+const latestFeed = posts.filter(p => !heroIds.has(p.id) && !isIndustryOnly(p)).slice(0, 8);
 const trending = homepagePosts.filter(p => !heroIds.has(p.id)).slice(0, 5);
 
 // Only surface substantial tags in the home nav (thin tags stay reachable from posts)
@@ -174,6 +198,24 @@ function tagClass(tag) {
       </a>
     </section>
 
+    <!-- Pillars (SEO money pages) -->
+    {pillars.length > 0 && (
+      <section class="section-group">
+        <div class="section-header">
+          <h2>Start here</h2>
+          <a href="/blog/tag/pillar/" class="section-more">all pillars →</a>
+        </div>
+        <div class="mini-grid">
+          {pillars.map(p => (
+            <a href={`/blog/${p.id}/`} class="mini-card">
+              <div class="mini-meta">pillar</div>
+              <div class="mini-title">{p.data.title}</div>
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
+
     <!-- Latest feed -->
     <section class="section-group">
       <div class="section-header">
@@ -219,6 +261,24 @@ function tagClass(tag) {
       </a>}
     </section>
 
+    <!-- Industry (gated off hero) -->
+    {industry.length > 0 && (
+      <section class="section-group">
+        <div class="section-header">
+          <h2>Industry</h2>
+          <a href="/blog/tag/industry/" class="section-more">all →</a>
+        </div>
+        <div class="compact-list">
+          {industry.map(p => (
+            <a href={`/blog/${p.id}/`} class="compact-item">
+              <span class="compact-date">{formatDate(p.data.pubDate)}</span>
+              <span class="compact-title">{p.data.title}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
+
     <!-- Comparisons -->
     <section class="section-group">
       <div class="section-header">
@@ -260,6 +320,8 @@ function tagClass(tag) {
         </div>
       </section>
     </div>
+
+    <Newsletter />
 
     <!-- Agents table -->
     <details class="agents-section">
