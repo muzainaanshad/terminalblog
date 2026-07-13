@@ -101,11 +101,21 @@ Project name in Vercel UI: **`seo-ai-blog`**.
 ```text
 Internet / GitHub / Vercel
         |
-   GitHub Actions (schedule)
-        |
-   scripts/* (measure / publish)
-        |
-   Telegram  <---- you only read this
+   GitHub Actions (schedule)     Hermes gateway (content crons)
+        |                              |
+   scripts/* (measure / publish)  MDX write/update (quality-only)
+        |                              |
+   Telegram  <---- you only read this -+
 ```
 
 You manage the product by **reading Telegram**, not by logging into Vercel/GitHub daily.
+
+## I) Hermes awareness
+
+Hermes loads persistent memory from `%LOCALAPPDATA%\hermes\memories\MEMORY.md` + `USER.md`.
+
+Repo-side briefing (cron prompts also point here):
+
+- [HERMES-SESSION-HANDOFF.md](./HERMES-SESSION-HANDOFF.md)
+- [content-policy.md](./content-policy.md)
+- this file

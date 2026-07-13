@@ -1,3 +1,13 @@
+## terminalblog / Hermes (read first)
+
+Before any content work:
+
+1. [docs/HERMES-SESSION-HANDOFF.md](docs/HERMES-SESSION-HANDOFF.md) — current autopilot state (2026-07-14)
+2. [docs/AUTOPILOT.md](docs/AUTOPILOT.md) — GHA + Telegram + Beehiiv map
+3. [docs/content-policy.md](docs/content-policy.md) — quality floors, firehose OFF
+
+Hermes = content factory. GitHub Actions = ops + Telegram. Do not resume paused firehose crons.
+
 ## Content policy (mandatory for posts)
 
 Read and follow:
@@ -5,6 +15,7 @@ Read and follow:
 - [docs/content-policy.md](docs/content-policy.md) — caps, one story one URL, off-niche rules
 - [docs/distribution-playbook.md](docs/distribution-playbook.md) — X / HN / newsletter
 - [docs/gsc-ops.md](docs/gsc-ops.md) — Search Console & IndexNow
+- [docs/channels-and-email.md](docs/channels-and-email.md) — Beehiiv/RSS, Hermes vs GHA
 
 Before publishing any new MDX:
 
@@ -14,7 +25,7 @@ npm run content-gate:strict
 node scripts/content-gate.cjs src/content/blog/your-post.mdx --strict
 ```
 
-Daily caps: **≤3 just-shipped**, soft **≤8 posts/day**. Prefer digests over firehose.
+Daily caps: **just-shipped = 0** (paused); max **3 new posts/day**; prefer **updates** (`updatedDate`) over new URLs. Floors: ≥600w any, ≥1000w evergreen/guide/beware.
 
 ## Development
 
