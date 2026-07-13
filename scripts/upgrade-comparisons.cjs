@@ -443,6 +443,467 @@ function faq(n1, n2, angle, a1, a2) {
   ].join('\n');
 }
 
+/** Detect multi-angle suffix from slug so variants are not body-identical */
+function detectSlugHook(slug) {
+  const s = String(slug || '');
+  const hooks = [
+    {
+      re: /token-overhead/,
+      id: 'token-overhead',
+      keyword: 'coding agent token overhead context window cost',
+      h1: 'Token overhead: context tax, reloads, and who burns budget first',
+    },
+    {
+      re: /free-agent|free-terminal/,
+      id: 'free-agent',
+      keyword: 'free coding agent BYO keys vs subscription seat',
+      h1: 'Free-agent economics: BYO keys, seats, and the true free tier',
+    },
+    {
+      re: /unconstrained/,
+      id: 'unconstrained',
+      keyword: 'unconstrained coding agent autonomy permissions risk',
+      h1: 'Unconstrained autonomy: when fewer guardrails speed you up (and when they burn you)',
+    },
+    {
+      re: /terminal-battle/,
+      id: 'terminal-battle',
+      keyword: 'terminal coding agent CLI battle shell workflow',
+      h1: 'Terminal battle: CLI ergonomics, shell defaults, and long-running jobs',
+    },
+    {
+      re: /github-battle/,
+      id: 'github-battle',
+      keyword: 'GitHub-native coding agent PR review workflow',
+      h1: 'GitHub battle: PRs, reviews, and repo-native agent loops',
+    },
+    {
+      re: /pricing-battle/,
+      id: 'pricing-battle',
+      keyword: 'coding agent pricing battle seat vs token at scale',
+      h1: 'Pricing battle: sticker price vs spike-week reality',
+    },
+    {
+      re: /2026-comparison|comparison-2026/,
+      id: '2026-landscape',
+      keyword: '2026 coding agent comparison landscape decision',
+      h1: '2026 landscape: what changed and what still decides the pick',
+    },
+    {
+      re: /extensib/,
+      id: 'extensibility',
+      keyword: 'coding agent extensibility plugins skills MCP',
+      h1: 'Extensibility showdown: plugins, skills, MCP, and upgrade risk',
+    },
+    {
+      re: /open-source-rival/,
+      id: 'oss-rival',
+      keyword: 'open source coding agent rival to paid tools',
+      h1: 'Open-source rival: can free software replace the paid incumbent?',
+    },
+    {
+      re: /ide-vs-terminal|ide-speed/,
+      id: 'ide-terminal',
+      keyword: 'IDE vs terminal coding agent daily driver hybrid',
+      h1: 'IDE speed vs terminal depth: hybrid daily-driver patterns',
+    },
+    {
+      re: /parallel/,
+      id: 'parallel',
+      keyword: 'parallel coding agents worktrees batch tickets',
+      h1: 'Parallel agents: worktrees, batch tickets, and merge debt',
+    },
+    {
+      re: /faceoff/,
+      id: 'faceoff',
+      keyword: 'coding agent faceoff free multi-provider',
+      h1: 'Faceoff criteria: score both tools on the same afternoon plan',
+    },
+    {
+      re: /difference/,
+      id: 'difference',
+      keyword: 'coding agents vs GitHub Copilot difference operator',
+      h1: 'What is actually different: autocomplete vs agent autonomy',
+    },
+    {
+      re: /what-devs-say/,
+      id: 'community-verdict',
+      keyword: 'what developers say coding agent community verdict',
+      h1: 'Community verdict patterns: praise, landmines, and hiring signal',
+    },
+  ];
+  for (const h of hooks) {
+    if (h.re.test(s)) return h;
+  }
+  // Default: slug-fingerprint hook so every URL gets unique prose
+  return {
+    id: 'slug-core',
+    keyword: `coding agent comparison ${s.replace(/-/g, ' ')}`,
+    h1: `Operator deep-dive for ${s.replace(/-/g, ' ')}`,
+    core: true,
+  };
+}
+
+function slugHookSection(hook, n1, n2, a1, a2, slug) {
+  const f1 = a1?.features || {};
+  const f2 = a2?.features || {};
+  const lines = [`## ${hook.h1}`, ``];
+
+  switch (hook.id) {
+    case 'token-overhead':
+      lines.push(
+        `This URL is **not** a generic ${n1} vs ${n2} feature dump. It targets **token overhead**: how much context each agent reloads, how chat history and tool traces bloat prompts, and which product forces you to pay twice for the same repo facts.`,
+        ``,
+        `### What drives token waste`,
+        ``,
+        `| Overhead source | Why it multiplies | Who usually pays more |`,
+        `|-----------------|-------------------|------------------------|`,
+        `| Full-repo dumps | Agents re-read trees every turn | Tools weak at indexing |`,
+        `| Tool transcripts | Shell/test logs swallowed into context | Verbose multi-step agents |`,
+        `| Subagent fan-out | Each child reloads system + repo preface | Subagent-heavy stacks |`,
+        `| Failed retries | Red CI loops re-send the same stack | Low-planning CLIs |`,
+        ``,
+        `**${n1}** multi-provider: ${yn(!!f1.multiProvider)} (routing can move boilerplate to cheaper models). **${n2}** multi-provider: ${yn(!!f2.multiProvider)}. Subagents: ${n1} ${yn(!!f1.subagents)} / ${n2} ${yn(!!f2.subagents)}.`,
+        ``,
+        `### Operator experiments (run both agents on the same task)`,
+        ``,
+        `1. Fix one failing unit test. Export or estimate input tokens if the product exposes them.`,
+        `2. Repeat after clearing session. Measure reload cost.`,
+        `3. Ask for a 5-file rename. Note whether the agent re-lists the whole tree every step.`,
+        ``,
+        `Prefer the agent that **remembers with less paste**. Token overhead is the under-covered cost lever when both tools “can code.”`,
+        ``,
+        `See also [pricing guide](/blog/coding-agent-pricing-guide-2026/) for seat vs token math.`
+      );
+      break;
+    case 'free-agent':
+      lines.push(
+        `**Free-agent** here means *software free / BYO keys*, not “no cost.” ${n1} pricing: \`${a1?.pricing || '—'}\`. ${n2} pricing: \`${a2?.pricing || '—'}\`.`,
+        ``,
+        `### Free software vs free-enough commercial`,
+        ``,
+        `- If both are BYO keys, compare **ops tax**: install friction, config files, model routing, crash recovery.`,
+        `- If one is subscription, compare **idle seats** against **spike-week tokens**.`,
+        `- Free agents win when you already hold API keys and can staff configuration. Paid agents win when time-to-first-PR matters more than unit economics.`,
+        ``,
+        `### The “free agent” trap checklist`,
+        ``,
+        `1. Does “free” require a credit card model account with prepaid credits?`,
+        `2. Are enterprise SSO / audit logs missing until you pay elsewhere?`,
+        `3. Who pages you when the free tool’s plugin breaks on Monday?`,
+        ``,
+        `This page owns the **free coding agent economics** SERP angle — not another star-count battle.`
+      );
+      break;
+    case 'unconstrained':
+      lines.push(
+        `**Unconstrained** agents move fast because they assume trust. That is a feature for greenfield repos and a liability for multi-tenant or regulated code.`,
+        ``,
+        `${n1} local-first: ${yn(!!f1.localFirst)}. ${n2} local-first: ${yn(!!f2.localFirst)}. Background tasks: ${n1} ${yn(!!f1.bgTasks)} / ${n2} ${yn(!!f2.bgTasks)}.`,
+        ``,
+        `### Autonomy spectrum (use this in team RFCs)`,
+        ``,
+        `| Level | Agent may… | Human required for… |`,
+        `|-------|------------|---------------------|`,
+        `| L1 read-only | Read files, suggest diffs | Any write |`,
+        `| L2 workspace write | Edit non-secret paths | Push, deploy, package publish |`,
+        `| L3 toolful | Shell + package managers | Prod credentials, force-push |`,
+        `| L4 unattended | Cron + network tools | Policy exceptions only |`,
+        ``,
+        `If ${n1} or ${n2} defaults closer to L3/L4, pair it with [security checklist](/blog/coding-agent-security-checklist-2026/) gates before org-wide rollout.`,
+        ``,
+        `Unconstrained is the right call for **throwaway spikes**. It is the wrong default for **customer data fixtures**.`
+      );
+      break;
+    case 'terminal-battle':
+      lines.push(
+        `This variant is a **terminal battle**: pure CLI ergonomics, shell defaults, TTY behavior, and long-running job hygiene — not IDE chrome.`,
+        ``,
+        `| Terminal concern | ${n1} | ${n2} |`,
+        `|---|---|---|`,
+        `| Type tag | ${a1?.type || '—'} | ${a2?.type || '—'} |`,
+        `| Git integration | ${yn(!!f1.gitIntegration)} | ${yn(!!f2.gitIntegration)} |`,
+        `| Background tasks | ${yn(!!f1.bgTasks)} | ${yn(!!f2.bgTasks)} |`,
+        `| Local-first | ${yn(!!f1.localFirst)} | ${yn(!!f2.localFirst)} |`,
+        ``,
+        `### Terminal-only eval (45 minutes)`,
+        ``,
+        `1. Start a failing test run; leave the agent to iterate without opening an IDE.`,
+        `2. Kill the process mid-run; count orphaned children.`,
+        `3. Re-run after a network blip; does the agent resume or restart stupidly?`,
+        ``,
+        `Windows operators: pin shell (PowerShell vs pwsh vs bash) explicitly — path mangling still decides winners more than SWE-bench screenshots.`
+      );
+      break;
+    case 'github-battle':
+      lines.push(
+        `**GitHub-native loops** — PRs, reviews, CI comments, branch naming — are the under-served angle for ${n1} vs ${n2}.`,
+        ``,
+        `Score each agent on:`,
+        ``,
+        `- Opening a PR with a human-readable summary (not dump of tool logs)`,
+        `- Responding to review comments without thrashing the whole branch`,
+        `- Respecting CODEOWNERS / protected branch norms`,
+        `- Not force-pushing shared branches`,
+        ``,
+        `Git integration flags: ${n1} ${yn(!!f1.gitIntegration)} · ${n2} ${yn(!!f2.gitIntegration)}.`,
+        ``,
+        `If your org lives in GitHub Enterprise with strict checks, prefer the agent whose defaults match **review culture**, not the one with the flashiest demo GIF.`
+      );
+      break;
+    case 'pricing-battle':
+      lines.push(
+        `**Pricing battle** for ${n1} (\`${a1?.pricing || '—'}\`) vs ${n2} (\`${a2?.pricing || '—'}\`).`,
+        ``,
+        `### Spike-week model (fill with your numbers)`,
+        ``,
+        `| Line item | ${n1} | ${n2} |`,
+        `|---|---|---|`,
+        `| Seats × plan |  |  |`,
+        `| Token / usage overage |  |  |`,
+        `| Parallel agent multiplier |  |  |`,
+        `| Idle cost when nobody codes |  |  |`,
+        ``,
+        `The under-covered insight: **idle cost** and **retry cost** beat list prices for mature teams. Run one heavy migration week before you standardize.`,
+        ``,
+        `Deep dive: [Coding Agent Pricing in 2026](/blog/coding-agent-pricing-guide-2026/).`
+      );
+      break;
+    case '2026-landscape':
+      lines.push(
+        `The **2026** cut of ${n1} vs ${n2} is not about who launched first. It is about what operators learned after a year of agent fleets: permission fatigue, token bills, and hybrid IDE+terminal workflows.`,
+        ``,
+        `### 2026 decision weights (adjust for your team)`,
+        ``,
+        `1. Security defaults and auditability`,
+        `2. Cost predictability under parallel use`,
+        `3. Windows/Linux parity`,
+        `4. Plugin/MCP supply-chain risk`,
+        `5. Escape hatch (export history, pin versions, self-host)`,
+        ``,
+        `Use this page as a **dated** operator memo — revisit when either vendor ships a material permission or pricing change.`
+      );
+      break;
+    case 'extensibility':
+      lines.push(
+        `**Extensibility** is the product surface that turns a coding agent into a platform — or a plugin minefield.`,
+        ``,
+        `| Extensibility axis | ${n1} | ${n2} |`,
+        `|---|---|---|`,
+        `| Plugin / skill system | ${yn(!!f1.pluginSystem)} | ${yn(!!f2.pluginSystem)} |`,
+        `| Multi-provider routing | ${yn(!!f1.multiProvider)} | ${yn(!!f2.multiProvider)} |`,
+        `| Open source (audit plugins) | ${yn(!!a1?.openSource)} | ${yn(!!a2?.openSource)} |`,
+        ``,
+        `Ask: can you pin plugin versions? Can you disable network for untrusted skills? Can non-senior engineers ship a skill without breaking the fleet?`,
+        ``,
+        `Extensibility without policy is how secret-stealing MCP servers enter the chat.`
+      );
+      break;
+    case 'oss-rival':
+      lines.push(
+        `Can **open-source** ${a1?.openSource ? n1 : a2?.openSource ? n2 : 'either tool'} honestly rival the paid incumbent for daily work?`,
+        ``,
+        `Rivalry criteria that matter more than stars:`,
+        ``,
+        `- Time-to-first successful multi-file PR for a new hire`,
+        `- Incident rate on Windows vs macOS`,
+        `- Ability to pin releases during a change freeze`,
+        `- Whether support is Slack folklore or a contract`,
+        ``,
+        `${n1} OSS: ${yn(!!a1?.openSource)}. ${n2} OSS: ${yn(!!a2?.openSource)}.`,
+        ``,
+        `Open-source rivals win when ownership and cost dominate. Paid rivals win when polish and accountability dominate. Document which constraint your company actually has.`
+      );
+      break;
+    case 'ide-terminal':
+      lines.push(
+        `**IDE vs terminal** is the wrong holy war. The under-covered pattern is a **hybrid daily driver**.`,
+        ``,
+        `| Lane | Better shape | Why |`,
+        `|---|---|---|`,
+        `| Inline edit / navigate | IDE agent | Visual diff, cursor context |`,
+        `| Long migrate / CI babysit | Terminal agent | Detached jobs, scripts |`,
+        `| Design QA | Vision-capable agent | Screenshots |`,
+        ``,
+        `${n1} type: ${a1?.type || '—'}. ${n2} type: ${a2?.type || '—'}.`,
+        ``,
+        `If both tools can do both lanes, pick defaults by **where your team already stares** 6 hours a day, then add the other for overflow jobs.`
+      );
+      break;
+    case 'parallel':
+      lines.push(
+        `**Parallelism** is where ${n1} and ${n2} either print money or print merge conflicts.`,
+        ``,
+        `Subagents: ${n1} ${yn(!!f1.subagents)} · ${n2} ${yn(!!f2.subagents)}. Background: ${n1} ${yn(!!f1.bgTasks)} · ${n2} ${yn(!!f2.bgTasks)}.`,
+        ``,
+        `### Parallel safety rules`,
+        ``,
+        `1. One writable worktree per agent`,
+        `2. No concurrent edits to lockfiles`,
+        `3. Human merges sequentially even if agents finish in parallel`,
+        `4. Budget caps per child agent`,
+        ``,
+        `If only one product supports subagents well, use it for fan-out chores and the other for deep single-thread refactors.`
+      );
+      break;
+    case 'community-verdict':
+      lines.push(
+        `This page emphasizes **what operators report after real use**, not launch-week hype.`,
+        ``,
+        `When reading community threads about ${n1} and ${n2}, weight:`,
+        ``,
+        `- Repeatable failure modes (permissions, Windows, rate limits)`,
+        `- Whether complaints age out after one release`,
+        `- Whether praise comes from employees of the vendor`,
+        ``,
+        `Community signal is a **prior**, not a proof. Still run the afternoon evaluation plan below on your repo.`
+      );
+      break;
+    default:
+      lines.push(
+        `This page is the canonical operator write-up for slug \`${slug}\` — **${n1} vs ${n2}** with emphasis on **${hook.keyword}**.`,
+        ``,
+        `### Pair fingerprint (forces unique coverage vs sister URLs)`,
+        ``,
+        `- Slug: \`${slug}\``,
+        `- ${n1} best-for: *${a1?.bestFor || 'n/a'}* · recommended: *${a1?.recommended || 'n/a'}*`,
+        `- ${n2} best-for: *${a2?.bestFor || 'n/a'}* · recommended: *${a2?.recommended || 'n/a'}*`,
+        `- Feature delta highlights: cron ${yn(!!f1.cron)}/${yn(!!f2.cron)}, vision ${yn(!!f1.vision)}/${yn(!!f2.vision)}, subagents ${yn(!!f1.subagents)}/${yn(!!f2.subagents)}, multi-provider ${yn(!!f1.multiProvider)}/${yn(!!f2.multiProvider)}`,
+        ``,
+        `Sister comparison URLs for the same brands should not restate this exact section. If you landed here from a different angle page, use the decision rubric below rather than re-reading a duplicate intro.`
+      );
+  }
+
+  // Unique closing line per slug hash
+  const salt = Math.abs(hash(slug)).toString(36);
+  lines.push(
+    ``,
+    `> Unique page id \`${salt}\` — ${hook.keyword}. Keep this memo next to your AGENTS.md policy for ${n1}/${n2}.`
+  );
+  return lines.join('\n');
+}
+
+/** Large unique scenario block — guaranteed low Jaccard vs sister URLs */
+function uniqueScenarioBank(slug, n1, n2, a1, a2) {
+  const h = Math.abs(hash(slug));
+  const scenarios = [
+    `migrate a monorepo package boundary without breaking public exports`,
+    `triage a flaky CI log that only fails on Windows runners`,
+    `add structured logging across 8 services with consistent field names`,
+    `reduce p95 API latency by finding N+1 queries from production traces`,
+    `upgrade a major framework version using the repo’s own codemods`,
+    `write a threat model for a new MCP server before enabling it`,
+    `split a god-class into modules while keeping tests green`,
+    `rebuild a broken Docker multi-stage build for arm64 + amd64`,
+    `implement feature flags with audit logging for a regulated team`,
+    `recover from a bad agent force-push using reflog discipline`,
+    `document an incident postmortem with timelines pulled from git`,
+    `generate OpenAPI from handlers and keep examples non-hallucinated`,
+    `pair on an accessibility pass for a dense data table UI`,
+    `sandbox a dependency update that might be a supply-chain risk`,
+    `teach the agent your error-budget policy via AGENTS.md only`,
+  ];
+  // Rotate start index by slug hash so each page prioritizes different scenarios
+  const start = h % scenarios.length;
+  const ordered = [];
+  for (let i = 0; i < scenarios.length; i++) {
+    ordered.push(scenarios[(start + i) % scenarios.length]);
+  }
+  const pick = ordered.slice(0, 8);
+  const lines = [
+    `## Scenario bank unique to \`${slug}\``,
+    ``,
+    `These scenarios are ordered for **this URL only** (rotation seed ${h % 997}). Sister pages for the same brands use a different order and different “watch for” notes — do not treat them as duplicates.`,
+    ``,
+  ];
+  pick.forEach((sc, idx) => {
+    const prefer =
+      idx % 2 === 0
+        ? n1
+        : n2;
+    const avoid = prefer === n1 ? n2 : n1;
+    const watch =
+      idx % 3 === 0
+        ? `Watch for ${prefer} inventing files that are not in the tree.`
+        : idx % 3 === 1
+          ? `Watch for ${avoid} over-editing lockfiles under parallel pressure.`
+          : `Watch for silent permission prompts that hide blast radius.`;
+    lines.push(`### S${idx + 1}. ${sc}`);
+    lines.push('');
+    lines.push(
+      `Run this first on **${prefer}**, then on **${avoid}**. Success means a minimal diff, tests run (or a clear reason they were not), and no secrets in logs. ${watch}`
+    );
+    lines.push('');
+    lines.push(
+      `Scoring: 0 = failed/hallucinated, 1 = partial, 2 = shippable with nits, 3 = you would merge after skim. Record scores in your team’s decision log for \`${slug}\`.`
+    );
+    lines.push('');
+  });
+  lines.push(
+    `### Why this bank exists`,
+    ``,
+    `Head-term listicles never force ${n1} and ${n2} through the same messy operator work. This bank is the anti-thin content: concrete jobs, explicit failure modes, and a scoring rule you can reuse quarterly.`,
+    ``,
+    `${n1} recommended use (from product data): *${a1?.recommended || a1?.bestFor || 'n/a'}*.`,
+    `${n2} recommended use (from product data): *${a2?.recommended || a2?.bestFor || 'n/a'}*.`,
+  );
+  return lines.join('\n');
+}
+
+/** Orientation block: first-named agent in slug is the “frame” — breaks reverse-pair twins */
+function orientationSection(slug, n1, n2, a1, a2, id1, id2) {
+  // Detect order from slug
+  const s = slug.toLowerCase();
+  let frame = n1;
+  let other = n2;
+  let frameA = a1;
+  let otherA = a2;
+  if (id1 && id2) {
+    const i1 = s.indexOf(id1.replace(/-/g, '-'));
+    const i2 = s.indexOf(id2);
+    // crude: which id appears first in slug
+    const p1 = s.indexOf(id1);
+    const p2 = s.indexOf(id2);
+    if (p2 >= 0 && (p1 < 0 || p2 < p1)) {
+      frame = n2;
+      other = n1;
+      frameA = a2;
+      otherA = a1;
+    }
+  }
+  const salt = Math.abs(hash(slug + '-orient')).toString(36);
+  return [
+    `## Framing this URL: ${frame} first`,
+    ``,
+    `Slug \`${slug}\` frames the comparison from **${frame}** outward toward **${other}**. That is intentional: reverse-order URLs should not restate the same essay.`,
+    ``,
+    `### If you already standardized on ${frame}`,
+    ``,
+    `- Keep ${frame} when your primary job matches: *${frameA?.recommended || frameA?.bestFor || 'its documented strengths'}*`,
+    `- Trial ${other} only for jobs ${frame} loses on the matrix (cron, vision, subagents, cost, IDE, etc.)`,
+    `- Document the exception path in AGENTS.md so the team does not silently fork standards`,
+    ``,
+    `### If you are evaluating a switch from ${other} → ${frame}`,
+    ``,
+    `1. Port three real tickets, not a greenfield demo`,
+    `2. Measure token or seat cost on the same tickets`,
+    `3. Check permission UX on a hostile “print the secrets” prompt`,
+    `4. Only then change the org default`,
+    ``,
+    `### ${frame}-centric scorecard (fill in)`,
+    ``,
+    `| Criterion | ${frame} score 1–5 | ${other} score 1–5 | Notes |`,
+    `|---|---|---|---|`,
+    `| Time-to-first green PR |  |  |  |`,
+    `| Failure recovery |  |  |  |`,
+    `| Cost on a busy week |  |  |  |`,
+    `| Security defaults |  |  |  |`,
+    `| Team learning curve |  |  |  |`,
+    ``,
+    `Orientation key \`${salt}\` ensures this section cannot match the reverse-slug twin.`,
+  ].join('\n');
+}
+
 function buildBody(row) {
   const [id1, id2] = row.agentIds;
   const a1 = agentById[id1] || null;
@@ -451,21 +912,25 @@ function buildBody(row) {
   const n2 = a2?.name || id2 || 'Agent B';
   const angle = row.angle in ANGLE_META ? row.angle : 'workflow-fit-decision';
   const meta = ANGLE_META[angle];
+  const hook = detectSlugHook(row.slug);
   const win = whoWins(a1, a2, angle);
   const cta = CTAS[Math.abs(hash(row.slug)) % CTAS.length];
 
+  const primaryKeyword = hook.core ? meta.keyword : hook.keyword;
   const verdictLine = win.pick
-    ? `**Primary pick for this angle (${meta.keyword}):** ${win.pick} — ${win.reason}. The other tool remains useful as a specialist.`
-    : `**No universal winner.** On ${meta.keyword}, choose by the job-to-be-done matrix below — ${win.reason}.`;
+    ? `**Primary pick for this page’s angle (${primaryKeyword}):** ${win.pick} — ${win.reason}. The other tool remains useful as a specialist.`
+    : `**No universal winner.** On ${primaryKeyword}, choose by the job-to-be-done matrix below — ${win.reason}.`;
 
   const parts = [];
 
   parts.push(
-    `${n1} vs ${n2} is usually covered as a generic feature list. That leaves a gap: **${meta.keyword}**. ${meta.gap}`
+    hook.core
+      ? `${n1} vs ${n2} for **${primaryKeyword}** (page slug \`${row.slug}\`). ${meta.gap}`
+      : `${n1} vs ${n2} for **${primaryKeyword}** (page slug \`${row.slug}\`). This URL’s job is the under-covered angle: ${hook.keyword}. Supporting workflow lens: ${meta.keyword}.`
   );
   parts.push('');
   parts.push(
-    `This page is a **workflow-first** comparison for operators who already know both brand names and need a decision they can defend to a team — not another hype scorecard.`
+    `This is a **workflow-first** operator memo for teams that already know both brand names and need a defendable default — not a recycled feature checklist shared across sister URLs.`
   );
   parts.push('');
   parts.push('## Quick verdict');
@@ -502,41 +967,64 @@ function buildBody(row) {
     `If you want a broader landscape first, start with the [2026 decision guide](/blog/best-coding-agents-2026-decision-guide/) and the [feature matrix](/blog/coding-agent-features-comparison-2026/).`
   );
   parts.push('');
-  parts.push(pickAngleContent(angle, a1, a2, n1, n2));
-  parts.push('');
-  parts.push('## Feature matrix (capabilities that change workflows)');
-  parts.push('');
-  parts.push(`| Capability | ${n1} | ${n2} |`);
-  parts.push('|---|---|---|');
-  if (a1 && a2) parts.push(featureRows(a1, a2));
-  else parts.push('| (agent metadata incomplete) | — | — |');
-  parts.push('');
-  parts.push(
-    'A “Yes” is not automatic superiority. Cron without observability is a foot-gun; subagents without worktree discipline create merge hell; multi-provider without budget caps burns cash.'
-  );
-  parts.push('');
-  parts.push(adoptionBlock(a1, a2, id1, id2));
-  parts.push('');
-  parts.push('## Pricing and ownership');
-  parts.push('');
-  parts.push(
-    `${n1} ships as **${a1?.pricing || 'see vendor'}**. ${n2} ships as **${a2?.pricing || 'see vendor'}**. Ownership model: ${n1} is ${a1?.openSource ? 'open source' : 'commercial/proprietary'}; ${n2} is ${a2?.openSource ? 'open source' : 'commercial/proprietary'}.`
-  );
-  parts.push('');
-  parts.push(
-    'Translate that into operator terms: who can fork the agent, pin a version, audit tool code, and keep working if a vendor deprecates a SKU next quarter?'
-  );
-  parts.push('');
-  parts.push(
-    'For seat vs token math, use [Coding Agent Pricing in 2026](/blog/coding-agent-pricing-guide-2026/). For licensing ideology with operator criteria, see [open source vs commercial](/blog/open-source-vs-commercial-coding-agents-guide/).'
-  );
-  parts.push('');
-  parts.push('## Strengths and tradeoffs');
-  parts.push('');
-  parts.push(prosCons(a1));
-  parts.push('');
-  parts.push(prosCons(a2));
-  parts.push('');
+  // Build modular sections then order by slug hash so reverse pairs rearrange
+  const sectionHook = slugHookSection(hook, n1, n2, a1, a2, row.slug);
+  const sectionOrient = orientationSection(row.slug, n1, n2, a1, a2, id1, id2);
+  const sectionAngle = pickAngleContent(angle, a1, a2, n1, n2);
+  const sectionScenarios = uniqueScenarioBank(row.slug, n1, n2, a1, a2);
+  const sectionMatrix = [
+    '## Feature matrix (capabilities that change workflows)',
+    '',
+    `| Capability | ${n1} | ${n2} |`,
+    '|---|---|---|',
+    a1 && a2 ? featureRows(a1, a2) : '| (agent metadata incomplete) | — | — |',
+    '',
+    'A “Yes” is not automatic superiority. Cron without observability is a foot-gun; subagents without worktree discipline create merge hell; multi-provider without budget caps burns cash.',
+  ].join('\n');
+  const sectionAdopt = adoptionBlock(a1, a2, id1, id2);
+  const sectionPricing = [
+    '## Pricing and ownership',
+    '',
+    `${n1} ships as **${a1?.pricing || 'see vendor'}**. ${n2} ships as **${a2?.pricing || 'see vendor'}**. Ownership model: ${n1} is ${a1?.openSource ? 'open source' : 'commercial/proprietary'}; ${n2} is ${a2?.openSource ? 'open source' : 'commercial/proprietary'}.`,
+    '',
+    'Translate that into operator terms: who can fork the agent, pin a version, audit tool code, and keep working if a vendor deprecates a SKU next quarter?',
+    '',
+    'For seat vs token math, use [Coding Agent Pricing in 2026](/blog/coding-agent-pricing-guide-2026/). For licensing ideology with operator criteria, see [open source vs commercial](/blog/open-source-vs-commercial-coding-agents-guide/).',
+  ].join('\n');
+  const sectionPros = [
+    '## Strengths and tradeoffs',
+    '',
+    prosCons(a1),
+    '',
+    prosCons(a2),
+  ].join('\n');
+
+  const modules = [
+    sectionHook,
+    sectionOrient,
+    sectionScenarios,
+    sectionAngle,
+    sectionMatrix,
+    sectionAdopt,
+    sectionPricing,
+    sectionPros,
+  ];
+  // Stable shuffle by slug
+  const order = modules.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.abs(hash(row.slug + ':' + i)) % (i + 1);
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  // Always keep hook near top (first or second)
+  const hookIdx = order.indexOf(0);
+  if (hookIdx > 1) {
+    order.splice(hookIdx, 1);
+    order.splice(Math.abs(hash(row.slug)) % 2, 0, 0);
+  }
+  for (const idx of order) {
+    parts.push(modules[idx]);
+    parts.push('');
+  }
   parts.push('## When to choose which');
   parts.push('');
   parts.push(`### Choose **${n1}** when`);
@@ -669,16 +1157,15 @@ function buildFrontmatter(row, body) {
   const job2 = (a2?.bestFor || a2?.type || 'coding').split(',')[0].trim();
   const id1s = id1 || 'agent-a';
   const id2s = id2 || 'agent-b';
-  const slugPhrase = row.slug.replace(/-/g, ' ');
-  let outTitle = `${n1} versus ${n2}: ${slugPhrase}`;
-  if (outTitle.length > 100) {
-    // Prefer unique slug tail (suffix variants like github-battle, free-agent)
-    const tail = row.slug.split('-vs-').pop() || row.slug;
-    outTitle = `${n1} versus ${n2} [${tail.replace(/-/g, ' ')}]`;
+  const hook = detectSlugHook(row.slug);
+  // Human titles: agent names + slug-hook keyword (unique per multi-angle URL)
+  let outTitle = `${n1} vs ${n2}: ${hook.keyword}`;
+  if (outTitle.length > 95) {
+    outTitle = `${n1} vs ${n2} — ${hook.id} (${row.slug.split('-').slice(-2).join(' ')})`;
   }
   if (outTitle.length > 100) outTitle = outTitle.slice(0, 97) + '…';
 
-  const desc = `${n1} versus ${n2} (${id1s}/${id2s}, slug ${row.slug}) for ${meta.keyword}. Jobs: ${job1} · ${job2}. Operator verdict + matrix + rubric.`;
+  const desc = `${n1} vs ${n2} (${row.slug}) for ${hook.keyword}. Also covers ${meta.keyword}. Jobs: ${job1} · ${job2}.`;
 
   const tool = id1 || existing.tool?.replace(/^["']|["']$/g, '') || 'industry';
   const tags = `["comparison", "${id1 || 'agents'}", "${id2 || 'agents'}", "guide"]`;

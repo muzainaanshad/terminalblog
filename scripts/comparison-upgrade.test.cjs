@@ -76,4 +76,54 @@ describe('comparison inventory + evergreen upgrades', () => {
     const tail = inv.rows[inv.rows.length - 1].priority;
     assert.ok(head >= tail, 'queue should be sorted by priority desc');
   });
+
+  it('no two comparison pages share an identical body', () => {
+    const crypto = require('crypto');
+    const inv = JSON.parse(
+      fs.readFileSync(path.join(ROOT, 'tmp', 'comparison-inventory.json'), 'utf8')
+    );
+    const byHash = new Map();
+    for (const r of inv.rows) {
+      const raw = fs.readFileSync(path.join(ROOT, r.path), 'utf8');
+      const body = raw.replace(/^---[\s\S]*?---/, '').trim();
+      const h = crypto.createHash('sha1').update(body).digest('hex');
+      if (!byHash.has(h)) byHash.set(h, []);
+      byHash.get(h).push(r.file);
+    }
+    const dups = [...byHash.values()].filter((v) => v.length > 1);
+    assert.deepEqual(dups, [], `identical bodies: ${JSON.stringify(dups)}`);
+  });
+
+  it('known multi-angle twins differ and mention their angle keywords', () => {
+    const twins = [
+      [
+        'src/content/blog/claude-code-vs-opencode-token-overhead.mdx',
+        'token overhead',
+      ],
+      [
+        'src/content/blog/claude-code-vs-ampcode-unconstrained-challenge.mdx',
+        'unconstrained',
+      ],
+      [
+        'src/content/blog/codex-vs-copilot-cli-terminal-battle.mdx',
+        'terminal battle',
+      ],
+      [
+        'src/content/blog/ampcode-vs-copilot-cli-pricing-battle.mdx',
+        'pricing battle',
+      ],
+    ];
+    const base = fs
+      .readFileSync(
+        path.join(ROOT, 'src/content/blog/claude-code-vs-opencode.mdx'),
+        'utf8'
+      )
+      .replace(/^---[\s\S]*?---/, '');
+    for (const [rel, needle] of twins) {
+      const raw = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+      const body = raw.replace(/^---[\s\S]*?---/, '');
+      assert.notEqual(body.trim(), base.trim(), `${rel} must not equal base pair body`);
+      assert.match(body.toLowerCase(), new RegExp(needle, 'i'), `${rel} missing ${needle}`);
+    }
+  });
 });

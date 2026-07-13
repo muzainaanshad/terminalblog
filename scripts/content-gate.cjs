@@ -192,7 +192,7 @@ function validateArticle(article, corpus) {
     const bothComparison = isComparison(article) && isComparison(other);
 
     if (bothComparison) {
-      // Comparison grid: only exact title collision or same pair+angle stem
+      // Comparison grid: exact title collision
       const t1 = String(article.fm.title || '')
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '');
@@ -204,6 +204,20 @@ function validateArticle(article, corpus) {
           level: 'error',
           code: 'duplicate-title',
           msg: `Exact title collision with ${other.slug}`,
+        });
+      }
+      // Identical body (multi-angle variants must not share prose)
+      const b1 = String(article.body || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const b2 = String(other.body || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (b1.length > 400 && b1 === b2) {
+        issues.push({
+          level: 'error',
+          code: 'duplicate-body',
+          msg: `Body identical to ${other.slug} — multi-angle URLs need unique prose or one canonical URL`,
         });
       }
       // Same pair key + identical stem (true reverse duplicates only)
