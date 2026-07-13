@@ -3,202 +3,223 @@ import Layout from '../layouts/Layout.astro';
 import { SITE_TITLE } from '../consts';
 import fs from 'fs';
 import path from 'path';
+import { createRequire } from 'module';
+import { join } from 'path';
+const require = createRequire(import.meta.url);
+const { scoreAgents, metric: getMetric } = require(
+  join(process.cwd(), 'scripts/lib/adoption-score.cjs')
+);
 
 const snapshotsDir = path.join(process.cwd(), 'src', 'data', 'adoption', 'snapshots');
-const snapshots = fs.readdirSync(snapshotsDir).filter(f => f.endsWith('.json')).sort().reverse();
-const latest = snapshots.length > 0 ? JSON.parse(fs.readFileSync(path.join(snapshotsDir, snapshots[0]), 'utf-8')) : null;
-const agents = latest?.agents || [];
-const lastUpdated = latest?.date || 'N/A';
+const snapshots = fs.existsSync(snapshotsDir)
+  ? fs.readdirSync(snapshotsDir).filter((f) => f.endsWith('.json')).sort().reverse()
+  : [];
 
-const prevSnapshot = snapshots.length > 1 ? JSON.parse(fs.readFileSync(path.join(snapshotsDir, snapshots[1]), 'utf-8')) : null;
-const prevAgents = prevSnapshot?.agents || [];
+// Prefer v3 methodology snapshot when same day has both
+function loadBestSnapshot(files: string[]) {
+  if (!files.length) return null;
+  const parsed = files.map((f) => {
+    try {
+      return {
+        file: f,
+        data: JSON.parse(fs.readFileSync(path.join(snapshotsDir, f), 'utf-8')),
+      };
+    } catch {
+      return null;
+    }
+  }).filter(Boolean) as { file: string; data: any }[];
 
-function getMetric(agent, key) {
-  if (agent.metrics && agent.metrics[key] !== undefined) return agent.metrics[key];
-  if (agent[key] !== undefined) return agent[key];
-  return null;
+  const v3 = parsed.find((p) => String(p.data.methodology_version || '').includes('v3'));
+  return (v3 || parsed[0])?.data || null;
 }
 
-// Compute Adoption Score: weighted combo of npm (50%) + GitHub stars (30%) + forks (20%)
-// All normalized 0-100 against the max in each category
-agents.forEach(agent => {
-  const prev = prevAgents.find(p => p.id === agent.id);
-  const npmNow = getMetric(agent, 'npm_downloads');
-  const npmPrev = prev ? getMetric(prev, 'npm_downloads') : null;
-  const starsNow = getMetric(agent, 'github_stars');
-  const starsPrev = prev ? getMetric(prev, 'github_stars') : null;
-  const forksNow = getMetric(agent, 'github_forks');
+const latest = loadBestSnapshot(snapshots);
+let agents = [...(latest?.agents || [])];
+const lastUpdated = latest?.date || 'N/A';
+const methodology = latest?.methodology_version || 'legacy';
+const excluded = latest?.excluded_config || [];
+const dropped = latest?.dropped_sparse || [];
 
-  agent.npm_change = (prev && npmPrev !== null) ? (npmNow || 0) - npmPrev : null;
-  agent.star_change = (prev && starsPrev !== null) ? (starsNow || 0) - starsPrev : null;
+// Re-score if snapshot is flat v2-style without value_score
+if (agents.length && agents[0].value_score == null) {
+  agents = scoreAgents(agents);
+}
 
-  if (!agent.metrics) {
-    agent.metrics = {
-      npm_downloads: agent.npm_downloads,
-      github_stars: agent.github_stars,
-      github_forks: agent.github_forks,
-    };
+const prevFile = snapshots.find((f) => {
+  try {
+    const d = JSON.parse(fs.readFileSync(path.join(snapshotsDir, f), 'utf-8'));
+    return d.date !== latest?.date;
+  } catch {
+    return false;
   }
 });
+const prevSnapshot = prevFile
+  ? JSON.parse(fs.readFileSync(path.join(snapshotsDir, prevFile), 'utf-8'))
+  : null;
+const prevAgents = prevSnapshot?.agents || [];
 
-// Normalize and compute adoption score
-const maxNpm = Math.max(...agents.map(a => getMetric(a, 'npm_downloads') || 0));
-const maxStars = Math.max(...agents.map(a => getMetric(a, 'github_stars') || 0));
-const maxForks = Math.max(...agents.map(a => getMetric(a, 'github_forks') || 0));
-
-agents.forEach(agent => {
-  const npm = getMetric(agent, 'npm_downloads') || 0;
-  const stars = getMetric(agent, 'github_stars') || 0;
-  const forks = getMetric(agent, 'github_forks') || 0;
-  const npmNorm = maxNpm > 0 ? (npm / maxNpm) * 100 : 0;
-  const starsNorm = maxStars > 0 ? (stars / maxStars) * 100 : 0;
-  const forksNorm = maxForks > 0 ? (forks / maxForks) * 100 : 0;
-  agent.adoption_score = Math.round(npmNorm * 0.5 + starsNorm * 0.3 + forksNorm * 0.2);
-  agent.data_sources = [npm > 0, stars > 0, forks > 0].filter(Boolean).length;
+agents.forEach((agent) => {
+  const prev = prevAgents.find((p: any) => p.id === agent.id);
+  const starsNow = getMetric(agent, 'github_stars');
+  const starsPrev = prev ? getMetric(prev, 'github_stars') : null;
+  const npmNow = getMetric(agent, 'npm_downloads');
+  const npmPrev = prev ? getMetric(prev, 'npm_downloads') : null;
+  agent.star_change =
+    prev && starsPrev != null ? (starsNow || 0) - starsPrev : null;
+  agent.npm_change =
+    prev && npmPrev != null ? (npmNow || 0) - npmPrev : null;
 });
 
-// Sort by adoption score
-agents.sort((a, b) => b.adoption_score - a.adoption_score);
-agents.forEach((a, i) => { a.rank = i + 1; });
+// Value ranking (best benefit per cost)
+const byValue = [...agents].sort(
+  (a, b) => (b.value_score || 0) - (a.value_score || 0)
+);
 
-function fmt(n) {
+function fmt(n: number | null | undefined) {
   if (n === null || n === undefined) return '—';
-  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
   return n.toLocaleString();
 }
-function fmtChange(n) {
+function fmtChange(n: number | null | undefined) {
   if (n === null || n === undefined || n === 0) return '';
   return n > 0 ? `+${fmt(n)}` : fmt(n);
 }
-
-// Hype ratio: stars per 1000 downloads
-const hypeAgents = agents.filter(a => {
-  const d = getMetric(a, 'npm_downloads');
-  const s = getMetric(a, 'github_stars');
-  return d && d > 0 && s && s > 0;
-}).map(a => {
-  const d = getMetric(a, 'npm_downloads');
-  const s = getMetric(a, 'github_stars');
-  a.hype_ratio = (s / d * 1000).toFixed(1);
-  return a;
-}).sort((a, b) => parseFloat(b.hype_ratio) - parseFloat(a.hype_ratio));
+function tierColor(t: string) {
+  if (t === 'low') return 'var(--green)';
+  if (t === 'high') return 'var(--amber)';
+  return 'var(--fg-dim)';
+}
 ---
 
-<Layout title={`AI Coding Agent Leaderboard — ${SITE_TITLE}`} description="Real adoption data for every AI coding agent. npm downloads, GitHub stars, and forks — updated daily.">
+<Layout
+  title={`Open-Source AI Coding Agent Leaderboard — ${SITE_TITLE}`}
+  description="OSS coding agents ranked by real multi-signal adoption: npm/PyPI, GitHub stars, commits, issues, Reddit & X — plus value-per-cost index."
+>
 
-<main style="max-width:1100px;margin:0 auto;padding:2rem 1rem;">
+<main style="max-width:1200px;margin:0 auto;padding:2rem 1rem;">
   <div style="text-align:center;margin-bottom:2rem;">
     <h1 style="font-family:var(--font-mono);font-size:1.5rem;color:var(--green);margin-bottom:0.5rem;">
-      AI Coding Agent Leaderboard
+      Open-Source Coding Agent Leaderboard
     </h1>
-    <p style="font-family:var(--font-mono);font-size:0.8rem;color:var(--fg-dim);">
-      Ranked by real adoption: npm downloads + GitHub stars + forks
+    <p style="font-family:var(--font-mono);font-size:0.8rem;color:var(--fg-dim);max-width:640px;margin:0 auto;">
+      Multi-signal ranking: package downloads, GitHub stars/forks, <strong style="color:var(--fg);">commits (30d)</strong>,
+      <strong style="color:var(--fg);">issues</strong>, optional Reddit/X — open-source only. Sparse-data & closed tools excluded.
     </p>
     <p style="font-family:var(--font-mono);font-size:0.7rem;color:var(--fg-dim);margin-top:0.5rem;">
-      Last updated: {lastUpdated} · {agents.length} agents tracked · Data from npm + GitHub
+      Last updated: {lastUpdated} · {agents.length} agents · methodology {methodology}
     </p>
     <p style="font-family:var(--font-mono);font-size:0.75rem;margin-top:0.75rem;">
-      <a href="/embed/leaderboard/" style="color:var(--green);">Embed this leaderboard</a>
+      <a href="/embed/leaderboard/" style="color:var(--green);">Embed</a>
       <span style="color:var(--fg-dim);"> · </span>
       <a href="/blog/best-coding-agents-2026-decision-guide/" style="color:var(--fg-dim);">Decision guide</a>
       <span style="color:var(--fg-dim);"> · </span>
-      <a href="/blog/coding-agent-security-checklist-2026/" style="color:var(--fg-dim);">Security checklist</a>
+      <a href="/blog/coding-agent-pricing-guide-2026/" style="color:var(--fg-dim);">Pricing</a>
     </p>
   </div>
 
-  {/* Hype vs Reality */}
+  {/* Value / price index */}
   <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:1.5rem;margin-bottom:2rem;">
     <h2 style="font-family:var(--font-mono);font-size:1rem;color:var(--amber);margin-bottom:0.5rem;">
-      Hype vs Reality
+      Value score — adoption per cost
     </h2>
     <p style="font-family:var(--font-mono);font-size:0.7rem;color:var(--fg-dim);margin-bottom:1rem;">
-      Star/dl ratio = GitHub stars per 1,000 weekly downloads. High = more talked about than used. Low = quietly popular.
+      value = adoption_score ÷ price_index (1=free/BYO low cost … 4=expensive). High value = more signal per dollar friction.
     </p>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0.75rem;">
-      {hypeAgents.slice(0, 6).map(agent => {
-        const stars = getMetric(agent, 'github_stars');
-        const downloads = getMetric(agent, 'npm_downloads');
-        const ratio = parseFloat(agent.hype_ratio);
-        const label = ratio > 50 ? 'more starred than used' : ratio < 2 ? 'quietly popular' : 'balanced';
-        const labelColor = ratio > 50 ? 'var(--amber)' : ratio < 2 ? 'var(--green)' : 'var(--fg-dim)';
-        return (
-          <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.75rem;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
-              <a href={`/tool/${agent.id}`} style="font-family:var(--font-mono);font-size:0.8rem;color:var(--green);text-decoration:none;font-weight:600;">
-                {agent.name}
-              </a>
-              <span style={`font-family:var(--font-mono);font-size:0.6rem;color:${labelColor};`}>{label}</span>
-            </div>
-            <div style="display:flex;gap:1rem;font-family:var(--font-mono);font-size:0.7rem;">
-              <div>
-                <span style="color:var(--amber);font-weight:600;">{fmt(stars)} ★</span>
-                <span style="color:var(--fg-dim);font-size:0.55rem;"> / </span>
-                <span style="color:var(--green);font-weight:600;">{fmt(downloads)}</span>
-                <span style="color:var(--fg-dim);font-size:0.55rem;">/wk</span>
-              </div>
-              <div style="margin-left:auto;">
-                <span style="color:var(--fg);font-weight:600;">{agent.hype_ratio}x</span>
-              </div>
-            </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.75rem;">
+      {byValue.slice(0, 6).map((agent, i) => (
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.75rem;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:0.35rem;">
+            <span style="font-family:var(--font-mono);font-size:0.65rem;color:var(--fg-dim);">#{i + 1} value</span>
+            <span style={`font-family:var(--font-mono);font-size:0.6rem;color:${tierColor(agent.price_tier)};`}>
+              cost {agent.price_tier || '—'}
+            </span>
           </div>
-        );
-      })}
+          <a href={`/tool/${agent.id}`} style="font-family:var(--font-mono);font-size:0.85rem;color:var(--green);text-decoration:none;font-weight:600;">
+            {agent.name}
+          </a>
+          <div style="font-family:var(--font-mono);font-size:0.7rem;margin-top:0.35rem;">
+            <span style="color:var(--fg);font-weight:600;">{agent.value_score ?? '—'}</span>
+            <span style="color:var(--fg-dim);"> value · adopt </span>
+            <span style="color:var(--fg-dim);">{agent.adoption_score ?? '—'}</span>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:0.6rem;color:var(--fg-dim);margin-top:0.25rem;">
+            {agent.pricing_label || '—'}
+          </div>
+        </div>
+      ))}
     </div>
   </div>
 
-  {/* Main Table */}
+  {/* Main table */}
   <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;overflow-x:auto;">
-    <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:0.75rem;">
+    <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:0.72rem;">
       <thead>
         <tr style="background:var(--bg);border-bottom:1px solid var(--border);">
-          <th style="padding:0.7rem 0.5rem;text-align:left;color:var(--fg-dim);width:2rem;">#</th>
-          <th style="padding:0.7rem 0.5rem;text-align:left;color:var(--fg-dim);">Agent</th>
-          <th style="padding:0.7rem 0.5rem;text-align:right;color:var(--fg-dim);">GitHub ★</th>
-          <th style="padding:0.7rem 0.5rem;text-align:right;color:var(--fg-dim);">Forks</th>
-          <th style="padding:0.7rem 0.5rem;text-align:right;color:var(--fg-dim);">npm / week</th>
-          <th style="padding:0.7rem 0.5rem;text-align:center;color:var(--fg-dim);">Adoption</th>
+          <th style="padding:0.65rem 0.4rem;text-align:left;color:var(--fg-dim);">#</th>
+          <th style="padding:0.65rem 0.4rem;text-align:left;color:var(--fg-dim);">Agent</th>
+          <th style="padding:0.65rem 0.4rem;text-align:right;color:var(--fg-dim);" title="GitHub stars">★</th>
+          <th style="padding:0.65rem 0.4rem;text-align:right;color:var(--fg-dim);">Forks</th>
+          <th style="padding:0.65rem 0.4rem;text-align:right;color:var(--fg-dim);" title="Commits last 30 days">Commits 30d</th>
+          <th style="padding:0.65rem 0.4rem;text-align:right;color:var(--fg-dim);" title="Issues opened last 30 days">Issues 30d</th>
+          <th style="padding:0.65rem 0.4rem;text-align:right;color:var(--fg-dim);">npm/wk</th>
+          <th style="padding:0.65rem 0.4rem;text-align:right;color:var(--fg-dim);">PyPI/wk</th>
+          <th style="padding:0.65rem 0.4rem;text-align:right;color:var(--fg-dim);">Reddit</th>
+          <th style="padding:0.65rem 0.4rem;text-align:right;color:var(--fg-dim);">X</th>
+          <th style="padding:0.65rem 0.4rem;text-align:center;color:var(--fg-dim);">Adopt</th>
+          <th style="padding:0.65rem 0.4rem;text-align:center;color:var(--fg-dim);">Value</th>
+          <th style="padding:0.65rem 0.4rem;text-align:left;color:var(--fg-dim);">Cost</th>
         </tr>
       </thead>
       <tbody>
         {agents.map((agent) => {
           const stars = getMetric(agent, 'github_stars');
           const forks = getMetric(agent, 'github_forks');
+          const commits = getMetric(agent, 'commits_30d');
+          const issues = getMetric(agent, 'issues_opened_30d');
           const npm = getMetric(agent, 'npm_downloads');
+          const pypi = getMetric(agent, 'pypi_downloads');
+          const reddit = getMetric(agent, 'reddit_subscribers');
+          const x = getMetric(agent, 'x_followers');
           return (
-            <tr style="border-bottom:1px solid var(--border);transition:background 0.15s;"
-                onmouseover="this.style.background='var(--bg)'"
-                onmouseout="this.style.background='transparent'">
-              <td style="padding:0.6rem 0.5rem;color:var(--fg-dim);">{agent.rank}</td>
-              <td style="padding:0.6rem 0.5rem;">
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:0.55rem 0.4rem;color:var(--fg-dim);">{agent.rank}</td>
+              <td style="padding:0.55rem 0.4rem;">
                 <a href={`/tool/${agent.id}`} style="color:var(--fg);text-decoration:none;font-weight:600;">
                   {agent.name}
                 </a>
+                {agent.github && (
+                  <div style="font-size:0.55rem;color:var(--fg-dim);margin-top:0.15rem;">
+                    {agent.github}
+                  </div>
+                )}
               </td>
-              <td style="padding:0.6rem 0.5rem;text-align:right;color:var(--amber);font-weight:600;">
-                {stars !== null && stars !== undefined ? fmt(stars) : '—'}
-                {agent.star_change !== null && agent.star_change !== 0 && (
-                  <span style={`font-size:0.55rem;margin-left:0.2rem;color:${agent.star_change > 0 ? 'var(--green)' : 'var(--red)'}`}>
+              <td style="padding:0.55rem 0.4rem;text-align:right;color:var(--amber);font-weight:600;">
+                {fmt(stars)}
+                {agent.star_change != null && agent.star_change !== 0 && (
+                  <span style={`font-size:0.5rem;margin-left:0.15rem;color:${agent.star_change > 0 ? 'var(--green)' : 'var(--red)'}`}>
                     {fmtChange(agent.star_change)}
                   </span>
                 )}
               </td>
-              <td style="padding:0.6rem 0.5rem;text-align:right;color:var(--fg-dim);">
-                {forks !== null && forks !== undefined ? fmt(forks) : '—'}
+              <td style="padding:0.55rem 0.4rem;text-align:right;color:var(--fg-dim);">{fmt(forks)}</td>
+              <td style="padding:0.55rem 0.4rem;text-align:right;color:var(--fg);font-weight:600;">{fmt(commits)}</td>
+              <td style="padding:0.55rem 0.4rem;text-align:right;color:var(--fg-dim);">{fmt(issues)}</td>
+              <td style="padding:0.55rem 0.4rem;text-align:right;color:var(--green);font-weight:600;">{fmt(npm)}</td>
+              <td style="padding:0.55rem 0.4rem;text-align:right;color:var(--green);">{fmt(pypi)}</td>
+              <td style="padding:0.55rem 0.4rem;text-align:right;color:var(--fg-dim);">{fmt(reddit)}</td>
+              <td style="padding:0.55rem 0.4rem;text-align:right;color:var(--fg-dim);">{fmt(x)}</td>
+              <td style="padding:0.55rem 0.4rem;text-align:center;">
+                <span style="font-weight:600;color:var(--fg);">{agent.adoption_score ?? '—'}</span>
+                <span style="font-size:0.5rem;color:var(--fg-dim);display:block;">{agent.data_sources ?? 0} sig</span>
               </td>
-              <td style="padding:0.6rem 0.5rem;text-align:right;color:var(--green);font-weight:600;">
-                {npm !== null && npm !== undefined ? fmt(npm) : '—'}
-                {agent.npm_change !== null && agent.npm_change !== 0 && (
-                  <span style={`font-size:0.55rem;margin-left:0.2rem;color:${agent.npm_change > 0 ? 'var(--green)' : 'var(--red)'}`}>
-                    {fmtChange(agent.npm_change)}
-                  </span>
-                )}
+              <td style="padding:0.55rem 0.4rem;text-align:center;font-weight:600;color:var(--green);">
+                {agent.value_score ?? '—'}
               </td>
-              <td style="padding:0.6rem 0.5rem;text-align:center;">
-                <div style="display:inline-flex;align-items:center;gap:0.3rem;">
-                  <div style={`width:${Math.max(agent.adoption_score, 3)}px;height:6px;background:var(--green);border-radius:3px;opacity:${0.4 + agent.adoption_score / 140};`}></div>
-                  <span style="font-size:0.6rem;color:var(--fg-dim);">{agent.data_sources}/3</span>
-                </div>
+              <td style="padding:0.55rem 0.4rem;">
+                <span style={`color:${tierColor(agent.price_tier)};font-size:0.65rem;`}>
+                  {agent.price_tier || '—'}
+                </span>
               </td>
             </tr>
           );
@@ -207,32 +228,27 @@ const hypeAgents = agents.filter(a => {
     </table>
   </div>
 
-  {/* Legend */}
-  <div style="margin-top:1rem;padding:0.75rem 1rem;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;">
-    <div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--fg-dim);line-height:1.8;">
-      <strong style="color:var(--amber);">Adoption score</strong> = 50% npm downloads + 30% GitHub stars + 20% forks (normalized against the highest agent in each category).
-      <span style="margin-left:0.5rem;">Data sources = how many of 3 metrics have data.</span>
-      <span style="margin-left:0.5rem;color:var(--fg-dim);">— = no data available.</span>
+  <div style="margin-top:1rem;padding:0.85rem 1rem;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;">
+    <div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--fg-dim);line-height:1.75;">
+      <strong style="color:var(--amber);">Adoption</strong> blends package downloads (npm+PyPI), stars, forks, commits (30d), issues activity, social, and data coverage.
+      <strong style="color:var(--amber); margin-left:0.4rem;">Value</strong> = adoption ÷ price index (free/BYO scores higher for the same adoption).
+      When GitHub/npm/PyPI rate-limit, the fetcher falls back to the previous snapshot or alternate APIs (pepy, participation stats, Twitter syndication).
+      <span style="display:block;margin-top:0.4rem;">Closed-source / sparse tools are listed under exclusions — not ranked.</span>
     </div>
   </div>
-</main>
 
-<script>
-document.querySelectorAll('th[data-col]').forEach(th => {
-  th.style.cursor = 'pointer';
-  th.addEventListener('click', () => {
-    const col = th.dataset.col;
-    const tbody = document.querySelector('tbody');
-    const rows = Array.from(tbody.querySelectorAll('tr'));
-    const colMap = { stars: 2, forks: 3, npm: 4 };
-    const ci = colMap[col] ?? 2;
-    rows.sort((a, b) => {
-      const av = parseFloat((a.cells[ci]?.textContent || '0').replace(/[^0-9.]/g, '')) || 0;
-      const bv = parseFloat((b.cells[ci]?.textContent || '0').replace(/[^0-9.]/g, '')) || 0;
-      return bv - av;
-    });
-    rows.forEach((r, i) => { r.cells[0].textContent = i + 1; tbody.appendChild(r); });
-  });
-});
-</script>
+  {(excluded.length > 0 || dropped.length > 0) && (
+    <div style="margin-top:1.25rem;padding:0.85rem 1rem;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;">
+      <h3 style="font-family:var(--font-mono);font-size:0.8rem;color:var(--fg-dim);margin:0 0 0.5rem;">Not on the board</h3>
+      <ul style="margin:0;padding-left:1.1rem;font-family:var(--font-mono);font-size:0.65rem;color:var(--fg-dim);line-height:1.7;">
+        {excluded.map((e: any) => (
+          <li><strong style="color:var(--fg);">{e.id}</strong> — {e.reason}</li>
+        ))}
+        {dropped.map((e: any) => (
+          <li><strong style="color:var(--fg);">{e.name || e.id}</strong> — {e.reason}</li>
+        ))}
+      </ul>
+    </div>
+  )}
+</main>
 </Layout>

@@ -2,7 +2,14 @@
 
 ## What This Is
 
-A live, auto-updating leaderboard that tracks **actual usage** (npm/PyPI downloads) and **community interest** (GitHub stars) for every AI coding agent. Unique data nobody else has. The backlink magnet that raises DR.
+A live, auto-updating **open-source** leaderboard that tracks multi-signal adoption:
+
+- Package usage: **npm + PyPI** (pypistats → pepy.tech fallback)
+- GitHub: stars, forks, **commits (30d)**, **issues opened (30d)**, open issues
+- Social (optional): **Reddit subscribers**, **X followers** (syndication; best-effort)
+- **Value score** = adoption ÷ price_index (free/BYO scores higher for same adoption)
+
+Closed-source tools (Cursor, Claude Code product, Amp, Copilot, etc.) are **excluded** from the main board when public signals are unfair or missing. Sparse-data repos are dropped until they have ≥2 strong signals.
 
 ---
 

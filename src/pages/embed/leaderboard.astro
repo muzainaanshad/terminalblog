@@ -5,38 +5,44 @@
  */
 import fs from 'fs';
 import path from 'path';
+import { join } from 'path';
+import { createRequire } from 'module';
 import { SITE_TITLE } from '../../consts';
+
+const require = createRequire(import.meta.url);
+const { scoreAgents, metric: getMetric } = require(
+  join(process.cwd(), 'scripts/lib/adoption-score.cjs')
+);
 
 const snapshotsDir = path.join(process.cwd(), 'src', 'data', 'adoption', 'snapshots');
 const snapshots = fs.existsSync(snapshotsDir)
   ? fs.readdirSync(snapshotsDir).filter(f => f.endsWith('.json')).sort().reverse()
   : [];
-const latest = snapshots.length
-  ? JSON.parse(fs.readFileSync(path.join(snapshotsDir, snapshots[0]), 'utf-8'))
-  : null;
-const agents = [...(latest?.agents || [])];
+// Prefer v3 snapshot when present
+function pickLatest() {
+  for (const f of snapshots) {
+    try {
+      const d = JSON.parse(fs.readFileSync(path.join(snapshotsDir, f), 'utf-8'));
+      if (String(d.methodology_version || '').includes('v3')) return d;
+    } catch { /* continue */ }
+  }
+  if (!snapshots.length) return null;
+  try {
+    return JSON.parse(fs.readFileSync(path.join(snapshotsDir, snapshots[0]), 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+const latest = pickLatest();
+
+let agents = [...(latest?.agents || [])];
 const lastUpdated = latest?.date || 'N/A';
 
-function getMetric(agent: any, key: string) {
-  if (agent.metrics && agent.metrics[key] !== undefined) return agent.metrics[key];
-  if (agent[key] !== undefined) return agent[key];
-  return null;
+if (agents.length && agents[0].value_score == null) {
+  agents = scoreAgents(agents);
+} else {
+  agents.sort((a: any, b: any) => (b.adoption_score || 0) - (a.adoption_score || 0));
 }
-
-const maxNpm = Math.max(...agents.map(a => getMetric(a, 'npm_downloads') || 0), 1);
-const maxStars = Math.max(...agents.map(a => getMetric(a, 'github_stars') || 0), 1);
-const maxForks = Math.max(...agents.map(a => getMetric(a, 'github_forks') || 0), 1);
-
-agents.forEach(agent => {
-  const npm = getMetric(agent, 'npm_downloads') || 0;
-  const stars = getMetric(agent, 'github_stars') || 0;
-  const forks = getMetric(agent, 'github_forks') || 0;
-  agent.adoption_score = Math.round(
-    (npm / maxNpm) * 50 + (stars / maxStars) * 30 + (forks / maxForks) * 20
-  );
-});
-
-agents.sort((a, b) => (b.adoption_score || 0) - (a.adoption_score || 0));
 const top = agents.slice(0, 10);
 
 function fmt(n: number | null) {
@@ -118,13 +124,14 @@ function fmt(n: number | null) {
             <tr>
               <th>#</th>
               <th>Agent</th>
-              <th class="num">npm/wk</th>
               <th class="num">★</th>
-              <th class="num">Score</th>
+              <th class="num">Commits</th>
+              <th class="num">Adopt</th>
+              <th class="num">Value</th>
             </tr>
           </thead>
           <tbody>
-            {top.map((a, i) => (
+            {top.map((a: any, i: number) => (
               <tr>
                 <td>{i + 1}</td>
                 <td>
@@ -132,16 +139,17 @@ function fmt(n: number | null) {
                     {a.name || a.id}
                   </a>
                 </td>
-                <td class="num">{fmt(getMetric(a, 'npm_downloads'))}</td>
                 <td class="num">{fmt(getMetric(a, 'github_stars'))}</td>
+                <td class="num">{fmt(getMetric(a, 'commits_30d'))}</td>
                 <td class="num score">{a.adoption_score}</td>
+                <td class="num">{a.value_score ?? '—'}</td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
       <footer>
-        <span>npm 50% · stars 30% · forks 20%</span>
+        <span>OSS multi-signal · value = adopt÷cost</span>
         <a href="https://terminalblog.com/leaderboard/" target="_blank" rel="noopener">
           Full leaderboard →
         </a>
