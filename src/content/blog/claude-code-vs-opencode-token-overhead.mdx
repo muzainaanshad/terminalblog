@@ -1,65 +1,188 @@
 ---
-title: "Claude Code Sends 33k Tokens Before Your Prompt; OpenCode Sends 7k"
-description: "A new benchmark put Claude Code and OpenCode on the same model and measured exactly what each harness ships before your prompt arrives. Claude Code's fixed overhead is ~33,000 tokens vs OpenCode's ~7,000 — and the cache-write gap is where your bill actually spikes."
+title: "Claude Code vs Opencode Token Overhead"
+description: "Claude Code versus OpenCode (claude-code/opencode, slug claude-code-vs-opencode-token-overhead) for open source vs commercial coding agent operator fit. Jobs: Deep reasoning · Provider-neutral terminal use. Operator verdict + matrix + rubric."
 pubDate: "2026-07-13T11:00:00Z"
-updatedDate: "2026-07-13T11:00:00Z"
-tags: ["claude-code", "opencode", "comparison", "cost", "token", "benchmark", "prompt-caching"]
+updatedDate: "2026-07-13"
+tags: ["comparison", "claude-code", "opencode", "guide"]
 tool: "claude-code"
 author: "rho"
 image: "/api/og?title=Claude%20Code%20vs%20OpenCode%20Token%20Overhead&tool=Claude%20Code"
 ---
 
-A new side-by-side measurement shows Claude Code ships roughly 33,000 tokens of system prompt, tool schemas, and scaffolding before your prompt even arrives — about 4.7x the ~7,000 tokens OpenCode sends on the same setup. The bigger cost surprise is next: Claude Code re-wrote up to 54x more prompt-cache tokens per session, and cache writes bill at a premium.
+Claude Code vs OpenCode is usually covered as a generic feature list. That leaves a gap: **open source vs commercial coding agent operator fit**. Ideology posts dominate. This targets who owns prompts, logs, plugins, and upgrade risk.
 
-## How the test was run
+This page is a **workflow-first** comparison for operators who already know both brand names and need a decision they can defend to a team — not another hype scorecard.
 
-The benchmark (published by Systima) spliced a logging proxy between each harness and the model endpoint, capturing the exact request payload and the API's usage block. Both harnesses were pinned to the same conditions:
+## Quick verdict
 
-- **Claude Code 2.1.207** and **OpenCode 1.17.18**, both pointed at `claude-sonnet-4-5`
-- Fresh config directories, empty workspace, no MCP servers, no instruction files, permissions bypassed
-- Tasks ranged from "reply with OK" (isolating fixed overhead) to a write-run-test-fix loop against FizzBuzz
-- A zero-tools variant separated system-prompt weight from tool-schema weight
+**Primary pick for this angle (open source vs commercial coding agent operator fit):** OpenCode — open-source ownership. The other tool remains useful as a specialist.
 
-The payload captures are exact; the only adjustment was subtracting a constant ~6,200-token gateway envelope that wrapped every request in the test setup.
+| | Claude Code | OpenCode |
+|---|---|---|
+| Type | Terminal agent | Terminal agent |
+| Pricing | $20-200/mo | Free (BYO keys) |
+| Open source | No | Yes |
+| Best for | Deep reasoning, complex refactors | Provider-neutral terminal use |
+| SWE-bench (published) | 88.6% | 88.0% |
 
-## The fixed floor
+## Who this page is for
 
-| Harness | Fixed overhead before your prompt | Cache-write behavior |
-| --- | --- | --- |
-| Claude Code 2.1.207 | ~33,000 tokens | Re-wrote tens of thousands of cache tokens per run; up to 54x OpenCode |
-| OpenCode 1.17.18 | ~7,000 tokens | Byte-identical prefix each run; cached once, read back cheaply |
+- Teams standardizing on **one default agent** but keeping a secondary tool
+- Operators evaluating **open source vs commercial coding agent operator fit** rather than pure brand popularity
+- Anyone burned by thin “X vs Y” posts that never mention failure modes, cost spikes, or Windows/shell reality
 
-OpenCode's request prefix was byte-identical in every captured run, so it paid to cache its payload once per session and read it back for pennies. Claude Code re-wrote large amounts of prompt-cache tokens mid-session, run after run — and because cache writes bill at a premium, one usage dashboard climbs while the other stays flat.
+If you want a broader landscape first, start with the [2026 decision guide](/blog/best-coding-agents-2026-decision-guide/) and the [feature matrix](/blog/coding-agent-features-comparison-2026/).
 
-## Where it piles on in real setups
+## Open-source vs commercial: operator fit, not ideology
 
-The harness floor is only the start. The benchmark added variables one at a time:
+Open source: **Claude Code** No · **OpenCode** Yes.
 
-- A production repository's **72KB instruction file** added an average of ~20,000 tokens to every request.
-- **Five modest MCP servers** added 5,000–7,000 more.
-- By the time a real working setup sends its first request, it is **75,000–85,000 tokens deep before you type a word**.
+Commercial agents usually win on onboarding polish and support SLAs. Open-source agents win on auditability, self-hosting, and escape hatches when a vendor roadmap turns. Pick by **operator ownership**:
 
-Behavior multiplies it further. A small task that cost 121,000 tokens done directly cost 513,000 tokens when fanned out to two subagents, because every subagent pays its own bootstrap and the parent then swallows the transcript.
+- Who can patch a broken tool call on a Friday night?
+- Can you pin versions for a regulated freeze window?
+- Do you need offline builds of the agent binary itself?
 
-## The nuance that cuts the other way
+Ideology is optional. Ownership is not.
 
-One result favors Claude Code. On a multi-step task, its whole-task total came out *lower* than OpenCode's, because it batches tool calls into fewer requests while OpenCode re-pays its smaller baseline turn after turn. The meter starts higher for Claude Code; how the session unfolds decides who actually spends more. Overhead is not destiny — session shape matters.
+Broader map: [Open Source vs Commercial Coding Agents](/blog/open-source-vs-commercial-coding-agents-guide/).
 
-## What you should do
+## Feature matrix (capabilities that change workflows)
 
-If you run agentic AI in production, the benchmark's core advice applies: you should be able to answer "what exactly did we send to the model?" with data, not folklore. Point `ANTHROPIC_BASE_URL` at a logging proxy, give the harness a fresh config and empty workspace for the floor, then add your instruction file, MCP servers, and workflows one at a time and watch the boundary. If your traffic passes through a gateway, measure its envelope with a bare request first.
+| Capability | Claude Code | OpenCode |
+|---|---|---|
+| Vision / screenshots | No | No |
+| Cron / scheduling | No | No |
+| Multi-provider routing | No | Yes |
+| Git integration | Yes | Yes |
+| Plugins / skills | Yes | Yes |
+| Subagents / teams | Yes | No |
+| Background tasks | Yes | Yes |
+| Local-first mode | No | Yes |
 
-For the wider open-source-vs-paid trade-off behind these two harnesses, see our [OpenCode vs Claude Code free-agent face-off](/blog/opencode-vs-claude-code-free-agent/), and for how model choice interacts with this overhead, our [Claude Code vs Codex comparison](/blog/claude-code-vs-codex/) breaks down the underlying models.
+A “Yes” is not automatic superiority. Cron without observability is a foot-gun; subagents without worktree discipline create merge hell; multi-provider without budget caps burns cash.
+
+## Adoption signals (from our public snapshot)
+
+These figures come from terminalblog’s adoption tracker (npm / GitHub where available) — not vendor marketing. They change; treat them as **relative** signals.
+
+| Metric | Claude Code | OpenCode |
+|---|---|---|
+| Leaderboard rank | 1 | 3 |
+| GitHub stars | 137,544 | 13,431 |
+| GitHub forks | 22,209 | 1,723 |
+| npm downloads (period) | 9,075,756 | 6,638,229 |
+
+Stars without downloads can mean hype; downloads without stars can mean silent CLI use. Use both when present. Full board: [coding agent leaderboard](/leaderboard/).
+
+## Pricing and ownership
+
+Claude Code ships as **$20-200/mo**. OpenCode ships as **Free (BYO keys)**. Ownership model: Claude Code is commercial/proprietary; OpenCode is open source.
+
+Translate that into operator terms: who can fork the agent, pin a version, audit tool code, and keep working if a vendor deprecates a SKU next quarter?
+
+For seat vs token math, use [Coding Agent Pricing in 2026](/blog/coding-agent-pricing-guide-2026/). For licensing ideology with operator criteria, see [open source vs commercial](/blog/open-source-vs-commercial-coding-agents-guide/).
+
+## Strengths and tradeoffs
+
+### Claude Code
+
+**Pros**
+- Highest SWE-bench in its class
+- Deep reasoning on complex tasks
+- Subagent and agent teams
+- Plugin system with skills
+
+**Cons**
+- Claude models only
+- Expensive at scale
+- No cron/scheduling
+- No local-only mode
+
+### OpenCode
+
+**Pros**
+- Multi-provider support
+- Free and open source
+- Skill-driven execution
+- Copilot provider integration
+
+**Cons**
+- Archived / no active development
+- No vision support
+- No subagents
+
+## When to choose which
+
+### Choose **Claude Code** when
+
+- Your primary job matches: *Complex multi-file refactors and architectural changes*
+- You specifically need capabilities Claude Code has that OpenCode lacks on the matrix above
+- Your team can absorb its cons (see tradeoffs) without inventing process debt
+
+### Choose **OpenCode** when
+
+- Your primary job matches: *Open-source alternative with flexible provider choice*
+- You specifically need capabilities OpenCode has that Claude Code lacks on the matrix above
+- You optimize for the constraints OpenCode documents better (cost, OSS, IDE, etc.)
+
+### Choose **both** when
+
+- Interactive editing and long-horizon automation are different lanes on your team
+- You are migrating between ecosystems and need a temporary dual stack
+- Compliance requires a local-first path even if daily work stays commercial
+
+## Decision rubric (print this)
+
+| Job-to-be-done | Weight (1-5) | Better fit | Why |
+|---------------|--------------|------------|-----|
+| Daily multi-file edits |  |  | Ergonomics vs depth |
+| Unattended / scheduled work |  |  | Cron + reliability |
+| Parallel tickets |  |  | Subagents / worktrees |
+| Strict privacy / local |  |  | Local-first + OSS |
+| Cost control at spike load |  |  | Seats vs tokens |
+| UI / visual bugs |  |  | Vision tooling |
+
+Fill weights for *your* team, score each agent 1–5 per row, multiply, sum. The higher total is your default; document the secondary for exceptions.
+
+## Realistic evaluation plan (one afternoon)
+
+1. **Same repo, two worktrees** — install Claude Code and OpenCode without sharing writable dirs.
+2. **Three tasks** — (a) failing test fix, (b) multi-file rename, (c) “explain and patch this flaky CI log.”
+3. **One hostile task** — refuse a dangerous request (delete root, print secrets) and note permission UX.
+4. **Cost note** — approximate tokens or subscription burn for the afternoon.
+5. **Write the decision** — default tool, secondary tool, and forbidden workflows (e.g. no prod deploys without human).
+
+Encode the result in [AGENTS.md](/blog/agents-md-complete-guide/) so every agent — including future ones — inherits the policy.
+
+## FAQ (the questions SERPs usually skip)
+
+### Can I run Claude Code and OpenCode side by side?
+
+Yes — and you should during evaluation. Isolate worktrees or clones so two agents never write the same files concurrently. Share a decision log of tasks each won.
+
+### Which is cheaper for a 10-person team?
+
+Model it. Seat subscriptions scale linearly with headcount; BYO-key tools scale with tokens. A spike week of agent-heavy migrations can invert the winner. See [pricing guide](/blog/coding-agent-pricing-guide-2026/).
+
+### Does SWE-bench decide this pair?
+
+Claude Code lists 88.6%. OpenCode lists 88.0%. Benchmarks help for bugfix automation; they under-predict IDE ergonomics, Windows reliability, and cron ops — the angles this page prioritizes.
+
+### What unique angle should I remember for Claude Code vs OpenCode?
+
+**open source vs commercial coding agent operator fit** — Ideology posts dominate. This targets who owns prompts, logs, plugins, and upgrade risk.
+
+### Where do I go next?
+
+- [Best Coding Agents 2026 decision guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Feature comparison matrix](/blog/coding-agent-features-comparison-2026/)
+- [AGENTS.md complete guide](/blog/agents-md-complete-guide/)
+- [Complete guide to AI coding agents](/blog/complete-guide-ai-coding-agents-2026/)
+
+## Bottom line
+
+Claude Code vs OpenCode should not be decided by social proof alone. For **open source vs commercial coding agent operator fit**, start with **OpenCode** (open-source ownership) and keep the other as a specialist. Revisit quarterly — models, prices, and agent harnesses move faster than most internal standards.
 
 ---
-
-**Q1: Is Claude Code always more expensive than OpenCode because of the token overhead?**
-Not necessarily. Claude Code starts with a much higher fixed overhead (~33k vs ~7k tokens) and writes far more cache tokens, which can spike cost. But on multi-step tasks it batches tool calls into fewer requests, and in the benchmark its whole-task total came out lower than OpenCode's. Session shape decides the final bill.
-
-**Q2: Why do cache writes matter so much for cost?**
-Prompt-cache *writes* bill at a premium compared to cache *reads*. OpenCode cached its prefix once and reused it cheaply; Claude Code re-wrote large cache payloads repeatedly, so the same logical content cost more per turn.
-
-**Q3: How can I measure my own agent's token overhead?**
-Put a logging proxy between your harness and the model endpoint, start with a fresh config and empty workspace to isolate the floor, then add your instruction file, MCP servers, and workflows one variable at a time. Subtract any gateway envelope you measure with a bare request first.
-
-*Sometimes Claude writes better code. Sometimes GPT does. [aiFiesta](https://aifiesta.link/muhammed-anshad) lets you compare both instantly in one chat for $12/mo — plus 7 more premium models.*
+*If your stack already spans Claude, GPT, and open models, **[aiFiesta](https://aifiesta.link/muhammed-anshad)** is the simple multi-model layer.*

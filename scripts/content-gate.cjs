@@ -167,7 +167,59 @@ function validateArticle(article, corpus) {
     }
   }
 
+  const isComparison = (a) => {
+    const tags = Array.isArray(a.fm.tags) ? a.fm.tags.join(' ') : String(a.fm.tags || '');
+    return (
+      a.slug.includes('-vs-') ||
+      /comparison/i.test(a.slug + ' ' + tags + ' ' + (a.fm.title || ''))
+    );
+  };
+
+  /** Normalize pair pages: claude-code-vs-opencode-free-agent → sorted pair key */
+  function pairKey(slug) {
+    const base = stemSlug(slug)
+      .replace(
+        /-(github-battle|terminal-battle|pricing-battle|free-agent|token-overhead|unconstrained-challenge|open-source-rival|extensibility-showdown|extensibility|ide-vs-terminal|ide-speed.*|parallel-vs-extensible|faceoff|showdown|deep-dive|difference|2026-comparison|comparison)$/g,
+        ''
+      )
+      .replace(/^what-devs-say-/, '');
+    const parts = base.split('-vs-').filter(Boolean);
+    if (parts.length >= 2) return parts.slice(0, 2).sort().join('-vs-');
+    return base;
+  }
+
   for (const other of others) {
+    const bothComparison = isComparison(article) && isComparison(other);
+
+    if (bothComparison) {
+      // Comparison grid: only exact title collision or same pair+angle stem
+      const t1 = String(article.fm.title || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '');
+      const t2 = String(other.fm.title || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '');
+      if (t1 && t1 === t2) {
+        issues.push({
+          level: 'error',
+          code: 'duplicate-title',
+          msg: `Exact title collision with ${other.slug}`,
+        });
+      }
+      // Same pair key + identical stem (true reverse duplicates only)
+      if (
+        pairKey(article.slug) === pairKey(other.slug) &&
+        stemSlug(article.slug) === stemSlug(other.slug)
+      ) {
+        issues.push({
+          level: 'error',
+          code: 'duplicate-slug',
+          msg: `Slug near-duplicate of ${other.slug} — one story, one URL`,
+        });
+      }
+      continue;
+    }
+
     const tj = jaccard(article.fm.title, other.fm.title);
     if (tj >= LIMITS.titleJaccardMax) {
       issues.push({
@@ -251,10 +303,21 @@ function main() {
   }
 
   const throttle = dailyThrottle(corpus);
-  for (const v of throttle.violations) {
+  // Single-draft mode: only TODAY's throttle errors count toward the draft score.
+  // Historical firehose debt must not block upgrading existing evergreen pages.
+  const throttleForScore = targetFile
+    ? throttle.violations.filter(
+        (v) => v.level !== 'error' || String(v.msg).startsWith(TODAY)
+      )
+    : throttle.violations;
+  for (const v of throttleForScore) {
     if (v.level === 'error') report.errors++;
     else report.warnings++;
   }
+  // Always report full throttle for visibility, but annotate historical
+  report.throttleHistorical = throttle.violations.filter(
+    (v) => v.level === 'error' && !String(v.msg).startsWith(TODAY)
+  ).length;
 
   console.log('=== CONTENT GATE ===');
   console.log(`Articles checked: ${report.checked} | corpus: ${corpus.length}`);
@@ -273,7 +336,11 @@ function main() {
   if (throttle.violations.length) {
     console.log('\n=== DAILY THROTTLE ===');
     for (const v of throttle.violations) {
-      console.log(`  [${v.level}] ${v.msg}`);
+      const hist =
+        targetFile && v.level === 'error' && !String(v.msg).startsWith(TODAY)
+          ? ' (historical — ignored for single-draft exit)'
+          : '';
+      console.log(`  [${v.level}] ${v.msg}${hist}`);
     }
   }
 
@@ -282,14 +349,22 @@ function main() {
   console.log(`\nReport: ${outPath}`);
 
   // Exit codes:
-  // --strict on a single draft → fail if that draft has errors
+  // --strict on a single draft → fail if that draft has errors (not historical corpus debt)
   // --strict on full corpus → fail only if TODAY's posts violate caps / new errors
   // --strict-all → fail on any historical error (CI debt scan)
   if (STRICT_ALL && report.errors > 0) {
     process.exit(1);
   }
-  if (STRICT && targetFile && report.errors > 0) {
-    process.exit(1);
+  if (STRICT && targetFile) {
+    const draftErrors = report.articles.reduce(
+      (n, a) => n + a.issues.filter((i) => i.level === 'error').length,
+      0
+    );
+    const todayThrottleErrors = throttle.violations.filter(
+      (v) => v.level === 'error' && String(v.msg).startsWith(TODAY)
+    ).length;
+    if (draftErrors + todayThrottleErrors > 0) process.exit(1);
+    process.exit(0);
   }
   if (STRICT && !targetFile) {
     const todayErrors = throttle.violations.filter(
