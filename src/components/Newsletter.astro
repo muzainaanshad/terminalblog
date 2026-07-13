@@ -1,13 +1,8 @@
 ---
 /**
- * Email capture — set PUBLIC_NEWSLETTER_ACTION to your provider form URL
- * (Beehiiv, Buttondown, ConvertKit, etc.). Without it, form shows setup hint.
+ * Beehiiv subscribe via /api/newsletter (server holds API key).
+ * Fallback links if JS disabled or API not configured.
  */
-const action =
-  import.meta.env.PUBLIC_NEWSLETTER_ACTION ||
-  import.meta.env.NEWSLETTER_FORM_ACTION ||
-  '';
-const configured = Boolean(action);
 ---
 
 <section class="newsletter" id="newsletter">
@@ -17,35 +12,65 @@ const configured = Boolean(action);
       One email: security Bewares, leaderboard moves, and the few posts that matter.
       No just-shipped spam.
     </p>
-    {configured ? (
-      <form class="newsletter-form" action={action} method="post" target="_blank" rel="noopener">
-        <label class="sr-only" for="newsletter-email">Email</label>
-        <input
-          id="newsletter-email"
-          type="email"
-          name="email"
-          required
-          placeholder="you@company.com"
-          autocomplete="email"
-        />
-        <button type="submit">Subscribe</button>
-      </form>
-    ) : (
-      <div class="newsletter-fallback">
-        <p>
-          Newsletter form not configured yet. Set
-          <code>PUBLIC_NEWSLETTER_ACTION</code> to your Beehiiv/Buttondown form action URL.
-        </p>
-        <p class="newsletter-alt">
-          Meanwhile: follow
-          <a href="https://x.com/terminalblog_en" target="_blank" rel="noopener">@terminalblog_en</a>
-          · <a href="/rss.xml">RSS</a>
-          · <a href="/cli/">CLI</a>
-        </p>
-      </div>
-    )}
+    <form class="newsletter-form" id="newsletter-form">
+      <label class="sr-only" for="newsletter-email">Email</label>
+      <input
+        id="newsletter-email"
+        type="email"
+        name="email"
+        required
+        placeholder="you@company.com"
+        autocomplete="email"
+      />
+      <button type="submit" id="newsletter-submit">Subscribe</button>
+    </form>
+    <p class="newsletter-status" id="newsletter-status" role="status" aria-live="polite"></p>
+    <p class="newsletter-alt">
+      Or follow
+      <a href="https://x.com/terminalblog_en" target="_blank" rel="noopener">@terminalblog_en</a>
+      · <a href="/rss.xml">RSS</a>
+      · <a href="/cli/">CLI</a>
+    </p>
   </div>
 </section>
+
+<script>
+  const form = document.getElementById('newsletter-form');
+  const statusEl = document.getElementById('newsletter-status');
+  const btn = document.getElementById('newsletter-submit');
+  if (form && statusEl && btn) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const emailInput = document.getElementById('newsletter-email');
+      const email = emailInput && 'value' in emailInput ? String(emailInput.value).trim() : '';
+      if (!email) return;
+      btn.setAttribute('disabled', 'true');
+      statusEl.textContent = 'Subscribing…';
+      statusEl.className = 'newsletter-status pending';
+      try {
+        const res = await fetch('/api/newsletter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.ok) {
+          statusEl.textContent = data.message || 'Subscribed. Welcome.';
+          statusEl.className = 'newsletter-status ok';
+          form.reset();
+        } else {
+          statusEl.textContent = data.error || 'Something went wrong. Try again.';
+          statusEl.className = 'newsletter-status err';
+        }
+      } catch {
+        statusEl.textContent = 'Network error. Try again in a moment.';
+        statusEl.className = 'newsletter-status err';
+      } finally {
+        btn.removeAttribute('disabled');
+      }
+    });
+  }
+</script>
 
 <style>
   .newsletter {
@@ -96,17 +121,22 @@ const configured = Boolean(action);
     font-size: 0.85rem;
     cursor: pointer;
   }
-  .newsletter-fallback {
-    font-size: 0.8rem;
+  .newsletter-form button:disabled { opacity: 0.6; cursor: wait; }
+  .newsletter-status {
+    min-height: 1.2em;
+    margin: 0.75rem 0 0;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+  }
+  .newsletter-status.ok { color: var(--green); }
+  .newsletter-status.err { color: #f87171; }
+  .newsletter-status.pending { color: var(--fg-dim); }
+  .newsletter-alt {
+    margin-top: 0.75rem;
+    font-size: 0.78rem;
     color: var(--fg-dim);
     font-family: var(--font-mono);
-    line-height: 1.5;
   }
-  .newsletter-fallback code {
-    color: var(--green);
-    font-size: 0.75rem;
-  }
-  .newsletter-alt { margin-top: 0.75rem; }
   .newsletter-alt a { color: var(--green); }
   .sr-only {
     position: absolute;
