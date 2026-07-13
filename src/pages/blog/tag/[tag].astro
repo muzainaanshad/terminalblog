@@ -22,10 +22,19 @@ const toolNames: Record<string, string> = {
 };
 
 export async function getStaticPaths() {
+  // Keep this list inline — Astro isolates getStaticPaths from outer consts
+  const toolTags = new Set([
+    'hermes', 'opencode', 'mimo', 'kilo', 'pi-dot-dev', 'gitlawb-zero',
+    'oh-my-pi', 'claude-code', 'goose', 'openclaw', 'codebuff', 'cursor',
+    'codex', 'ampcode', 'copilot-cli',
+  ]);
   const posts = await getCollection('blog');
   const tags = new Set<string>();
   for (const p of posts) {
-    for (const t of p.data.tags || []) tags.add(t);
+    for (const t of p.data.tags || []) {
+      // Tool tags are served by /tool/[id] (see vercel.json redirects)
+      if (!toolTags.has(t)) tags.add(t);
+    }
   }
   return Array.from(tags).map(tag => ({
     params: { tag },
@@ -35,19 +44,21 @@ export async function getStaticPaths() {
 
 const { tag } = Astro.props;
 
-// If tag is a known tool, redirect to the tool page
-const toolTag = toolNames[tag];
-if (toolTag) {
-  Astro.response.status = 302;
-  Astro.response.headers.set('Location', `/tool/${tag}/`);
-}
-
 const allPosts = (await getCollection('blog'))
   .filter(p => (p.data.tags || []).includes(tag))
   .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+
+// Thin tag pages: keep for navigation, but don't waste crawl budget ranking them
+const MIN_INDEXABLE_POSTS = 3;
+const robots =
+  allPosts.length < MIN_INDEXABLE_POSTS ? 'noindex, follow' : 'index, follow';
 ---
 
-<Layout title={`#${tag} — ${SITE_TITLE}`} description={`Articles tagged with #${tag}`}>
+<Layout
+  title={`#${tag} — ${SITE_TITLE}`}
+  description={`Articles tagged with #${tag} on terminalblog — AI coding agent coverage.`}
+  robots={robots}
+>
   <div class="content" style="max-width:860px;margin:0 auto;padding:0 1.5rem;">
     <h1 style="font-size:1.75rem;margin-bottom:0.5rem;">#<span style="color:var(--green);">{tag}</span></h1>
     <p style="color:var(--fg-dim);margin-bottom:2.5rem;font-size:0.85rem;font-family:var(--font-mono);">{allPosts.length} article{allPosts.length !== 1 ? 's' : ''}</p>

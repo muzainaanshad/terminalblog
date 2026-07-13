@@ -8,17 +8,44 @@ const posts = (await getCollection('blog')).sort(
   (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
 );
 
+/** Low-signal commit roundups — fine in /blog, deprioritized on homepage hero. */
+function isJustShipped(p: (typeof posts)[number]) {
+  const tags = p.data.tags || [];
+  return (
+    p.id.includes('just-shipped') ||
+    tags.includes('just-shipped') ||
+    tags.includes('shipped')
+  );
+}
+
+/** Prefer security, opinion, comparison, and non-roundup news for homepage surface. */
+const featurePosts = posts.filter(p => !isJustShipped(p));
+const homepagePosts = featurePosts.length >= 4 ? featurePosts : posts;
+
 // Articles shown in hero + spotlight — filter these from other sections
-const heroIds = new Set(posts.slice(0, 4).map(p => p.id));
+const heroIds = new Set(homepagePosts.slice(0, 4).map(p => p.id));
 
 const comparisons = posts.filter(p => p.data.tags?.includes('comparison') && !heroIds.has(p.id)).slice(0, 6);
 const opinions = posts.filter(p => p.data.tags?.includes('opinion') && !heroIds.has(p.id)).slice(0, 5);
+// Latest feed still shows everything chronological, but not the four already featured
 const latestFeed = posts.filter(p => !heroIds.has(p.id)).slice(0, 8);
-const trending = latestFeed.slice(0, 5);
+const trending = homepagePosts.filter(p => !heroIds.has(p.id)).slice(0, 5);
 
-const tagCounts = {};
-posts.forEach(p => (p.data.tags || []).forEach(t => tagCounts[t] = (tagCounts[t] || 0) + 1));
-const topTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([tag]) => tag);
+// Only surface substantial tags in the home nav (thin tags stay reachable from posts)
+const tagCounts: Record<string, number> = {};
+posts.forEach(p => (p.data.tags || []).forEach(t => {
+  tagCounts[t] = (tagCounts[t] || 0) + 1;
+}));
+const topTags = Object.entries(tagCounts)
+  .filter(([, count]) => count >= 3)
+  .sort((a, b) => b[1] - a[1])
+  .slice(0, 15)
+  .map(([tag]) => tag);
+
+const hero = homepagePosts[0];
+const spot1 = homepagePosts[1];
+const spot2 = homepagePosts[2];
+const spot3 = homepagePosts[3];
 
 function formatDate(d) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
@@ -38,7 +65,7 @@ function tagClass(tag) {
       <div class="home-header-main">
         <div>
           <h1>terminalblog<span class="cursor-blink">▊</span></h1>
-          <p class="home-sub">Following the AI coding agent ecosystem</p>
+          <p class="home-sub">AI coding agents — security, adoption data, comparisons</p>
         </div>
         <div class="home-stats">
           <span><b>{agents.length}</b> agents</span>
@@ -132,17 +159,17 @@ function tagClass(tag) {
       <a href="/blog/" class="tag-pill all-link">all →</a>
     </nav>
 
-    <!-- Featured hero -->
+    <!-- Featured hero (quality-first: skip just-shipped roundups) -->
     <section class="hero-section">
-      <a href={`/blog/${posts[0].id}/`} class="hero-card">
+      <a href={`/blog/${hero.id}/`} class="hero-card">
         <div class="hero-meta">
           <span class="hero-badge">latest</span>
-          <span>{formatDate(posts[0].data.pubDate)}</span>
+          <span>{formatDate(hero.data.pubDate)}</span>
         </div>
-        <h2 class="hero-title">{posts[0].data.title}</h2>
-        <p class="hero-desc">{posts[0].data.description}</p>
+        <h2 class="hero-title">{hero.data.title}</h2>
+        <p class="hero-desc">{hero.data.description}</p>
         <div class="hero-tags">
-          {(posts[0].data.tags || []).slice(0, 4).map(t => <span class="mini-tag">{t}</span>)}
+          {(hero.data.tags || []).slice(0, 4).map(t => <span class="mini-tag">{t}</span>)}
         </div>
       </a>
     </section>
@@ -166,29 +193,29 @@ function tagClass(tag) {
 
     <!-- Spotlight grid -->
     <section class="spotlight">
-      <a href={`/blog/${posts[1].id}/`} class="spotlight-card">
+      {spot1 && <a href={`/blog/${spot1.id}/`} class="spotlight-card">
         <div class="spotlight-meta">
-          {(posts[1].data.tags || []).filter(t => t !== 'opinion').slice(0, 2).map(t => <span class="mini-tag">{t}</span>)}
-          <span class="spotlight-date">{formatDate(posts[1].data.pubDate)}</span>
+          {(spot1.data.tags || []).filter(t => t !== 'opinion').slice(0, 2).map(t => <span class="mini-tag">{t}</span>)}
+          <span class="spotlight-date">{formatDate(spot1.data.pubDate)}</span>
         </div>
-        <h3>{posts[1].data.title}</h3>
-        <p>{posts[1].data.description?.substring(0, 100)}</p>
-      </a>
-      <a href={`/blog/${posts[2].id}/`} class="spotlight-card">
+        <h3>{spot1.data.title}</h3>
+        <p>{spot1.data.description?.substring(0, 100)}</p>
+      </a>}
+      {spot2 && <a href={`/blog/${spot2.id}/`} class="spotlight-card">
         <div class="spotlight-meta">
-          {(posts[2].data.tags || []).filter(t => t !== 'opinion').slice(0, 2).map(t => <span class="mini-tag">{t}</span>)}
-          <span class="spotlight-date">{formatDate(posts[2].data.pubDate)}</span>
+          {(spot2.data.tags || []).filter(t => t !== 'opinion').slice(0, 2).map(t => <span class="mini-tag">{t}</span>)}
+          <span class="spotlight-date">{formatDate(spot2.data.pubDate)}</span>
         </div>
-        <h3>{posts[2].data.title}</h3>
-        <p>{posts[2].data.description?.substring(0, 100)}</p>
-      </a>
-      {posts[3] && <a href={`/blog/${posts[3].id}/`} class="spotlight-card highlight">
+        <h3>{spot2.data.title}</h3>
+        <p>{spot2.data.description?.substring(0, 100)}</p>
+      </a>}
+      {spot3 && <a href={`/blog/${spot3.id}/`} class="spotlight-card highlight">
         <div class="spotlight-meta">
-          {(posts[3].data.tags || []).filter(t => t !== 'opinion').slice(0, 2).map(t => <span class="mini-tag">{t}</span>)}
-          <span class="spotlight-date">{formatDate(posts[3].data.pubDate)}</span>
+          {(spot3.data.tags || []).filter(t => t !== 'opinion').slice(0, 2).map(t => <span class="mini-tag">{t}</span>)}
+          <span class="spotlight-date">{formatDate(spot3.data.pubDate)}</span>
         </div>
-        <h3>{posts[3].data.title}</h3>
-        <p>{posts[3].data.description?.substring(0, 100)}</p>
+        <h3>{spot3.data.title}</h3>
+        <p>{spot3.data.description?.substring(0, 100)}</p>
       </a>}
     </section>
 

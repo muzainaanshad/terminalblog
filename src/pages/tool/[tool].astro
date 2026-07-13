@@ -4,11 +4,16 @@ import { SITE_TITLE } from '../../consts';
 import { getCollection } from 'astro:content';
 import agents from '../../data/agents.json';
 
+/** Only real coding agents get /tool/ hubs — not news tags like industry/launches. */
 export async function getStaticPaths() {
+  // Inline agent IDs so Astro's isolated getStaticPaths scope always has them
+  const validIds = new Set((agents as { id: string }[]).map(a => a.id));
+  const tools = new Set<string>(validIds);
   const posts = await getCollection('blog');
-  const tools = new Set<string>();
   for (const p of posts) {
-    if (p.data.tool) tools.add(p.data.tool);
+    if (p.data.tool && validIds.has(p.data.tool)) {
+      tools.add(p.data.tool);
+    }
   }
   return Array.from(tools).map(tool => ({
     params: { tool },
@@ -17,29 +22,20 @@ export async function getStaticPaths() {
 }
 
 const { tool } = Astro.props;
-const allPosts = (await getCollection('blog')).filter(p => p.data.tool === tool)
+const agentData = (agents as { id: string; name: string; type?: string }[]).find(
+  a => a.id === tool
+);
+
+// Safety: never render hub pages for non-agent "tools"
+if (!agentData) {
+  return Astro.redirect('/blog/', 301);
+}
+
+const allPosts = (await getCollection('blog'))
+  .filter(p => p.data.tool === tool)
   .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
 
-const toolNames: Record<string, string> = {
-  hermes: 'Hermes Agent',
-  opencode: 'OpenCode',
-  mimo: 'Mimo Code',
-  kilo: 'Kilo Code CLI',
-  'pi-dot-dev': 'pi.dev',
-  'gitlawb-zero': 'Gitlawb Zero',
-  'oh-my-pi': 'Oh My Pi',
-  'claude-code': 'Claude Code',
-  goose: 'Goose',
-  openclaw: 'OpenClaw',
-  codebuff: 'Codebuff',
-  cursor: 'Cursor',
-  codex: 'OpenAI Codex',
-  ampcode: 'AmpCode',
-  'copilot-cli': 'GitHub Copilot CLI',
-};
-
-const toolName = toolNames[tool] || tool;
-const agentData = agents.find((a: any) => a.id === tool);
+const toolName = agentData.name;
 
 // Count article types
 const tags: Record<string, number> = {};
