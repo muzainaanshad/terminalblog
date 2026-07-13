@@ -1,22 +1,31 @@
 /**
  * Vercel Serverless: Beehiiv subscribe proxy.
- * Secrets stay server-side (BEEHIIV_API_KEY, BEEHIIV_PUBLICATION_ID).
+ * Env: BEEHIIV_API_KEY, BEEHIIV_PUBLICATION_ID
  *
  * POST /api/newsletter  { "email": "you@example.com" }
  */
 
-const ALLOWED_ORIGIN = process.env.NEWSLETTER_CORS_ORIGIN || 'https://terminalblog.com';
+const ALLOWED_ORIGINS = new Set([
+  'https://terminalblog.com',
+  'https://www.terminalblog.com',
+  'http://localhost:4321',
+  'http://localhost:3000',
+]);
 
-function cors(res) {
-  res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
+function setCors(req, res) {
+  const origin = req.headers.origin || '';
+  if (ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', 'https://terminalblog.com');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-function json(res, status, body) {
-  cors(res);
+function send(res, status, body) {
   res.statusCode = status;
-  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.end(JSON.stringify(body));
 }
 
@@ -24,52 +33,68 @@ function isEmail(s) {
   return typeof s === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
 }
 
+async function readJsonBody(req) {
+  if (req.body != null) {
+    if (typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
+      return req.body;
+    }
+    if (typeof req.body === 'string') {
+      return req.body ? JSON.parse(req.body) : {};
+    }
+    if (Buffer.isBuffer(req.body)) {
+      const s = req.body.toString('utf8');
+      return s ? JSON.parse(s) : {};
+    }
+  }
+
+  const chunks = [];
+  for await (const chunk of req) {
+    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+  }
+  if (!chunks.length) return {};
+  const raw = Buffer.concat(chunks).toString('utf8').trim();
+  if (!raw) return {};
+  return JSON.parse(raw);
+}
+
 module.exports = async function handler(req, res) {
-  cors(res);
-
-  if (req.method === 'OPTIONS') {
-    res.statusCode = 204;
-    return res.end();
-  }
-
-  if (req.method !== 'POST') {
-    return json(res, 405, { ok: false, error: 'Method not allowed' });
-  }
-
-  const apiKey = process.env.BEEHIIV_API_KEY;
-  const publicationId = process.env.BEEHIIV_PUBLICATION_ID;
-
-  if (!apiKey || !publicationId) {
-    return json(res, 503, {
-      ok: false,
-      error: 'Newsletter not configured (missing Beehiiv env vars)',
-    });
-  }
-
-  let body = req.body;
-  if (typeof body === 'string') {
-    try {
-      body = JSON.parse(body);
-    } catch {
-      return json(res, 400, { ok: false, error: 'Invalid JSON' });
-    }
-  }
-  // Vercel sometimes leaves body as buffer/object
-  if (body && Buffer.isBuffer(body)) {
-    try {
-      body = JSON.parse(body.toString('utf8'));
-    } catch {
-      return json(res, 400, { ok: false, error: 'Invalid JSON body' });
-    }
-  }
-
-  const email = (body?.email || '').trim().toLowerCase();
-  if (!isEmail(email)) {
-    return json(res, 400, { ok: false, error: 'Valid email required' });
-  }
+  setCors(req, res);
 
   try {
-    const bee = await fetch(
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      return res.end();
+    }
+
+    if (req.method !== 'POST') {
+      return send(res, 405, { ok: false, error: 'Method not allowed' });
+    }
+
+    const apiKey = process.env.BEEHIIV_API_KEY;
+    const publicationId = process.env.BEEHIIV_PUBLICATION_ID;
+
+    if (!apiKey || !publicationId) {
+      return send(res, 503, {
+        ok: false,
+        error: 'Newsletter not configured (missing Beehiiv env vars)',
+      });
+    }
+
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch {
+      return send(res, 400, { ok: false, error: 'Invalid JSON body' });
+    }
+
+    const email = String(body?.email || '')
+      .trim()
+      .toLowerCase();
+    if (!isEmail(email)) {
+      return send(res, 400, { ok: false, error: 'Valid email required' });
+    }
+
+    const beeRes = await fetch(
       `https://api.beehiiv.com/v2/publications/${publicationId}/subscriptions`,
       {
         method: 'POST',
@@ -89,27 +114,34 @@ module.exports = async function handler(req, res) {
       }
     );
 
-    const data = await bee.json().catch(() => ({}));
+    const data = await beeRes.json().catch(() => ({}));
 
-    if (bee.ok) {
-      return json(res, 200, {
+    if (beeRes.ok) {
+      return send(res, 200, {
         ok: true,
         message: 'Subscribed — check your inbox to confirm if required.',
         status: data?.data?.status || 'active',
       });
     }
 
-    // Beehiiv often returns 400 if already subscribed — treat as soft success
-    const msg = data?.errors?.[0]?.message || data?.error || bee.statusText;
-    if (bee.status === 400 && /already|exist/i.test(String(msg))) {
-      return json(res, 200, { ok: true, message: 'You are already subscribed.' });
+    const msg =
+      data?.errors?.[0]?.message ||
+      data?.error ||
+      data?.statusText ||
+      beeRes.statusText ||
+      'Beehiiv error';
+
+    if (beeRes.status === 400 && /already|exist|subscribed/i.test(String(msg))) {
+      return send(res, 200, { ok: true, message: 'You are already subscribed.' });
     }
 
-    return json(res, bee.status >= 400 && bee.status < 600 ? bee.status : 502, {
+    console.error('Beehiiv error', beeRes.status, JSON.stringify(data));
+    return send(res, beeRes.status >= 400 && beeRes.status < 600 ? beeRes.status : 502, {
       ok: false,
-      error: msg || 'Beehiiv error',
+      error: msg,
     });
   } catch (e) {
-    return json(res, 502, { ok: false, error: e.message || 'Upstream error' });
+    console.error('newsletter handler crash', e);
+    return send(res, 500, { ok: false, error: e.message || 'Server error' });
   }
 };
