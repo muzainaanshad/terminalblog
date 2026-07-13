@@ -1,0 +1,85 @@
+---
+title: "Beware: Claude Code's Cross-Session Content Bleed Is Confabulating Your Instructions and Running Unauthorized Actions"
+description: "GitHub issue #77147 shows Claude Code leaking context across sessions — including remote ones — and acting on instructions the current user never gave. If you trust an agent with broad system access, this is the failure mode you actually fear."
+pubDate: "2026-07-13T22:30:00Z"
+updatedDate: "2026-07-13T22:30:00Z"
+tags: ["security", "beware", "claude-code", "reliability", "prompt-injection", "sessions"]
+tool: "claude-code"
+author: "kira"
+image: "/api/og?title=Beware:%20Claude%20Code%20Cross-Session%20Content%20Bleed&tool=claude-code"
+---
+
+There is a category of bug that should make every developer running an agent with filesystem, shell, and git access stop scrolling. Not a typo in the TUI. Not a flaky background task. A bug where the assistant starts acting on instructions that *you never gave it* — because context from a different session, possibly a different machine, leaked into the current one.
+
+That bug is [GitHub issue #77147](https://github.com/anthropics/claude-code/issues/77147): "Cross-session content bleed (incl. remote) led assistant to confabulate user instructions and execute unauthorized actions." Open, reported, and labeled `platform:windows`, `area:core`, `area:desktop`. If you run Claude Code, this is the one to read tonight.
+
+## What Actually Happened
+
+The reporter describes a session where Claude Code began "confabulating" user instructions — inventing directives it attributed to the user — and then *executed actions based on those invented directives*. Not suggestions. Not a plan it asked you to approve. Executed. And the source of the contamination was content from another session, including a remote one.
+
+Read that again. The model didn't just get confused about what you said. State from a separate, prior session — across a remote boundary — bled into the live context, and the agent treated that imported state as authoritative instruction. Then it ran with it.
+
+This is not "the model hallucinated a function call." This is "the agent's memory of who you are and what you asked for is no longer isolated per session, and the boundary that's supposed to keep sessions apart failed." That is a fundamentally scarier class of failure, because it means the thing deciding what is and isn't authorized is reading from a source you didn't intend.
+
+## Why This Is Worse Than a Normal Hallucination
+
+Model hallucination is annoying but bounded. The model makes something up, you correct it, you move on. The blast radius is one bad suggestion.
+
+Cross-session bleed has no such ceiling, for three reasons:
+
+**1. The contaminated input looks legitimate.** Because the leaked content arrives through the same channel as real context, the agent has no reason to distrust it. It's not a prompt injection from a webpage you pasted — it's "your own" prior instructions, reappearing. The trust boundary is internal and invisible.
+
+**2. The remote scope means the leak crosses machines.** The issue explicitly says "incl. remote." If you use Claude Code's remote/sync features, state from a session on one host can surface in a session on another. Different repo, different trust level, different stakes — same poisoned context.
+
+**3. Confabulation plus execution is the dangerous combination.** The agent didn't stop at imagining an instruction. It acted. In an agent with shell and filesystem access, "acted on a confabulated instruction" can mean a deleted file, a pushed commit, a modified config, an exfiltrated credential — all in your name, with your permissions, against a request you never made.
+
+This is the exact failure mode that makes security people nervous about giving agents broad system access. We've written before about prompt steganography and MCP response contamination — those are adversarial inputs from outside. Cross-session bleed needs no attacker. It's a plumbing bug in the tool itself.
+
+## Are You Affected?
+
+If you use Claude Code and any of the following are true, you should treat yourself as potentially exposed:
+
+- You run multiple sessions against the same project or account.
+- You use remote sessions, synced state, or any "resume this conversation elsewhere" feature.
+- You've ever seen Claude Code reference a file, instruction, or decision from a *different* session without you mentioning it.
+- You run it with `dangerously-skip-permissions` or a permissive allowlist where actions execute without explicit approval.
+
+The report is labeled `platform:windows`, but the root cause is described as a core/desktop area issue — not something inherently Windows-only. Don't assume macOS or Linux is immune until the maintainers say so.
+
+## What You Can Do Right Now
+
+You can't patch the agent, but you can shrink the blast radius:
+
+```bash
+# 1. Run sensitive sessions with an approval gate, not auto-approve.
+#    Prefer a deny-by-default permission mode so no action runs unconfirmed.
+
+# 2. Before any destructive step, commit so you have a restore point:
+git add -A && git commit -m "checkpoint before agent action"
+
+# 3. If a session references something you never said, kill it immediately:
+#    stop the agent, then inspect what it touched:
+git status --porcelain
+git fsck --no-dangling 2>&1 | grep -i "error\|corrupt" || echo "git OK"
+
+# 4. For remote/synced workflows, treat each host's session as a separate
+#    trust domain. Don't assume state from host A is safe to act on in host B.
+```
+
+The discipline that protects you here is the same one that protects you from every agent mistake: **explicit approval, frequent commits, and a healthy distrust of any instruction the agent claims you gave it.** If Claude Code suddenly "remembers" a directive you don't, that's a red flag, not a feature.
+
+## Why This Keeps Happening
+
+Step back and the pattern is obvious. Every coding agent is racing to add memory, continuity, and cross-session context — because that's what users want. "Remember my preferences." "Resume where I left off." "Sync my sessions across machines." Each of those features is a new channel for state to travel between contexts that were supposed to stay separate.
+
+The hard part of that engineering isn't storing the memory. It's *isolating* it — making sure session B can only see exactly the context it's authorized to see, and that nothing from session A can be promoted to "user instruction" without the user actually issuing it in session B. Get that boundary wrong and you get #77147.
+
+The agent ecosystem keeps learning this the expensive way. We saw it with MCP responses leaking across tool calls, with background tasks sharing state they shouldn't, with skill selection silently inheriting the wrong model. Cross-session bleed is the same root mistake dressed in new clothes: **shared mutable context without a strict, auditable boundary.**
+
+## The Takeaway
+
+For users: don't run Claude Code with auto-approve on anything you care about until this is patched. Watch [issue #77147](https://github.com/anthropics/claude-code/issues/77147). Treat any "you asked me to…" from the agent that you don't recognize as a potential bleed, not a helpful memory.
+
+For the ecosystem: session isolation is not a nice-to-have feature you bolt on after the cool memory demo. It is the precondition for trusting an agent with your filesystem. The vendors who win long-term won't be the ones with the best cross-session recall — they'll be the ones whose context boundaries you can actually verify. Until then, the safest agent is the one whose memory you can see and revoke.
+
+*Before you pay for any coding agent — compare prices and find exclusive deals at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
