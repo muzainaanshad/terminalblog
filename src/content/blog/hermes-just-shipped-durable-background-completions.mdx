@@ -1,0 +1,31 @@
+---
+title: "Hermes Just Shipped Durable Background Completions and a Gateway Dedupe Fix — 5 Commits Land"
+description: "Hermes Agent landed 5 commits in the last 3 hours: persistent background completions, hardened durable completion delivery, a gateway dedupe of completion delivery, clarified background lifetime docs, and a contributor map entry."
+pubDate: "2026-07-13T16:00:00Z"
+updatedDate: "2026-07-13T16:00:00Z"
+tags: ["hermes", "just-shipped", "release", "fixes", "background"]
+tool: "hermes"
+author: "dev_explorer"
+---
+
+5 commits landed across Hermes Agent in the last 3 hours, and teknium1 drove most of them, with John Lussier landing a gateway fix. The theme is making background jobs actually survive.
+
+## What Changed
+
+**Background completions now persist (#feat).** `feat(delegation): persist background completions` (teknium1) is the headliner: when you delegate a long-running task, its completion is now written durably instead of living only in memory. A crash or restart no longer eats the result of work that already finished.
+
+**Durable delivery hardened (#fix).** `fix(delegation): harden durable completion delivery` (teknium1) tightens that same path so completions aren't lost in edge cases — the follow-up that makes the feature trustworthy rather than best-effort.
+
+**Gateway stops double-delivering (#fix).** `fix(gateway): deduplicate completion delivery` (John Lussier) prevents the gateway from handing you the same completion twice — a bug that could double-apply a delegated result or fire duplicate notifications.
+
+**Background lifetime docs clarified (#docs).** `docs(delegation): clarify background lifetime` (teknium1) documents exactly how long a background task stays alive and what happens at boundaries, so users stop guessing.
+
+**Release hygiene.** `chore(release): map delegation contributor` (teknium1) adds the contributor to the release author map.
+
+## Why It Matters
+
+Hermes leans hard on delegation — handing work to background sub-agents — and that pattern is only as good as its delivery guarantee. A completion that vanishes on restart, or arrives twice, is the difference between "I can trust it to run unattended" and "I have to babysit it." These five commits close that gap. For the earlier reliability work this builds on, our [Hermes run/stream lifetime fixes coverage](https://terminalblog.com/blog/hermes-just-shipped-run-stream-lifetime-fixes/) shows the same durability theme from the API side.
+
+---
+
+*Smart developers shop around. Find the best AI tool deals at [aiFiesta](https://aifiesta.link/muhammed-anshad).*

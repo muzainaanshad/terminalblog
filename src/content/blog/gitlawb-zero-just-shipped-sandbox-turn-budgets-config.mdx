@@ -1,0 +1,33 @@
+---
+title: "gitlawb-zero Just Shipped Sandbox Unblocks, Turn-Budget Raises, and a Config Safety Net — 7 Commits Land"
+description: "gitlawb-zero (gitlawb/zero) landed 7 commits in the last 3 hours: a WRITE_RESTRICTED sandbox token fix, git operations unblocked under the write-restricted sandbox, raised default and deep-mode turn budgets, a config typo surfacer, and a Windows/Unix lock-file leak fix."
+pubDate: "2026-07-13T16:00:00Z"
+updatedDate: "2026-07-13T16:00:00Z"
+tags: ["gitlawb-zero", "just-shipped", "release", "fixes", "sandbox"]
+tool: "gitlawb-zero"
+author: "kira_bug_hunter"
+---
+
+7 commits landed across gitlawb-zero (gitlawb/zero) in the last 3 hours, and euxaristia drove most of them, with Octopus and Ashwinhegde19 each landing one. The batch is a sandbox-and-config reliability push.
+
+## What Changed
+
+**Sandbox now uses the right token (#658).** `fix(sandbox): use WRITE_RESTRICTED token when no DenyRead paths are configured` (euxaristia) fixes a permission mismatch — when you haven't configured any DenyRead paths, the sandbox now correctly requests the write-restricted token instead of over- or under-requesting.
+
+**Git works under the restricted sandbox (#654).** `fix(sandbox): unblock git fetch/commit/add under the write-restricted sandbox` (euxaristia) is the headline: git operations that the agent needs for real work were being blocked by the sandbox's write restrictions. They now pass through, so the agent can actually commit and fetch inside the safe boundary.
+
+**Turn budgets raised (#650).** `fix(agent): raise default and deep-mode turn budgets` (euxaristia) gives the agent more turns before it bails — fewer "hit the turn limit" deaths on genuinely long tasks, especially in deep mode.
+
+**Typo'd config no longer silently dropped (#645).** `fix(config): surface unknown/typo'd config fields instead of silently dropping them` (Ashwinhegde19) turns a silent failure into a visible error. A misspelled config key used to vanish; now it tells you.
+
+**Lock-file leak fixed on Windows/Unix (#628).** `fix(lock): prevent POSIX lock file overwrite and leak on Windows/Unix` (euxaristia) stops the lock file from being clobbered or leaked across both platforms — a real fix for anyone running the agent on Windows.
+
+**Plus a provider refresh.** `feat(providers): refresh MiniMax model coverage` (#665, Octopus) updates the MiniMax model list so the agent picks current endpoints.
+
+## Why It Matters
+
+gitlawb-zero's whole pitch is a sandbox you can actually trust — and a sandbox that blocks `git commit` is a sandbox that breaks the agent's core loop. Unblocking git under write restrictions is the fix that makes the safety boundary usable rather than decorative. For the broader "sandbox is the unsung hero" theme, our [coding-agents security hardening wave coverage](https://terminalblog.com/blog/coding-agents-security-hardening-wave/) tracks the same reliability push across the ecosystem.
+
+---
+
+*Running multiple AI agents? Save on API costs and subscriptions at [aiFiesta](https://aifiesta.link/muhammed-anshad).*

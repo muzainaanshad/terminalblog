@@ -1,0 +1,31 @@
+---
+title: "Goose Just Shipped DeepSeek Reasoning Fixes and Streaming Hardening — 10 Commits Land"
+description: "Goose (block/goose) landed 10 commits in the last 3 hours: DeepSeek reasoning_content preservation across tool calls, non-terminal empty finish_reason handling, timezone-explicit prompt timestamps, compact-during-approval fixes, and a pnpm 11 config restore."
+pubDate: "2026-07-13T16:00:00Z"
+updatedDate: "2026-07-13T16:00:00Z"
+tags: ["goose", "just-shipped", "release", "fixes", "streaming"]
+tool: "goose"
+author: "kira_bug_hunter"
+---
+
+10 commits landed across Goose (block/goose) in the last 3 hours, and the theme is model-compatibility and streaming correctness. benthecarman, Ellen Blaine, Theofanis Petkos, Yashas Gunderia, Michael Neale, and dependabot all show up in the batch.
+
+## What Changed
+
+**DeepSeek thinking survives tool calls (#10366).** `fix: preserve reasoning_content for DeepSeek thinking mode on multi-turn tool calls` (benthecarman) keeps the model's reasoning trace intact when a tool call interrupts a multi-turn conversation. Without it, DeepSeek's chain-of-thought dropped out the moment a tool ran, leaving later turns context-blind.
+
+**Empty finish_reason is no longer terminal (#10258).** `fix: treat empty-string finish_reason as non-terminal in streaming` (benthecarman) stops Goose from prematurely ending a stream when a provider sends an empty `finish_reason` mid-chunk — a classic cause of truncated responses from providers that stream partial stops.
+
+**Timezone-explicit prompt timestamps (#10209).** `fix(prompt): make prompt timestamps timezone-explicit` (Ellen Blaine) stamps prompts with an explicit timezone so logs and replayed sessions don't drift between UTC and local time.
+
+**Compact no longer dies during approval (#10089).** `Fix/compact disabled during approval` (Theofanis Petkos) re-enables context compaction that was being suppressed while a tool-approval prompt was open — a memory leak waiting to happen on long sessions.
+
+**Plus the build and test hygiene.** `fix(ui): restore pnpm 11 project configuration` (#10395, Yashas Gunderia) fixes a broken install path, `test: drop unavailable and preview Gemini smoke models` (#10355, Michael Neale) trims flaky CI, and dependabot bumped docker/login-action, step-security/harden-runner, actions/cache, and dorny/paths-filter.
+
+## Why It Matters
+
+Goose is a Rust agent that prides itself on running any model — and these fixes are exactly what "runs any model" costs. DeepSeek's thinking mode and providers that stream empty stop reasons are two of the most common ways a generic agent silently breaks on a non-OpenAI backend. For the broader "why a Rust core matters for agent reliability" angle, our [Goose Rust agent breakdown](https://terminalblog.com/blog/goose-rust-agent-why-it-matters/) covers the architectural bet behind these patches.
+
+---
+
+*Want to save money on AI coding tools? Check out the best deals and discounts at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
