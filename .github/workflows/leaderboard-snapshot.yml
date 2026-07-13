@@ -16,11 +16,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Fetch adoption data
+      - name: Fetch adoption data (OSS multi-signal v3)
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Prefer a classic PAT with public_repo if GITHUB_TOKEN is restricted;
+          # fetcher auto-retries without auth on 401 (bad credentials).
+          GITHUB_TOKEN: ${{ secrets.ADOPTION_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
-          node scripts/fetch-adoption-data.cjs || node scripts/fetch-adoption-data.cjs 2>&1 | tee tmp/adoption-log.txt || true
+          mkdir -p tmp
+          node scripts/fetch-adoption-data.cjs --force 2>&1 | tee tmp/adoption-log.txt
         continue-on-error: true
       - name: Leaderboard note
         run: |
