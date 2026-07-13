@@ -37,10 +37,12 @@ const OFF_NICHE_HINTS = [
 ];
 
 const LIMITS = {
-  maxJustShippedPerDay: 3,
-  maxPostsPerDay: 8,
-  minJustShippedWords: 400,
-  minAnyWords: 250,
+  // Long-term SEO: fewer posts, thicker posts
+  maxJustShippedPerDay: 0, // just-shipped disabled; use weekly digest only
+  maxPostsPerDay: 3,
+  minJustShippedWords: 800,
+  minAnyWords: 600,
+  minEvergreenWords: 1000,
   titleJaccardMax: 0.72,
   slugStemDistanceMax: 0.85,
 };
@@ -122,11 +124,25 @@ function validateArticle(article, corpus) {
   if (article.words < LIMITS.minAnyWords) {
     issues.push({ level: 'error', code: 'thin', msg: `Only ${article.words} words (min ${LIMITS.minAnyWords})` });
   }
-  if (isJustShipped(article) && article.words < LIMITS.minJustShippedWords) {
+  const tagsStr = Array.isArray(article.fm.tags)
+    ? article.fm.tags.join(' ')
+    : String(article.fm.tags || '');
+  const evergreen =
+    /pillar|guide|checklist|comparison|pricing|security|beware|agents-md|decision/i.test(
+      article.slug + ' ' + tagsStr + ' ' + (article.fm.title || '')
+    );
+  if (evergreen && article.words < LIMITS.minEvergreenWords) {
     issues.push({
       level: 'error',
-      code: 'just-shipped-thin',
-      msg: `just-shipped post is ${article.words}w (min ${LIMITS.minJustShippedWords}) — batch into a digest instead`,
+      code: 'evergreen-thin',
+      msg: `Evergreen/guide is ${article.words}w (min ${LIMITS.minEvergreenWords}) — expand for long-term SEO`,
+    });
+  }
+  if (isJustShipped(article)) {
+    issues.push({
+      level: 'error',
+      code: 'just-shipped-disabled',
+      msg: 'just-shipped posts are disabled — use weekly digest or a deep Beware/guide instead',
     });
   }
 

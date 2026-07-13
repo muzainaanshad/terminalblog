@@ -8,13 +8,17 @@ Purpose: grow traffic with **trustworthy, durable coverage** of AI coding agents
 - Prefer updating an existing post (`updatedDate`) over a new URL.
 - Near-duplicates are rejected by `node scripts/content-gate.cjs --strict`.
 
-## Daily caps (automation)
+## Daily caps (automation) — long-term SEO first
 
 | Type | Max / day | Notes |
 |------|-----------|--------|
-| just-shipped / commit roundups | **3** | Prefer one multi-agent digest |
-| All new posts | **8** soft | Deep posts > firehose |
-| just-shipped word count | **≥ 400** | Else batch into weekly digest |
+| just-shipped / commit roundups | **0** | Disabled — weekly digest only |
+| All new posts | **3** hard soft-cap | Quality over volume |
+| Any new post | **≥ 600 words** | Below = reject |
+| Evergreen / guide / beware / pillar | **≥ 1000 words** | Long-term traffic assets |
+| Prefer | **update existing URL** | Set `updatedDate` instead of new slug |
+
+Hermes crons were retuned: firehose jobs paused; article generator once/day quality-only.
 
 ## What we publish (priority order)
 
