@@ -48,16 +48,21 @@ function argVal(f) {
 
 function sh(cmd, opts = {}) {
   try {
-    return execSync(cmd, {
+    let out = execSync(cmd, {
       cwd: ROOT,
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
       maxBuffer: 20 * 1024 * 1024,
       ...opts,
     }).trim();
+    // Strip ANSI escape codes that leak from git/terminal
+    out = out.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+    return out;
   } catch (e) {
     if (opts.allowFail) {
-      return (e.stdout || '').toString().trim();
+      let out = (e.stdout || '').toString().trim();
+      out = out.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+      return out;
     }
     throw e;
   }
@@ -485,74 +490,98 @@ function buildHtml(data) {
   const parts = [];
   const ts = new Date().toISOString().replace('T', ' ').slice(0, 16);
 
-  parts.push(`📰 <b>Articles Management</b>`);
-  parts.push(`<code>terminalblog</code> · ${escapeHtml(ts)} UTC`);
+  // Summary line
+  const summary = [];
+  if (data.created.length) summary.push(`${data.created.length} new`);
+  if (data.updated.length) summary.push(`${data.updated.length} updated`);
+  if (data.deleted.length) summary.push(`${data.deleted.length} deleted`);
+  if (data.interlinks.length) summary.push(`${data.interlinks.length} interlinks`);
+  const summaryStr = summary.length ? summary.join(', ') : 'No content changes';
+
+  parts.push(`📰 <b>terminalblog</b> · ${escapeHtml(ts)} UTC`);
+  parts.push(`<i>${escapeHtml(summaryStr)}</i>`);
   parts.push('─'.repeat(22));
   parts.push('');
 
   // 1 new
   const nNew = data.created.length;
-  parts.push(`<b>1-</b> <b>${nNew}</b> new article${nNew === 1 ? '' : 's'} created`);
-  parts.push('');
-  if (nNew === 0) {
-    parts.push('<i>none</i>');
-  } else {
+  if (nNew > 0) {
+    parts.push(`<b>1-</b> <b>${nNew}</b> new article${nNew === 1 ? '' : 's'}`);
+    parts.push('');
     parts.push(
       ...listOrMore(
         data.created,
         (a) => `• <a href="${escapeHtml(a.url)}">${escapeHtml(a.title)}</a>`
       )
     );
+    parts.push('');
   }
-  parts.push('');
 
-  // 2 updated
+  // 2 updated — group by note type
   const nUp = data.updated.length;
-  parts.push(
-    `<b>2-</b> <b>${nUp}</b> existing article${nUp === 1 ? '' : 's'} were updated`
-  );
-  parts.push('');
-  if (nUp === 0) {
-    parts.push('<i>none</i>');
-  } else {
-    parts.push(
-      ...listOrMore(
-        data.updated,
-        (a) =>
-          `• <a href="${escapeHtml(a.url)}">${escapeHtml(a.title)}</a> — ${escapeHtml(a.note)}`
-      )
-    );
-  }
-  parts.push('');
+  if (nUp > 0) {
+    // Group by note similarity
+    const groups = {};
+    for (const u of data.updated) {
+      const key = u.note || 'metadata update';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(u);
+    }
 
-  // 3 deleted — only if any
+    // Sort groups by size descending
+    const sorted = Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
+
+    parts.push(`<b>2-</b> <b>${nUp}</b> articles updated`);
+    parts.push('');
+
+    for (const [note, articles] of sorted) {
+      if (articles.length === 1) {
+        const a = articles[0];
+        parts.push(`• <a href="${escapeHtml(a.url)}">${escapeHtml(a.title)}</a> — ${escapeHtml(note)}`);
+      } else if (articles.length <= 3) {
+        for (const a of articles) {
+          parts.push(`• <a href="${escapeHtml(a.url)}">${escapeHtml(a.title)}</a>`);
+        }
+        parts.push(`  <i>${escapeHtml(note)}</i>`);
+      } else {
+        // Show first 2 + count
+        for (const a of articles.slice(0, 2)) {
+          parts.push(`• <a href="${escapeHtml(a.url)}">${escapeHtml(a.title)}</a>`);
+        }
+        parts.push(`  <i>+${articles.length - 2} more (${escapeHtml(note)})</i>`);
+      }
+    }
+    parts.push('');
+  }
+
+  // 3 deleted — group and show count
   if (data.deleted.length > 0) {
     const nDel = data.deleted.length;
-    parts.push(
-      `<b>3-</b> <b>${nDel}</b> Article${nDel === 1 ? '' : 's'} deleted`
-    );
+    parts.push(`<b>3-</b> <b>${nDel}</b> article${nDel === 1 ? '' : 's'} deleted`);
     parts.push('');
-    parts.push(
-      ...listOrMore(data.deleted, (a) => `• ${escapeHtml(a.title)}`)
-    );
+    // Show first 3 + count
+    for (const a of data.deleted.slice(0, 3)) {
+      parts.push(`• ${escapeHtml(a.title)}`);
+    }
+    if (nDel > 3) {
+      parts.push(`<i>+${nDel - 3} more</i>`);
+    }
     parts.push('');
   }
 
-  // 4 interlinks
+  // 4 interlinks — only show if < 5, otherwise just count
   const nLink = data.interlinks.length;
-  parts.push(
-    `<b>4-</b> <b>${nLink}</b> New Interlink${nLink === 1 ? '' : 's'} for existing articles`
-  );
-  parts.push('');
-  if (nLink === 0) {
-    parts.push('<i>none</i>');
-  } else if (nLink < 5) {
+  if (nLink > 0 && nLink < 5) {
+    parts.push(`<b>4-</b> <b>${nLink}</b> interlink${nLink === 1 ? '' : 's'}`);
+    parts.push('');
     for (const u of data.interlinks) {
       const label = u.replace(/^https?:\/\/terminalblog\.com/, '') || u;
       parts.push(`• <a href="${escapeHtml(u)}">${escapeHtml(label)}</a>`);
     }
-  } else {
-    parts.push(`<i>(${nLink} links — listing skipped)</i>`);
+    parts.push('');
+  } else if (nLink >= 5) {
+    parts.push(`<b>4-</b> <b>${nLink}</b> interlinks added`);
+    parts.push('');
   }
 
   // Others
