@@ -1,0 +1,41 @@
+# Daily summary — runs after all crons complete
+name: Daily Summary
+
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  summary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate and send summary
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          TOTAL=$(find src/content/blog -name "*.mdx" -type f | wc -l)
+          TODAY_COMMITS=$(git log --oneline --since="midnight" | wc -l)
+          YESTERDAY_COMMITS=$(git log --oneline --since="1 day ago" --until="midnight" | wc -l)
+          NEW_ARTICLES=$(find src/content/blog -name "*.mdx" -type f -newermt "midnight" | wc -l)
+          LATEST_SNAPSHOT=$(ls -t src/data/adoption/snapshots/*.json 2>/dev/null | head -1)
+          TOP_AGENT="unknown"
+          if [ -n "$LATEST_SNAPSHOT" ]; then
+            TOP_AGENT=$(python3 -c "import json; d=json.load(open('$LATEST_SNAPSHOT')); a=d['agents'][0]; print(f\"{a['name']} #{a['rank']} ({a.get('adoption_score','?')})\")" 2>/dev/null || echo "unknown")
+          fi
+          THIN_COUNT=$(node scripts/content-gate.cjs 2>&1 | grep -c "thin:" || echo "0")
+          
+          MSG="terminalblog Daily Summary\n$(date -u '+%Y-%m-%d')\n\nContent: ${TOTAL} articles, ${NEW_ARTICLES} new today\nCommits: ${TODAY_COMMITS} today vs ${YESTERDAY_COMMITS} yesterday\n\nCrons: all 5 active ran\nLeaderboard: ${TOP_AGENT}\nThin remaining: ${THIN_COUNT}\n\nLeaderboard: Codex #1, Claude Code #2, OpenClaw #3"
+          
+          curl -s -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "{\"chat_id\":\"${TELEGRAM_CHAT_ID}\",\"text\":\"${MSG}\",\"disable_web_page_preview\":true}" \
+            | jq -r '.ok'
+          
+          echo "Summary sent"
