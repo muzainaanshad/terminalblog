@@ -1,0 +1,78 @@
+---
+title: "Beware: Oh-My-Pi Subagents Can Write Into Your Protected Parent Checkout (Write-Root Not Enforced)"
+description: "A verified oh-my-pi bug shows non-isolated subagents inherit the parent cwd with no enforced write boundary, so edit/write/ast_edit calls can silently land in your main checkout. Here's who's affected, the real incident, and how to contain it."
+pubDate: "2026-07-14T13:00:00Z"
+updatedDate: "2026-07-14T13:00:00Z"
+tags: ["security", "beware", "oh-my-pi", "subagents", "sandbox-escape", "file-write"]
+tool: "oh-my-pi"
+author: "kira_bug_hunter"
+image: "/api/og?title=Beware:%20Subagent%20Write-Root%20Escape&tool=Oh-My-Pi"
+---
+
+You spin up a fleet of subagents to parallelize edits against a shared worktree. You brief each one with absolute paths. You trust the orchestrator to keep every spawned subprocess inside its own sandbox. And then, silently, one of those subagents writes a file into your *real* checkout — the protected parent tree you never intended any subagent to touch. No error, no warning. Just a polluted git status you only catch later. That is not a hypothetical; it is a reproduced failure logged in oh-my-pi this week, and it has real blast radius for anyone running multi-subagent orchestration.
+
+## The Issue
+
+GitHub issue [#5387](https://github.com/can1357/oh-my-pi/issues/5387) (open, filed 2026-07-14 by @TobiasFandrich) reports that oh-my-pi enforces write-root pinning for *isolated* subagents but leaves *non-isolated* subagents with no enforced boundary on where their `edit`, `write`, and `ast_edit` calls are allowed to land.
+
+The mechanics are spelled out in the issue. `task` already has genuine isolation machinery — `task.isolation.mode` (apfs/btrfs/zfs/reflink/overlayfs/projfs/block-clone/rcopy/auto), materialized through the pi-natives PAL (`ensureIsolation` → `isoResolve`/`isoStart`) with patch or branch merge-back into the parent (`packages/coding-agent/src/task/worktree.ts`). That path is solid *for the `isolated: true` case*.
+
+The gap is the non-isolated path. Per the task tool's own flow notes, "Non-isolated spawns call `runSubprocess(...)` directly [with] parent cwd." Any subagent item that does not opt into isolation — which, as the reporter notes, is *most* orchestrator-pattern executors doing parallel file edits under a shared worktree layout — inherits the parent process's cwd with no enforced containment. The only guardrail is the prose in the task brief telling the subagent to use absolute worktree paths.
+
+Prose is not a security boundary. The issue documents two real recurrences:
+
+- **2026-07-13** (marbetDE PR #4 retro): an executor subagent wrote **4 files into the parent checkout** despite its brief explicitly specifying absolute worktree paths.
+- **2026-07-14, same day, same run**, while building the mitigation for the above: it recurs. One edit resolved a relative path against the wrong cwd and landed in the protected main checkout. It was caught and reverted post-hoc by fingerprint-based detection (git status/diff hashing around each spawn).
+
+The reporter's local mitigation — a custom extension hooking `tool_call` (the pre-exec lifecycle hook that may block) to reject `edit`/`write`/`ast_edit` calls whose resolved path falls inside a protected root but outside the subagent's allowed root — works, but it is glued on from *outside* the tool layer. Every team doing multi-subagent orchestration against a shared checkout has to reinvent it, the guard only covers the editor tools it intercepts, and everything else (notably `bash` file mutations) still relies on post-hoc fingerprint diffing.
+
+## Are You Affected?
+
+You are in the blast radius if **all** of the following are roughly true:
+
+- You use oh-my-pi with `task`/subagents for editing work (not just isolated one-shot spawns).
+- Your orchestration pattern relies on **non-isolated** subagents — parallel executor/editor subagents sharing one worktree rather than paying the isolation-mode overhead per subprocess.
+- Multiple subagents write files in the same run, and at least one subagent's brief depends on relative paths or on the harness honoring a declared working directory.
+
+The danger is worst precisely because it is silent. An isolated subagent failure usually shows up immediately (no merge-back, sandbox error). A non-isolated write-root escape shows up as ordinary-looking files appearing in the wrong place — sometimes not discovered until a commit, a review, or a deploy picks them up. The reporter only caught theirs via hash fingerprinting *after the fact*.
+
+Run this after any dense multi-subagent run where you did not opt into isolation:
+
+```bash
+# Snapshot what the parent tree looked like before the run
+git -C /path/to/main-checkout status --porcelain > /tmp/before.txt
+
+# After the run, diff against the snapshot
+git -C /path/to/main-checkout status --porcelain > /tmp/after.txt
+diff /tmp/before.txt /tmp/after.txt
+
+# If anything shows up that a subagent "shouldn't" have touched,
+# inspect the offending paths and the subagent's resolved cwd
+git -C /path/to/main-checkout status --porcelain | grep -v '^??'  # tracked mutations
+```
+
+If tracked or untracked files appear in the parent checkout that no top-level command of yours created, you have likely hit the write-root escape.
+
+## The Fix / Mitigations
+
+Until the tool layer enforces a per-task-item `cwd`/`writeRoot` pin (the reporter's explicit ask — a `cwd`/`writeRoot` field on the task item shape, enforced inside `edit`/`write`/`ast_edit` and ideally the file-touching paths of `bash`, not via external interception), you have to build the boundary yourself:
+
+1. **Prefer isolation for any subagent that writes.** Set `isolated: true` on task items. Isolated spawns already get write-root containment for free via workspace materialization. The escape is specifically the non-isolated path, so the cheapest fix is to stop using it for writers.
+
+2. **Add a `tool_call` guard extension.** Mirror the reporter's approach: hook `tool_call` (pre-exec, blocking-capable), resolve the target path of any `edit`/`write`/`ast_edit` call, and reject it when the resolved path is inside a protected root but outside the subagent's allowed root.
+
+3. **Fingerprint before/after every run.** As shown above, snapshot `git status --porcelain` and diff it. Make it a non-negotiable step in any CI or pre-commit wrapper that invokes multi-subagent edits.
+
+4. **Ban relative paths in subagent briefs — and verify, don't trust.** Even absolute paths failed twice in the documented incident. Treat the subagent's chosen cwd as untrusted and gate writes at the harness, not the prompt.
+
+5. **Run `git status` review as a gate, not an afterthought.** If you cannot prove the parent tree is unchanged after a run, do not commit.
+
+The clean upstream fix is small and well-scoped: thread the existing "subagent has a cwd" concept into an *enforced* boundary at the tool layer for both isolated and non-isolated spawns, without new isolation backends or merge-strategy changes. Until that lands, containment is your responsibility.
+
+## Ecosystem Pattern
+
+This is not an oh-my-pi-only quirk — it is a structural class of bug in subagent orchestration: **the boundary between a spawned agent and the parent workspace is only as strong as the harness's enforcement, not its documentation.** Across the coding-agent ecosystem, "subagents get their own directory" is overwhelmingly implemented as a *convention* (a passed cwd, a brief instruction, a worktree you hope they respect) rather than a *hard* containment primitive for the non-isolated path.
+
+The safe pattern — materialize a real, separate workspace and merge back — is exactly what oh-my-pi already does for `isolated: true`, and what every agent that cares about operator safety should default to for any subprocess that can write. The cheap pattern — inherit the parent cwd and trust the model to stay in bounds — is what produces escapes like #5387. If you orchestrate subagents in *any* agent, assume the non-isolated path has this shape until you have proven otherwise, and gate writes accordingly.
+
+This is the same defensive posture we lay out in the [Coding Agent Security Checklist (2026)](/blog/coding-agent-security-checklist-2026/): treat the agent's filesystem as a privilege boundary, require explicit sandboxing for anything that writes, and verify the boundary with tooling rather than prose. A subagent that can touch your main checkout without an error is a privilege-escalation surface — contain it before it ships something you didn't author.
