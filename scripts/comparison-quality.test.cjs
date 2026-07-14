@@ -54,4 +54,41 @@ describe('comparison quality rewrites', () => {
     assert.notEqual(a.trim(), b.trim());
     assert.match(b, /token/i);
   });
+
+  it('no comparison file has consecutive identical paragraphs (pad spam)', () => {
+    const files = listComparisons();
+    const bad = [];
+    for (const f of files) {
+      const body = fs
+        .readFileSync(path.join(BLOG, f), 'utf8')
+        .replace(/^---[\s\S]*?---/, '');
+      const paras = body
+        .split(/\n\n+/)
+        .map((p) => p.replace(/\s+/g, ' ').trim())
+        .filter(Boolean);
+      for (let i = 1; i < paras.length; i++) {
+        if (paras[i] === paras[i - 1] && paras[i].length > 40) {
+          bad.push(f);
+          break;
+        }
+      }
+      const spam = paras.filter((p) =>
+        p.startsWith('Teams that win with agents treat the harness')
+      );
+      if (spam.length > 1) bad.push(f + ':spam');
+    }
+    assert.deepEqual(bad, [], JSON.stringify(bad.slice(0, 20)));
+  });
+
+  it('pad-thin-comparisons.cjs does not contain a while-loop that appends a fixed spam sentence', () => {
+    const src = fs.readFileSync(
+      path.join(__dirname, 'pad-thin-comparisons.cjs'),
+      'utf8'
+    );
+    assert.doesNotMatch(
+      src,
+      /while\s*\([^)]*words\s*<\s*1000[\s\S]{0,200}Teams that win with agents/
+    );
+    assert.match(src, /BANK/);
+  });
 });
