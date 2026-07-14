@@ -20,6 +20,8 @@ Purpose: grow traffic with **trustworthy, durable coverage** of AI coding agents
 
 Hermes crons were retuned: firehose jobs paused; article generator once/day quality-only.
 
+**When new posts appear:** see [new-post-cadence.md](./new-post-cadence.md). Sparse homepage updates are intentional while quality rewrites run on existing comparison URLs.
+
 ## What we publish (priority order)
 
 1. **Security / Beware** — GitHub issues with repro, mitigations, blast radius  

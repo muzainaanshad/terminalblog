@@ -25,6 +25,14 @@ Push `master` → Vercel auto-deploys. No manual `vercel --prod` needed.
 | **Vercel** | Build + host terminalblog.com |
 | **Beehiiv** | Collect subscribers only (API *send* is Enterprise-blocked) |
 
+## New posts on the site
+
+Sparse **new** URLs are **deliberate** (just-shipped firehose paused). See [new-post-cadence.md](./new-post-cadence.md).
+
+- Quality article generator: daily ~15:00, ≤1 post if gate passes  
+- Weekly digest: Monday GHA  
+- Comparison rewrites update **existing** slugs (not a firehose of new posts)
+
 ## Content hard rules
 
 1. Run `node scripts/content-gate.cjs --strict` before writing; per-file after draft.

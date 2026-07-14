@@ -370,14 +370,13 @@ function main() {
     process.exit(1);
   }
   if (STRICT && targetFile) {
+    // Only this draft's issues fail the gate. Corpus-wide daily caps are reported
+    // but must not block upgrading an unrelated evergreen file.
     const draftErrors = report.articles.reduce(
       (n, a) => n + a.issues.filter((i) => i.level === 'error').length,
       0
     );
-    const todayThrottleErrors = throttle.violations.filter(
-      (v) => v.level === 'error' && String(v.msg).startsWith(TODAY)
-    ).length;
-    if (draftErrors + todayThrottleErrors > 0) process.exit(1);
+    if (draftErrors > 0) process.exit(1);
     process.exit(0);
   }
   if (STRICT && !targetFile) {
