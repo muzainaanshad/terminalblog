@@ -50,8 +50,34 @@ function addRelatedSection(article, relatedArticles) {
   ).join('\n')}`;
 
   // Insert before the last separator or affiliate CTA
-  let insertPoint = article.raw.lastIndexOf('\n---\n');
-  if (insertPoint === -1) {
+  // Find the last --- separator (but skip frontmatter closing)
+  const lines = article.raw.split('\n');
+  let lastSepIdx = -1;
+  let inFrontmatter = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() === '---') {
+      if (!inFrontmatter) {
+        inFrontmatter = true; // first --- = frontmatter start
+      } else {
+        lastSepIdx = i; // subsequent --- = possible separator
+      }
+    }
+  }
+  
+  let insertPoint;
+  if (lastSepIdx > 0) {
+    // Find byte position of that line
+    insertPoint = article.raw.indexOf('\n---\n', article.raw.indexOf('---') + 3);
+    // Find the LAST --- after frontmatter
+    const allSeps = [];
+    let pos = 0;
+    while ((pos = article.raw.indexOf('\n---\n', pos)) !== -1) {
+      allSeps.push(pos);
+      pos += 5;
+    }
+    // Skip first two --- (frontmatter open/close), use the rest
+    insertPoint = allSeps.length > 2 ? allSeps[allSeps.length - 1] : article.raw.length;
+  } else {
     insertPoint = article.raw.lastIndexOf('\n*Your coding agent');
     if (insertPoint === -1) {
       insertPoint = article.raw.length;
