@@ -1,8 +1,8 @@
 ---
 title: "AGENTS.md Complete Guide — Make Every Coding Agent Follow Your Repo Rules"
-description: "How to write AGENTS.md (and related instruction files) so Claude Code, OpenCode, Cursor, Codex, and others respect your architecture, tests, and safety rules."
+description: "How to write AGENTS.md (and related instruction files) so Claude Code, OpenCode, Cursor, Codex, and others respect your architecture, tests, and safety rules. Includes OS-specific pitfalls, permission boundaries, and a loop to prove the agent is actually reading it."
 pubDate: 2026-07-13
-updatedDate: 2026-07-13
+updatedDate: 2026-07-15
 tags: ["agents-dot-md", "guide", "pillar", "best-practices", "workflow"]
 tool: "opencode"
 author: "ada"
@@ -29,6 +29,17 @@ Agents thrash when:
 - Safety (“never force push”, “no prod secrets”) is implied  
 
 `AGENTS.md` is the **always-on brief**. Put it at the repo root. Keep it short enough to load, strict enough to prevent disasters.
+
+## How harnesses actually load it (don't assume)
+
+A surprising number of "my AGENTS.md is ignored" bugs come from misunderstanding discovery order, not bad content. The rules below reflect how mainstream harnesses behave in practice:
+
+- **Repo root is the default.** Most agents read `./AGENTS.md` relative to the working directory they were launched in. If you start the agent in a subdirectory (or it `cd`s into one), the root file still applies, but a `docs/AGENTS.md` in the subfolder layers on top.  
+- **Agent-specific names take precedence where supported.** Claude Code reads `CLAUDE.md`; Cursor reads project rules; OpenCode and many open agents read `AGENTS.md`. When a harness supports both, the agent-native name (e.g. `CLAUDE.md`) is often loaded *in addition to* `AGENTS.md`, not instead of it — so keep them in sync or have one import the other.  
+- **Nested files layer, they don't replace.** A `packages/api/AGENTS.md` adds repo-local constraints for that package. This is your friend for monorepos: root file for universal rules, package files for invariants that only matter there.  
+- **Linked docs are not auto-loaded.** Writing "see `docs/architecture.md`" does not mean the agent read it. If a rule is load-bearing, paste the rule or use an explicit `@path` import that your harness supports. Vague references are the #1 cause of agents "forgetting" a constraint that was technically documented.
+
+The mental model: `AGENTS.md` is the file that gets **automatically injected into context**. Anything outside it must be explicitly pulled in.
 
 ## Minimal template
 
@@ -93,25 +104,70 @@ One paragraph: what this repo does, who it serves.
 - Prefer explicit test and lint commands; cloud agents love “done” without proof.  
 - Sandbox assumptions differ by OS — verify.
 
+## Operating system pitfalls (the section most teams skip)
+
+If your agents behave perfectly on macOS and "randomly" break on Windows (or CI), the cause is usually in `AGENTS.md` itself, not the model.
+
+- **Line endings.** A file written with CRLF on Windows and LF on Linux confuses diffs and some test fixtures. State `*.sh text eol=lf` in `.gitattributes` and tell the agent never to rewrite line endings as a side effect of an edit.  
+- **Path separators.** Agents trained on Unix will emit `src/utils/foo.ts` but Windows shells and some tools want `src\utils\foo.ts`. Tell the agent explicitly: "use forward slashes in all paths; this repo builds on Windows."  
+- **Shebang and shell.** A `./scripts/build.sh` with no executable bit works on Windows WSL but fails on a bare Windows terminal. Either call it through `bash scripts/build.sh` (what you put in AGENTS.md) or document the invocation that actually works on every target OS.  
+- **`node_modules`/`.venv` assumptions.** A command that works because a binary is globally installed on your laptop will fail in CI. Pin the command to the repo-local binary: `npx tsc` not `tsc`, `python -m pytest` not `pytest`.  
+- **Symlinks and case-sensitivity.** macOS is case-insensitive by default; Linux is not. "I renamed `Utils` to `utils`" is a silent break on deploy. State the canonical casing and forbid case-only renames.  
+
+These five alone eliminate most "works on my machine" agent failures.
+
+## Permissions are not the same as instructions
+
+A common mistake is treating `AGENTS.md` as a security boundary. It is not. `AGENTS.md` is **advice the model is asked to follow**; a permission system is an **enforced gate the model cannot bypass**.
+
+- Put *intent* in `AGENTS.md`: "never force-push main."  
+- Put *enforcement* in the harness: deny `git push --force`, require approval for `rm -rf`, sandbox network egress.  
+
+When the agent "ignores" a safety rule, the fix is usually to move it from the advice layer to the enforcement layer. See the [security checklist](/blog/coding-agent-security-checklist-2026/) for the boundary that actually holds. The guide on the [feature every coding agent is missing](/blog/feature-every-coding-agent-missing/) covers why enforcement beats trust.
+
 ## Progressive disclosure (context hygiene)
 
-1. **Root AGENTS.md** — always loaded, &lt; ~200–400 lines ideally  
+1. **Root AGENTS.md** — always loaded, < ~200–400 lines ideally  
 2. **docs/** or **skills/** — loaded when the task matches  
 3. **Never** paste entire design history into the root file  
 
+When the root file crosses ~400 lines, agents start skipping it the same way humans skim a wall of text. If your rules are long, promote whole sections into linked `docs/` files and keep the root as an index with the few rules that are truly universal.
+
+## How to prove the agent is reading it
+
+Instructions you can't verify are wishes. Add a 60-second check to your workflow:
+
+1. Add a deliberately odd-but-harmless rule, e.g. "Always echo `AGENTS_OK` as the first line of any shell output in this repo."  
+2. Ask the agent a trivial task and watch whether it complies.  
+3. If it doesn't, the file isn't being loaded at the path/working directory you assumed — fix discovery before blaming the model.  
+
+Remove the canary rule after the check. This single loop resolves the majority of "it ignores my file" reports.
+
+## Monorepo and multi-repo patterns
+
+- **Monorepo:** root `AGENTS.md` for universal rules (no force-push, run tests, match style). Per-package `AGENTS.md` for invariants that only matter there (e.g. "the `api` package owns the database schema; never edit migrations by hand").  
+- **Shared conventions across repos:** keep the canonical rules in one repo and have others `@import` or copy a pinned version. A drifting copy is worse than no file — version it.  
+- **Generated code:** explicitly tell the agent which directories are generated and must never be hand-edited ("`dist/`, `*.pb.go`, `openapi_client/` are generated; change the source, not the output").
+
 ## Anti-patterns
 
-| Don’t | Do |
+| Don't | Do |
 |-------|-----|
 | 2,000-line AGENTS.md | Split by feature/skill |
-| Vague “write clean code” | Concrete commands + paths |
+| Vague "write clean code" | Concrete commands + paths |
 | No safety section | Explicit deny list |
 | Duplicate rules in 5 files | One source of truth + links |
 | Ignore Windows | Note OS-specific pitfalls |
+| Trust instructions as security | Enforce in the permission layer |
+| Reference docs you never import | Paste the rule or `@import` it |
+
+## Keep it honest
+
+The fastest way to train an agent to ignore `AGENTS.md` is to put rules in it that are false. If the file says "tests run with `make test`" but the real command is `npm test`, the agent learns the file is unreliable and stops weighting it. Audit the commands in `AGENTS.md` the same way you'd audit a CI script — they must actually work, on the actual target OS, today.
 
 ## Pair with security
 
-Instruction files do not replace isolation. After you write `AGENTS.md`, still run the [security checklist](/blog/coding-agent-security-checklist-2026/).
+Instruction files do not replace isolation. After you write `AGENTS.md`, still run the [security checklist](/blog/coding-agent-security-checklist-2026/). For a full decision framework on which agent fits your stack, start from the [best coding agents decision guide](/blog/best-coding-agents-2026-decision-guide/).
 
 ## Related
 
