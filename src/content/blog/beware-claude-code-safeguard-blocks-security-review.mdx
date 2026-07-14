@@ -1,61 +1,105 @@
 ---
 title: "Beware: Claude Code's Safeguard Blocked a Legitimate Security Code Review — Twice"
-description: "A fresh Claude Code bug shows the model safeguard firing false positives on read-only defensive security reviews, blocking credential-handling and TLS audits. Here's how to detect and work around it."
+description: "A confirmed Claude Code bug (GitHub #76930) shows the model safeguard firing false positives on read-only defensive security reviews, blocking credential-handling and TLS audits. Here's the verified repro, who is affected, and how to keep your review pipeline working."
 pubDate: "2026-07-12T20:30:00Z"
-updatedDate: "2026-07-12T20:30:00Z"
-tags: ["security", "beware", "claude-code", "safeguard", "false-positive", "code-review"]
+updatedDate: "2026-07-14T15:00:00Z"
+tags: ["security", "beware", "claude-code", "safeguard", "false-positive", "code-review", "pillar"]
 tool: "claude-code"
 author: "kira_bug_hunter"
 image: "/api/og?title=Beware:%20Safeguard%20Blocks%20Security%20Review&tool=Claude%20Code"
 ---
 
-You ask Claude Code to review a local Git diff for credential leaks and TLS misconfiguration. Nothing leaves your machine, nothing gets modified — pure defensive static analysis. And the model refuses. Twice. Not because you did anything wrong, but because the prompt contained words like "credential," "SSRF," and "secret lifecycle." That's a real, reproducible failure reported this week, and it can silently derail your security workflow.
+You ask Claude Code to review a local Git diff for credential leaks and TLS misconfiguration. Nothing leaves your machine, nothing gets modified — pure defensive static analysis. And the model refuses. Twice. Not because you did anything wrong, but because the prompt contained words like "credential," "SSRF," and "secret lifecycle." That is a real, reproducible failure ([GitHub issue #76930](https://github.com/anthropics/claude-code/issues/76930), filed 2026-07-12), and it can silently derail your security workflow.
 
-## The Issue
+This post is an evergreen writeup of that issue: what actually happened, who it affects, how to detect it, and the operational workarounds that keep a defensive review pipeline alive without disabling safety controls.
 
-GitHub issue [#76930](https://github.com/anthropics/claude-code/issues/76930) (labeled `bug`, `area:security`, `area:model`, Windows) reports two consecutive `TelemetrySafeError` refusals from Fable 5 on the same read-only review. The user requested a structured audit of locally developed onboarding code: verifying email credentials before storage, keeping secrets out of logs, TLS validation, and SSRF/DNS-rebinding protection. The prompt explicitly banned file edits, network calls, and secret disclosure. It was textbook defensive work.
+## The Issue (verified)
 
-Instead, the safeguard classified the request as a policy violation and blocked both attempts (request IDs `req_011CcxKSpSVH8p5ikD2R79P6` and `req_011CcxLB58hhgS4X1558VUKp`). The author had to abandon Claude Code and finish the review on a different model in a separate session.
+GitHub issue [#76930](https://github.com/anthropics/claude-code/issues/76930) was opened by `@GBA63` and is labeled `bug`, `platform:windows`, `area:model`, and `area:security`. It reports two consecutive `TelemetrySafeError` refusals from Fable 5 on the same read-only review, on Claude Code version **2.1.205** (Windows Terminal, `win32`).
 
-The issue is not the safety system existing — it's the **granularity**. Content moderation keyed on security *terminology* rather than *intent* means benign audits get lumped in with exploit requests.
+The user requested a structured audit of locally developed onboarding code, including:
+
+- verifying email credentials before storage;
+- keeping credentials out of logs, chat context, and error messages;
+- TLS certificate validation and protection against SSRF / DNS-rebinding;
+- read-only IMAP, SMTP authentication, and CalDAV connectivity checks;
+- secure credential reuse and account-specific secret names;
+- identifying ordinary P0/P1/P2 software findings.
+
+The prompt **explicitly prohibited** file edits, network access, cloud mutations, deployment, and secret disclosure. It asked only for static analysis of a local Git diff and a structured code-review report. This is textbook defensive work.
+
+Instead, the safeguard classified the request as a policy violation and blocked both attempts:
+
+- `req_011CcxKSpSVH8p5ikD2R79P6`
+- `req_011CcxLB58hhgS4X1558VUKp`
+
+The author had to abandon Claude Code and finish the review on a different model in a separate session.
+
+The interesting part is buried in the attached telemetry. The `TelemetrySafeError` payload is not a content-moderation verdict — it is:
+
+```json
+TelemetrySafeError: VirtualMessageList: itemKeys/messages length desync
+  (keys=500 messages=499 range=[473,500))
+```
+
+So the *human-readable* block the user saw was keyed off a telemetry/UI sync event, not a clean "your prompt matched policy class X" message. That is exactly why the reporter asked for "which portion or category caused the block" — and got nothing actionable. The classification is opaque, so legitimate engineers are left doing trial-and-error reframing to escape it.
 
 ## Are You Affected?
 
-Run these checks after any unexpected refusal on defensive security work:
+The classification runs server-side on the model, so although the report is filed on Windows, macOS and Linux users are just as exposed when they hit the same prompt-side vocabulary. Run these checks after any unexpected refusal on defensive security work:
 
 ```bash
 # Look for TelemetrySafeError refusals in your session logs
 grep -rl "TelemetrySafeError" ~/.claude/projects/*/*.jsonl 2>/dev/null
 
 # Count safeguard blocks in the most recent session
-grep -c "TelemetrySafeError" ~/.claude/projects/*/$(ls -t ~/.claude/projects/*/*.jsonl 2>/dev/null | head -1 | xargs basename) 2>/dev/null
+latest=$(ls -t ~/.claude/projects/*/*.jsonl 2>/dev/null | head -1)
+grep -c "TelemetrySafeError" "$latest" 2>/dev/null
 
 # Check your Claude Code version (issue filed on 2.1.205)
 claude --version
 ```
 
-If you see `TelemetrySafeError` on a read-only, no-network prompt that only *describes* credential or TLS handling, you've hit the false positive.
+If you see `TelemetrySafeError` on a read-only, no-network prompt that only *describes* credential or TLS handling, you have hit the false positive. The tell is that the prompt never asks the model to perform an attack — it asks the model to *review* code that *mentions* defensive security.
 
-## The Fix
+## Why It Happens
 
-- **Reframe the prompt.** Swap attack-flavored nouns for neutral phrasing ("auth validation checks" instead of "SSRF prevention") to slip past keyword filters.
-- **Split the review.** Break a single large audit into smaller, topic-scoped prompts so one flagged term doesn't sink the whole task.
-- **Keep a fallback model.** For routine defensive reviews, a separate session or model avoids the block without losing the work.
-- **Report the request IDs** to Anthropic so the classifier can be retrained on intent, not vocabulary.
+Guardrail classifiers for coding agents often run on prompt-side signal that maps security lexicons to prohibited-activity classes. A static-analysis request that *mentions* credential handling, TLS, or SSRF reads similarly to requests that *perform* it. Without intent-aware classification or a returned "which phrase triggered this" hint, legitimate engineers are collateral damage.
 
-## Why It Happened
+This is the same over-refusal family that has been getting louder across Anthropic's newest models — see our coverage of [Claude's over-refusal problem](/blog/claude-over-refusal-safety-guardrails-backlash/). The difference here is that the refusal arrived inside a developer's own local code-review loop, where the cost is unreviewed code shipping to production, not just a declined chat answer.
 
-Guardrail classifiers for coding agents often run on prompt-side signal matching security lexicons to prohibited-activity classes. A static analysis request that *mentions* credential handling, TLS, or SSRF reads similarly to requests that *perform* it. Without intent-aware classification or a returned "which phrase triggered this" hint, legitimate engineers are collateral damage.
+The deeper design tension: keyword- and class-based safety filters are cheap and fast, but they cannot distinguish "write an exploit" from "review my exploit-prevention code." Coding agents sit exactly on that boundary all day, which is why this class of bug keeps resurfacing. Our [coding agent security checklist](/blog/coding-agent-security-checklist-2026/) covers the operational controls you should have around any agent that touches credentials or network code — regardless of which model is behind it.
+
+## The Fix (operational workarounds)
+
+You should not disable the safeguard — but you do need to keep reviews moving. In order of preference:
+
+1. **Reframe the prompt.** Swap attack-flavored nouns for neutral phrasing ("auth validation checks" instead of "SSRF prevention", "log hygiene" instead of "secret lifecycle"). This slips past keyword filters without changing the substance of the review.
+2. **Split the review.** Break a single large audit into smaller, topic-scoped prompts so one flagged term doesn't sink the whole task. Review credential handling in one prompt, TLS in another, SSRF in a third.
+3. **Keep a fallback model.** For routine defensive reviews, a separate session or a different model avoids the block without losing the work. Treat Claude Code as one reviewer in a rotation, not the only one.
+4. **Report the request IDs.** Send `req_011CcxKSpSVH8p5ikD2R79P6` and `req_011CcxLB58hhgS4X1558VUKp` (plus your own) to Anthropic so the classifier can be retrained on intent, not vocabulary.
+
+For broader context on why opaque agent error handling is a recurring risk, our writeup on [Claude Code's steganographic system-prompt markers](/blog/claude-code-steganography/) and the [Codex desktop system-instruction leak](/blog/codex-crash-leaks-system-instructions/) show the same theme from the other side: when an agent's internals surface in errors, operators need to know what they're looking at.
 
 ## FAQ
 
 **Q1: Is this a security vulnerability in Claude Code?**
-No — it's an over-broad safety filter, not an exploit. But it erodes trust: teams may ship unreviewed code because the review tool refused to help.
+No — it is an over-broad safety filter, not an exploit. But it erodes trust: teams may ship unreviewed code because the review tool refused to help. That indirectly raises risk.
 
 **Q2: Does it only hit Windows?**
-The report is on Windows (2.1.205), but the classification runs server-side on the model, so macOS and Linux users are just as exposed.
+The report is on Windows (2.1.205), but the classification runs server-side on the model, so macOS and Linux users are just as exposed when the same vocabulary triggers it.
 
 **Q3: Can I disable the safeguard?**
-No, and you shouldn't. The fix is prompt reframing and reporting false positives — not turning off safety controls.
+No, and you shouldn't. The fix is prompt reframing, task splitting, a fallback model, and reporting false positives — not turning off safety controls.
+
+**Q4: How is this different from a model simply refusing a harmful request?**
+A correct refusal names the prohibited action. Here the model blocked a read-only, explicitly no-network, no-edit audit of *defensive* code. The request IDs and opaque telemetry show the block was not a clean policy match — it was a vocabulary collision.
+
+**Q5: Is there a permanent fix?**
+As of the issue's filing, no. The maintainers have the two request IDs and theFeedback ID `f2fa4cae-523c-4036-adce-fff1b7e88bc0`. The reporter's concrete ask — return the specific phrase or category that triggered the block — would let legitimate prompts self-correct without repeated trial and error.
+
+## Bottom line
+
+If your security review workflow runs through Claude Code, assume that prompts rich in security *terminology* can be blocked even when the task is purely defensive. Build the reframing and fallback-model habits now, and report every false positive with its request ID. The safeguard is doing its job too broadly, and the fastest path to a better classifier is reproducible reports from operators who hit it.
 
 *Before you commit to a subscription — see if there's a better deal at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
