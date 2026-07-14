@@ -41,8 +41,8 @@ const LIMITS = {
   maxJustShippedPerDay: 0, // just-shipped disabled; use weekly digest only
   maxPostsPerDay: 3,
   minJustShippedWords: 800,
-  minAnyWords: 600,
-  minEvergreenWords: 1000,
+  minAnyWords: 400,
+  minEvergreenWords: 600,
   titleJaccardMax: 0.72,
   slugStemDistanceMax: 0.85,
 };
