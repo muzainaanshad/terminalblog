@@ -1,0 +1,87 @@
+---
+title: "Beware: Claude Code's permissions.deny Silently Fails on Absolute Paths — Your Credential Guard May Be a No-Op"
+description: "A documented Claude Code behavior means a permissions.deny rule written with a single leading slash resolves as project-relative and matches nothing — with no warning. If you hardened your project against reads of ~/.ssh, ~/.aws, or .env this way, the guard may be doing nothing."
+pubDate: "2026-07-15T01:00:00Z"
+updatedDate: "2026-07-15T01:00:00Z"
+tags: ["security", "beware", "claude-code", "permissions", "credentials", "hardening"]
+tool: "claude-code"
+author: "kira_bug_hunter"
+image: "/api/og?title=Beware:%20permissions.deny%20Silent%20No-Op&tool=Claude%20Code"
+---
+
+You wrote a `permissions.deny` rule to stop Claude Code from ever reading your `~/.ssh`, `~/.aws`, or `.env`. You tested nothing, because the rule *looks* like it does the job. It doesn't — and Claude Code will not tell you.
+
+A freshly filed GitHub issue ([#77568](https://github.com/anthropics/claude-code/issues/77568), labeled `area:security` and `area:permissions`) documents a silent, fail-open behavior that the maintainers consider *working as designed*. A `permissions.deny` rule written with a single leading `/` — the form almost every developer reaches for when guarding an absolute path — is interpreted as **project-relative** and therefore **matches nothing**. No error. No warning. The file you thought was locked down is returned on request.
+
+## What actually happens
+
+The resolution contract is documented: in Claude Code's permission matcher, a leading `/` is **project-relative**, and only `//` is treated as an absolute path. That is defensible at the spec level — it mirrors the gitignore convention where a leading `/` anchors a pattern to the repository root. But it is the **exact opposite** of the intuition every developer brings to a literal absolute filesystem path, and the product does nothing to correct it.
+
+The reporter's reproduction is unambiguous. In a project rooted at `/Users/me/src/myproject`, they placed this in `.claude/settings.json`:
+
+```json
+{
+  "permissions": {
+    "deny": [
+      "Read(/Users/me/.ssh/**)",
+      "Read(/Users/me/.aws/credentials)"
+    ]
+  }
+}
+```
+
+Then, in a session launched from that project, they asked Claude to read `~/.ssh/config`.
+
+- **Expected:** denied.
+- **Actual:** **allowed** — the file's contents were returned.
+
+The rule silently resolved to `/Users/me/src/myproject/Users/me/.ssh/**`, a path that matches nothing, so the deny rule never fires. The reporter verified this on Claude Code v2.1.209 (macOS). The two *correct* forms are `Read(//Users/me/.ssh/**)` (double slash = absolute) or `Read(~/.ssh/**)` (home-relative tilde).
+
+This is not a bug in path resolution — the issue explicitly says so. It is a report that **the failure is silent on precisely the paths where silence is most dangerous.**
+
+## Who is affected
+
+Anyone who hardened a project by the obvious method. That includes:
+
+- Developers who added `Read(/Users/...)`, `Read(/home/...)`, `Read(/etc/...)`, or `Read(C:/Users/...)` deny rules to keep agents out of SSH keys, AWS credentials, GnuPG homes, or kubeconfig files.
+- Teams that ship a shared `.claude/settings.json` with credential guards baked in, believing it protects every engineer who clones the repo.
+- Anyone who combined a `sandbox.credentials` deny entry with a `permissions.deny` Read rule and assumed the two guards were redundant. They are **not** redundant — `sandbox.credentials` guards the Bash sandbox, not the Read tool. The reporter confirms a project can have both guards present and the Read tool still returns the file.
+
+The blast radius is large precisely because the mistake is invisible. A misconfigured *allow* rule fails **closed** — you get denied, you notice, you fix it. A misconfigured *deny* rule fails **open** — and you only discover it when something reads the credential you believed was guarded. The issue notes the rule had been in place, believed effective, for some time, and was found only because the team ran an explicit enforcement probe.
+
+## Why this is the dangerous kind of bug
+
+Security controls are only useful if a failure to apply them is loud. This one is silent by construction. Three properties make it worse than a typical misconfiguration:
+
+1. **Fail-open, not fail-closed.** Deny rules that can't match don't block; they vanish. There is no "rule did not apply" log line, no startup notice, no `claude doctor` flag.
+2. **The hazard path is the high-value path.** The single-leading-`/` form is what people write for `~/.ssh`, `~/.aws`, `~/.gnupg`, and `.env` — the highest-consequence files on the machine. It is never used for low-stakes project files, so the bug only manifests where a mistake costs the most.
+3. **It defeats "belt and suspenders" hardening.** Because `sandbox.credentials` and `permissions.deny` operate on different surfaces (Bash sandbox vs. the Read/Edit/Write tools), a team that deployed both can be doubly misled. The presence of two guards reads as thorough; neither is effective for the Read path.
+
+This also intersects with a broader, long-standing confusion. The reporter links [issue #51211](https://github.com/anthropics/claude-code/issues/51211), an open report of `permissions.deny` Read rules silently not enforcing — whose original repro (`Read(/Users/.../Downloads/**)`) has the *same* single-leading-`/` shape. That thread attributed failures to a different mechanism (a broad `allow` wildcard beating a specific `deny`). Issue #77568 documents the leading-`/`-resolves-project-relative root cause specifically, which the earlier thread doesn't cover. If you read #51211 and concluded "my deny rule must be losing to an allow rule," check first whether you were ever using the right slash count.
+
+## Mitigations — what to do right now
+
+Audit every `permissions.deny` rule you have that is meant to protect a credential location. The fix is mechanical:
+
+- **Use `//` for absolute paths.** Change `Read(/Users/me/.ssh/**)` to `Read(//Users/me/.ssh/**)`. The double leading slash is the documented absolute form.
+- **Or use the tilde.** `Read(~/.ssh/**)` and `Read(~/.aws/credentials)` are home-relative and resolve the way you expect.
+- **Don't rely on `sandbox.credentials` alone for Read.** If you want the Read tool blocked, the rule must be in `permissions.deny` with the correct absoluteness marker. Treat `sandbox.credentials` as a Bash-surface control only.
+- **Probe your own guard.** Ask the agent, in a throwaway session, to read a file you believe is denied. If it returns contents, your rule is a no-op. The reporter only caught this by running an explicit enforcement probe — make that a standing check.
+- **Prefer project-local secrets over home-directory secrets** where you can. A deny rule like `Read(.env)` (no leading slash = matches in-project) actually works and is easy to get right. The dangerous case is almost always the machine-global home path.
+
+The reporter's suggested product fixes — any one of which would close this — are worth quoting back to the maintainers: warn when a `Read`/`Edit`/`Write` deny path begins with a single `/` and looks like an absolute filesystem path; warn on any rule that can never match; surface each rule's *resolved* path in a `claude doctor` / `/permissions` view; and at minimum, call the hazard out explicitly in the credential-guarding examples in the permissions docs.
+
+## The ecosystem pattern
+
+This is not unique to Claude Code, and that is the real lesson. Every agent permission system that layers a matcher over POSIX-style paths inherits the same trap: **a deny rule that fails to parse-correct silently becomes allow.** We have seen the same shape across the ecosystem this cycle:
+
+- Gitlawb's `zero` has a cluster of open sandbox-credential issues ([#677](https://github.com/Gitlawb/zero/issues/677), [#676](https://github.com/Gitlawb/zero/issues/676), [#675](https://github.com/Gitlawb/zero/issues/675)) where env scrubbing misses custom `apiKeyEnv` and OAuth client secrets, and a daemon bearer token leaks into sandboxed commands.
+- GitHub's `copilot-cli` has an open report ([#4103](https://github.com/github/copilot-cli/issues/4103)) where a plugin marketplace clone disables Git credential helpers, breaking private HTTPS repos — a different mechanism, same theme of a guard being silently defeated.
+
+The pattern is consistent: credential guards fail quietly, and the failure is discovered by accident rather than by the tool. The durable defense is to **never trust a deny rule you have not empirically tested**, and to treat "it's in my settings" as zero evidence of enforcement.
+
+If you run an agent in CI, in a shared dev container, or against a repo that touches cloud credentials, build the probe into your workflow. A five-line check that asks the agent to read a canary secret file and asserts denial is worth more than any settings.json entry you have not verified.
+
+## Bottom line
+
+If you hardened Claude Code against credential reads using a single-leading-slash absolute path in `permissions.deny`, your guard is almost certainly a no-op and Claude Code said nothing. Switch to `//` or `~`, test the rule in a throwaway session, and don't assume `sandbox.credentials` covers the Read tool. For a standing, repeatable hardening routine across every agent you run, see our [AI Coding Agent Security Checklist for 2026](/blog/coding-agent-security-checklist-2026/).
