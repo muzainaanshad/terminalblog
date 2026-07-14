@@ -90,5 +90,50 @@ describe('comparison quality rewrites', () => {
       /while\s*\([^)]*words\s*<\s*1000[\s\S]{0,200}Teams that win with agents/
     );
     assert.match(src, /BANK/);
+    // Must advance a bank index / exhaust bank — not infinite same-line append
+    assert.match(src, /bi\s*<\s*BANK\.length|BANK\[bi/);
+  });
+
+  it('no comparison file contains known pad-bank signature sentences', () => {
+    const sigs = [
+      'Teams lose weeks debating brands instead of measuring jobs',
+      'Cost is not only seats. Retries, parallel subagents, and full-repo context dumps dominate API spend',
+      'That is the whole method.',
+      'Teams that win with agents treat the harness as infrastructure',
+    ];
+    const bad = [];
+    for (const f of listComparisons()) {
+      const raw = fs.readFileSync(path.join(BLOG, f), 'utf8');
+      for (const s of sigs) {
+        if (raw.includes(s)) bad.push(`${f}:${s.slice(0, 40)}`);
+      }
+    }
+    assert.deepEqual(bad, [], JSON.stringify(bad.slice(0, 20)));
+  });
+
+  it('pillar comparisons have no post-aifiesta bank dump', () => {
+    for (const f of [
+      'open-source-vs-commercial-coding-agents-guide.mdx',
+      'coding-agent-features-comparison-2026.mdx',
+      'coding-agents-vs-github-copilot-difference.mdx',
+    ]) {
+      const raw = fs.readFileSync(path.join(BLOG, f), 'utf8');
+      assert.doesNotMatch(raw, /## Operator close:/i);
+      assert.doesNotMatch(
+        raw,
+        /Teams lose weeks debating brands|That is the whole method/i
+      );
+      // After last aifiesta line: no new ## headings
+      const idx = raw.toLowerCase().lastIndexOf('aifiesta.link');
+      if (idx === -1) continue;
+      const lineEnd = raw.indexOf('\n', idx);
+      const after = lineEnd === -1 ? '' : raw.slice(lineEnd + 1).trim();
+      assert.doesNotMatch(
+        after,
+        /^## /m,
+        `${f} has heading after aifiesta footer`
+      );
+    }
   });
 });
+

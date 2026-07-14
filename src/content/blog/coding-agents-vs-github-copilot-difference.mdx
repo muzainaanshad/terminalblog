@@ -10,6 +10,8 @@ image: "/api/chart?type=features&agents=copilot-cli,claude-code"
 ---
 “We already have Copilot” is the most common reason teams skip real agent evaluations. Sometimes that is correct. Often it confuses **inline completion** with an **agent that plans, runs tools, and iterates on failures**.
 
+This page draws a hard line between those product classes, then explains when GitHub-native agent modes change the story—and when they do not.
+
 ## Quick verdict
 
 - **Stay on Copilot-style completion** when you want faster typing inside an editor with low blast radius.
@@ -51,15 +53,34 @@ If a product can open a shell, edit many files, and push commits, **evaluate it 
 
 If your world is Issues/PRs/Actions, GitHub-integrated agents reduce glue code. That is a **workflow** win, not proof they are safer. Still apply the [security checklist](/blog/coding-agent-security-checklist-2026/): deny-by-default secrets, no force-push to shared branches, human merge.
 
+GitHub-native also means identity and audit trails may already exist in your org. That can make **procurement** easier and **blast radius** larger at the same time—especially if bot accounts hold write access across many repositories.
+
 ## Cost confusion
 
 Autocomplete feels “included.” Agents surface **token and retry cost**. A “free” OSS agent with BYO keys can outspend a Copilot seat during a bad loop. Model a busy week, not a demo day—[pricing guide](/blog/coding-agent-pricing-guide-2026/).
+
+Concrete comparison for finance:
+
+| Scenario | Autocomplete-like cost | Agent-like cost |
+|---|---|---|
+| Typist writing one file for an hour | Mostly seat | Seat + light chat |
+| Agent retries a failing test 40 times | Rare | Tokens explode |
+| Parallel subagents on three tickets | N/A | Multiplies usage |
+| Overnight cron job | N/A | Needs caps + separate keys |
+
+If leadership only understands seat pricing, show them a single bad agent loop invoice once—politely—before expanding access.
 
 ## Community patterns worth trusting (and ignoring)
 
 Trust patterns that survive across companies: IDE agents win for typing speed; terminal agents win for multi-step tool loops; hybrid stacks are common. Ignore patterns that require a single viral demo repo or a vendor employee as the only source.
 
-When someone says “Copilot already does this,” ask whether they mean inline completion, chat in the editor, or a full agent with shell access. Those three share a brand family and almost none of the risk profile.
+When someone says “Copilot already does this,” ask whether they mean:
+
+1. Inline completion in the editor
+2. Chat in the editor with limited tools
+3. A full agent with shell, multi-file edit, and PR loops
+
+Those three share a brand family and almost none of the risk profile. Treat them as three different products in policy documents even if marketing uses one logo.
 
 ## Rollout checklist for mixed Copilot + agent teams
 
@@ -68,45 +89,37 @@ When someone says “Copilot already does this,” ask whether they mean inline 
 3. Require worktree isolation and human merge for agent PRs.
 4. Cap token spend and log tool use.
 5. Write the policy in AGENTS.md before expanding seats.
+6. Define which ticket types are “agent-eligible” (migrations, CI triage) vs “human-first.”
 
 If the pilot only produces demos, the failure is process—not “AI.” If the pilot produces merged work with clear review, expand carefully.
 
-## More operator context
+## Skills teams need for each class
 
-Teams lose weeks debating brands instead of measuring jobs. Lock three production-like tasks, run both tools the same afternoon, and write down: default tool, specialist tool, and forbidden actions.
+**Autocomplete skills:** accept/reject speed, prompt snippets, knowing when to ignore a bad suggestion.
 
-Windows and Linux still diverge on path handling and process cleanup. Cost is not only seats—retries and context dumps dominate. Security policy is part of feature fit. Revisit quarterly and prefer updating a strong URL over inventing near-duplicate posts.
+**Agent skills:** writing tickets the agent can execute, reviewing multi-file diffs, reading tool logs, killing runaway jobs, and refusing to merge “the agent said it works” without CI.
+
+Training only the first skill set, then handing out agent credentials, is how orgs create incident tickets labeled “AI chaos” that are really process failures.
+
+## Decision table for engineering managers
+
+| Question | If yes… | If no… |
+|---|---|---|
+| Can we absorb multi-file review debt this quarter? | Pilot an agent | Stay on completion |
+| Do we forbid shell from AI tools? | Completion only | Agent possible with sandbox |
+| Is GitHub the system of record for all code? | Prefer GitHub-native agents | Evaluate terminal agents too |
+| Do we need overnight unattended work? | Agent with cron + caps | Interactive tools enough |
+| Can we pin models and revoke bot tokens fast? | Scale agents | Keep scope tiny |
+
+## One-week pilot template
+
+Day 1–2: completion only on normal tickets (baseline). Day 3–4: one agent on a non-prod migration and one CI failure. Day 5: compare review comments, incidents, and spend. Publish the default/specialist decision before day 6 expands access. If the pilot cannot produce a written policy, do not buy more seats—buy process.
 
 ## Bottom line
 
-**Copilot-class tools optimize keystrokes. Agents optimize jobs.** Use both when your process can absorb the risk; never pretend they are the same product category.
+**Copilot-class tools optimize keystrokes. Agents optimize jobs.** Use both when your process can absorb the risk; never pretend they are the same product category. Name the default, name the specialist, measure three real tickets, and put the policy in AGENTS.md so the argument does not restart every sprint planning.
 
-Related: [best coding agents decision guide](/blog/best-coding-agents-2026-decision-guide/), [leaderboard](/leaderboard/).
+Related: [best coding agents decision guide](/blog/best-coding-agents-2026-decision-guide/), [feature matrix](/blog/coding-agent-features-comparison-2026/), [leaderboard](/leaderboard/).
 
 ---
 *Testing multiple models while you evaluate agents? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** keeps multi-model access simple.*
-
-Cost is not only seats. Retries, parallel subagents, and full-repo context dumps dominate API spend. Prefer tools that expose usage and allow hard caps. Prefer processes that require human review before production changes.
-
-Security is part of feature fit. An agent that can schedule jobs and open the network needs a written policy: who owns the API keys, where logs live, and how MCP or plugins are approved. Open source helps audit; it does not remove the need for policy.
-
-Revisit the decision quarterly. Model providers, agent harnesses, and your team size change faster than most internal standards documents. Updating an existing comparison URL with a fresh updatedDate is better for readers and for search than inventing a near-duplicate slug.
-
-Document the outcome in AGENTS.md so every future agent—human or automated—inherits the same defaults. Include model pins, approval gates, and which worktrees agents may touch.
-
-When two tools look similar on a feature matrix, break the tie with failure modes: who recovers better from a red CI log, who invents fewer files, and who asks before destructive shell commands.
-
-Treat adoption signals (stars, downloads, commits) as relative context from the leaderboard, not as proof of fitness for your monorepo. A quieter tool with better permissions UX can beat a louder brand.
-
-If you keep both tools, separate lanes: interactive day-to-day edits in one, long unattended jobs in the other. Shared lockfiles and shared branches are the fastest way to create false “the agent is bad” incidents.
-
-Prefer one strong updated page over ten thin rewrites. Search engines and readers both punish near-duplicate comparison spam; operators should too.
-
-Document the rollout: default tool, specialist tool, worktree policy, secret policy, and a quarterly review date. Prefer one strong updated URL over ten thin near-duplicates. Measure jobs, not brand heat.
-
-If the two tools still look equal after three real tickets, pick the one with clearer permissions UX and better recovery from a red CI log—not the one with more social proof.
-
-Keep human merge gates for production. Agents accelerate drafts; they do not replace review culture.
-
-Adoption signals from the leaderboard are relative context. A quieter tool with better permissions can beat a louder brand on your monorepo.
-

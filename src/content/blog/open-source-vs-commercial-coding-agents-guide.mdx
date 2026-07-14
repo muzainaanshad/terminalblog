@@ -10,6 +10,8 @@ image: "/api/chart?type=pricing&agents=hermes,claude-code"
 ---
 The open-source vs commercial debate for coding agents is usually ideology. Operators should treat it as **constraints**: who owns the harness, who answers at 2am, and what happens when a model vendor deprecates your default SKU.
 
+This guide is a procurement memo, not a fan thread. It maps **what you actually buy**, **where each class fails**, and **how hybrid stacks survive real release trains**.
+
 ## Quick verdict
 
 | Choose OSS agents when… | Choose commercial when… |
@@ -50,6 +52,8 @@ Examples in our catalog: Claude Code, Cursor, Copilot-class products, Amp-class 
 **You pay:** seats and/or usage, roadmap dependency, less ability to fork when incentives diverge.  
 **Watch:** rate limits, usage caps mid-sprint, closed plugin ecosystems.
 
+Commercial tools win when the cost of **training humans** exceeds the cost of **licenses**. They lose when procurement cannot answer “what if we need to leave in six months?” with a real export path for policies, prompts, and agent configs.
+
 ### Open-source coding agents
 
 Examples: Hermes, OpenCode, Goose, Aider, Cline, OpenClaw, and similar tools on the [leaderboard](/leaderboard/).
@@ -58,32 +62,60 @@ Examples: Hermes, OpenCode, Goose, Aider, Cline, OpenClaw, and similar tools on 
 **You pay:** setup tax, uneven docs, “you are the support team.”  
 **Watch:** plugin/MCP supply chain, sparse releases, star-count hype without downloads.
 
+OSS wins when **ownership of the harness** is part of risk management. It loses when the team treats “free” as “zero operating cost” and nobody owns upgrades, key rotation, or broken plugin audits.
+
 ## Cost shape (not sticker price)
 
 - **Seats** scale with headcount even when idle.
 - **BYO keys** scale with tokens × retries × parallel agents.
 - Failed agent loops are often the real invoice.
 
-Model a busy week. See [pricing guide](/blog/coding-agent-pricing-guide-2026/).
+A commercial seat that looks expensive can be cheaper than an unconstrained OSS agent that retries a full monorepo context dump for an hour. A free OSS CLI that never ships a PR is also expensive—just in calendar time.
+
+Model a busy week with: two multi-file migrations, one CI babysit, and one “agent opened a messy PR” recovery. See the [pricing guide](/blog/coding-agent-pricing-guide-2026/).
 
 ## Security and compliance
 
 OSS does **not** automatically mean safer. Commercial does **not** automatically mean compliant.
 
-Ask both:
+Ask both stacks the same questions:
 
 1. Can we deny network for untrusted tools?
 2. Are secrets redacted in logs?
 3. Can we pin versions for a freeze window?
 4. Who can change production with the agent’s credentials?
+5. How do we revoke a compromised plugin or MCP server within an hour?
 
-Use the [security checklist](/blog/coding-agent-security-checklist-2026/).
+Use the [security checklist](/blog/coding-agent-security-checklist-2026/). Write answers into AGENTS.md so the next hire (and the next automated agent) inherits the same gates.
 
 ## Hybrid stacks that work in practice
 
 A durable pattern: commercial IDE agent for daily interactive work, open-source terminal agent for automation, scripts, and ownership-sensitive jobs. That matches how tools are actually strong.
 
+**Rules that keep hybrids from becoming chaos:**
+
+- Separate worktrees (or repos) so two agents never “own” the same branch at once.
+- Name a **default** tool and a **specialist** tool in writing.
+- Cap spend and log tool use on both sides—commercial dashboards and OSS wrappers alike.
+- Run the same three production-like tickets on both classes before a company-wide default.
+
 Avoid two agents writing the same branch without isolation. Avoid “OSS only” when nobody will maintain the harness. Avoid “commercial only” when you cannot leave a vendor after a pricing shock.
+
+## Failure modes by class
+
+### Commercial failure modes
+- Mid-sprint usage caps that stall a migration
+- Roadmap changes that remove a workflow you standardized on
+- Plugin ecosystems that only work inside one vendor’s control plane
+- Support that answers tickets slowly while your release train waits
+
+### OSS failure modes
+- Half-documented install paths that differ on Windows vs Linux
+- Abandoned plugins with broad filesystem permissions
+- “Stars high, commits dead” projects that look healthy on marketing pages
+- No on-call when the agent force-pushes or dumps secrets into CI logs
+
+Score these against **your** incident history, not a Twitter thread.
 
 ## Procurement questions (copy into your RFC)
 
@@ -92,6 +124,7 @@ Avoid two agents writing the same branch without isolation. Avoid “OSS only”
 - What is the unit of cost under a bad retry loop?
 - Who is on-call when the agent opens a broken PR at midnight?
 - How do we revoke credentials if a plugin is compromised?
+- What is the exit path if pricing doubles or the product is sunset?
 
 Answer those before you argue about stars or SWE-bench screenshots.
 
@@ -107,34 +140,27 @@ Score 1–5 for your team:
 | Multi-provider requirement | medium | | |
 | Support / SLA need | medium | | |
 | Budget predictability | high | | |
+| Exit / pin / fork ability | high | | |
 
-Highest weighted total wins the **default**. Keep the other class as a **specialist**.
+Highest weighted total wins the **default**. Keep the other class as a **specialist**. Re-score after one real pilot sprint, not after a demo day.
 
-## More operator context
+## Operating the decision after you pick
 
-Document defaults in AGENTS.md. Measure three jobs. Separate worktrees for parallel agents. Deny-by-default for secrets and production deploys. Revisit quarterly when models and pricing change. Prefer updating this URL’s updatedDate over inventing near-duplicate posts.
+Standardization is not a one-time vote. Put the outcome in AGENTS.md:
+
+- Default tool for interactive edits
+- Specialist tool for unattended or ownership-sensitive jobs
+- Forbidden actions (force-push, production secrets, unattended deploys without a human gate)
+- Model pins where applicable
+- Quarterly review date
+
+When headcount, compliance, or model pricing changes, update **this URL’s** `updatedDate` and the AGENTS.md policy. Prefer one strong living page over inventing near-duplicate “OSS vs commercial 2027” slugs that dilute search and confuse readers.
 
 ## Bottom line
 
-**Pick ownership vs polish based on constraints, not Twitter.** Revisit when headcount, compliance, or model pricing changes—agent markets move faster than most standards docs.
+**Pick ownership vs polish based on constraints, not Twitter.** Commercial tools buy speed and support; open-source tools buy inspectability and escape hatches. Most serious teams need a hybrid with clear lanes. Revisit when headcount, compliance, or model pricing changes—agent markets move faster than most standards docs.
 
 Related: [feature matrix](/blog/coding-agent-features-comparison-2026/), [decision guide](/blog/best-coding-agents-2026-decision-guide/), [leaderboard](/leaderboard/).
 
 ---
 *Evaluating models while you pick an agent harness? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** helps consolidate multi-model access.*
-
-## More operator context
-
-Teams lose weeks debating brands instead of measuring jobs. Lock three production-like tasks, run both tools the same afternoon, and write down: default tool, specialist tool, and forbidden actions (force-push, production secrets, unattended deploys).
-
-Windows and Linux still diverge on path handling and process cleanup. If your company ships on Windows, do not standardize from a macOS demo. If your company is container-only Linux, still test credential files and CI log volume under realistic load.
-
-Cost is not only seats. Retries, parallel subagents, and full-repo context dumps dominate API spend. Prefer tools that expose usage and allow hard caps. Prefer processes that require human review before production changes.
-
-Security is part of feature fit. An agent that can schedule jobs and open the network needs a written policy: who owns the API keys, where logs live, and how MCP or plugins are approved. Open source helps audit; it does not remove the need for policy.
-
-Revisit the decision quarterly. Model providers, agent harnesses, and your team size change faster than most internal standards documents. Updating an existing comparison URL with a fresh updatedDate is better for readers and for search than inventing a near-duplicate slug.
-
-Document the outcome in AGENTS.md so every future agent—human or automated—inherits the same defaults. Include model pins, approval gates, and which worktrees agents may touch.
-
-When two tools look similar on a feature matrix, break the tie with failure modes: who recovers better from a red CI log, who invents fewer files, and who asks before destructive shell commands.
