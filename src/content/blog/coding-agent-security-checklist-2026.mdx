@@ -1,8 +1,8 @@
 ---
-title: "Coding Agent Security Checklist 2026 — What Every Operator Must Lock Down"
-description: "A practical security checklist for Claude Code, Codex, Cursor, Hermes, OpenCode, and other coding agents — session isolation, permissions, secrets, MCP, and supply chain."
+title: "Coding Agent Security Checklist 2026 — The Operator's Hardening Guide"
+description: "A practical, runnable security checklist for Claude Code, Codex, Cursor, Hermes, OpenCode, and other coding agents. Sandbox isolation, permissions, secrets, MCP, network egress, supply chain, and incident response — with the command you can run today to find your own holes."
 pubDate: 2026-07-13
-updatedDate: 2026-07-13
+updatedDate: 2026-07-14
 tags: ["security", "beware", "guide", "checklist", "pillar"]
 tool: "industry"
 author: "kira"
@@ -11,74 +11,172 @@ author: "kira"
 
 - [Open source vs commercial coding agents: operator fit, not ideology](/blog/open-source-vs-commercial-coding-agents-guide/)
 - [Beware: Oh-My-Pi Subagents Can Write Into Your Protected Parent Checkout (Write-Root Not Enforced)](/blog/beware-oh-my-pi-subagent-write-root-escape/)
-- [Claude Code vs Mimo Code: open source vs commercial tradeoffs](/blog/claude-code-vs-mimo/)
+- [Your coding agent's sandbox just handed out your AWS keys](/blog/zero-sandbox-credential-leak/)
+- [AGENTS.md makes a coding agent 10× smarter](/blog/agents-dot-md-make-coding-agent-10x-smarter/)
 ---
 
-Coding agents with shell, filesystem, and git access fail differently than chatbots. A bad completion becomes a **real action**. This checklist is the pillar we keep updating as new issues land.
+A coding agent is not a chatbot with extra steps. It is a process with a shell, a filesystem, a git client, network egress, and — usually — your environment variables already loaded. When a chatbot makes a mistake, you get a wrong sentence. When a coding agent makes a mistake, it commits to `main`, exfiltrates a token through a plugin, or SIGKILLs itself mid-rebase and corrupts the worktree.
 
-Use it before you grant auto-approve, before you wire MCP servers, and after every major agent upgrade.
+This is the pillar we keep current. Use it **before** you flip on auto-approve, **before** you wire an MCP server, and **after** every major agent upgrade. Every section ends with a command you can run right now.
 
-## 1. Session & context isolation
+## The threat model, in one table
 
-- [ ] Never run sensitive work with “resume / remote / sync” features until you trust isolation.
-- [ ] Treat unexplained “you asked me to…” as a **bleed red flag**, not a feature.
+Before the checklist, name what you are defending against. An agent's blast radius is the union of everything it can reach.
+
+| Capability the agent has | What a bug or injection turns it into | Where we've seen it |
+|---|---|---|
+| Shell access to your worktree | Arbitrary command execution, `rm -rf`, credential theft | [GhostCommit PNG injection](/blog/ghostcommit-png-prompt-injection-env-theft/) |
+| Inherited environment (`AWS_*`, `GITHUB_TOKEN`) | Silent secret exfiltration from "inside" the sandbox | [Zero sandbox credential leak](/blog/zero-sandbox-credential-leak/) |
+| Write to parent checkout / protected dirs | Subagent escapes its scoping boundary | [Oh-My-Pi write-root escape](/blog/beware-oh-my-pi-subagent-write-root-escape/) |
+| Git operations | Force-push, branch deletion, corrupted rebase | [Background SIGKILL + git corruption](/blog/beware-claude-code-background-task-sigkill-git-corruption/) |
+| MCP / third-party servers | Cross-contaminated responses, network calls you didn't authorize | [MCP response cross-contamination](/blog/claude-code-mcp-response-cross-contamination/) |
+| Model routing | Wrong/cheaper model billed as premium, silent quota burn | [Silent quota / wrong model](/blog/beware-silent-quota-model-burn/) |
+
+The rule underneath all of it: **assume the agent can do anything its process can do, minus the guardrails you explicitly enforce.** Most breaches in this space are not "the model went rogue" — they are guardrails that were never actually on.
+
+## 1. Sandbox & session isolation
+
+The sandbox is the single most important control, and the single most commonly faked. A "sandbox enabled" flag in a config file proves nothing until you verify it actually scrubs environment, filesystem, and network.
+
+- [ ] Never run sensitive work with resume / remote / sync until you have personally verified isolation.
+- [ ] Treat unexplained "you asked me to…" framing as a **bleed red flag**, not a feature.
 - [ ] One sensitive repo per session; kill the session if context from another machine appears.
+- [ ] On Windows, confirm the sandbox is real — click-through UAC dialogs and Smart App Control gaps can leave it off.
+
+Run this to see whether your shell actually leaks secrets into child processes:
+
+```bash
+# What secrets would a sandboxed child inherit right now?
+env | grep -iE '^(AWS_|GITHUB_|GITLAB_|DATABASE_|POSTGRES_|API_KEY|SECRET|TOKEN|PASSWORD|DB_|PG|MONGODB|REDIS|NPM_TOKEN|AZURE_|GOOGLE_|OPENAI_|ANTHROPIC_)'
+```
+
+If that prints anything you would not paste into a public gist, your sandbox is only as safe as the agent's discipline. The Gitlawb Zero fix ([zero-sandbox-credential-leak](/blog/zero-sandbox-credential-leak/)) is the canonical example: the sandbox protected the filesystem and network but inherited every `AWS_*` and `GITHUB_TOKEN` verbatim.
 
 **Deep dives:** [Cross-session content bleed](/blog/beware-claude-code-cross-session-content-bleed/) · [MCP response cross-contamination](/blog/claude-code-mcp-response-cross-contamination/) · [Interrupt drops work](/blog/beware-claude-code-interrupt-drops-work/)
 
 ## 2. Permissions: deny by default
 
+Auto-approve is a convenience you pay for in blast radius. Every agent that offers `dangerously-skip-permissions` or "always allow" should be treated as an opt-in risk, not a default.
+
 - [ ] Prefer approval gates over `dangerously-skip-permissions` / full auto-approve.
-- [ ] Deny network by default in sandboxes; allowlist only what you need.
-- [ ] On Windows, verify sandboxes are actually enforced (Smart App Control, click-through dialogs).
+- [ ] Deny network by default inside sandboxes; allowlist only the hosts you need.
+- [ ] On Windows, verify sandboxes are actually enforced — do not trust the toggle.
+- [ ] Batch destructive operations behind a human checkpoint.
+
+The failure modes are concrete and documented: on Windows, a click-through permission dialog can silently grant what the policy denied ([windows-click-through-permissions](/blog/claude-code-windows-click-through-permissions/)), and a flood of prompts can train you to click "yes" without reading ([permission prompt flood](/blog/claude-code-permission-prompt-flood/)). The Codex sandbox is known to be effectively dead on some Windows configurations ([smart-app-control-sandbox-fail](/blog/codex-smart-app-control-sandbox-fail/)).
 
 **Deep dives:** [Codex sandbox dead on Windows](/blog/codex-smart-app-control-sandbox-fail/) · [Windows click-through permissions](/blog/claude-code-windows-click-through-permissions/) · [Permission prompt flood](/blog/claude-code-permission-prompt-flood/)
 
 ## 3. Secrets & environment
 
-- [ ] No AWS/GitHub tokens in the agent’s inherited env when avoidable.
-- [ ] Block `.env` writes/reads in agent allowlists unless required.
-- [ ] Assume prompt injection via images, READMEs, and tool output is possible.
+This is where the highest-severity incidents cluster, because the payoff for an attacker is immediate and reusable. A leaked `GITHUB_TOKEN` is a credential, not a log line.
+
+- [ ] Do not load AWS/GitHub/DB tokens into the shell the agent inherits when avoidable.
+- [ ] Block `.env` reads/writes in agent allowlists unless the task explicitly requires them.
+- [ ] Assume prompt injection via images, READMEs, and tool output is possible — never let injected text trigger a secret read.
+- [ ] Rotate any secret that touched a contaminated session.
+
+Real vectors we have covered: a PNG in the repo carried a prompt-injection payload that coerced the agent into dumping its environment ([GhostCommit](/blog/ghostcommit-png-prompt-injection-env-theft/)); a sandbox inherited credentials verbatim ([zero-sandbox-credential-leak](/blog/zero-sandbox-credential-leak/)); a PreToolUse hook leaked the raw command including embedded secrets ([codex-pretooluse-hook-raw-command-leak](/blog/codex-pretooluse-hook-raw-command-leak/)).
+
+Audit your own exposure:
+
+```bash
+# Find .env files the agent could read in your project tree
+find . -name '.env*' -not -path './node_modules/*' 2>/dev/null
+# Check git history for accidentally committed secrets
+git log -p --all -S 'GITHUB_TOKEN' --oneline 2>/dev/null | head -20
+```
 
 **Deep dives:** [GhostCommit PNG injection](/blog/ghostcommit-png-prompt-injection-env-theft/) · [Zero sandbox credential leak](/blog/zero-sandbox-credential-leak/) · [PreToolUse raw command leak](/blog/codex-pretooluse-hook-raw-command-leak/)
 
 ## 4. Git & data-loss blast radius
 
+An agent that can `git push --force` can end your afternoon. The cheapest insurance is a checkpoint you control.
+
 - [ ] Commit or stash **before** any agent destructive step.
-- [ ] Watch background tasks for SIGKILL mid-write.
-- [ ] Never trust “done” without `git status` / tests.
+- [ ] Watch background tasks for SIGKILL mid-write — they corrupt more than they report.
+- [ ] Never trust "done" without `git status` and a test run.
+- [ ] Protect `main`/`master` with branch protection so a force-push fails loudly.
+
+The documented hazards: a background agent killed mid-write corrupted the git state ([background SIGKILL + git corruption](/blog/beware-claude-code-background-task-sigkill-git-corruption/)); an interrupt dropped in-progress work entirely ([interrupt drops work](/blog/beware-claude-code-interrupt-drops-work/)).
+
+```bash
+# Before you let an agent loose, snapshot the tree
+git stash push -u -m "pre-agent-$(date +%s)"
+# After it finishes, see exactly what it touched
+git status --short && git diff --stat
+```
 
 **Deep dives:** [Background SIGKILL + git corruption](/blog/beware-claude-code-background-task-sigkill-git-corruption/) · [Silent work drop after interrupt](/blog/beware-claude-code-interrupt-drops-work/)
 
-## 5. MCP, plugins, and third-party tools
+## 5. MCP, plugins, and supply chain
 
-- [ ] Audit every MCP server: who built it, what network it can hit.
+MCP servers and plugins are the fastest-growing attack surface because each one is a new process with its own network and tool surface — and you probably did not read its source.
+
+- [ ] Audit every MCP server: who built it, what network it can reach, what it writes.
 - [ ] Prefer read-only MCP for untrusted contexts.
 - [ ] Cap parallel tool calls if your agent has cross-wire bugs under load.
+- [ ] Pin plugin versions; treat a major-version bump like a code review.
+
+The cross-contamination bug ([MCP response cross-contamination](/blog/claude-code-mcp-response-cross-contamination/)) shows two tool calls leaking state into each other; the AWS Agent Toolkit MCP path ([aws-agent-toolkit-claude-code-mcp](/blog/aws-agent-toolkit-claude-code-mcp/)) is a reminder that "official" servers still expand your egress footprint.
+
+```bash
+# Enumerate what MCP/plugin processes would be spawned
+grep -rEi 'mcp|command:|args:' .mcp.json ~/.claude.json 2>/dev/null | head -40
+```
 
 **Deep dives:** [MCP response cross-contamination](/blog/claude-code-mcp-response-cross-contamination/) · [AWS Agent Toolkit / MCP](/blog/aws-agent-toolkit-claude-code-mcp/)
 
-## 6. Cost & model routing integrity
+## 6. Network egress control
 
-- [ ] Log which model actually ran (not only which you selected).
+Even a "local" agent reaches the internet through package installs, MCP, and tool output fetches. Uncontrolled egress is how data leaves and how malicious packages arrive.
+
+- [ ] Default-deny outbound; allowlist package registries and API hosts only.
+- [ ] Run agents behind a proxy or firewall you can observe, not a raw laptop.
+- [ ] Watch for unexpected outbound connections during a build step.
+
+This is the control that would have contained the credential-leak class of bugs: with no egress, an exfiltrating child process has nowhere to send the token.
+
+## 7. Cost & model-routing integrity
+
+Security is not only confidentiality — availability and billing integrity count. An agent that silently routes you to the wrong model, or retries forever, burns money and corrupts your assumptions about what you are paying for.
+
+- [ ] Log which model actually ran, not only which you selected.
 - [ ] Cap auto-retries after rate limits.
 - [ ] Alert on unexpected token burn.
 
+Documented failures: a session that billed premium rates while running a cheaper model ([silent-quota-model-burn](/blog/beware-silent-quota-model-burn/)); an agent that retried indefinitely against a token limit ([indefinite auto-retry](/blog/claude-code-indefinite-auto-retry-token-limit/)); token overhead differences between harnesses ([claude-code-vs-opencode-token-overhead](/blog/claude-code-vs-opencode-token-overhead/)).
+
 **Deep dives:** [Silent quota / wrong model](/blog/beware-silent-quota-model-burn/) · [Indefinite auto-retry](/blog/claude-code-indefinite-auto-retry-token-limit/) · [Token overhead Claude Code vs OpenCode](/blog/claude-code-vs-opencode-token-overhead/)
 
-## 7. Operator discipline (non-negotiable)
+## 8. Operator discipline & incident response
 
-1. Checkpoint git before agent runs.  
-2. Read the plan before approve.  
-3. Reject any instruction the agent “remembers” that you did not give.  
-4. Rotate secrets if a session looked contaminated.  
-5. Follow [terminalblog Beware tag](/blog/tag/beware/) weekly.
+Tooling fails; discipline is the backstop. These five habits prevent more incidents than any single flag.
+
+1. **Checkpoint git before every agent run.** A stash is cheaper than a postmortem.
+2. **Read the plan before you approve.** The 10 seconds of review beats the 2 hours of undo.
+3. **Reject any instruction the agent "remembers" that you did not give.** Memory bleed is a signal, not a feature.
+4. **Rotate secrets the moment a session looked contaminated.** Assume compromise; prove otherwise.
+5. **Follow the [Beware tag](/blog/tag/beware/) weekly.** New classes of failure land faster than any checklist can be rewritten.
+
+If you suspect a leak, the response is mechanical: revoke the token at the provider, rotate it locally, purge it from shell profiles and `.env`, then re-run the `env | grep` check from Section 1 to confirm it is gone.
+
+## Printable one-page summary
+
+- [ ] Ran `env | grep` — no secret inherited by children
+- [ ] Sandbox verified real (not just toggled)
+- [ ] Auto-approve off; network default-deny
+- [ ] Git checkpoint taken before agent ran
+- [ ] MCP servers audited and read-only where untrusted
+- [ ] Model-ran logging on; retry cap set
+- [ ] Secrets rotated after any suspicious session
 
 ## Related pillars
 
-- [Coding agent pricing guide](/blog/coding-agent-pricing-guide-2026/)  
-- [Feature comparison matrix](/blog/coding-agent-features-comparison-2026/)  
-- [AGENTS.md makes agents 10× smarter](/blog/agents-dot-md-make-coding-agent-10x-smarter/)  
-- [Live adoption leaderboard](/leaderboard/)  
+- [Coding agent pricing guide](/blog/coding-agent-pricing-guide-2026/)
+- [Feature comparison matrix](/blog/coding-agent-features-comparison-2026/)
+- [AGENTS.md makes agents 10× smarter](/blog/agents-dot-md-make-coding-agent-10x-smarter/)
+- [Why the harness — not the model — is your real security boundary](/blog/your-coding-agent-is-a-harness-the-model-is-the-commodity/)
+- [Live adoption leaderboard](/leaderboard/)
 
-*Last verified: July 2026. When a new security class appears, we add a Beware post and link it here.*
+*Last verified: July 2026. When a new security class appears, we add a Beware post and link it here. This page is the index; the linked deep dives carry the reproductions and fixes.*
