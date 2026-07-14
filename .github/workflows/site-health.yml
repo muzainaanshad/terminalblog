@@ -1,4 +1,5 @@
-# Daily site health -> Telegram
+# Site health checks — results stay in Actions logs (no Telegram).
+# Telegram: only Ops Digest (Articles Management format).
 name: Site Health
 
 on:
@@ -16,10 +17,10 @@ jobs:
           node-version: '22'
       - name: Run health checks
         run: node scripts/site-health.cjs
-        continue-on-error: true
-      - name: Telegram report
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          node scripts/telegram-notify.cjs --file tmp/health-report.txt
+      - name: Upload health report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: health-report
+          path: tmp/health-report.txt
+          if-no-files-found: ignore

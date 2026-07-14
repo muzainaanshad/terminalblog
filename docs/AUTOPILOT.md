@@ -75,9 +75,15 @@ Project name in Vercel UI: prefer **`terminalblog`** (legacy slug may still be `
 
 ---
 
-## F) Telegram message types you will receive
+## F) Telegram — **ONLY** Ops Digest (Articles Management)
 
-### Primary — **Ops Digest** (daily ~13:00 UTC + on-demand)
+**Policy (hard):** Telegram receives **one** message style. No PUSH/DEPLOY, no HEALTH, no
+leaderboard blasts, no SEO-learn dumps, no newsletter status pings.
+
+| Allowed | Script / workflow |
+|---------|-------------------|
+| **Ops Digest** (Articles Management) | `scripts/telegram-ops-digest.cjs` · `.github/workflows/ops-digest.yml` |
+| Everything else | **Muted** — stays in GitHub Actions logs / artifacts |
 
 Exact format:
 
@@ -96,13 +102,15 @@ Others
 3- automation errors           ← omitted if none
 ```
 
-Run: `npm run telegram:digest` · script: `scripts/telegram-ops-digest.cjs`
+Run: `npm run telegram:digest` · schedule daily ~13:00 UTC · on-demand via workflow_dispatch
 
-### Secondary (keep for alerts)
-
-1. **Health** — every 6h (or failures)  
-2. **Newsletter** — Monday Beehiiv/site digest status  
-3. **Deploy** — every git push to master  
+Muted workflows (still run work; no Telegram):
+- Deploy Notify (disabled auto-fire)
+- Site Health
+- Content Refresh
+- Leaderboard Snapshot
+- SEO Learn
+- Weekly Newsletter status
 
 ---
 

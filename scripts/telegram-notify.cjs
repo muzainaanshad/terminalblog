@@ -157,6 +157,23 @@ async function main() {
   const plain = hasFlag('--plain');
   const title = argVal('--title');
   const raw = readBody();
+
+  // Hard mute: operator wants ONLY Articles Management (ops-digest) on Telegram.
+  // Set TELEGRAM_ALLOW_RAW=1 to override for emergencies.
+  if (process.env.TELEGRAM_ALLOW_RAW !== '1') {
+    const probe = `${title || ''}\n${raw || ''}`;
+    const blocked =
+      /PUSH\/DEPLOY|terminalblog HEALTH|terminalblog LEADERBOARD|terminalblog NEWSLETTER|Content refresh queue|SEO learn/i.test(
+        probe
+      );
+    if (blocked) {
+      console.error(
+        'telegram-notify blocked: raw deploy/health/leaderboard/newsletter messages are muted. Use scripts/telegram-ops-digest.cjs (Articles Management). Override with TELEGRAM_ALLOW_RAW=1 only if intentional.'
+      );
+      process.exit(0);
+    }
+  }
+
   const html = plain ? raw : toTelegramHtml(raw, title);
   const parts = chunk(html);
 

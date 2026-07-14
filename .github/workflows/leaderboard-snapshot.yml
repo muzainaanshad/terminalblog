@@ -42,12 +42,13 @@ jobs:
             git push
           fi
         continue-on-error: true
-      - name: Telegram
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          MSG="terminalblog LEADERBOARD $(date -u +%F)
-          $(cat tmp/leaderboard-note.txt 2>/dev/null || echo note unavailable)
-          site: https://terminalblog.com/leaderboard/"
-          node scripts/telegram-notify.cjs "$MSG"
+      # Telegram muted — leaderboard changes roll into Ops Digest (Articles Management)
+      - name: Upload leaderboard note
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: leaderboard-note
+          path: |
+            tmp/leaderboard-note.txt
+            tmp/adoption-log.txt
+          if-no-files-found: ignore

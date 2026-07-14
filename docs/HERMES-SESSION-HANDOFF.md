@@ -21,7 +21,7 @@ Push `master` → Vercel auto-deploys. No manual `vercel --prod` needed.
 | System | Owns |
 |--------|------|
 | **Hermes crons** | Write/update MDX, quality improve, issues/HN deep dives, adoption data, pings, outreach |
-| **GitHub Actions** | Site Health (6h), Leaderboard (daily), SEO Learn (Mon), Weekly Newsletter (Mon), Content Refresh Queue (Wed), Deploy Notify (push) → **Telegram** |
+| **GitHub Actions** | Site Health / Leaderboard / SEO Learn / Newsletter / Refresh (logs only). **Telegram ONLY via Ops Digest** (Articles Management). Deploy Notify muted. |
 | **Vercel** | Build + host terminalblog.com |
 | **Beehiiv** | Collect subscribers only (API *send* is Enterprise-blocked) |
 
@@ -72,21 +72,22 @@ node scripts/content-refresh.cjs --days 45
 node scripts/quality-check.cjs
 node scripts/site-health.cjs
 node scripts/seo-learn.cjs
-node scripts/telegram-notify.cjs --title "..." "HTML body"
 node scripts/orchestrator.js   # prefer issues/discussions over commits
+# Telegram (ONLY allowed path):
+node scripts/telegram-ops-digest.cjs --send
 ```
 
 ## After you publish
 
 1. Gate passes  
 2. Conventional commit + push `master`  
-3. Prefer **ops digest** Telegram format (not freeform spam):
+3. **Telegram:** only ops digest (do **not** call `telegram-notify.cjs` for deploy/health):
 
 ```bash
 node scripts/telegram-ops-digest.cjs --send
 ```
 
-Format expected by operator:
+Format expected by operator (hard):
 
 - **Articles Management:** (1) new titles+links (2) updates title+≤7 word note (3) deleted only if any (4) interlinks — list only if &lt;5  
 - **Others:** SEO learnings if new · leaderboard only if changed · automation errors only if any  
@@ -98,6 +99,9 @@ Format expected by operator:
 - Resume firehose crons  
 - Ship thin multi-post news days  
 - Assume Beehiiv blast works  
+- Send PUSH/DEPLOY, HEALTH, leaderboard, SEO-learn, or newsletter pings to Telegram  
+- Hermes `deliver: all` for content jobs (use `local` — GHA ops-digest owns Telegram)  
+
 - Force-push  
 - Spam HN/Reddit  
 

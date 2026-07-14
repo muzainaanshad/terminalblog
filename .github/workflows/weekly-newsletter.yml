@@ -69,20 +69,11 @@ jobs:
           fi
         continue-on-error: true
 
-      - name: Telegram report
+      # Telegram muted — weekly post appears in Ops Digest as new/updated article
+      - name: Upload newsletter log
         if: always()
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          DATE=$(date -u +%F)
-          LOG=$(cat tmp/newsletter-run.log 2>/dev/null | tail -c 2500 || echo "no log")
-          MSG="terminalblog NEWSLETTER ${DATE}
-          run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          schedule: Mondays 14:00 UTC
-
-          ${LOG}
-
-          weekly (if created): https://terminalblog.com/blog/coding-agent-weekly-${DATE}/
-          site: https://terminalblog.com/"
-          node scripts/telegram-notify.cjs "$MSG"
+        uses: actions/upload-artifact@v4
+        with:
+          name: newsletter-run
+          path: tmp/newsletter-run.log
+          if-no-files-found: ignore
