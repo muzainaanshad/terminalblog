@@ -16,7 +16,7 @@ Grow **long-term SEO traffic** for [terminalblog.com](https://terminalblog.com) 
 
 Push `master` → Vercel auto-deploys. Prefer push over manual `vercel --prod`.
 
-**Git at handoff:** `master` @ `5c1130e` (synced origin; includes this handoff + Telegram mute).
+**Git at handoff:** `master` @ `33b703e` (synced origin; includes this handoff + Telegram mute).
 
 ## Who does what
 
