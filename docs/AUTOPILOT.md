@@ -31,7 +31,7 @@ Workflow files: `.github/workflows/*.yml`
 | Env vars | Beehiiv keys for `/api/newsletter` |
 | Live subscribe | Homepage form → Beehiiv audience |
 
-Project name in Vercel UI: **`seo-ai-blog`**.
+Project name in Vercel UI: prefer **`terminalblog`** (legacy slug may still be `seo-ai-blog` until renamed).
 
 ---
 

@@ -44,7 +44,7 @@ Your Beehiiv plan **cannot** Create/Send posts via API (Enterprise only). Subscr
 
 You have **both**:
 
-### Hermes (local gateway, `seo-ai-blog` workdir) — content factory
+### Hermes (local gateway, `terminalblog` / legacy `seo-ai-blog` workdir) — content factory
 
 | Job | Schedule | Role | Status after retune |
 |-----|----------|------|---------------------|

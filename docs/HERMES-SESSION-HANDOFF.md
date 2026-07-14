@@ -10,9 +10,9 @@ Grow **long-term SEO traffic** for [terminalblog.com](https://terminalblog.com) 
 
 | Path | Role |
 |------|------|
-| `C:\Users\muzai\seo-ai-blog` | Hermes workdir (content factory) |
-| `C:\Users\muzai\terminalblog` | Same remote; ops docs often edited here |
-| Remote | `Anshad2u/terminalblog` → Vercel project **`seo-ai-blog`** |
+| `C:\Users\muzai\terminalblog` | Primary repo workdir (content + ops) |
+| `C:\Users\muzai\seo-ai-blog` | Legacy Hermes clone path — same remote if still present |
+| Remote | `Anshad2u/terminalblog` → Vercel project **`terminalblog`** (or legacy `seo-ai-blog` until rename) |
 
 Push `master` → Vercel auto-deploys. No manual `vercel --prod` needed.
 
