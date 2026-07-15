@@ -2,29 +2,61 @@
 title: "OpenCode Deep Dive: The Skill-Driven Open-Source Coding Agent"
 description: "Everything about OpenCode — its SKILL.md execution model, slash command workflows, agent lifecycle, and how it compares to other coding agents."
 pubDate: "2026-07-03T16:00:00Z"
-updatedDate: "2026-07-03T16:00:00Z"
+updatedDate: "2026-07-16T16:00:00Z"
 tags: ["deep-dive", "pillar", "opencode-architecture", "skill-driven"]
 tool: "opencode"
 author: "kira"
 ---
 
-OpenCode is an MIT-licensed coding agent that pioneered the skill-driven execution model. Instead of treating every request as a fresh prompt, OpenCode packages workflows into reusable SKILL.md files.
+OpenCode is an MIT-licensed coding agent that pioneered the skill-driven execution model. Instead of treating every request as a fresh prompt and hoping the model improvises the right steps, OpenCode packages workflows into reusable `SKILL.md` files. The result is an agent that behaves less like an unpredictable chatbot and more like a set of documented, repeatable procedures — which is exactly what teams want when they put an agent anywhere near production code.
+
+This deep dive covers how the skill model works, the slash-command surface, the agent lifecycle, and where OpenCode fits relative to commercial agents.
 
 ## The Skill Execution Model
 
-Every task maps to a skill. Skills live in a /skills directory with SKILL.md files containing frontmatter and step-by-step instructions. When a request matches a skill description, OpenCode loads that skill and follows its workflow.
+Every task in OpenCode maps to a skill. Skills live in a `/skills` directory as `SKILL.md` files, each containing frontmatter (name, description, allowed tools) and step-by-step instructions. When an incoming request matches a skill's description, OpenCode loads that skill and follows its workflow instead of free-forming a plan.
+
+This matters for two reasons. First, **reproducibility**: the same request runs the same steps every time, so you get consistent output instead of a different approach on every invocation. Second, **auditability**: because the workflow is a plain Markdown file in your repo, anyone can read exactly what the agent will do before it does it. There is no opaque system prompt to reverse-engineer — the behavior is the file.
 
 ## Slash Commands
 
-OpenCode exposes skills through slash commands: /plan, /spec, /review, /test, /ship, /debug. Each loads a specific skill with its own steps, tools, and exit criteria.
+OpenCode exposes skills through slash commands, giving you a predictable surface instead of hoping natural language routes correctly:
+
+- `/plan` — break a task into steps before touching code
+- `/spec` — turn a rough idea into a concrete specification
+- `/review` — critique a diff against style and correctness rules
+- `/test` — generate and run tests for changed code
+- `/ship` — commit, and prepare a PR with a summary
+- `/debug` — reproduce and isolate a failure
+
+Each command loads a specific skill with its own steps, tool permissions, and exit criteria. You can add your own commands by dropping a new `SKILL.md` in the skills directory — no plugin registry, no rebuild.
 
 ## Agent Lifecycle
 
-OpenCode maps requests to skills, loads skill instructions, executes each step, verifies outputs against exit criteria, and reports results. This structured lifecycle produces consistent output quality.
+OpenCode's loop is deliberately explicit. It maps the request to a skill, loads the skill instructions, executes each step, verifies outputs against the skill's exit criteria, and reports results. Because verification is a first-class step rather than an afterthought, the agent catches its own half-finished work — a skill that says "run the tests and confirm they pass" will not report success on a red suite.
 
-## Comparison to Hermes
+That structured lifecycle is the whole point: consistent output quality comes from consistent process, not from a bigger model.
 
-OpenCode is simpler and more focused. It does not have MOA, cron jobs, persistent memory, or a console dashboard. But its skill execution model is more explicit and easier to customize. For teams that want transparent, hackable workflows, OpenCode is compelling.
+## Configuring OpenCode With AGENTS.md
+
+Like most terminal agents, OpenCode reads project conventions from `AGENTS.md` — build commands, code style, directories to avoid, and review rules. Pairing a good `AGENTS.md` with a set of skills is the highest-leverage setup for any team, because the two files together encode both *what your project is* and *how the agent should work in it*. Start from our [complete AGENTS.md guide](/blog/agents-md-complete-guide) if you have not written one yet.
+
+## Security Considerations
+
+Skills declare which tools they are allowed to use, which gives you per-workflow permission scoping instead of one blanket grant. That is a genuine security advantage, but self-hosting an open-source agent also means the sandboxing and credential handling are your responsibility, not a vendor's. Before you point OpenCode at a real repo with real secrets, run through our [coding agent security checklist](/blog/coding-agent-security-checklist-2026) — the section on credential exposure and write-scope escapes is directly relevant to any agent that can edit files and run commands.
+
+## How OpenCode Compares
+
+**Against Hermes.** OpenCode is simpler and more focused. It does not ship mixture-of-agents, cron jobs, persistent memory, or a console dashboard. But its skill execution model is more explicit and easier to customize. For teams that want transparent, hackable workflows over a batteries-included platform, OpenCode is the more compelling starting point.
+
+**Against commercial agents.** The trade is the usual open-source calculus: you give up the polished gateway, hosted auth, and vendor support that something like [Claude Code](/blog/deep-dive-claude-code-anthropic-coding-agent) provides, and in return you get source you can read, fork, and self-host. Our [open-source vs commercial coding agents guide](/blog/open-source-vs-commercial-coding-agents-guide) works through that decision in detail, and the [coding agent features comparison](/blog/coding-agent-features-comparison-2026) puts the capability matrix side by side.
+
+**Model flexibility.** Because OpenCode is provider-agnostic, you can point it at whichever model API you want — including cheap models for bulk work and stronger ones for hard reasoning. That routing freedom is a real cost lever; see the [coding agent pricing guide](/blog/coding-agent-pricing-guide-2026) for how that plays out on the bill.
+
+## Who Should Use OpenCode
+
+Reach for OpenCode if you value transparency, want to encode your team's workflows as version-controlled skills, and are comfortable owning your own hosting and security. Look at a commercial agent instead if you need an enterprise gateway, hosted authentication, and a support contract out of the box. For most engineers who like reading the code they run, the skill-driven model is worth trying — and because it is MIT-licensed, the only cost of evaluating it is your time. To place it against the rest of the field, the [best coding agents decision guide](/blog/best-coding-agents-2026-decision-guide) maps tools to team size and workload.
 
 ---
+
 *Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
