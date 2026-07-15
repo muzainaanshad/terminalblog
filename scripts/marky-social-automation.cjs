@@ -233,6 +233,7 @@ async function generatePost(postType, article = null) {
 async function schedulePost(postId, publishAt) {
   const res = await apiCall('POST', `/businesses/${BIZ_ID}/posts/${postId}/schedule`, {
     scheduled_publish_time: publishAt,
+    restrict_publish_to: ['twitter', 'facebook', 'linkedIn'], // Instagram needs images
   });
   
   if (res.status === 200) {
