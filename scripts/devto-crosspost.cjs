@@ -117,13 +117,22 @@ async function main() {
     if (!tags.includes('terminalblog')) tags.push('terminalblog');
     tags = tags.slice(0, 4);
 
+    // Fix internal links: convert relative to full terminalblog.com URLs
+    const fixedBody = body
+      .replace(/\]\(\/blog\//g, '](https://terminalblog.com/blog/')
+      .replace(/\]\(\/tool\//g, '](https://terminalblog.com/tool/')
+      .replace(/\]\(\/compare\//g, '](https://terminalblog.com/compare/')
+      .replace(/\]\(\/leaderboard\//g, '](https://terminalblog.com/leaderboard/')
+      .replace(/\]\(\.\.\/([^)]+)\)/g, '](https://terminalblog.com/$1)')
+      .replace(/\]\(\.\/([^)]+)\)/g, '](https://terminalblog.com/blog/$1)');
+
     const article = {
       title,
       published: true,
       tags,
       canonical_url: canonical,
       description: fields.description || title,
-      body_markdown: body,
+      body_markdown: fixedBody,
     };
 
     if (dry) {
