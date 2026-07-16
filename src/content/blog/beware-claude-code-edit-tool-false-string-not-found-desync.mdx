@@ -1,0 +1,89 @@
+---
+title: "Beware: Claude Code's Edit Tool Rejects Strings That Are in the File"
+description: "A confirmed, reproducible Claude Code bug (issue #78076) makes the Edit tool return \"String not found in file\" for multi-line text that is byte-identical to the current file. It's a file-state desync that fails real edits and teaches agents a wrong model of reality."
+pubDate: "2026-07-16T12:00:00Z"
+updatedDate: "2026-07-16T12:00:00Z"
+tags: ["security", "beware", "claude-code", "reliability", "edit-tool", "file-state"]
+tool: "claude-code"
+author: "kira_bug_hunter"
+image: "/api/og?title=Beware:%20Edit%20Tool%20False%20String%20Not%20Found&tool=Claude%20Code"
+---
+
+You ask Claude Code to change a few lines. The `old_string` you give it is copy-pasted from the file. The tool comes back with `String not found in file. Failed to apply edit.` — and you know for a fact the text is there. You re-read the file, the bytes match, you retry, and sometimes it works, sometimes it doesn't. That is not you misreading the diff. It is a confirmed, reproducible bug in Claude Code's Edit tool, and the failure mode is worse than a wasted call.
+
+## The Issue
+
+GitHub issue [#78076](https://github.com/anthropics/claude-code/issues/78076) reports that the Edit tool intermittently rejects a multi-line `old_string` that is **byte-identical** to the file content on disk at call time. The reporter is running Claude Code **2.1.183** on Linux (kernel 6.17, Ubuntu) inside the VS Code extension host, model `claude-fable-5`, permission mode `acceptEdits`. The maintainers triaged it and applied `bug`, `has repro`, `area:tools`, `platform:linux`, and `platform:vscode` — so the labels say the team can reproduce it and it lives in the core tools path, not a peripheral feature.
+
+This is the kind of bug that matters for a coding agent specifically because the Edit tool is the agent's hands. When the hand sends back a false negative, the model's next move is built on a lie about the world.
+
+## The Evidence (why this is real, not a typo)
+
+The reporter did the work most bug reports skip, and the evidence is unusually strong:
+
+- **Byte-level proof.** At failure time, `cmp` between the file and a heredoc of the failing hunk reported **identical** bytes. The `old_string` was not slightly off — it matched exactly.
+- **Transcript forensics.** Successful Edit calls record `toolUseResult.originalFile` — the content the tool saw before applying that edit. The failing strings are present **inside the `originalFile` snapshots recorded by the immediately-preceding and immediately-following successful calls.** The tool refused strings that its own snapshots contained.
+- **A clean, alternating repro pattern.** In one batch of 8 Edit calls to a ~6KB markdown file, outcomes alternated perfectly: success, FAIL, success, FAIL, success, FAIL, success, FAIL. Every failing `old_string` was **≥3 lines** (3, 5, and 22 lines); every succeeding one was **≤2 lines**. An identical string failed (call 1), a different edit succeeded (call 2), then the identical string **failed again** (call 3).
+- **Control tests that exonerate the content.** The exact failing 3-line string **succeeded** via Edit on a byte-identical copy of the file at a different path. And after an out-of-band write to the real file (which triggered the "file was modified externally" re-sync), the same class of multi-line edit **succeeded**. The content was always fine; the tool's view of the file was stale.
+- **Ruled-out alternatives.** No PreToolUse hook denies this path. No concurrent writer touches the file. Unicode/whitespace mismatches were byte-compared away. The strings occur exactly once, so non-uniqueness isn't the cause.
+
+A second occurrence the same day, on a different markdown file, failed a 3-line edit immediately after a successful edit in the same message batch — and a **fresh targeted `Read` of the hunk followed by an identical retry succeeded** with no content change.
+
+## The Likely Mechanism
+
+The reporter's working theory, which the evidence supports: after a successful edit, some multi-line match path consults a **stale view of the file**, while the ≤2-line match path and the `originalFile` snapshot recorder see current content. In other words, the tool's internal notion of "what the file looks like right now" drifts out of sync with the bytes on disk after an edit lands, and the drift only bites multi-line matches.
+
+That lines up with the alternating pattern: a short edit path keeps its view fresh, a long old_string hits the stale path, the next short edit path refreshes, and so on.
+
+## Why This Is Dangerous (beyond a wasted call)
+
+A wrong "string not found" is not just an inconvenience. It changes agent behavior:
+
+- **Wasted turns and burned tokens.** The model re-reads, re-derives, and retries, often splitting the change into many small edits it wouldn't otherwise need.
+- **Cascading corruption from workarounds.** When a multi-line edit is rejected, the common agent response is to apply the change as a series of tiny edits or, worse, rewrite the whole section with `Write`. That widens the blast radius of a transient glitch into a large, hard-to-review diff.
+- **A corrupted model of the file.** If the agent believes the target text isn't present, it may "helpfully" insert a duplicate, rewrite adjacent code, or conclude the file is in a state it isn't. Every downstream edit is now reasoning from a false premise.
+- **Silent on shared/multi-agent workflows.** This is the same family of file-state confusion that shows up in [Claude Code's MCP response cross-contamination](/blog/claude-code-mcp-response-cross-contamination/), where one sub-agent's view leaks into another's. When you parallelize edits across sub-agents, a desynced file view is how two agents edit through each other.
+
+## Are You Affected?
+
+If you run Claude Code 2.1.183 (or nearby builds) and do multi-line Edit calls — especially in batches, in the VS Code extension host, or across parallel sub-agents — you are in the risk window. The reporter is on Linux/VS Code, but a stale file-state path is not inherently platform-bound; don't assume macOS or Windows are immune.
+
+Tell-tale signs:
+
+```bash
+# An Edit fails with "String not found" but the text is visibly present
+# A retry of the identical old_string sometimes succeeds, sometimes fails
+# Failures cluster on old_string >= 3 lines while <= 2 line edits sail through
+# A fresh Read of the exact lines, then an identical retry, succeeds
+```
+
+## The Fix (until upstream patches)
+
+The reporter found three workarounds that clear the desync, in increasing weight:
+
+1. **Fresh targeted `Read` + retry.** Read the exact hunk, then immediately retry the identical edit. This re-syncs the tool's view and made occurrence 2 succeed.
+2. **Split multi-line edits into ≤2-line hunks.** The ≤2-line match path sees current content; break the change down and you sidestep the stale path.
+3. **Out-of-band write to reset tracked state.** An external change (or even a no-op write) to the file triggers Claude Code's "file was modified externally" re-sync and clears the stale view. Use as a last resort.
+
+Operational guardrails until a fix lands:
+
+- **Don't trust a single "string not found" — verify and retry.** `cmp` the file against your intended `old_string` before concluding the text moved.
+- **Keep edits small and single-purpose** when batching; avoid 20-line `old_string` blocks in one call.
+- **Review diffs, not the agent's summary.** When an edit is rejected and the agent "fixed it another way," diff the result. A rejected multi-line edit that quietly became a full-section rewrite is a review smell. Cross-check against your own `git` state the way you would for the [background-task SIGKILL git corruption](/blog/beware-claude-code-background-task-sigkill-git-corruption/) bug.
+- **Watch issue [#78076](https://github.com/anthropics/claude-code/issues/78076)** for the patch and the affected version range.
+
+## FAQ
+
+**Q1: Is my file content at risk, or just the edit call?**
+The content on disk is fine — the bug is in the tool's *view* of the file, not the file itself. The risk is what the agent does next based on the false negative (duplicate inserts, full rewrites, wrong assumptions). The bytes are not corrupted.
+
+**Q2: Does this affect `Write` or just `Edit`?**
+The report is specific to the Edit tool's multi-line `old_string` match. `Write` (full-file replace) wasn't implicated, but a desynced file view can still push an agent toward `Write` as a workaround — which is its own review hazard.
+
+**Q3: Should I stop using multi-line edits?**
+Not necessarily. Keep them, but if you hit a "string not found" on text you can see is present, do a targeted `Read` and retry before reaching for a bigger hammer. Splitting into ≤2-line hunks is the reliable short-term fix.
+
+**Q4: Why does a fresh `Read` fix it?**
+A `Read` forces the tool to re-ingest the file from disk, overwriting the stale in-memory view that the multi-line match path was consulting. The retry then matches against real bytes.
+
+*Don't overpay for AI tools. Check [aiFiesta](https://aifiesta.link/muhammed-anshad) for exclusive pricing on coding agents.*
