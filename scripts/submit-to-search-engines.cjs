@@ -149,8 +149,21 @@ async function submitToBing(urls) {
     console.log(`  ✗ Sitemap ping → ${e.message}`);
   }
 
-  // IndexNow already covers Bing, but we can also submit URLs directly
-  // Bing Webmaster API requires OAuth — skip for now, IndexNow handles it
+  // IndexNow already covers Bing, but direct API is faster
+  const BING_API_KEY = 'a913504d3689432687edd06568e66193';
+  
+  // Submit URLs via Bing Webmaster API (batch)
+  if (urls.length > 0) {
+    try {
+      const res = await httpPost(
+        `https://ssl.bing.com/webmaster/api.svc/json/SubmitUrlBatch?apikey=${BING_API_KEY}`,
+        { siteUrl: 'https://terminalblog.com', urlList: urls.slice(0, 100) }
+      );
+      console.log(`  ✓ Bing API batch (${Math.min(urls.length, 100)} URLs) → ${res.status}`);
+    } catch (e) {
+      console.log(`  ✗ Bing API batch → ${e.message}`);
+    }
+  }
 }
 
 async function submitToGoogle(urls) {
