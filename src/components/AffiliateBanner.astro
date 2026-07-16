@@ -1,0 +1,108 @@
+---
+/**
+ * AffiliateBanner.astro — Reusable affiliate promotion banner
+ * 
+ * Props:
+ *   variant: 'inline' | 'sidebar' | 'banner' (default: 'inline')
+ *   affiliate: 'shipkit' | 'rankpill' | 'aifiesta' (required)
+ */
+
+interface Props {
+  variant?: 'inline' | 'sidebar' | 'banner';
+  affiliate: string;
+}
+
+const { variant = 'inline', affiliate } = Astro.props;
+
+import affiliates from '../data/affiliates.json';
+
+const aff = affiliates.affiliates.find(a => a.id === affiliate);
+if (!aff) return null;
+
+const variants = {
+  inline: 'aff-inline',
+  sidebar: 'aff-sidebar',
+  banner: 'aff-banner',
+};
+---
+
+<div class={`affiliate-banner ${variants[variant]}`} data-affiliate={affiliate}>
+  <a href={aff.url} target="_blank" rel="noopener sponsored" class="aff-link">
+    <span class="aff-label">Partner</span>
+    <span class="aff-name">{aff.name}</span>
+    <span class="aff-desc">{aff.description}</span>
+    <span class="aff-cta">Learn more →</span>
+  </a>
+</div>
+
+<style>
+  .affiliate-banner {
+    margin: 1.5rem 0;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  
+  .aff-link {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 1rem 1.25rem;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border: 1px solid #333;
+    border-radius: 8px;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  
+  .aff-link:hover {
+    border-color: #22c55e;
+    transform: translateY(-1px);
+  }
+  
+  .aff-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #22c55e;
+    font-weight: 600;
+  }
+  
+  .aff-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #f5f5f5;
+  }
+  
+  .aff-desc {
+    font-size: 0.85rem;
+    color: #999;
+    line-height: 1.4;
+  }
+  
+  .aff-cta {
+    font-size: 0.8rem;
+    color: #22c55e;
+    font-weight: 500;
+    margin-top: 0.25rem;
+  }
+  
+  /* Banner variant — full width */
+  .aff-banner .aff-link {
+    flex-direction: row;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(90deg, #0a1628 0%, #1a1a2e 50%, #0a1628 100%);
+    border: 1px solid #22c55e33;
+  }
+  
+  .aff-banner .aff-desc {
+    flex: 1;
+  }
+  
+  /* Sidebar variant */
+  .aff-sidebar .aff-link {
+    padding: 0.75rem 1rem;
+  }
+</style>
