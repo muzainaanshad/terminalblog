@@ -110,11 +110,25 @@ async function submitToIndexNow(urls) {
   };
 
   const results = [];
+  let rateLimited = false;
+  
   for (const endpoint of INDEXNOW_ENDPOINTS) {
+    if (rateLimited) {
+      console.log(`  ⏭ ${endpoint} → skipped (rate limited)`);
+      continue;
+    }
+    
     try {
       const res = await httpPost(endpoint, payload);
       const ok = res.status === 200 || res.status === 202;
-      console.log(`  ${ok ? '✓' : '✗'} ${endpoint} → ${res.status}`);
+      const body = JSON.parse(res.body || '{}');
+      
+      if (res.status === 429) {
+        console.log(`  ⏳ ${endpoint} → rate limited (will skip remaining)`);
+        rateLimited = true;
+      } else {
+        console.log(`  ${ok ? '✓' : '✗'} ${endpoint} → ${res.status}`);
+      }
       results.push({ endpoint, status: res.status, ok });
     } catch (e) {
       console.log(`  ✗ ${endpoint} → ${e.message}`);
