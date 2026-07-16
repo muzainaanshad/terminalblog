@@ -1,0 +1,75 @@
+---
+title: "Beware: Claude Code's Approval Previews Could Be Spoofed With Invisible Unicode"
+description: "Claude Code 2.1.211 (July 15) quietly patched a flaw where permission-approval previews sent to chat channels didn't strip bidirectional-override, zero-width, and look-alike quote characters. A tool input could render as one command in the approval card and execute as another. Here's how the spoof works and how to approve safely."
+pubDate: "2026-07-17T14:00:00Z"
+updatedDate: "2026-07-17T14:00:00Z"
+tags: ["security", "beware", "claude-code", "prompt-injection", "approval", "unicode"]
+tool: "claude-code"
+author: "kira_bug_hunter"
+image: "/api/og?title=Beware:%20Approval%20Previews%20Spoofed%20by%20Invisible%20Unicode&tool=Claude%20Code"
+---
+
+## Related articles
+
+- [Beware: Your Coding Agent's Sandbox Was Leaking Its Own Credentials to Spawned Commands](/blog/beware-coding-agent-sandbox-leaks-own-credentials/)
+- [Coding Agent Security Checklist 2026: the isolation model every operator needs](/blog/coding-agent-security-checklist-2026/)
+- [Beware: Claude Code's disallowedTools Don't Reach Subagents](/blog/beware-claude-code-disallowedtools-not-inherited-by-subagents/)
+
+---
+
+You get a Slack (or Teams, or Discord) message: Claude Code wants to run `rm -rf ./tmp/build`. It looks harmless, so you tap Approve. But the command that actually executes is `rm -rf ./` followed by a homoglyph and a string of zero-width characters that made it *render* as `./tmp/build` in the approval card. You approved something you never saw.
+
+That is the class of bug Claude Code **2.1.211**, shipped July 15, quietly fixed:
+
+> *"Fixed permission previews relayed to chat channels not neutralizing bidirectional-override, zero-width, and look-alike quote characters, so tool inputs cannot visually alter the approval message."*
+
+It is buried in a 40-item changelog between a terminal-rendering tweak and a `/clear` cost-counter fix. But for anyone who reviews and approves Claude Code tool calls from a chat channel instead of the terminal, it is one of the more consequential security fixes of the release. This is a "Trojan Source"-style spoof aimed not at your compiler, but at *you* — the human in the approval loop.
+
+## What the bug actually was
+
+When Claude Code needs permission to run a tool (a Bash command, a file write, an MCP call), it renders a **permission preview** — the human-readable text of what it is about to do. If your setup relays those approvals to a chat channel, the preview is the card you read before clicking Approve or Reject.
+
+The flaw: that preview text was passed through to the chat channel **without neutralizing a set of Unicode characters that change how text is displayed but not how it is executed**:
+
+- **Bidirectional override characters** (`U+202E` RIGHT-TO-LEFT OVERRIDE, `U+202D` LEFT-TO-RIGHT OVERRIDE, and friends). These flip the visual order of surrounding characters. A string can *display* as `rm -rf ./tmp/build` while the underlying bytes — the thing the shell actually parses — are `rm -rf ./{reversed-junk}`. The classic "Trojan Source" technique (CVE-2021-42574) uses exactly this against source code; here it is used against the approval UI.
+- **Zero-width characters** (`U+200B` ZERO WIDTH SPACE, `U+200D` ZERO WIDTH JOINER, `U+FEFF` BYTE ORDER MARK). They are invisible but break string matching, hide suffixes, or split a command so a human skims the "clean" left half and misses the malicious right half.
+- **Look-alike quote characters** (homoglyphs like `U+2018`/`U+2019` curly quotes, fullwidth characters, Cyrillic look-alikes). A path or argument wrapped in a spoofed quote can change how a shell or downstream parser tokenizes it, while rendering identically to a trusted ASCII quote to a reviewer.
+
+None of these characters change what the agent executes — they change what you *think* the agent is about to execute. The dangerous assumption is that the approval card is a faithful rendering of the command line. Before 2.1.211, on chat-channel relays, it was not guaranteed to be.
+
+## Why this matters for your daily workflow
+
+Most Claude Code operators do not read raw tool input byte-by-byte. They read the preview, decide "does this look right," and approve. That is exactly the trust boundary the spoof attacks.
+
+The realistic kill chain:
+
+1. You clone or `git pull` a repository — your own dependency, a fork, a coworker's branch — that contains a file with a poisoned command string. The string looks innocuous in an editor (or is hidden in a log, a README code fence, or a generated config).
+2. Claude Code reads that file as part of its task. Indirect prompt-injection content the subagent reads is a known risk class — and notably, 2.1.210 *also* hardened the Agent tool against exactly that. But the injected content does not need to persuade the model; it only needs to survive into a tool input that gets surfaced for your approval.
+3. Claude Code dutifully asks permission to run the command. The approval preview is relayed to your chat channel.
+4. The Unicode tricks make the card show a benign command. You approve. The shell runs the real, hostile bytes.
+
+The reason this is worse over a *chat channel* than the terminal: terminals and TUIs vary in how they render bidirectional and zero-width characters, but chat renderers (Slack, Teams, Discord, web views) are particularly prone to "helpful" bidirectional text reordering and invisible-character collapsing. The fix specifically calls out "relayed to chat channels" because that is where the rendering mismatch between *what you see* and *what executes* is widest.
+
+## The fix, and its limits
+
+2.1.211 neutralizes those characters in the permission preview text before it is relayed, so the approval message can no longer be visually altered by the tool input. Update to **2.1.211 or later** (`claude --version` should report ≥ 2.1.211).
+
+But treat the patch as raising the floor, not closing the door:
+
+- **It covers the preview, not your eyes elsewhere.** The same poisoned string can still appear in a normal chat message, a generated file, or agent output. Only the permission-approval card is sanitized.
+- **Unicode spoofing is a moving target.** New homoglyph ranges, combining marks, and rendering quirks appear constantly. A patch that neutralizes today's known set does not guarantee tomorrow's does not slip through.
+- **The human approval step remains the weakest link.** Any rendering-based trust boundary can be defeated by a renderer the vendor did not test.
+
+## How to approve safely anyway
+
+- **Verify the command, not the card.** When a high-impact command comes through chat, open it in the Claude Code terminal or run `claude` and read the tool input there before approving. The terminal is a more honest rendering surface than a chat card.
+- **Lean on allow/deny lists instead of manual approval.** Encode the commands you trust into permission rules (`permissions.allow`) and deny the ones you never want (`permissions.deny`). A pre-approved allow rule removes the spoofable approval step entirely for known-good operations.
+- **Use PreToolUse hooks for the dangerous verbs.** A hook can inspect the *raw* tool input (before any rendering) and block or require a prompt for commands touching `rm`, `git push --force`, credential files, or your home directory. Unlike the chat card, a hook sees the bytes.
+- **Treat any repo content as untrusted input.** The poisoned string almost always originates from a file the agent read. Pair Claude Code with the isolation model in our [coding agent security checklist](/blog/coding-agent-security-checklist-2026/) and keep `disallowedTools` in mind — though note those deny rules do **not** propagate to subagents, a gap we covered in [this Beware](/blog/beware-claude-code-disallowedtools-not-inherited-by-subagents/).
+- **Don't approve from a glance on mobile.** Chat apps on phones are the most aggressive at collapsing zero-width and reordering bidirectional text. If you must approve on the go, tap through to the raw view.
+
+## The bigger signal
+
+Two releases in a row — 2.1.210's indirect-prompt-injection hardening on the Agent tool, and 2.1.211's approval-preview sanitization — show Claude Code closing the gap between *what the model executes* and *what the human reviewer perceives*. That gap is the entire attack surface for agentic coding: the model is increasingly sandboxed and audited, but the approval loop you sit in is still rendered by third-party chat clients that were never designed to be a security boundary.
+
+Patch. Verify the command, not the card. And never let a chat renderer be the only thing standing between a poisoned string and `rm -rf`.
