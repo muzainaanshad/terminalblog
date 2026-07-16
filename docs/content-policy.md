@@ -11,8 +11,8 @@ Purpose: grow traffic with **trustworthy, durable coverage** of AI coding agents
 ## Daily caps (automation) — long-term SEO first
 
 | Type | Max / day | Notes |
-|------|-----------|--------|
-| just-shipped / commit roundups | **0** | Disabled — weekly digest only |
+|------|-----------|-------|
+| just-shipped / commit roundups | **1** | Must be interesting angle, not just "released" |
 | All new posts | **3** hard soft-cap | Quality over volume |
 | Any new post | **≥ 600 words** | Below = reject |
 | Evergreen / guide / beware / pillar | **≥ 1000 words** | Long-term traffic assets |
