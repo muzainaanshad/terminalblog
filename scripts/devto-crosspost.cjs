@@ -11,7 +11,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const https = require('https');
 
 const ROOT = path.join(__dirname, '..');
 const BLOG = path.join(ROOT, 'src', 'content', 'blog');
@@ -55,37 +54,22 @@ function slugTag(t) {
 }
 
 function postToDevTo(article) {
-  return new Promise((resolve, reject) => {
-    const data = JSON.stringify(article);
-    const req = https.request({
-      hostname: 'dev.to',
-      path: '/api/articles',
+  return (async () => {
+    const data = JSON.stringify({ article });
+    const res = await fetch(API, {
       method: 'POST',
-      headers: {
-        'api-key': KEY,
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(data),
-      },
-    }, (res) => {
-      let body = '';
-      res.on('data', c => body += c);
-      res.on('end', () => {
-        try {
-          const json = JSON.parse(body);
-          if (res.statusCode >= 200 && res.statusCode < 300) {
-            resolve({ ok: true, url: json.url, id: json.id });
-          } else {
-            resolve({ ok: false, error: json.error || body.slice(0, 200), status: res.statusCode });
-          }
-        } catch {
-          resolve({ ok: false, error: body.slice(0, 200), status: res.statusCode });
-        }
-      });
+      headers: { 'api-key': KEY, 'Content-Type': 'application/json' },
+      body: data,
     });
-    req.on('error', reject);
-    req.write(data);
-    req.end();
-  });
+    const body = await res.text();
+    let json = null;
+    try { json = JSON.parse(body); } catch { /* non-json */ }
+    const errMsg = (json && (json.error)) ? json.error : body.slice(0, 200);
+    if (res.status >= 200 && res.status < 300) {
+      return { ok: true, url: json.url, id: json.id };
+    }
+    return { ok: false, error: errMsg, status: res.status };
+  })();
 }
 
 async function main() {
@@ -128,10 +112,10 @@ async function main() {
     const { fields, body } = parseFront(content);
     const title = fields.title || slug.replace(/-/g, ' ');
     const canonical = `https://terminalblog.com/blog/${slug}/`;
-    const tags = (fields.tags || ['ai', 'coding']).map(slugTag).filter(Boolean).slice(0, 4);
-    
-    // Add terminalblog tag
+    let tags = (fields.tags || ['ai', 'coding']).map(slugTag).filter(Boolean);
+    // Add terminalblog tag, but keep total <= 4 (dev.to hard cap)
     if (!tags.includes('terminalblog')) tags.push('terminalblog');
+    tags = tags.slice(0, 4);
 
     const article = {
       title,
