@@ -1,0 +1,79 @@
+---
+title: "Beware: Claude Code's disallowedTools Don't Reach Subagents — Your Deny List Is a Parent-Only Guard"
+description: "A reproducible Claude Code bug shows that tools you explicitly deny in settings are NOT inherited by subagents spawned through the Agent tool. If your safety model assumes a global deny list, subagents can run the very tools you blocked."
+pubDate: "2026-07-16T10:00:00Z"
+updatedDate: "2026-07-16T10:00:00Z"
+tags: ["security", "beware", "claude-code", "permissions", "subagents", "hardening"]
+tool: "claude-code"
+author: "jax_opensrc"
+image: "/api/og?title=Beware:%20disallowedTools%20Not%20Inherited%20by%20Subagents&tool=Claude%20Code"
+---
+
+You lock down your agent. You write a `permissions.deny` list, or you restrict the allowed toolset, and you trust that the boundary holds everywhere the agent runs. A freshly filed, reproducible GitHub issue says otherwise for one important case: **subagents you launch through the Agent tool do not inherit your `disallowedTools`**.
+
+If your threat model assumes that blocking a tool once blocks it everywhere, this is a guard you should stop trusting today.
+
+## The claim, in plain terms
+
+In Claude Code, you can constrain what tools are available. Two common patterns:
+
+- `permissions.deny` — a blocklist of tool operations that should never be permitted.
+- A scoped `allowedTools` / `disallowedTools` set handed to a session or a subagent.
+
+The reported behavior: when the main session spawns a subagent via the **Agent tool**, that subagent does **not** receive the parent's `disallowedTools`. The subagent starts with its own (broader) tool policy. A tool you banned at the top level can run inside the subagent with no prompt, no warning, and no log line saying the guard was dropped.
+
+The reporter included a reproduction and the maintainers tagged it with `has repro` and `area:permissions`. That is the combination we treat as real, not speculative.
+
+## Why this matters more than a normal bug
+
+Most Claude Code setups run subagents constantly. The Agent tool is the standard way to fan work out: "research this," "refactor that file," "run the test suite in a loop." Each of those spawns an autonomous loop with tools. If your hardening assumed the parent's deny list travels with it, every one of those loops is running outside your intended guardrails.
+
+Three concrete shapes of damage:
+
+**1. A banned destructive tool runs silently.** You denied `Bash` patterns that touch `rm -rf`, `git push --force`, or your cloud CLI. A subagent with an unrestricted toolset can still execute them. You only find out when the filesystem or the remote changes.
+
+**2. A scoped credential boundary collapses.** Many teams hand the parent a narrow toolset and assume children inherit it. If children get the full default toolset, a subagent can call network tools, read files, or hit APIs the parent was never meant to touch.
+
+**3. Audit trails lie.** Your compliance story says "we block tool X on this project." The subagent used tool X. There is no inherited deny, so the block simply never applied. The audit trail shows the parent was clean.
+
+## Build the corrected mental model
+
+The lesson is not "Claude Code is broken." The lesson is that **tool permissions are scoped per agent, and inheritance is not guaranteed**. Treat every subagent as starting from a fresh, default-ish policy unless you explicitly pass it constraints.
+
+That flips how you should configure:
+
+- **Don't assume top-down inheritance.** A parent deny list is a *parent* deny list. It is not a project-wide firewall.
+- **Pin policy at the point of spawn.** If you launch a subagent that must not use a tool, configure that subagent's own tool scope. Don't rely on the parent's settings to reach it.
+- **Default to deny at the subagent level too.** The safest posture is a subagent that can do less than the parent, not more.
+
+## Practical mitigations you can apply now
+
+Until the inheritance behavior is fixed or documented as intentional, close the gap yourself.
+
+**1. Pass an explicit tool allowlist when you spawn.** Instead of relying on inherited denies, give the subagent a narrow `allowedTools` set. If a subagent only needs to read and edit files, hand it exactly that and nothing else. A short allowlist beats a long inherited deny list you can't verify.
+
+**2. Add an external guardrail.** Don't trust the agent's own tool policy as your only defense. Put destructive operations behind something the agent can't widen — a wrapped shell script that refuses `rm -rf` / force-push, a Git pre-commit hook, a CI gate that rejects pushes from the working tree, read-only cloud credentials with separate break-glass access. The agent's permission system is convenience, not a security boundary.
+
+**3. Separate dangerous credentials from the agent environment.** A subagent that inherits the parent's environment variables inherits its tokens. Scope credentials per task, keep long-lived secrets out of the shell the agent runs in, and prefer short-lived, narrow tokens. This is the same isolation rule that matters for any agent leak, and it neutralizes the worst case here too.
+
+**4. Log and review subagent tool calls.** If your setup supports it, capture which tools subagents actually invoke. A subagent calling a network or shell tool it was never meant to touch is your early-warning signal. Watch for Bash, WebFetch, and any cloud SDK calls in subagent output.
+
+**5. Test the boundary instead of assuming it.** Before you trust a deny list, prove it. Spawn a subagent and ask it to perform the blocked operation. If it succeeds, your guard is a no-op for subagents — exactly the failure this issue describes.
+
+## Who is at risk
+
+- **Solo developers** who set a `permissions.deny` once and forgot about it. Your setup probably assumes the list is global. It isn't, for subagents.
+- **Teams** running multi-agent workflows where subagents do real file and shell work. The blast radius is larger because more loops run with more access.
+- **Anyone** using the Agent tool to parallelize work without re-specifying tool scope per child.
+
+If you only ever run the main session and never spawn subagents, your deny list still does its job for that session. The gap is specifically the parent-to-subagent handoff.
+
+## The verdict
+
+This is a real, reproduced permission gap, not a theoretical worry. The fix is to stop treating `disallowedTools` as a project-wide firewall. Pin tool scope at every spawn, keep your real security boundaries outside the agent's own permission system, and verify the boundary with a test rather than trusting it.
+
+A denied tool is only denied where it is actually applied. Right now, for subagents spawned via the Agent tool, it may not be applied at all.
+
+---
+
+*Ever wonder if Claude gives a better answer than GPT for a specific coding problem? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** lets you compare 9+ premium models side-by-side in one chat. No more juggling tabs.*
