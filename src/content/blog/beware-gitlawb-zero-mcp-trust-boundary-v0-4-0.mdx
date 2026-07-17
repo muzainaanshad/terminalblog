@@ -1,0 +1,94 @@
+---
+title: "Beware: Gitlawb Zero v0.4.0 Closed a Hole Where a Cloned Repo Could Re-Enable the MCP Servers You Disabled"
+description: "Gitlawb Zero v0.4.0 (July 17, 2026) shipped a quiet but important security fix: a project-level config could previously override a user's disabled MCP server. For anyone who treats MCP as a security boundary, this is the kind of trust gap worth understanding before your next git clone."
+pubDate: "2026-07-17T15:00:00Z"
+updatedDate: "2026-07-17T15:00:00Z"
+tags: ["security", "beware", "gitlawb-zero", "mcp", "trust-boundary", "hardening"]
+tool: "gitlawb-zero"
+author: "kira_bug_hunter"
+image: "/api/og?title=Beware:%20A%20Cloned%20Repo%20Could%20Re-Enable%20Your%20MCP%20Servers&tool=Gitlawb%20Zero"
+---
+
+You disabled an MCP server. You trust it's off.
+
+That assumption is exactly what Gitlawb Zero **v0.4.0**, shipped July 17, 2026, quietly hardened. Buried in the release notes under "Bug Fixes" is this line:
+
+> **config:** enforce MCP trust boundary so project config cannot override user disable ([#609](https://github.com/Gitlawb/zero/issues/609)), closes [#512](https://github.com/Gitlawb/zero/issues/512)
+
+No CVE. No advisory banner. But if you run coding agents — and especially if your mental model of "I turned that integration off" doubles as a security boundary — this is a fix worth a closer look. The maintainers closed issue **#512** by making the user-level disable authoritative. Before v0.4.0, the implication is that a *project-level config shipped inside a repository* could flip a disabled MCP server back on.
+
+That is not a cosmetic bug. MCP servers are not plugins you install for fun. They are tool providers with file access, network egress, and often live credentials.
+
+## What MCP actually is in this threat model
+
+Model Context Protocol servers are how coding agents reach the outside world: a database, a cloud console, a ticketing system, a private API, your filesystem. Each one is a standing grant of capability. When you disable an MCP server, you are — usually implicitly — saying "this agent should not be able to talk to that thing right now."
+
+That makes the disable switch a security control, whether or not the UI calls it one. And like every security control, its value is entirely in whether it holds when something tries to reverse it.
+
+So the question v0.4.0 answers is simple: **if a repo you just cloned ships its own config that says "enable this MCP server," does your explicit disable win, or does the project's config win?**
+
+Before this release, the project config could win. The fix flips that: the user disable is now the authoritative boundary, and project config cannot override it.
+
+## The scenario that should worry you
+
+Imagine the normal flow:
+
+1. You clone a repository someone sent you, or that you found on a forum.
+2. You open it in your coding agent to read or patch it.
+3. The repo's project config — the part that travels *inside* the repository — declares an MCP server and enables it.
+4. Because a project config could override a user-level disable, a server you had turned off silently comes back online in that session.
+
+Now combine that with what MCP servers do. A server can read files, make outbound requests, and carry credentials. A malicious or compromised repo doesn't need a prompt injection mid-conversation. It can arrive pre-wired to re-enable an integration the moment you open the folder — with no "Allow this?" dialog, because the config frame says the server is wanted.
+
+This is the same class of risk that makes **supply-chain** problems in dev tooling so stubborn: the dangerous payload isn't in the code you review, it's in the configuration that the code's tooling trusts by default.
+
+## Why a coding-agent operator should care
+
+You might think "I only disable MCP servers I don't use, so who cares if one turns back on." Two reasons this is sharper than it sounds:
+
+**1. Your disable list is a forgetting aid.** Most operators disable servers they tried once and decided were risky, or that they only want active on a specific trusted project. Treating that list as a global off-switch is reasonable — until a per-project config quietly reverses it.
+
+**2. Repos are untrusted input.** You open far more repositories than you would grant a shell in. A project config that can re-enable integrations turns "just looking at this code" into "this code's config just widened my agent's access." The trust boundary between "I'm reading a repo" and "my agent is now calling that repo's declared servers" should not be crossable by the repo itself.
+
+Gitlawb Zero's fix restores the only sane default: **the user's explicit decision beats the project's request.** A cloned repo can ask. It cannot override.
+
+## Other hardening in the same release worth noting
+
+The MCP trust-boundary fix wasn't the only security-adjacent change in v0.4.0. Reading the full changelog, Zero also shipped:
+
+- **harden MCP credential boundaries** ([#597](https://github.com/Gitlawb/zero/issues/597)) — tightening how MCP credentials are scoped and stored.
+- **sandbox: scrub dynamic credential env vars** ([#682](https://github.com/Gitlawb/zero/issues/682)) — preventing dynamic secrets from leaking into the sandbox environment.
+- **hooks: fail closed on launch failures for beforeTool hooks** ([#629](https://github.com/Gitlawb/zero/issues/629)) — a fail-closed posture so a broken hook can't silently let a tool run.
+- **windows: resolve absolute path for taskkill to prevent hijacking** ([#617](https://github.com/Gitlawb/zero/issues/617)) — closing a local privilege/confusion vector on Windows.
+
+The cluster tells you something about the project's priorities: they are treating config, credentials, and hooks as security boundaries, not conveniences. That's the right instinct, and it makes the MCP trust-boundary fix part of a consistent posture rather than a one-off.
+
+## How to verify and harden on your side
+
+Regardless of which agent you run, the Zero fix is a useful prompt to audit your own MCP trust model:
+
+**1. Upgrade to v0.4.0 if you run Zero.** The trust boundary is enforced at the config layer; the fix is in the default behavior, so moving to the latest release is the whole remediation.
+
+**2. Audit where your MCP configs live.** User-level (global) config and project-level (repo) config interact differently across agents. Know which one wins in *your* tool. If you can't answer that question, assume the project config is more influential than you'd like and test it.
+
+**3. Treat "disabled" as a thing to verify, not assume.** Open a throwaway repo with a project config that declares an MCP server you've disabled. Confirm it stays disabled. The Gitlawb fix means it will in Zero now — but the same test is worth running on every agent you depend on.
+
+**4. Keep credentials out of the agent's default environment.** The scrub-dynamic-credential-env-vars fix is a reminder that sandbox env vars are a common leak path. Scope secrets per task, prefer short-lived tokens, and don't let every repo's session inherit your long-lived keys.
+
+**5. Prefer explicit deny at the highest level.** If your agent supports a user-level deny list for MCP servers, set it there. A boundary the project config cannot reach is the only boundary that survives an untrusted clone.
+
+## The verdict
+
+This is a real trust-boundary fix, not a theoretical tidy-up — the maintainers closed a specific issue (#512) to make user-level MCP disables authoritative over project config. For a tool whose pitch is "the coding agent that answers to you, your model, your machine, your rules," enforcing that the *user's* rules beat a repo's rules is exactly the right default.
+
+The lesson travels further than one release. Every coding agent now has an MCP layer, and every MCP layer has a place where global and per-project config meet. That intersection is a trust boundary. If a cloned repository can widen your agent's access without a prompt, then "open folder" is a bigger blast-radius action than it looks. Make sure your off-switch is wired to win.
+
+## Related articles
+
+- [AGENTS.md Complete Guide — Make Every Coding Agent Follow Your Repo Rules](/blog/agents-md-complete-guide/)
+- [Beware: Claude Code's disallowedTools Don't Reach Subagents](/blog/beware-claude-code-disallowedtools-not-inherited-by-subagents/)
+- [Claude Code Background Subagent Secret Leak — What Operators Should Know](/blog/claude-code-background-subagent-secret-leak/)
+
+---
+
+*Ever wonder if Claude gives a better answer than GPT for a specific coding problem? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** lets you compare 9+ premium models side-by-side in one chat. No more juggling tabs.*
