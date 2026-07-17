@@ -1,8 +1,8 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { checkAuth } from '../../middleware/auth';
-import fs from 'node:fs';
-import path from 'node:path';
+import fs from 'fs';
+import path from 'path';
 
 export const prerender = false;
 
@@ -11,766 +11,335 @@ if (!isAuth) {
   return Astro.redirect('/admin/login');
 }
 
-// ── Helpers ──────────────────────────────────────────────
-const ROOT = path.resolve(process.cwd());
-function safeJson(rel: string): any {
-  try { return JSON.parse(fs.readFileSync(path.join(ROOT, rel), 'utf-8')); } catch { return null; }
-}
+// Read cron state
+let cronData = [];
+try {
+  const stateFile = path.join(process.cwd(), 'tmp', 'cron-state.json');
+  if (fs.existsSync(stateFile)) {
+    cronData = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+  }
+} catch {}
 
-// ── Cron data ────────────────────────────────────────────
-const crons = [
-  { name: 'Content Refresh Queue', slug: 'content-refresh', schedule: '0 5 * * 3', scheduleLabel: 'Wed 05:00 UTC', category: 'content', status: 'active', model: 'anthropic/claude-sonnet-4', prompt: 'Refresh evergreen articles flagged for update. Read article-memory.json for needsUpdate=true entries, pick the top-priority ones, rewrite with fresh data and examples. Gate-check each output before saving.', lastRun: '2026-07-16T05:00:00Z', nextRun: '2026-07-23T05:00:00Z' },
-  { name: 'Daily Summary', slug: 'daily-summary', schedule: '0 3 * * *', scheduleLabel: 'Daily 06:00 AST', category: 'ops', status: 'active', model: 'anthropic/claude-sonnet-4', prompt: 'Compile daily summary of all cron runs, article publications, and site metrics. Send formatted report to Telegram in Articles Management format.', lastRun: '2026-07-17T03:00:00Z', nextRun: '2026-07-18T03:00:00Z' },
-  { name: 'Leaderboard Snapshot', slug: 'leaderboard-snapshot', schedule: '0 12 * * *', scheduleLabel: 'Daily 12:00 UTC', category: 'monitoring', status: 'active', model: 'none', prompt: 'Take daily adoption leaderboard snapshot. Fetch current star counts, contributor stats, and trending repos. Save historical data for trend analysis.', lastRun: '2026-07-17T12:00:00Z', nextRun: '2026-07-18T12:00:00Z' },
-  { name: 'Ops Digest', slug: 'ops-digest', schedule: '0 13 * * *', scheduleLabel: 'Daily 13:00 UTC', category: 'ops', status: 'active', model: 'anthropic/claude-sonnet-4', prompt: 'Generate Telegram ops digest in Articles Management format. Summarize: new articles published, updates made, cron successes/failures, site health status. Include action items if any.', lastRun: '2026-07-17T13:00:00Z', nextRun: '2026-07-18T13:00:00Z' },
-  { name: 'SEO Learn', slug: 'seo-learn', schedule: '0 6 * * 1', scheduleLabel: 'Mon 06:00 UTC', category: 'seo', status: 'active', model: 'anthropic/claude-sonnet-4', prompt: 'Weekly SEO learnings report. Analyze Search Console data, identify top-performing queries, click-through patterns, and pages needing optimization. Generate actionable recommendations.', lastRun: '2026-07-14T06:00:00Z', nextRun: '2026-07-21T06:00:00Z' },
-  { name: 'Site Health', slug: 'site-health', schedule: '0 */6 * * *', scheduleLabel: 'Every 6 hours', category: 'monitoring', status: 'active', model: 'none', prompt: 'Run automated site health checks: verify all published URLs return 200, check for broken internal links, validate RSS feed, test OG images, and confirm sitemap freshness.', lastRun: '2026-07-17T12:00:00Z', nextRun: '2026-07-17T18:00:00Z' },
-  { name: 'Weekly Newsletter', slug: 'weekly-newsletter', schedule: '0 14 * * 1', scheduleLabel: 'Mon 14:00 UTC', category: 'content', status: 'active', model: 'anthropic/claude-sonnet-4', prompt: 'Compile weekly Coding Agent digest for Beehiiv newsletter. Pick top 5-7 articles from the week, write editorial intro, format for email delivery. Send via Beehiiv API.', lastRun: '2026-07-14T14:00:00Z', nextRun: '2026-07-21T14:00:00Z' },
-  { name: 'Deploy Notify', slug: 'deploy-notify', schedule: 'on push', scheduleLabel: 'Vercel auto', category: 'ops', status: 'muted', model: 'none', prompt: 'MUTED — Deploy notifications disabled per user request. Vercel handles deployment via Git integration. No Telegram ping on deploy.', lastRun: '2026-07-17T00:00:00Z', nextRun: '—' },
-];
+// Read article memory
+let articleMemory = { articles: [], topics: {} };
+try {
+  const memFile = path.join(process.cwd(), 'src', 'data', 'article-memory.json');
+  if (fs.existsSync(memFile)) {
+    articleMemory = JSON.parse(fs.readFileSync(memFile, 'utf8'));
+  }
+} catch {}
 
-const categoryColors: Record<string, string> = {
-  content: '#22c55e',
-  seo: '#3b82f6',
-  social: '#a855f7',
-  ops: '#f59e0b',
-  monitoring: '#06b6d4',
-};
-const categoryLabels: Record<string, string> = {
-  content: '📝 Content',
-  seo: '🔍 SEO',
-  social: '🐦 Social',
-  ops: '⚙️ Ops',
-  monitoring: '📡 Monitoring',
-};
-const categoryOrder = ['content', 'seo', 'social', 'ops', 'monitoring'];
-
-// Group crons by category
-const cronGroups: Record<string, typeof crons> = {};
-for (const c of crons) {
-  if (!cronGroups[c.category]) cronGroups[c.category] = [];
-  cronGroups[c.category].push(c);
-}
-
-// ── Article memory for daily progress ────────────────────
-const mem = safeJson('src/data/article-memory.json');
-const memArticles: Record<string, any> = mem?.articles ?? {};
-const totalInMemory = Object.keys(memArticles).length;
-const needsUpdateCount = Object.values(memArticles).filter((v: any) => v.needsUpdate).length;
-const blogDir = path.join(ROOT, 'src', 'content', 'blog');
-let totalMdx = 0;
-try { totalMdx = fs.readdirSync(blogDir).filter(f => f.endsWith('.mdx')).length; } catch {}
-
-// ── Today's date for progress section ────────────────────
-const today = new Date().toISOString().split('T')[0];
+// Count articles
+let articleCount = 0;
+try {
+  const blogDir = path.join(process.cwd(), 'src', 'content', 'blog');
+  articleCount = fs.readdirSync(blogDir).filter(f => f.endsWith('.mdx')).length;
+} catch {}
 ---
 
 <Layout title="Automation Flow - terminalblog">
-  <div class="flow-page">
-    <!-- ═══ Top bar ═══ -->
-    <div class="flow-topbar">
-      <div class="flow-topbar-left">
-        <a href="/admin" class="back-link">← Dashboard</a>
-        <span class="flow-topbar-title">🔄 Automation Flow</span>
+  <div style="min-height:100vh;background:#0a0a0a;color:#e0e0e0;font-family:'JetBrains Mono',monospace;">
+    <!-- Top bar -->
+    <div style="position:sticky;top:0;z-index:100;background:#111;border-bottom:1px solid #22c55e20;padding:0.75rem 1.5rem;display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:1rem;">
+        <a href="/admin" style="color:#22c55e;text-decoration:none;font-size:0.8rem;">← Dashboard</a>
+        <span style="color:#f59e0b;font-size:0.85rem;">Automation Flow</span>
       </div>
-      <span class="flow-topbar-sub">terminalblog.com</span>
+      <span style="color:#555;font-size:0.7rem;">terminalblog.com · {articleCount} articles</span>
     </div>
 
-    <!-- ═══ Canvas ═══ -->
-    <div class="flow-canvas">
-      <div class="flow-inner">
+    <div style="padding:2rem;overflow-x:auto;">
+      <div style="max-width:1400px;margin:0 auto;">
 
-        <!-- Title -->
-        <div class="flow-header">
-          <h1 class="flow-title">End-to-End Automation Flow</h1>
-          <p class="flow-subtitle">Single source of truth — every cron, pipeline, and schedule</p>
-        </div>
-
-        <!-- ════════════════════════════════════════════════════
-             1. PIPELINE FLOW DIAGRAMS
-             ════════════════════════════════════════════════════ -->
-        <section class="flow-section">
-          <h2 class="flow-section-title"><span class="dot green"></span> Pipeline Diagrams</h2>
-
-          <!-- Content Pipeline -->
-          <div class="pipeline-card" style="border-color: #22c55e40;">
-            <div class="pipeline-header">
-              <span class="pipeline-num green-bg">01</span>
-              <h3 class="pipeline-name" style="color:#22c55e;">Content Pipeline</h3>
-              <span class="pipeline-freq">Every 3h + daily</span>
-            </div>
-            <div class="pipeline-nodes">
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#f59e0b;">📡 TRIGGER</div>
-                <div class="node-name">Commit Watcher</div>
-                <div class="node-meta">Every 3h · 19 repos</div>
-              </div>
-              <div class="pipeline-arrow green">→</div>
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#f59e0b;">🧠 DECIDE</div>
-                <div class="node-name">Article Memory</div>
-                <div class="node-meta">361 indexed · dedup</div>
-              </div>
-              <div class="pipeline-arrow green">→</div>
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#f59e0b;">✍️ WRITE</div>
-                <div class="node-name">Article Generator</div>
-                <div class="node-meta">3 PM daily · 1 max</div>
-              </div>
-              <div class="pipeline-arrow green">→</div>
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#f59e0b;">✅ GATE</div>
-                <div class="node-name">Content Gate</div>
-                <div class="node-meta">≥600w · no dups</div>
-              </div>
-              <div class="pipeline-arrow green">→</div>
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#f59e0b;">🚀 DEPLOY</div>
-                <div class="node-name">Vercel Auto</div>
-                <div class="node-meta">git push → live</div>
-              </div>
-            </div>
+        <!-- ═══ CONTENT PIPELINE ═══ -->
+        <div style="border:1px solid #22c55e30;border-radius:8px;padding:1.5rem;background:#111;margin-bottom:1.5rem;">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;">
+            <span style="background:#22c55e;color:#000;padding:0.2rem 0.6rem;border-radius:4px;font-size:0.7rem;font-weight:700;">01</span>
+            <h2 style="font-size:0.9rem;color:#22c55e;margin:0;">Content Pipeline</h2>
+            <span style="font-size:0.65rem;color:#666;margin-left:auto;">5 AM–7 AM Saudi</span>
           </div>
-
-          <!-- Quality Pipeline -->
-          <div class="pipeline-card" style="border-color: #f59e0b40;">
-            <div class="pipeline-header">
-              <span class="pipeline-num amber-bg">02</span>
-              <h3 class="pipeline-name" style="color:#f59e0b;">Quality Pipeline</h3>
-              <span class="pipeline-freq">Daily 4 AM</span>
-            </div>
-            <div class="pipeline-nodes">
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#f59e0b;">🔍 SCAN</div>
-                <div class="node-name">Find Thin Articles</div>
-                <div class="node-meta">&lt;600w · stale &gt;45d</div>
-              </div>
-              <div class="pipeline-arrow amber">→</div>
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#f59e0b;">📝 EXPAND</div>
-                <div class="node-name">Quality Improver</div>
-                <div class="node-meta">4 AM daily · 2 max</div>
-              </div>
-              <div class="pipeline-arrow amber">→</div>
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#f59e0b;">🔄 MEMORY</div>
-                <div class="node-name">Update Article Memory</div>
-                <div class="node-meta">tags, topics, links</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- SEO Pipeline -->
-          <div class="pipeline-card" style="border-color: #3b82f640;">
-            <div class="pipeline-header">
-              <span class="pipeline-num blue-bg">03</span>
-              <h3 class="pipeline-name" style="color:#3b82f6;">SEO Pipeline</h3>
-              <span class="pipeline-freq">Every 6h + daily + weekly</span>
-            </div>
-            <div class="pipeline-nodes">
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#3b82f6;">📡 PING</div>
-                <div class="node-name">Search Engines</div>
-                <div class="node-meta">Every 6h · IndexNow</div>
-              </div>
-              <div class="pipeline-arrow blue">→</div>
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#3b82f6;">📊 TRACK</div>
-                <div class="node-name">SEO Autopilot</div>
-                <div class="node-meta">6 AM daily · scores</div>
-              </div>
-              <div class="pipeline-arrow blue">→</div>
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#3b82f6;">🔗 BUILD</div>
-                <div class="node-name">Backlink Outreach</div>
-                <div class="node-meta">10 AM daily · HARO</div>
-              </div>
-              <div class="pipeline-arrow blue">→</div>
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#3b82f6;">📈 AUDIT</div>
-                <div class="node-name">Weekly Monitor</div>
-                <div class="node-meta">Mon 9 AM · DA + rankings</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Social Pipeline -->
-          <div class="pipeline-card" style="border-color: #a855f740;">
-            <div class="pipeline-header">
-              <span class="pipeline-num purple-bg">04</span>
-              <h3 class="pipeline-name" style="color:#a855f7;">Social Pipeline</h3>
-              <span class="pipeline-freq">Daily + weekly batch</span>
-            </div>
-            <div class="pipeline-nodes">
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#a855f7;">🤖 GENERATE</div>
-                <div class="node-name">MyMarky AI</div>
-                <div class="node-meta">8 AM daily · 3 posts</div>
-              </div>
-              <div class="pipeline-arrow purple">→</div>
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#a855f7;">📱 POST</div>
-                <div class="node-name">Twitter / LinkedIn</div>
-                <div class="node-meta">Auto-publish</div>
-              </div>
-              <div class="pipeline-arrow purple">→</div>
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#a855f7;">🔧 TOOL TWEETS</div>
-                <div class="node-name">Terminal Tools</div>
-                <div class="node-meta">Mon/Wed/Fri · weekly</div>
-              </div>
-              <div class="pipeline-arrow purple">→</div>
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#a855f7;">📝 CROSSPOST</div>
-                <div class="node-name">Dev.to</div>
-                <div class="node-meta">With each article</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- HN / Show HN Pipeline -->
-          <div class="pipeline-card" style="border-color: #fb923c40;">
-            <div class="pipeline-header">
-              <span class="pipeline-num orange-bg">05</span>
-              <h3 class="pipeline-name" style="color:#fb923c;">HN / Show HN Pipeline</h3>
-              <span class="pipeline-freq">As triggered</span>
-            </div>
-            <div class="pipeline-nodes">
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#fb923c;">🔥 FRONT PAGE</div>
-                <div class="node-name">HN Front Page</div>
-                <div class="node-meta">Trending articles</div>
-              </div>
-              <div class="pipeline-arrow orange">→</div>
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#fb923c;">💬 SCRAPE</div>
-                <div class="node-name">Discussion Scraper</div>
-                <div class="node-meta">Comments + threads</div>
-              </div>
-              <div class="pipeline-arrow orange">→</div>
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#fb923c;">✍️ OPINION</div>
-                <div class="node-name">Opinion Article</div>
-                <div class="node-meta">HN angle + insight</div>
-              </div>
-              <div class="pipeline-arrow orange">→</div>
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#fb923c;">🚀 PUBLISH</div>
-                <div class="node-name">Deploy + Share</div>
-                <div class="node-meta">Gate → Vercel → HN</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Monitoring Pipeline -->
-          <div class="pipeline-card" style="border-color: #ef444440;">
-            <div class="pipeline-header">
-              <span class="pipeline-num red-bg">06</span>
-              <h3 class="pipeline-name" style="color:#ef4444;">Monitoring Pipeline</h3>
-              <span class="pipeline-freq">Daily + real-time</span>
-            </div>
-            <div class="pipeline-nodes">
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#ef4444;">📊 SNAPSHOTS</div>
-                <div class="node-name">Adoption Tracker</div>
-                <div class="node-meta">2 AM daily · npm + GH</div>
-              </div>
-              <div class="pipeline-arrow red">→</div>
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#ef4444;">⚠️ ISSUES</div>
-                <div class="node-name">Issues Watcher</div>
-                <div class="node-meta">4 PM daily · 19 repos</div>
-              </div>
-              <div class="pipeline-arrow red">→</div>
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#ef4444;">📋 DIGEST</div>
-                <div class="node-name">Ops Digest</div>
-                <div class="node-meta">1 PM UTC · Telegram</div>
-              </div>
-              <div class="pipeline-arrow red">→</div>
-              <div class="pipeline-node">
-                <div class="node-label" style="color:#ef4444;">💬 TELEGRAM</div>
-                <div class="node-name">Notifications</div>
-                <div class="node-meta">7 msgs/day max</div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- ════════════════════════════════════════════════════
-             2. COLLAPSIBLE PROMPT CARDS
-             ════════════════════════════════════════════════════ -->
-        <section class="flow-section">
-          <h2 class="flow-section-title"><span class="dot amber"></span> Cron Jobs & Prompts</h2>
-
-          {categoryOrder.filter(cat => cronGroups[cat]?.length).map(cat => {
-            const color = categoryColors[cat];
-            const jobs = cronGroups[cat];
-            return (
-              <div class="cron-group">
-                <h3 class="cron-group-title" style={`color: ${color}`}>{categoryLabels[cat]}</h3>
-                {jobs.map(cron => {
-                  const statColor = cron.status === 'active' ? '#22c55e' : '#6b7280';
-                  const statBg = cron.status === 'active' ? 'rgba(34,197,94,0.15)' : 'rgba(107,114,128,0.15)';
-                  return (
-                    <details class="cron-card">
-                      <summary class="cron-header">
-                        <div class="cron-header-left">
-                          <span class="cron-name">{cron.name}</span>
-                          <span class="cron-badge" style={`color: ${color}; background: ${color}20;`}>{cron.category}</span>
-                          <span class="cron-badge" style={`color: ${statColor}; background: ${statBg};`}>{cron.status}</span>
-                        </div>
-                        <div class="cron-header-right">
-                          <span class="cron-schedule">{cron.scheduleLabel}</span>
-                          <span class="cron-model">{cron.model}</span>
-                        </div>
-                      </summary>
-                      <div class="cron-body">
-                        <div class="cron-prompt-label">Prompt:</div>
-                        <pre class="cron-prompt">{cron.prompt}</pre>
-                        <div class="cron-meta">
-                          <span>Last run: {cron.lastRun ? new Date(cron.lastRun).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
-                          <span>Next run: {cron.nextRun && cron.nextRun !== '—' ? new Date(cron.nextRun).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
-                        </div>
-                      </div>
-                    </details>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </section>
-
-        <!-- ════════════════════════════════════════════════════
-             3. DAILY TIMELINE
-             ════════════════════════════════════════════════════ -->
-        <section class="flow-section">
-          <h2 class="flow-section-title"><span class="dot green"></span> Daily Timeline (Saudi Time / AST)</h2>
-
-          <div class="timeline-grid">
+          
+          <div style="display:flex;align-items:center;gap:0;flex-wrap:wrap;margin-bottom:1rem;">
             {[
-              { time: '2 AM', name: 'Adoption Tracker', color: '#ef4444', desc: 'npm + GitHub snapshots' },
-              { time: '3 AM', name: 'Daily Summary', color: '#22c55e', desc: 'Telegram report' },
-              { time: '4 AM', name: 'Quality Improver', color: '#f59e0b', desc: 'Expand thin articles' },
-              { time: '6 AM', name: 'SEO Autopilot', color: '#3b82f6', desc: 'Score tracking' },
-              { time: '7 AM', name: 'Daily Insights', color: '#22c55e', desc: 'Telegram summary' },
-              { time: '8 AM', name: 'MyMarky Posts', color: '#a855f7', desc: 'AI social posts' },
-              { time: '10 AM', name: 'Backlink Outreach', color: '#3b82f6', desc: 'HARO + mentions' },
-              { time: '12 PM', name: 'Tool Tweets', color: '#a855f7', desc: 'Mon/Wed/Fri' },
-              { time: '1 PM', name: 'Ops Digest', color: '#22c55e', desc: 'Telegram report' },
-              { time: '3 PM', name: 'Article Generator', color: '#22c55e', desc: '1 quality article' },
-              { time: '4 PM', name: 'Issues Watcher', color: '#ef4444', desc: '19 agent repos' },
-              { time: 'Every 3h', name: 'Commit Watcher', color: '#22c55e', desc: 'Releases + features' },
-              { time: 'Every 6h', name: 'Ping Engines', color: '#3b82f6', desc: 'IndexNow + Bing' },
-            ].map(item => (
-              <div class="timeline-card" style={`border-color: ${item.color}30; border-left-color: ${item.color};`}>
-                <div class="timeline-time" style={`color: ${item.color};`}>{item.time}</div>
-                <div class="timeline-name">{item.name}</div>
-                <div class="timeline-desc">{item.desc}</div>
+              { icon: '📡', label: 'TRIGGER', name: 'Commit Watcher', detail: 'Every 3h · 19 repos', color: '#22c55e' },
+              { icon: '🧠', label: 'DECIDE', name: 'Article Memory', detail: '361 indexed · dedup', color: '#22c55e' },
+              { icon: '✍️', label: 'WRITE', name: 'Article Generator', detail: '5 AM Saudi · 1 max', color: '#22c55e' },
+              { icon: '✅', label: 'GATE', name: 'Content Gate', detail: '≥600w · no dupes', color: '#22c55e' },
+              { icon: '🚀', label: 'DEPLOY', name: 'Vercel Auto', detail: 'git push → live', color: '#22c55e' },
+            ].map((node, i) => (
+              <div style="display:flex;align-items:center;">
+                <div style="background:#0a0a0a;border:1px solid #333;border-radius:6px;padding:0.5rem 0.7rem;min-width:130px;">
+                  <div style={`font-size:0.6rem;color:${node.color};margin-bottom:0.15rem;`}>{node.icon} {node.label}</div>
+                  <div style="font-size:0.72rem;color:#fff;">{node.name}</div>
+                  <div style="font-size:0.58rem;color:#666;">{node.detail}</div>
+                </div>
+                {i < 4 && <div style={`color:${node.color};font-size:1rem;padding:0 0.2rem;`}>→</div>}
               </div>
             ))}
           </div>
-        </section>
 
-        <!-- ════════════════════════════════════════════════════
-             4. TELEGRAM FORMAT DEMO
-             ════════════════════════════════════════════════════ -->
-        <section class="flow-section">
-          <h2 class="flow-section-title"><span class="dot green"></span> Telegram Message Format</h2>
+          <!-- Commit Watcher Prompt -->
+          <details style="margin-top:0.5rem;">
+            <summary style="font-size:0.65rem;color:#666;cursor:pointer;">📝 Commit Watcher Prompt</summary>
+            <pre style="background:#0a0a0a;border:1px solid #333;border-radius:4px;padding:0.6rem;font-size:0.6rem;color:#888;overflow-x:auto;margin-top:0.3rem;white-space:pre-wrap;">Monitor GitHub commits/releases for coding agents. Write INTERESTING articles with unique angles.
 
-          <div class="telegram-card">
-            <div class="telegram-header">
-              <span class="telegram-bot">🤖</span>
-              <span class="telegram-bot-name">Coding Agent Bot</span>
+FIRST: Read docs/content-policy.md and docs/terminal-tool-tweets.md
+
+THEN: Run: node scripts/agent-commit-watcher.cjs
+
+Find releases and significant commits for all 17 agent repos. Pick the MOST interesting one.
+Write with one of these angles: Security, Comparison, Prediction, Developer, Impact, Controversy.
+
+RULES:
+- Max 1 article per run
+- Never boring "X released v2.0"
+- Pass content-gate.cjs --strict
+- Cross-post to dev.to</pre>
+          </details>
+
+          <!-- HN/YC Pipeline -->
+          <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid #22c55e15;">
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.8rem;">
+              <span style="font-size:0.75rem;">🔶</span>
+              <h3 style="font-size:0.8rem;color:#f59e0b;margin:0;">Hacker News / YCombinator Pipeline</h3>
             </div>
-            <div class="telegram-body">
-              <div class="tg-line"><strong>📋 Articles Management</strong></div>
-              <div class="tg-line">1- 2 new articles created</div>
-              <div class="tg-line tg-item">• Beware: Codex encrypts subagent instructions</div>
-              <div class="tg-line tg-item">• Beware: Gitlawb Zero MCP trust boundary</div>
-              <div class="tg-line">2- 1 existing article updated</div>
-              <div class="tg-line tg-item">• Claude Code lock issues fix (refreshed data)</div>
-              <div class="tg-line">3- 0 Articles deleted</div>
-              <div class="tg-line">4- 3 New Interlinks</div>
-              <div class="tg-spacer"></div>
-              <div class="tg-line"><strong style="color:#f59e0b;">Others</strong></div>
-              <div class="tg-line tg-muted">1- new seo learning (omitted)</div>
-              <div class="tg-line tg-muted">2- leaderboard updates (omitted)</div>
-              <div class="tg-line tg-muted">3- automation errors (omitted)</div>
+            
+            <div style="display:flex;align-items:center;gap:0;flex-wrap:wrap;margin-bottom:0.8rem;">
+              {[
+                { icon: '🔍', label: 'SCRAPE', name: 'HN Front Page', detail: 'Daily 6 PM Saudi', color: '#f59e0b' },
+                { icon: '💬', label: 'EXTRACT', name: 'Opinions & Debates', detail: 'Comments + threads', color: '#f59e0b' },
+                { icon: '✍️', label: 'WRITE', name: 'Opinion Article', detail: 'No HN mention', color: '#f59e0b' },
+                { icon: '✅', label: 'GATE', name: 'Content Gate', detail: '≥600w', color: '#f59e0b' },
+              ].map((node, i) => (
+                <div style="display:flex;align-items:center;">
+                  <div style="background:#0a0a0a;border:1px solid #333;border-radius:6px;padding:0.5rem 0.7rem;min-width:120px;">
+                    <div style={`font-size:0.6rem;color:${node.color};margin-bottom:0.15rem;`}>{node.icon} {node.label}</div>
+                    <div style="font-size:0.72rem;color:#fff;">{node.name}</div>
+                    <div style="font-size:0.58rem;color:#666;">{node.detail}</div>
+                  </div>
+                  {i < 3 && <div style={`color:${node.color};font-size:1rem;padding:0 0.2rem;`}>→</div>}
+                </div>
+              ))}
             </div>
+
+            <details>
+              <summary style="font-size:0.65rem;color:#666;cursor:pointer;">📝 HN Deep Dive Prompt</summary>
+              <pre style="background:#0a0a0a;border:1px solid #333;border-radius:4px;padding:0.6rem;font-size:0.6rem;color:#888;overflow-x:auto;margin-top:0.3rem;white-space:pre-wrap;">Find Hacker News discussions about coding agents. Extract opinions and write unique articles.
+
+FIRST: Read docs/content-policy.md
+
+THEN: Scrape HN front page for coding agent discussions. Find debates, hot takes, controversial opinions.
+
+RULES:
+- Never mention HN as source
+- Write from "developers are saying" perspective
+- Include specific quotes/ opinions from comments
+- Max 1 article per run
+- Pass content-gate.cjs --strict</pre>
+            </details>
           </div>
-        </section>
+        </div>
 
-        <!-- ════════════════════════════════════════════════════
-             5. AFFILIATES LIST
-             ════════════════════════════════════════════════════ -->
-        <section class="flow-section">
-          <h2 class="flow-section-title"><span class="dot amber"></span> Affiliate Programs</h2>
-
-          <div class="affiliates-grid">
-            <a href="https://aifiesta.link/muhammed-anshad" target="_blank" rel="noopener" class="affiliate-card">
-              <div class="affiliate-name">aiFiesta</div>
-              <div class="affiliate-commission">10% lifetime</div>
-              <div class="affiliate-url">aifiesta.link/muhammed-anshad</div>
-            </a>
-            <a href="https://betterauth.app?via=TerminalBlog" target="_blank" rel="noopener" class="affiliate-card">
-              <div class="affiliate-name">ShipKit</div>
-              <div class="affiliate-commission">30% per sale</div>
-              <div class="affiliate-url">betterauth.app?via=TerminalBlog</div>
-            </a>
-            <a href="https://rankpill.com?via=TerminalBlog" target="_blank" rel="noopener" class="affiliate-card">
-              <div class="affiliate-name">RankPill</div>
-              <div class="affiliate-commission">Recurring</div>
-              <div class="affiliate-url">rankpill.com?via=TerminalBlog</div>
-            </a>
-            <a href="https://scrolllaunch.com/?via=TerminalBlog" target="_blank" rel="noopener" class="affiliate-card">
-              <div class="affiliate-name">ScrollLaunch</div>
-              <div class="affiliate-commission">Per sale</div>
-              <div class="affiliate-url">scrolllaunch.com/?via=TerminalBlog</div>
-            </a>
+        <!-- ═══ QUALITY PIPELINE ═══ -->
+        <div style="border:1px solid #f59e0b30;border-radius:8px;padding:1.5rem;background:#111;margin-bottom:1.5rem;">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;">
+            <span style="background:#f59e0b;color:#000;padding:0.2rem 0.6rem;border-radius:4px;font-size:0.7rem;font-weight:700;">02</span>
+            <h2 style="font-size:0.9rem;color:#f59e0b;margin:0;">Quality Pipeline</h2>
+            <span style="font-size:0.65rem;color:#666;margin-left:auto;">Daily 4 AM Saudi</span>
           </div>
-        </section>
+          
+          <div style="display:flex;align-items:center;gap:0;flex-wrap:wrap;margin-bottom:0.8rem;">
+            {[
+              { icon: '🔍', label: 'SCAN', name: 'Find Thin Articles', detail: '<600w · stale >45d', color: '#f59e0b' },
+              { icon: '📝', label: 'EXPAND', name: 'Quality Improver', detail: '4 AM · 2 max', color: '#f59e0b' },
+              { icon: '🔄', label: 'UPDATE', name: 'Article Memory', detail: 'tags, topics, links', color: '#f59e0b' },
+            ].map((node, i) => (
+              <div style="display:flex;align-items:center;">
+                <div style="background:#0a0a0a;border:1px solid #333;border-radius:6px;padding:0.5rem 0.7rem;min-width:130px;">
+                  <div style={`font-size:0.6rem;color:${node.color};margin-bottom:0.15rem;`}>{node.icon} {node.label}</div>
+                  <div style="font-size:0.72rem;color:#fff;">{node.name}</div>
+                  <div style="font-size:0.58rem;color:#666;">{node.detail}</div>
+                </div>
+                {i < 2 && <div style={`color:${node.color};font-size:1rem;padding:0 0.2rem;`}>→</div>}
+              </div>
+            ))}
+          </div>
 
-        <!-- ════════════════════════════════════════════════════
-             6. DAILY PROGRESS
-             ════════════════════════════════════════════════════ -->
-        <section class="flow-section">
-          <h2 class="flow-section-title"><span class="dot green"></span> Daily Progress</h2>
+          <details>
+            <summary style="font-size:0.65rem;color:#666;cursor:pointer;">📝 Quality Improver Prompt</summary>
+            <pre style="background:#0a0a0a;border:1px solid #333;border-radius:4px;padding:0.6rem;font-size:0.6rem;color:#888;overflow-x:auto;margin-top:0.3rem;white-space:pre-wrap;">Improve thin/stale articles using article memory for smart updates.
 
-          <div class="progress-grid">
-            <div class="progress-card">
-              <h3 class="progress-card-title">📝 New Articles Today</h3>
-              <p class="progress-note">Check back after next article generation run (3 PM AST).</p>
-            </div>
-            <div class="progress-card">
-              <h3 class="progress-card-title">🔄 Updated Articles</h3>
-              <p class="progress-note">Content Refresh Queue runs Wed 05:00 UTC.</p>
-            </div>
-            <div class="progress-card">
-              <h3 class="progress-card-title">📱 MyMarky Posts</h3>
-              <p class="progress-note">Posts generated at 8 AM AST. Check Twitter/LinkedIn.</p>
-            </div>
-            <div class="progress-card">
-              <h3 class="progress-card-title">🔍 SEO Changes</h3>
-              <div class="progress-stats">
-                <span>Total indexed: {totalInMemory}</span>
-                <span>Needs update: {needsUpdateCount}</span>
-                <span>MDX on disk: {totalMdx}</span>
+FIRST: Read docs/content-policy.md
+
+THEN: Run: node scripts/article-memory.cjs scan
+Find articles below word floor or stale >45 days.
+
+Pick top 2 priority articles. For each:
+1. Read current content
+2. Add real data, examples, code snippets
+3. Update frontmatter (updatedDate)
+4. Run content-gate.cjs on each file
+
+Max 2 articles per run.</pre>
+          </details>
+        </div>
+
+        <!-- ═══ SEO PIPELINE ═══ -->
+        <div style="border:1px solid #3b82f630;border-radius:8px;padding:1.5rem;background:#111;margin-bottom:1.5rem;">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;">
+            <span style="background:#3b82f6;color:#fff;padding:0.2rem 0.6rem;border-radius:4px;font-size:0.7rem;font-weight:700;">03</span>
+            <h2 style="font-size:0.9rem;color:#3b82f6;margin:0;">SEO Pipeline</h2>
+            <span style="font-size:0.65rem;color:#666;margin-left:auto;">Every 6h + daily + weekly</span>
+          </div>
+          
+          <div style="display:flex;align-items:center;gap:0;flex-wrap:wrap;margin-bottom:0.8rem;">
+            {[
+              { icon: '📡', label: 'PING', name: 'Search Engines', detail: 'Every 6h · IndexNow', color: '#3b82f6' },
+              { icon: '📊', label: 'TRACK', name: 'SEO Autopilot', detail: '6 AM · score tracking', color: '#3b82f6' },
+              { icon: '🔗', label: 'BUILD', name: 'Backlink Outreach', detail: '10 AM · HARO', color: '#3b82f6' },
+              { icon: '📈', label: 'AUDIT', name: 'Weekly Monitor', detail: 'Monday 9 AM', color: '#3b82f6' },
+            ].map((node, i) => (
+              <div style="display:flex;align-items:center;">
+                <div style="background:#0a0a0a;border:1px solid #333;border-radius:6px;padding:0.5rem 0.7rem;min-width:120px;">
+                  <div style={`font-size:0.6rem;color:${node.color};margin-bottom:0.15rem;`}>{node.icon} {node.label}</div>
+                  <div style="font-size:0.72rem;color:#fff;">{node.name}</div>
+                  <div style="font-size:0.58rem;color:#666;">{node.detail}</div>
+                </div>
+                {i < 3 && <div style={`color:${node.color};font-size:1rem;padding:0 0.2rem;`}>→</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <!-- ═══ SOCIAL PIPELINE ═══ -->
+        <div style="border:1px solid #a855f730;border-radius:8px;padding:1.5rem;background:#111;margin-bottom:1.5rem;">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;">
+            <span style="background:#a855f7;color:#fff;padding:0.2rem 0.6rem;border-radius:4px;font-size:0.7rem;font-weight:700;">04</span>
+            <h2 style="font-size:0.9rem;color:#a855f7;margin:0;">Social Pipeline</h2>
+            <span style="font-size:0.65rem;color:#666;margin-left:auto;">Daily + weekly batch</span>
+          </div>
+          
+          <div style="display:flex;align-items:center;gap:0;flex-wrap:wrap;margin-bottom:0.8rem;">
+            {[
+              { icon: '🤖', label: 'GENERATE', name: 'MyMarky AI', detail: '8 AM · 3 posts', color: '#a855f7' },
+              { icon: '📱', label: 'POST', name: 'Twitter / LinkedIn', detail: 'Auto-publish', color: '#a855f7' },
+              { icon: '🔧', label: 'TOOL TWEETS', name: 'Terminal Tools', detail: 'Mon/Wed/Fri', color: '#a855f7' },
+              { icon: '📝', label: 'CROSSPOST', name: 'Dev.to', detail: 'With each article', color: '#a855f7' },
+            ].map((node, i) => (
+              <div style="display:flex;align-items:center;">
+                <div style="background:#0a0a0a;border:1px solid #333;border-radius:6px;padding:0.5rem 0.7rem;min-width:120px;">
+                  <div style={`font-size:0.6rem;color:${node.color};margin-bottom:0.15rem;`}>{node.icon} {node.label}</div>
+                  <div style="font-size:0.72rem;color:#fff;">{node.name}</div>
+                  <div style="font-size:0.58rem;color:#666;">{node.detail}</div>
+                </div>
+                {i < 3 && <div style={`color:${node.color};font-size:1rem;padding:0 0.2rem;`}>→</div>}
+              </div>
+            ))}
+          </div>
+
+          <details>
+            <summary style="font-size:0.65rem;color:#666;cursor:pointer;">📝 Terminal Tool Tweet Prompt</summary>
+            <pre style="background:#0a0a0a;border:1px solid #333;border-radius:4px;padding:0.6rem;font-size:0.6rem;color:#888;overflow-x:auto;margin-top:0.3rem;white-space:pre-wrap;">Post about a popular terminal tool on Twitter/X for engagement.
+
+FIRST: Read docs/terminal-tool-tweets.md
+
+RULES:
+- No links in main tweet (engagement killer)
+- Mix formats (stop paying, somebody built this, cant believe this exists)
+- Under 280 chars
+- GitHub repo link in reply or (.) format
+- Use screenshot-to-mymarky skill for images
+- Schedule via MyMarky POST /posts endpoint</pre>
+          </details>
+        </div>
+
+        <!-- ═══ DAILY TIMELINE ═══ -->
+        <div style="border:1px solid #22c55e30;border-radius:8px;padding:1.5rem;background:#111;margin-bottom:1.5rem;">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;">
+            <span style="background:#22c55e;color:#000;padding:0.2rem 0.6rem;border-radius:4px;font-size:0.7rem;font-weight:700;">⏰</span>
+            <h2 style="font-size:0.9rem;color:#22c55e;margin:0;">Daily Timeline (Saudi Time)</h2>
+          </div>
+          
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.5rem;">
+            {[
+              { time: '2 AM', name: 'Adoption Tracker', color: '#ef4444', desc: 'npm + GitHub snapshots' },
+              { time: '4 AM', name: 'Quality Improver', color: '#f59e0b', desc: 'Expand thin articles' },
+              { time: '5 AM', name: 'Article Generator', color: '#22c55e', desc: '1 quality article' },
+              { time: '6 AM', name: 'SEO Autopilot', color: '#3b82f6', desc: 'Score tracking' },
+              { time: '7 AM', name: '☀️ Morning Telegram', color: '#22c55e', desc: 'Daily progress report' },
+              { time: '8 AM', name: 'MyMarky Posts', color: '#a855f7', desc: 'AI social posts' },
+              { time: '10 AM', name: 'Backlink Outreach', color: '#3b82f6', desc: 'HARO + mentions' },
+              { time: '12 PM', name: 'Tool Tweets', color: '#a855f7', desc: 'Mon/Wed/Fri' },
+              { time: '4 PM', name: 'Issues Watcher', color: '#ef4444', desc: '19 agent repos' },
+              { time: '6 PM', name: 'HN Deep Dive', color: '#f59e0b', desc: 'Opinion articles' },
+              { time: '8 PM', name: '🌙 Evening Telegram', color: '#22c55e', desc: 'Day summary' },
+              { time: 'Every 3h', name: 'Commit Watcher', color: '#22c55e', desc: 'Releases + features' },
+              { time: 'Every 6h', name: 'Ping Engines', color: '#3b82f6', desc: 'IndexNow + Bing' },
+            ].map(item => (
+              <div style={`background:#0a0a0a;border:1px solid ${item.color}30;border-radius:6px;padding:0.45rem 0.6rem;border-left:3px solid ${item.color};`}>
+                <div style={`font-size:0.6rem;color:${item.color};font-weight:700;`}>{item.time}</div>
+                <div style="font-size:0.7rem;color:#fff;">{item.name}</div>
+                <div style="font-size:0.55rem;color:#666;">{item.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <!-- ═══ TELEGRAM FORMAT ═══ -->
+        <div style="border:1px solid #22c55e30;border-radius:8px;padding:1.5rem;background:#111;margin-bottom:1.5rem;">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;">
+            <span style="background:#22c55e;color:#000;padding:0.2rem 0.6rem;border-radius:4px;font-size:0.7rem;font-weight:700;">💬</span>
+            <h2 style="font-size:0.9rem;color:#22c55e;margin:0;">Telegram Messages (2/day)</h2>
+          </div>
+          
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+            <!-- Morning -->
+            <div>
+              <div style="font-size:0.7rem;color:#22c55e;margin-bottom:0.5rem;font-weight:700;">☀️ Morning (7 AM Saudi)</div>
+              <div style="background:#0a0a0a;border:1px solid #333;border-radius:6px;padding:0.8rem;font-size:0.68rem;line-height:1.5;">
+                <div style="color:#22c55e;font-weight:700;margin-bottom:0.3rem;">📋 Daily Progress</div>
+                <div style="color:#fff;">📝 Content</div>
+                <div style="color:#888;padding-left:0.5rem;">• 1 new article published</div>
+                <div style="color:#888;padding-left:0.5rem;">• 2 articles updated</div>
+                <div style="color:#888;padding-left:0.5rem;">• 0 thin articles remaining</div>
+                <div style="color:#fff;margin-top:0.3rem;">📱 Social</div>
+                <div style="color:#888;padding-left:0.5rem;">• 3 posts scheduled (MyMarky)</div>
+                <div style="color:#888;padding-left:0.5rem;">• 0 published today</div>
+                <div style="color:#fff;margin-top:0.3rem;">🔍 SEO</div>
+                <div style="color:#888;padding-left:0.5rem;">• 734 URLs indexed</div>
+                <div style="color:#888;padding-left:0.5rem;">• DA: 3 (stable)</div>
+                <div style="color:#fff;margin-top:0.3rem;">🔶 HN</div>
+                <div style="color:#888;padding-left:0.5rem;">• 0 articles from HN today</div>
+                <div style="color:#fff;margin-top:0.3rem;">🔧 Changes</div>
+                <div style="color:#888;padding-left:0.5rem;">• Admin dashboard updated</div>
+                <div style="color:#888;padding-left:0.5rem;">• Affiliate links fixed</div>
               </div>
             </div>
-            <div class="progress-card">
-              <h3 class="progress-card-title">🔥 HN Posts</h3>
-              <p class="progress-note">No HN/Show HN posts today.</p>
+            
+            <!-- Evening -->
+            <div>
+              <div style="font-size:0.7rem;color:#f59e0b;margin-bottom:0.5rem;font-weight:700;">🌙 Evening (8 PM Saudi)</div>
+              <div style="background:#0a0a0a;border:1px solid #333;border-radius:6px;padding:0.8rem;font-size:0.68rem;line-height:1.5;">
+                <div style="color:#f59e0b;font-weight:700;margin-bottom:0.3rem;">📊 End of Day Summary</div>
+                <div style="color:#fff;">📝 Articles</div>
+                <div style="color:#888;padding-left:0.5rem;">• 1 new, 2 updated, 0 deleted</div>
+                <div style="color:#fff;margin-top:0.3rem;">📱 Social</div>
+                <div style="color:#888;padding-left:0.5rem;">• 3 posts published today</div>
+                <div style="color:#888;padding-left:0.5rem;">• Best performer: [post title]</div>
+                <div style="color:#fff;margin-top:0.3rem;">🔍 SEO</div>
+                <div style="color:#888;padding-left:0.5rem;">• 12 new pages indexed</div>
+                <div style="color:#888;padding-left:0.5rem;">• Rankings stable</div>
+                <div style="color:#fff;margin-top:0.3rem;">⚠️ Issues</div>
+                <div style="color:#888;padding-left:0.5rem;">• None today</div>
+                <div style="color:#fff;margin-top:0.3rem;">🔧 Crons</div>
+                <div style="color:#888;padding-left:0.5rem;">• 14/16 successful</div>
+                <div style="color:#888;padding-left:0.5rem;">• 2 errors (rate limit)</div>
+              </div>
             </div>
           </div>
-        </section>
+        </div>
 
       </div>
     </div>
   </div>
-
-  <style>
-    /* ═══════════════════════════════════════════════════════
-       FLOW PAGE STYLES
-       ═══════════════════════════════════════════════════════ */
-    .flow-page {
-      min-height: 100vh;
-      background: #0a0a0a;
-      color: #e0e0e0;
-      font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
-    }
-
-    /* ── Top bar ── */
-    .flow-topbar {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      background: #111;
-      border-bottom: 1px solid rgba(34,197,94,0.2);
-      padding: 0.75rem 1.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .flow-topbar-left { display: flex; align-items: center; gap: 1rem; }
-    .back-link { color: #22c55e; text-decoration: none; font-size: 0.8rem; }
-    .back-link:hover { text-decoration: underline; }
-    .flow-topbar-title { color: #f59e0b; font-size: 0.85rem; }
-    .flow-topbar-sub { color: #555; font-size: 0.7rem; }
-
-    /* ── Canvas ── */
-    .flow-canvas { padding: 2rem; overflow-x: auto; }
-    .flow-inner { max-width: 1400px; margin: 0 auto; }
-
-    /* ── Header ── */
-    .flow-header { text-align: center; margin-bottom: 2.5rem; }
-    .flow-title { font-size: 1.4rem; color: #22c55e; margin: 0 0 0.3rem; }
-    .flow-subtitle { font-size: 0.75rem; color: #666; margin: 0; }
-
-    /* ── Sections ── */
-    .flow-section { margin-bottom: 2.5rem; }
-    .flow-section-title {
-      font-size: 1rem;
-      color: #e5e5e5;
-      font-weight: 600;
-      margin-bottom: 1.2rem;
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-    }
-    .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      display: inline-block;
-    }
-    .dot.green { background: #22c55e; }
-    .dot.amber { background: #f59e0b; }
-
-    /* ═══════════════════════════════════════════════════════
-       PIPELINE CARDS
-       ═══════════════════════════════════════════════════════ */
-    .pipeline-card {
-      border: 1px solid;
-      border-radius: 8px;
-      padding: 1.5rem;
-      background: #111;
-      margin-bottom: 1rem;
-    }
-    .pipeline-header {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-bottom: 1.2rem;
-    }
-    .pipeline-num {
-      padding: 0.2rem 0.6rem;
-      border-radius: 4px;
-      font-size: 0.7rem;
-      font-weight: 700;
-      color: #000;
-    }
-    .green-bg { background: #22c55e; }
-    .amber-bg { background: #f59e0b; }
-    .blue-bg { background: #3b82f6; color: #fff; }
-    .purple-bg { background: #a855f7; color: #fff; }
-    .orange-bg { background: #fb923c; }
-    .red-bg { background: #ef4444; color: #fff; }
-    .pipeline-name { font-size: 0.9rem; margin: 0; }
-    .pipeline-freq { font-size: 0.65rem; color: #666; margin-left: auto; }
-    .pipeline-nodes {
-      display: flex;
-      align-items: center;
-      gap: 0;
-      flex-wrap: wrap;
-    }
-    .pipeline-arrow {
-      font-size: 1.2rem;
-      padding: 0 0.3rem;
-    }
-    .pipeline-arrow.green { color: #22c55e; }
-    .pipeline-arrow.amber { color: #f59e0b; }
-    .pipeline-arrow.blue { color: #3b82f6; }
-    .pipeline-arrow.purple { color: #a855f7; }
-    .pipeline-arrow.orange { color: #fb923c; }
-    .pipeline-arrow.red { color: #ef4444; }
-    .pipeline-node {
-      background: #0a0a0a;
-      border: 1px solid #333;
-      border-radius: 6px;
-      padding: 0.6rem 0.8rem;
-      min-width: 130px;
-    }
-    .node-label { font-size: 0.65rem; margin-bottom: 0.2rem; }
-    .node-name { font-size: 0.75rem; color: #fff; }
-    .node-meta { font-size: 0.6rem; color: #666; }
-
-    /* ═══════════════════════════════════════════════════════
-       CRON CARDS (collapsible)
-       ═══════════════════════════════════════════════════════ */
-    .cron-group { margin-bottom: 1.5rem; }
-    .cron-group-title {
-      font-size: 0.85rem;
-      font-weight: 600;
-      margin-bottom: 0.8rem;
-      padding-bottom: 0.4rem;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-    }
-    .cron-card {
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 6px;
-      background: #111;
-      margin-bottom: 0.5rem;
-      overflow: hidden;
-    }
-    .cron-card[open] {
-      border-color: rgba(34,197,94,0.2);
-    }
-    .cron-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0.8rem 1rem;
-      cursor: pointer;
-      list-style: none;
-      gap: 1rem;
-    }
-    .cron-header::-webkit-details-marker { display: none; }
-    .cron-header::marker { content: ''; }
-    .cron-header:hover { background: rgba(34,197,94,0.04); }
-    .cron-header-left { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
-    .cron-header-right { display: flex; align-items: center; gap: 1rem; flex-shrink: 0; }
-    .cron-name { font-size: 0.8rem; color: #e5e5e5; font-weight: 600; white-space: nowrap; }
-    .cron-badge {
-      padding: 0.15rem 0.5rem;
-      border-radius: 4px;
-      font-size: 0.6rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      white-space: nowrap;
-    }
-    .cron-schedule { font-size: 0.7rem; color: #888; white-space: nowrap; }
-    .cron-model { font-size: 0.65rem; color: #555; white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
-    .cron-body {
-      padding: 0 1rem 1rem;
-      border-top: 1px solid rgba(255,255,255,0.04);
-    }
-    .cron-prompt-label { font-size: 0.65rem; color: #666; text-transform: uppercase; margin: 0.8rem 0 0.4rem; }
-    .cron-prompt {
-      padding: 0.8rem;
-      background: #0a0a0a;
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 4px;
-      font-size: 0.7rem;
-      color: #aaa;
-      line-height: 1.6;
-      white-space: pre-wrap;
-      word-break: break-word;
-      max-height: 200px;
-      overflow-y: auto;
-      font-family: inherit;
-      margin: 0;
-    }
-    .cron-meta {
-      display: flex;
-      gap: 2rem;
-      margin-top: 0.8rem;
-      font-size: 0.7rem;
-      color: #666;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       TIMELINE GRID
-       ═══════════════════════════════════════════════════════ */
-    .timeline-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 0.6rem;
-    }
-    .timeline-card {
-      background: #0a0a0a;
-      border: 1px solid;
-      border-radius: 6px;
-      padding: 0.5rem 0.7rem;
-      border-left-width: 3px;
-    }
-    .timeline-time { font-size: 0.65rem; font-weight: 700; margin-bottom: 0.15rem; }
-    .timeline-name { font-size: 0.75rem; color: #fff; }
-    .timeline-desc { font-size: 0.6rem; color: #666; }
-
-    /* ═══════════════════════════════════════════════════════
-       TELEGRAM DEMO
-       ═══════════════════════════════════════════════════════ */
-    .telegram-card {
-      border: 1px solid rgba(34,197,94,0.15);
-      border-radius: 8px;
-      overflow: hidden;
-      max-width: 500px;
-    }
-    .telegram-header {
-      background: rgba(34,197,94,0.08);
-      padding: 10px 14px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      color: #22c55e;
-      font-weight: 600;
-    }
-    .telegram-bot { font-size: 18px; }
-    .telegram-body {
-      padding: 16px;
-      background: #0d0d0d;
-      font-size: 13px;
-      line-height: 1.7;
-    }
-    .tg-line { color: #ddd; }
-    .tg-item { padding-left: 16px; }
-    .tg-spacer { height: 8px; }
-    .tg-muted { color: #666; }
-
-    /* ═══════════════════════════════════════════════════════
-       AFFILIATES GRID
-       ═══════════════════════════════════════════════════════ */
-    .affiliates-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 1rem;
-    }
-    .affiliate-card {
-      display: block;
-      background: #111;
-      border: 1px solid rgba(34,197,94,0.15);
-      border-radius: 8px;
-      padding: 1.2rem;
-      text-decoration: none;
-      transition: all 0.15s;
-    }
-    .affiliate-card:hover {
-      border-color: rgba(34,197,94,0.4);
-      background: rgba(34,197,94,0.03);
-    }
-    .affiliate-name { font-size: 1rem; color: #22c55e; font-weight: 700; margin-bottom: 0.3rem; }
-    .affiliate-commission { font-size: 0.8rem; color: #f59e0b; font-weight: 600; margin-bottom: 0.5rem; }
-    .affiliate-url { font-size: 0.7rem; color: #666; word-break: break-all; }
-
-    /* ═══════════════════════════════════════════════════════
-       DAILY PROGRESS
-       ═══════════════════════════════════════════════════════ */
-    .progress-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 1rem;
-    }
-    .progress-card {
-      background: #111;
-      border: 1px solid rgba(34,197,94,0.15);
-      border-radius: 8px;
-      padding: 1.2rem;
-    }
-    .progress-card-title { font-size: 0.85rem; color: #22c55e; font-weight: 600; margin: 0 0 0.5rem; }
-    .progress-note { font-size: 0.75rem; color: #666; margin: 0; }
-    .progress-stats {
-      display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
-      font-size: 0.75rem;
-      color: #888;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       RESPONSIVE
-       ═══════════════════════════════════════════════════════ */
-    @media (max-width: 768px) {
-      .flow-canvas { padding: 1rem; }
-      .flow-title { font-size: 1.1rem; }
-      .pipeline-nodes { flex-direction: column; align-items: stretch; }
-      .pipeline-arrow { transform: rotate(90deg); text-align: center; padding: 0.3rem 0; }
-      .cron-header { flex-direction: column; align-items: flex-start; gap: 0.4rem; }
-      .cron-header-right { gap: 0.5rem; }
-      .timeline-grid { grid-template-columns: 1fr; }
-      .affiliates-grid { grid-template-columns: 1fr; }
-      .progress-grid { grid-template-columns: 1fr; }
-    }
-  </style>
 </Layout>

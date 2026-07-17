@@ -6,7 +6,6 @@ import path from 'node:path';
 
 export const prerender = false;
 
-// Auth check
 const isAuth = await checkAuth(Astro.request);
 if (!isAuth) {
   return Astro.redirect('/admin/login');
@@ -38,35 +37,29 @@ function wordCount(content: string): number {
   return body.split(/\s+/).filter(Boolean).length;
 }
 
-// ── 1. Read tags from MDX frontmatter (NOT article-memory.json) ──────
+// ── 1. MDX files ────────────────────────────────────────
 const blogDir = path.join(ROOT, 'src', 'content', 'blog');
 const totalMdx = countMdx(blogDir);
+const mdxFiles: string[] = (() => {
+  try { return fs.readdirSync(blogDir).filter(f => f.endsWith('.mdx')); } catch { return []; }
+})();
 
+// ── 2. Tag counts from MDX frontmatter ──────────────────
 const tagCounts: Record<string, number> = {};
-let mdxFiles: string[] = [];
-try {
-  mdxFiles = fs.readdirSync(blogDir).filter(f => f.endsWith('.mdx'));
-  for (const f of mdxFiles) {
-    const content = fs.readFileSync(path.join(blogDir, f), 'utf-8');
-    const fm = parseFrontmatter(content);
-    const tags = (fm.tags ?? '').replace(/[\[\]"\\]/g, '').split(',').map(t => t.trim()).filter(Boolean);
-    for (const t of tags) tagCounts[t] = (tagCounts[t] || 0) + 1;
-  }
-} catch {}
-
+for (const f of mdxFiles) {
+  const content = fs.readFileSync(path.join(blogDir, f), 'utf-8');
+  const fm = parseFrontmatter(content);
+  const tags = (fm.tags ?? '').replace(/[\[\]"\\]/g, '').split(',').map(t => t.trim()).filter(Boolean);
+  for (const t of tags) tagCounts[t] = (tagCounts[t] || 0) + 1;
+}
 const sortedTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 15);
 const maxTagCount = sortedTags.length > 0 ? sortedTags[0][1] : 1;
 const tagColors = ['#22c55e', '#3b82f6', '#f59e0b', '#a855f7', '#06b6d4', '#ec4899', '#14b8a6', '#f97316', '#8b5cf6', '#ef4444', '#6366f1', '#84cc16', '#e879f9', '#2dd4bf', '#fb923c'];
 
-// ── 2. Recent articles (last 10 by mtime) ────────────────
+// ── 3. Recent articles (last 10 by mtime) ───────────────
 interface RecentArticle {
-  filename: string;
-  title: string;
-  date: string;
-  tool: string;
-  tags: string;
-  wordCount: number;
-  mtime: string;
+  filename: string; title: string; date: string; tool: string;
+  tags: string; wordCount: number; mtime: string;
 }
 let recentArticles: RecentArticle[] = [];
 try {
@@ -90,17 +83,29 @@ try {
   });
 } catch {}
 
-// ── 3. Article memory stats ──────────────────────────────
+// ── 4. Article memory (for keywords + stats) ────────────
 const mem = safeJson('src/data/article-memory.json');
 const memArticles: Record<string, any> = mem?.articles ?? {};
 const totalInMemory = Object.keys(memArticles).length;
 const needsUpdateCount = Object.values(memArticles).filter((v: any) => v.needsUpdate).length;
 
-// ── 4. Content gate ──────────────────────────────────────
+// Top 10 keywords
+import { Counter } from 'node:os';
+const kwCounter: Record<string, number> = {};
+for (const a of Object.values(memArticles) as any[]) {
+  for (const kw of (a.keywords ?? [])) {
+    kwCounter[kw] = (kwCounter[kw] || 0) + 1;
+  }
+}
+const topKeywords = Object.entries(kwCounter)
+  .sort((a, b) => b[1] - a[1])
+  .slice(0, 10);
+
+// ── 5. Content gate ─────────────────────────────────────
 const gate = safeJson('content-gate-report.json');
 const thinArticles = gate?.warnings ?? 0;
 
-// ── 5. Cron stats (lightweight — just counts for overview card) ──────
+// ── 6. Cron counts ──────────────────────────────────────
 const crons = [
   { name: 'Content Refresh Queue', status: 'active' },
   { name: 'Daily Summary', status: 'active' },
@@ -112,17 +117,23 @@ const crons = [
   { name: 'Deploy Notify', status: 'muted' },
 ];
 const activeCrons = crons.filter(c => c.status === 'active').length;
-const telegramCrons = 4; // Daily Summary + Ops Digest + SEO Learn + Content Refresh
+const telegramCrons = 4;
 
-// ── 6. Derived stats ─────────────────────────────────────
-const now = new Date().toISOString();
+// ── 7. Affiliates ───────────────────────────────────────
+const affData = safeJson('src/data/affiliates.json');
+const affiliates: any[] = affData?.affiliates ?? [];
+
+// ── 8. Recent activity (last 5 articles by mtime) ───────
+const activityFeed = recentArticles.slice(0, 5).map(a => ({
+  type: 'article' as const,
+  title: a.title,
+  time: a.mtime,
+}));
 ---
 
 <Layout title="Admin Dashboard - terminalblog">
   <div class="admin-layout">
-    <!-- ═══════════════════════════════════════════════════════
-         SIDEBAR
-         ═══════════════════════════════════════════════════════ -->
+    <!-- SIDEBAR -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-brand">
         <span class="sidebar-brand-icon">⚡</span>
@@ -131,8 +142,8 @@ const now = new Date().toISOString();
       <nav class="sidebar-nav">
         <a href="#dashboard" class="sidebar-link active">📊 Dashboard</a>
         <a href="#articles" class="sidebar-link">📝 Articles</a>
-        <a href="/admin/flow" class="sidebar-link">🔄 Flow</a>
-        <a href="/admin/affiliates" class="sidebar-link">💰 Affiliates</a>
+        <a href="#affiliates" class="sidebar-link">💰 Affiliates</a>
+        <a href="/admin/flow" class="sidebar-link">🔄 Flow →</a>
       </nav>
       <div class="sidebar-footer">
         <button id="refresh-btn" class="sidebar-btn">↻ Refresh</button>
@@ -143,12 +154,8 @@ const now = new Date().toISOString();
     <!-- Mobile hamburger -->
     <button class="mobile-toggle" id="mobile-toggle">☰</button>
 
-    <!-- ═══════════════════════════════════════════════════════
-         MAIN CONTENT
-         ═══════════════════════════════════════════════════════ -->
+    <!-- MAIN CONTENT -->
     <main class="main-content">
-
-      <!-- Top bar -->
       <header class="topbar">
         <h1 class="topbar-title">Admin Dashboard</h1>
         <div class="topbar-actions">
@@ -157,9 +164,7 @@ const now = new Date().toISOString();
         </div>
       </header>
 
-      <!-- ════════════════════════════════════════════════════
-           SECTION: Dashboard Overview
-           ════════════════════════════════════════════════════ -->
+      <!-- ═══ DASHBOARD ═══ -->
       <section id="dashboard" class="admin-section">
         <h2 class="section-title"><span class="section-arrow">▸</span> Overview</h2>
         <p class="section-desc">Key metrics at a glance.</p>
@@ -185,18 +190,36 @@ const now = new Date().toISOString();
             <p class="stat-sub">all services online</p>
           </div>
         </div>
+
+        <!-- Recent Activity -->
+        <div class="card" style="margin-top: 20px;">
+          <h3 class="card-title">Recent Activity</h3>
+          <div class="activity-feed">
+            {activityFeed.map(a => {
+              const diff = Date.now() - new Date(a.time).getTime();
+              const hrs = Math.floor(diff / 3600000);
+              const timeAgo = hrs < 1 ? `${Math.floor(diff / 60000)}m ago` : hrs < 24 ? `${hrs}h ago` : `${Math.floor(hrs / 24)}d ago`;
+              return (
+                <div class="activity-row">
+                  <span class="activity-dot green"></span>
+                  <span class="activity-text">New article: <strong>{a.title}</strong></span>
+                  <span class="activity-time">{timeAgo}</span>
+                </div>
+              );
+            })}
+            {activityFeed.length === 0 && <p class="muted" style="font-size:13px;">No recent activity.</p>}
+          </div>
+        </div>
       </section>
 
-      <!-- ════════════════════════════════════════════════════
-           SECTION: Articles
-           ════════════════════════════════════════════════════ -->
+      <!-- ═══ ARTICLES ═══ -->
       <section id="articles" class="admin-section">
         <h2 class="section-title"><span class="section-arrow">▸</span> Articles</h2>
-        <p class="section-desc">Tags read from MDX frontmatter, recent articles by edit time, and memory stats.</p>
+        <p class="section-desc">Tags, recent articles, keywords, and content health.</p>
 
-        <!-- Tag bar chart (from MDX frontmatter) -->
+        <!-- Tag bar chart -->
         <div class="card mb-6">
-          <h3 class="card-title">Articles by Tag <span class="card-subtitle">(top 15 from MDX files)</span></h3>
+          <h3 class="card-title">Articles by Tag <span class="card-subtitle">(top 15 from MDX)</span></h3>
           <div class="tag-bars">
             {sortedTags.length > 0 ? sortedTags.map(([tag, count], i) => (
               <div class="tag-bar-row">
@@ -212,27 +235,26 @@ const now = new Date().toISOString();
           </div>
         </div>
 
-        <!-- Memory stats + Recent articles -->
+        <!-- Top Keywords + Content Gate -->
         <div class="grid-2col">
-          <!-- Article Memory Status -->
           <div class="card">
-            <h3 class="card-title purple">Article Memory</h3>
+            <h3 class="card-title purple">Top 10 Keywords</h3>
             <div class="gate-stats">
-              <div class="gate-row"><span>Total indexed</span><span class="mono white">{totalInMemory}</span></div>
-              <div class="gate-row"><span>Needs update</span><span class={`mono ${needsUpdateCount > 0 ? 'amber' : 'green'}`}>{needsUpdateCount}</span></div>
-              <div class="gate-row"><span>Thin articles</span><span class={`mono ${thinArticles > 0 ? 'amber' : 'green'}`}>{thinArticles}</span></div>
-              <div class="gate-row"><span>MDX files on disk</span><span class="mono white">{totalMdx}</span></div>
+              {topKeywords.length > 0 ? topKeywords.map(([kw, count]) => (
+                <div class="gate-row"><span>{kw}</span><span class="mono white">{count}</span></div>
+              )) : (
+                <p class="muted" style="font-size:13px;">No keywords in article memory.</p>
+              )}
             </div>
           </div>
-
-          <!-- Quick stats -->
           <div class="card">
-            <h3 class="card-title amber">Quick Stats</h3>
+            <h3 class="card-title amber">Content Health</h3>
             <div class="gate-stats">
+              <div class="gate-row"><span>MDX files on disk</span><span class="mono white">{totalMdx}</span></div>
+              <div class="gate-row"><span>Indexed in memory</span><span class="mono white">{totalInMemory}</span></div>
+              <div class="gate-row"><span>Needs update</span><span class={`mono ${needsUpdateCount > 0 ? 'amber' : 'green'}`}>{needsUpdateCount}</span></div>
+              <div class="gate-row"><span>Thin articles</span><span class={`mono ${thinArticles > 0 ? 'amber' : 'green'}`}>{thinArticles}</span></div>
               <div class="gate-row"><span>Unique tags</span><span class="mono white">{Object.keys(tagCounts).length}</span></div>
-              <div class="gate-row"><span>Content gate checked</span><span class="mono white">{gate?.checked ?? '—'}</span></div>
-              <div class="gate-row"><span>Gate warnings</span><span class={`mono ${thinArticles > 0 ? 'amber' : 'green'}`}>{gate?.warnings ?? 0}</span></div>
-              <div class="gate-row"><span>Gate errors</span><span class={`mono ${gate?.errors ? 'red' : 'green'}`}>{gate?.errors ?? 0}</span></div>
             </div>
           </div>
         </div>
@@ -243,25 +265,15 @@ const now = new Date().toISOString();
           <div class="table-wrap">
             <table class="data-table">
               <thead>
-                <tr>
-                  <th>Title</th>
-                  <th>Date</th>
-                  <th>Words</th>
-                  <th>Tool</th>
-                  <th>Edited</th>
-                </tr>
+                <tr><th>Title</th><th>Date</th><th>Words</th><th>Tool</th><th>Edited</th></tr>
               </thead>
               <tbody>
-                {recentArticles.map((a) => {
+                {recentArticles.map(a => {
                   const wordColor = a.wordCount < 600 ? '#f59e0b' : a.wordCount < 1000 ? '#e5e5e5' : '#22c55e';
                   const mtime = new Date(a.mtime);
-                  const timeAgo = (() => {
-                    const diff = Date.now() - mtime.getTime();
-                    const hrs = Math.floor(diff / 3600000);
-                    if (hrs < 1) return `${Math.floor(diff / 60000)}m ago`;
-                    if (hrs < 24) return `${hrs}h ago`;
-                    return `${Math.floor(hrs / 24)}d ago`;
-                  })();
+                  const diff = Date.now() - mtime.getTime();
+                  const hrs = Math.floor(diff / 3600000);
+                  const timeAgo = hrs < 1 ? `${Math.floor(diff / 60000)}m ago` : hrs < 24 ? `${hrs}h ago` : `${Math.floor(hrs / 24)}d ago`;
                   return (
                     <tr>
                       <td class="td-title" title={a.title}>{a.title}</td>
@@ -276,31 +288,45 @@ const now = new Date().toISOString();
             </table>
           </div>
           {thinArticles > 0 && (
-            <div class="card-warning">
-              ⚠ {thinArticles} thin article{thinArticles !== 1 ? 's' : ''} below word minimum.
-            </div>
+            <div class="card-warning">⚠ {thinArticles} thin article{thinArticles !== 1 ? 's' : ''} below word minimum.</div>
           )}
         </div>
       </section>
 
+      <!-- ═══ AFFILIATES ═══ -->
+      <section id="affiliates" class="admin-section">
+        <h2 class="section-title"><span class="section-arrow">▸</span> Affiliates</h2>
+        <p class="section-desc">{affiliates.length} active affiliate{affiliates.length !== 1 ? 's' : ''}.</p>
+        <div class="affiliate-grid">
+          {affiliates.length > 0 ? affiliates.map(aff => (
+            <div class="affiliate-card">
+              <div class="aff-header">
+                <h4 class="aff-name">{aff.name}</h4>
+                <span class={`aff-status ${aff.status === 'active' ? 'aff-active' : 'aff-paused'}`}>{aff.status}</span>
+              </div>
+              <p class="aff-desc">{aff.description}</p>
+              <div class="aff-meta">
+                <span class="aff-commission">💰 {aff.commission}</span>
+                <a href={aff.url} target="_blank" rel="noopener" class="aff-link">↗ View</a>
+              </div>
+            </div>
+          )) : (
+            <p class="muted" style="font-size:13px;">No affiliates found in src/data/affiliates.json.</p>
+          )}
+        </div>
+      </section>
     </main>
   </div>
 
   <script>
-    // ── Last updated timestamp ──
     const ts = new Date().toLocaleTimeString();
     document.getElementById('last-updated').textContent = ts;
     document.getElementById('last-updated-bar').textContent = `Last updated: ${ts}`;
+    document.getElementById('refresh-btn')?.addEventListener('click', () => window.location.reload());
 
-    // ── Refresh button ──
-    document.getElementById('refresh-btn')?.addEventListener('click', () => {
-      window.location.reload();
-    });
-
-    // ── Sidebar active link tracking ──
     const sections = document.querySelectorAll('.admin-section');
     const links = document.querySelectorAll('.sidebar-link');
-    const observer = new IntersectionObserver((entries) => {
+    const observer = new IntersectionObserver(entries => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           const id = entry.target.id;
@@ -312,7 +338,6 @@ const now = new Date().toISOString();
     }, { rootMargin: '-20% 0px -70% 0px' });
     sections.forEach(s => observer.observe(s));
 
-    // ── Mobile sidebar toggle ──
     document.getElementById('mobile-toggle')?.addEventListener('click', () => {
       document.getElementById('sidebar')?.classList.toggle('open');
     });
@@ -322,277 +347,102 @@ const now = new Date().toISOString();
   </script>
 
   <style>
-    /* ═══════════════════════════════════════════════════════
-       ADMIN LAYOUT
-       ═══════════════════════════════════════════════════════ */
-    .admin-layout {
-      display: flex;
-      min-height: 100vh;
-      background: #0a0a0a;
-      font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
-      color: #e5e5e5;
-    }
-
-    /* ── Sidebar ── */
-    .sidebar {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 240px;
-      height: 100vh;
-      background: #0d0d0d;
-      border-right: 1px solid rgba(34,197,94,0.15);
-      display: flex;
-      flex-direction: column;
-      z-index: 100;
-      overflow-y: auto;
-    }
-    .sidebar-brand {
-      padding: 20px 16px;
-      border-bottom: 1px solid rgba(34,197,94,0.1);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
+    .admin-layout { display: flex; min-height: 100vh; background: #0a0a0a; font-family: 'JetBrains Mono','Fira Code','Cascadia Code', monospace; color: #e5e5e5; }
+    .sidebar { position: fixed; top: 0; left: 0; width: 240px; height: 100vh; background: #0d0d0d; border-right: 1px solid rgba(34,197,94,0.15); display: flex; flex-direction: column; z-index: 100; overflow-y: auto; }
+    .sidebar-brand { padding: 20px 16px; border-bottom: 1px solid rgba(34,197,94,0.1); display: flex; align-items: center; gap: 10px; }
     .sidebar-brand-icon { font-size: 22px; color: #22c55e; }
     .sidebar-brand-text { font-size: 15px; color: #22c55e; font-weight: 600; }
-    .sidebar-nav {
-      flex: 1;
-      padding: 12px 0;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .sidebar-link {
-      display: block;
-      padding: 10px 16px;
-      color: #888;
-      text-decoration: none;
-      font-size: 13px;
-      transition: all 0.15s;
-      border-left: 3px solid transparent;
-    }
-    .sidebar-link:hover {
-      color: #22c55e;
-      background: rgba(34,197,94,0.05);
-    }
-    .sidebar-link.active {
-      color: #22c55e;
-      background: rgba(34,197,94,0.08);
-      border-left-color: #22c55e;
-    }
-    .sidebar-footer {
-      padding: 16px;
-      border-top: 1px solid rgba(34,197,94,0.1);
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .sidebar-btn {
-      background: rgba(34,197,94,0.15);
-      color: #22c55e;
-      border: 1px solid rgba(34,197,94,0.2);
-      border-radius: 6px;
-      padding: 8px;
-      cursor: pointer;
-      font-family: inherit;
-      font-size: 13px;
-      transition: background 0.15s;
-    }
+    .sidebar-nav { flex: 1; padding: 12px 0; display: flex; flex-direction: column; gap: 2px; }
+    .sidebar-link { display: block; padding: 10px 16px; color: #888; text-decoration: none; font-size: 13px; transition: all 0.15s; border-left: 3px solid transparent; }
+    .sidebar-link:hover { color: #22c55e; background: rgba(34,197,94,0.05); }
+    .sidebar-link.active { color: #22c55e; background: rgba(34,197,94,0.08); border-left-color: #22c55e; }
+    .sidebar-footer { padding: 16px; border-top: 1px solid rgba(34,197,94,0.1); display: flex; flex-direction: column; gap: 8px; }
+    .sidebar-btn { background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.2); border-radius: 6px; padding: 8px; cursor: pointer; font-family: inherit; font-size: 13px; transition: background 0.15s; }
     .sidebar-btn:hover { background: rgba(34,197,94,0.25); }
     .sidebar-updated { color: #555; font-size: 11px; text-align: center; }
-
-    /* ── Mobile toggle ── */
-    .mobile-toggle {
-      display: none;
-      position: fixed;
-      top: 12px;
-      left: 12px;
-      z-index: 200;
-      background: #111;
-      border: 1px solid rgba(34,197,94,0.3);
-      color: #22c55e;
-      font-size: 20px;
-      width: 40px;
-      height: 40px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-family: inherit;
-    }
-
-    /* ── Main content ── */
-    .main-content {
-      margin-left: 240px;
-      flex: 1;
-      min-height: 100vh;
-    }
-
-    /* ── Top bar ── */
-    .topbar {
-      padding: 16px 32px;
-      border-bottom: 1px solid rgba(34,197,94,0.1);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: #0d0d0d;
-      position: sticky;
-      top: 0;
-      z-index: 50;
-    }
+    .mobile-toggle { display: none; position: fixed; top: 12px; left: 12px; z-index: 200; background: #111; border: 1px solid rgba(34,197,94,0.3); color: #22c55e; font-size: 20px; width: 40px; height: 40px; border-radius: 8px; cursor: pointer; font-family: inherit; }
+    .main-content { margin-left: 240px; flex: 1; min-height: 100vh; }
+    .topbar { padding: 16px 32px; border-bottom: 1px solid rgba(34,197,94,0.1); display: flex; align-items: center; justify-content: space-between; background: #0d0d0d; position: sticky; top: 0; z-index: 50; }
     .topbar-title { font-size: 16px; color: #f59e0b; font-weight: 600; }
     .topbar-actions { display: flex; align-items: center; gap: 16px; }
     .topbar-updated { font-size: 12px; color: #555; }
-    .flow-btn {
-      background: rgba(34,197,94,0.15);
-      color: #22c55e;
-      border: 1px solid rgba(34,197,94,0.3);
-      border-radius: 6px;
-      padding: 6px 14px;
-      font-size: 12px;
-      font-weight: 600;
-      text-decoration: none;
-      transition: all 0.15s;
-      font-family: inherit;
-    }
-    .flow-btn:hover {
-      background: rgba(34,197,94,0.25);
-      border-color: rgba(34,197,94,0.5);
-    }
-
-    /* ── Sections ── */
-    .admin-section {
-      padding: 32px;
-      border-bottom: 1px solid rgba(34,197,94,0.06);
-    }
-    .section-title {
-      font-size: 18px;
-      color: #22c55e;
-      font-weight: 600;
-      margin-bottom: 4px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+    .flow-btn { background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.3); border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 600; text-decoration: none; transition: all 0.15s; font-family: inherit; }
+    .flow-btn:hover { background: rgba(34,197,94,0.25); border-color: rgba(34,197,94,0.5); }
+    .admin-section { padding: 32px; border-bottom: 1px solid rgba(34,197,94,0.06); }
+    .section-title { font-size: 18px; color: #22c55e; font-weight: 600; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
     .section-arrow { color: #f59e0b; }
     .section-desc { font-size: 13px; color: #666; margin-bottom: 20px; }
-
-    /* ── Stat cards ── */
-    .stat-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
-    }
-    .stat-card {
-      background: #111;
-      border: 1px solid rgba(34,197,94,0.15);
-      border-radius: 8px;
-      padding: 20px;
-    }
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .stat-card { background: #111; border: 1px solid rgba(34,197,94,0.15); border-radius: 8px; padding: 20px; }
     .stat-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
     .stat-value { font-size: 32px; font-weight: 700; line-height: 1.2; }
     .stat-value.green { color: #22c55e; }
     .stat-value.amber { color: #f59e0b; }
     .stat-sub { font-size: 11px; color: #555; margin-top: 4px; }
-
-    /* ── Cards ── */
-    .card {
-      background: #111;
-      border: 1px solid rgba(34,197,94,0.15);
-      border-radius: 8px;
-      padding: 20px;
-    }
+    .card { background: #111; border: 1px solid rgba(34,197,94,0.15); border-radius: 8px; padding: 20px; }
     .mb-6 { margin-bottom: 24px; }
-    .card-title {
-      font-size: 14px;
-      color: #22c55e;
-      font-weight: 600;
-      margin-bottom: 4px;
-    }
+    .card-title { font-size: 14px; color: #22c55e; font-weight: 600; margin-bottom: 4px; }
     .card-title.amber { color: #f59e0b; }
     .card-title.purple { color: #a855f7; }
     .card-subtitle { font-size: 12px; color: #666; font-weight: 400; }
-    .card-warning {
-      margin-top: 12px;
-      padding: 10px 14px;
-      background: rgba(245,158,11,0.08);
-      border: 1px solid rgba(245,158,11,0.2);
-      border-radius: 6px;
-      font-size: 12px;
-      color: #f59e0b;
-    }
-
-    /* ── Tag bar chart ── */
+    .card-warning { margin-top: 12px; padding: 10px 14px; background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); border-radius: 6px; font-size: 12px; color: #f59e0b; }
     .tag-bars { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
     .tag-bar-row { display: flex; align-items: center; gap: 12px; }
     .tag-bar-label { width: 140px; font-size: 12px; color: #aaa; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .tag-bar-track { flex: 1; height: 20px; background: rgba(255,255,255,0.03); border-radius: 4px; overflow: hidden; }
     .tag-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; min-width: 2px; }
     .tag-bar-count { width: 36px; font-size: 13px; color: #22c55e; font-weight: 600; }
-
-    /* ── Gate stats ── */
     .gate-stats { display: flex; flex-direction: column; gap: 8px; }
     .gate-row { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
     .gate-row:last-child { border-bottom: none; }
     .gate-row span:first-child { color: #888; }
-
-    /* ── Badges ── */
-    .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: 600;
-    }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
     .green-badge { color: #22c55e; background: rgba(34,197,94,0.15); }
-
-    /* ── Grid layouts ── */
-    .grid-2col {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
-      margin-bottom: 24px;
-    }
-
-    /* ── Tables ── */
+    .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
     .table-wrap { overflow-x: auto; }
     .data-table { width: 100%; border-collapse: collapse; }
     .data-table thead { border-bottom: 1px solid rgba(34,197,94,0.15); }
-    .data-table th {
-      text-align: left;
-      padding: 10px 12px;
-      font-size: 11px;
-      color: #666;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      font-weight: 600;
-    }
-    .data-table td {
-      padding: 10px 12px;
-      font-size: 13px;
-      border-bottom: 1px solid rgba(255,255,255,0.03);
-    }
+    .data-table th { text-align: left; padding: 10px 12px; font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+    .data-table td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.03); }
     .data-table tbody tr:hover { background: rgba(34,197,94,0.04); }
     .td-title { color: #e5e5e5; max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .td-date { font-size: 12px; color: #888; white-space: nowrap; }
     .td-words { font-weight: 600; white-space: nowrap; }
     .muted { color: #555; }
     .mono { font-family: inherit; }
-
-    /* ── Color helpers ── */
     .green { color: #22c55e; }
     .amber { color: #f59e0b; }
     .purple { color: #a855f7; }
     .red { color: #ef4444; }
     .white { color: #e5e5e5; }
 
-    /* ═══════════════════════════════════════════════════════
-       RESPONSIVE
-       ═══════════════════════════════════════════════════════ */
+    /* ── Activity Feed ── */
+    .activity-feed { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+    .activity-row { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .activity-row:last-child { border-bottom: none; }
+    .activity-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .activity-dot.green { background: #22c55e; }
+    .activity-text { flex: 1; color: #ccc; }
+    .activity-text strong { color: #e5e5e5; }
+    .activity-time { font-size: 12px; color: #555; white-space: nowrap; }
+
+    /* ── Affiliates ── */
+    .affiliate-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    .affiliate-card { background: #111; border: 1px solid rgba(34,197,94,0.15); border-radius: 8px; padding: 20px; transition: border-color 0.15s; }
+    .affiliate-card:hover { border-color: rgba(34,197,94,0.3); }
+    .aff-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .aff-name { font-size: 15px; color: #22c55e; font-weight: 600; margin: 0; }
+    .aff-status { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; text-transform: uppercase; }
+    .aff-active { color: #22c55e; background: rgba(34,197,94,0.15); }
+    .aff-paused { color: #f59e0b; background: rgba(245,158,11,0.15); }
+    .aff-desc { font-size: 13px; color: #888; margin: 0 0 12px 0; line-height: 1.5; }
+    .aff-meta { display: flex; justify-content: space-between; align-items: center; }
+    .aff-commission { font-size: 12px; color: #f59e0b; }
+    .aff-link { font-size: 12px; color: #22c55e; text-decoration: none; padding: 4px 10px; border: 1px solid rgba(34,197,94,0.2); border-radius: 4px; transition: all 0.15s; }
+    .aff-link:hover { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.4); }
+
     @media (max-width: 768px) {
-      .sidebar {
-        transform: translateX(-100%);
-        transition: transform 0.2s ease;
-      }
+      .sidebar { transform: translateX(-100%); transition: transform 0.2s ease; }
       .sidebar.open { transform: translateX(0); }
       .mobile-toggle { display: block; }
       .main-content { margin-left: 0; }
@@ -600,6 +450,7 @@ const now = new Date().toISOString();
       .admin-section { padding: 20px 16px; }
       .stat-grid { grid-template-columns: repeat(2, 1fr); }
       .grid-2col { grid-template-columns: 1fr; }
+      .affiliate-grid { grid-template-columns: 1fr; }
       .topbar-actions { gap: 8px; }
       .flow-btn { font-size: 11px; padding: 5px 10px; }
     }
