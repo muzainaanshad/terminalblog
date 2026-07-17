@@ -2,7 +2,8 @@
 title: "Claude Code Just Fixed One of the Most Annoying Issues in Open Source Automation"
 description: "The lock-closed-issues workflow was broken by GitHub API changes. Claude Code's fix uses the search API instead of pagination — and it's a masterclass in maintainable CI."
 pubDate: "2026-06-19T12:00:00Z"
-updatedDate: "2026-06-19T12:00:00Z"
+updatedDate: "2026-07-17T04:00:00Z"
+updated: true
 tags: ["claude-code", "github-actions", "ci", "workflow", "automation", "viral"]
 tool: "claude-code"
 author: "ada"
@@ -15,6 +16,8 @@ GitHub Actions are great until they break silently. Claude Code just fixed a wor
 The `lock-closed-issues` workflow in Claude Code's repository was using offset pagination to fetch issues. The problem: GitHub's API changes broke offset pagination, causing the workflow to only see the first page of results. Old issues weren't getting locked.
 
 This is the kind of bug that goes unnoticed for weeks. The workflow runs successfully (green checkmark), but it's not actually doing its job. Silent failure is the most dangerous kind.
+
+The deeper lesson is that the green checkmark lied. A workflow that "succeeds" while doing nothing is worse than one that fails loudly — at least a failure gets someone's attention. The breakage here was upstream: GitHub changed pagination behavior, and a workflow that assumed offset paging would always work silently lost coverage.
 
 ## The Fix
 
@@ -34,9 +37,16 @@ This is the kind of fix that separates maintainable CI from fragile CI:
 2. **Assume APIs will change** — offset pagination broke because GitHub's API evolved. Build for evolution.
 3. **Test for correctness, not just success** — a green workflow that does nothing is worse than a red one.
 
+## The principle behind it
+
+The fix is small, but it reflects a habit worth copying: treat third-party API contracts as unstable. Any integration that depends on undocumented pagination behavior is a future incident waiting to happen. Pin to the query interface the vendor actually maintains, and add a check that the workflow did what it claimed — not just that it exited zero.
+
 Claude Code's workflow fix is small. But it's the kind of attention to infrastructure that keeps open-source projects healthy.
 
+If you want to apply the same rigor to your own agent setup, our [confessor audit: what your AI coding agent touched](/blog/confessor-audit-what-ai-coding-agent-touched/) covers how to verify an agent actually did the work, and [AGENTS.md: make your coding agent 10x smarter](/blog/agents-dot-md-make-coding-agent-10x-smarter/) is a good companion on writing instructions agents won't quietly ignore. For choosing tooling that encourages this discipline, the [best coding agents 2026 decision guide](/blog/best-coding-agents-2026-decision-guide/) is a useful starting point.
+
 ---
 
 ---
+
 *Running Claude Code or Cursor but still paying separately for ChatGPT Plus? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you GPT, Claude, Gemini, and 6 more premium models for $12/mo — pick the best model for every task without paying for 9 subscriptions.*

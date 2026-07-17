@@ -1,0 +1,79 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+// Check if already logged in
+const cookie = Astro.request.headers.get('cookie') || '';
+const match = cookie.match(/admin_auth=([^;]+)/);
+const isAuth = match && match[1] === Buffer.from(process.env.ADMIN_PASSWORD || 'terminalblog2026').toString('base64');
+
+if (isAuth) {
+  return Astro.redirect('/admin');
+}
+---
+
+<Layout title="Admin Login - terminalblog">
+  <div class="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+    <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg p-8 w-full max-w-md">
+      <div class="text-center mb-8">
+        <span class="text-[#22c55e] text-4xl">⚡</span>
+        <h1 class="text-2xl font-mono text-[#22c55e] mt-4">terminalblog</h1>
+        <p class="text-gray-500 mt-2">Admin Dashboard</p>
+      </div>
+
+      <form id="login-form" class="space-y-6">
+        <div>
+          <label for="password" class="block text-sm font-mono text-gray-400 mb-2">Password</label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            required
+            class="w-full px-4 py-3 bg-[#0a0a0a] border border-[#22c55e]/30 rounded text-white font-mono focus:outline-none focus:border-[#22c55e]"
+            placeholder="Enter admin password"
+          />
+        </div>
+
+        <div id="error-message" class="hidden text-red-500 text-sm font-mono"></div>
+
+        <button
+          type="submit"
+          class="w-full px-4 py-3 bg-[#22c55e]/20 text-[#22c55e] rounded hover:bg-[#22c55e]/30 font-mono"
+        >
+          Login
+        </button>
+      </form>
+
+      <div class="mt-6 text-center text-xs text-gray-600">
+        Authorized personnel only
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('login-form') as HTMLFormElement;
+    const errorDiv = document.getElementById('error-message') as HTMLDivElement;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const password = (document.getElementById('password') as HTMLInputElement).value;
+
+      try {
+        const res = await fetch('/admin/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password }),
+        });
+
+        if (res.ok) {
+          window.location.href = '/admin';
+        } else {
+          errorDiv.textContent = 'Invalid password';
+          errorDiv.classList.remove('hidden');
+        }
+      } catch (err) {
+        errorDiv.textContent = 'Login failed';
+        errorDiv.classList.remove('hidden');
+      }
+    });
+  </script>
+</Layout>

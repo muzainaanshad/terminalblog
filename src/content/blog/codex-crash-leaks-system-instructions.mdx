@@ -1,8 +1,9 @@
 ---
 title: "Codex App Crashes and Leaks Its Own System Instructions in the Error Message"
-description: "A reproducible crash in Codex Desktop spills internal system prompts into the error output — revealing exactly how the agent is instructed to behave."
+description: "A reproducible crash in Codex Desktop spills internal system prompts into the error output — revealing exactly how the agent is instructed to behave, and what it means for anyone running it on Windows."
 pubDate: "2026-07-11T05:00:00Z"
-updatedDate: "2026-07-11T05:00:00Z"
+updatedDate: "2026-07-17T04:00:00Z"
+updated: true
 tags: ["opinion", "trend", "codex", "security", "bug"]
 tool: "codex"
 author: "kira"
@@ -15,13 +16,26 @@ Today it's Codex. A crash bug filed a few hours ago caught my attention — not 
 
 When the Codex Desktop app crashes under certain conditions, the error message doesn't just say "something went wrong." It dumps the agent's own internal system instructions into plain view. The reporter included a screenshot in their bug report, and the content is unmistakable: the exact prompt template Codex uses to bootstrap itself, the model parameters it defaults to, the safety instructions it follows — all sitting in an error dialog that any user can read.
 
+## Why this leak matters
+
 This is a disclosure that cuts both ways. On one hand, it's transparency you don't normally get — the actual system prompt of a commercial coding agent, confirmed by a crash handler that forgot to filter what it showed. On the other, it means every crash is potentially leaking whatever internal guidance the app ships with. If those instructions change per feature flag or contain proprietary evaluation criteria, that's information the vendor likely didn't intend to share.
+
+The bigger problem is the pattern, not the single dump. Error handlers are a classic blind spot: they run outside the normal render path, they're rarely reviewed for what they display, and they often serialize internal state that the main UI carefully hides. A crash dialog is exactly where you'd expect sanitization to be skipped.
+
+## It's reproducible, not a fluke
 
 The reporter noted the crash happens on Windows, and two other users confirmed they could reproduce it. That's the worrying part — it's not a one-off memory corruption on an obscure configuration. It's a triggered crash with consistent output.
 
-**What this means for you:** If you're using Codex Desktop and it crashes, the error dialog may contain more than you expect. Screenshot it before clicking dismiss — you might see parts of the agent's internal configuration that aren't normally visible. And for the teams building these tools: at minimum, error handlers should sanitize their output. The crash is bad enough without it also becoming an information leak.
+Consistent output means the leak is deterministic. Anyone who can trigger the crash can read the instructions, which turns a bug into a reliable extraction path rather than a lucky screenshot.
+
+## What this means for you
+
+If you're using Codex Desktop and it crashes, the error dialog may contain more than you expect. Screenshot it before clicking dismiss — you might see parts of the agent's internal configuration that aren't normally visible. And for the teams building these tools: at minimum, error handlers should sanitize their output. The crash is bad enough without it also becoming an information leak.
+
+This is the same class of failure we've tracked elsewhere in the ecosystem. Our [Claude Code steganography writeup](/blog/claude-code-steganography/) covers a different angle on how agent internals can leak, and [beware: Codex Desktop Windows silent exit node leak](/blog/beware-codex-desktop-windows-silent-exit-node-leak/) documents another Windows-specific Codex failure mode worth knowing if you run it on that platform.
 
 ---
 
 ---
+
 *Stop paying for AI subscriptions you barely use. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** is $12/mo for access to GPT, Claude, Gemini, Grok, DeepSeek, Perplexity, and more. One sub, every top model.*
