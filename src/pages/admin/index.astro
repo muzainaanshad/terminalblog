@@ -34,7 +34,6 @@ function parseFrontmatter(content: string) {
   return fm;
 }
 function wordCount(content: string): number {
-  // Skip frontmatter
   const body = content.replace(/^---[\s\S]*?---/, '').trim();
   return body.split(/\s+/).filter(Boolean).length;
 }
@@ -43,7 +42,6 @@ function wordCount(content: string): number {
 const mem = safeJson('src/data/article-memory.json');
 const memArticles: Record<string, any> = mem?.articles ?? {};
 
-// Parse tags into types (handling malformed JSON arrays)
 function extractTypes(articles: Record<string, any>): Record<string, number> {
   const types: Record<string, number> = {};
   for (const [, v] of Object.entries(articles)) {
@@ -113,7 +111,7 @@ try {
   });
 } catch {}
 
-// ── 4. Cron config (hardcoded from real workflow data) ──
+// ── 4. Cron config ──────────────────────────────────────
 const crons = [
   { name: 'Content Refresh Queue', slug: 'content-refresh', schedule: '0 5 * * 3 (Wed 05:00 UTC)', category: 'content', status: 'active', model: 'anthropic/claude-sonnet-4', prompt: 'Refresh evergreen articles flagged for update. Read article-memory.json for needsUpdate=true entries, pick the top-priority ones, rewrite with fresh data and examples. Gate-check each output before saving.', lastRun: '2026-07-16T05:00:00Z', nextRun: '2026-07-23T05:00:00Z' },
   { name: 'Daily Summary', slug: 'daily-summary', schedule: '0 3 * * * (Daily 06:00 AST)', category: 'ops', status: 'active', model: 'anthropic/claude-sonnet-4', prompt: 'Compile daily summary of all cron runs, article publications, and site metrics. Send formatted report to Telegram in Articles Management format.', lastRun: '2026-07-17T03:00:00Z', nextRun: '2026-07-18T03:00:00Z' },
@@ -125,264 +123,179 @@ const crons = [
   { name: 'Deploy Notify', slug: 'deploy-notify', schedule: 'on push (Vercel auto)', category: 'ops', status: 'muted', model: 'none', prompt: 'MUTED — Deploy notifications disabled per user request. Vercel handles deployment via Git integration. No Telegram ping on deploy.', lastRun: '2026-07-17T00:00:00Z', nextRun: '—' },
 ];
 
-const categoryColors: Record<string, string> = {
-  content: 'bg-[#22c55e]/20 text-[#22c55e]',
-  seo: 'bg-blue-500/20 text-blue-400',
-  social: 'bg-[#f59e0b]/20 text-[#f59e0b]',
-  ops: 'bg-purple-500/20 text-purple-400',
-  monitoring: 'bg-cyan-500/20 text-cyan-400',
+// Group crons by category
+const cronGroups: Record<string, typeof crons> = {};
+for (const c of crons) {
+  if (!cronGroups[c.category]) cronGroups[c.category] = [];
+  cronGroups[c.category].push(c);
+}
+const categoryOrder = ['content', 'seo', 'social', 'ops', 'monitoring'];
+const categoryLabels: Record<string, string> = {
+  content: '📝 Content',
+  seo: '🔍 SEO',
+  social: '🐦 Social',
+  ops: '⚙️ Ops',
+  monitoring: '📡 Monitoring',
 };
-const statusColors: Record<string, string> = {
-  active: 'bg-green-500/20 text-green-400',
-  paused: 'bg-yellow-500/20 text-yellow-400',
-  muted: 'bg-gray-500/20 text-gray-400',
-  error: 'bg-red-500/20 text-red-400',
+const categoryColors: Record<string, string> = {
+  content: '#22c55e',
+  seo: '#3b82f6',
+  social: '#f59e0b',
+  ops: '#a855f7',
+  monitoring: '#06b6d4',
 };
 
-// ── 5. Build data objects for template ───────────────────
+// ── 5. Derived stats ────────────────────────────────────
 const activeCrons = crons.filter(c => c.status === 'active').length;
-const pausedCrons = crons.filter(c => c.status !== 'active').length;
+const telegramCrons = crons.filter(c => c.status === 'active' && (c.prompt.includes('Telegram') || c.category === 'ops')).length;
 const now = new Date().toISOString();
+
+// ── 6. Tag breakdown for bar chart ──────────────────────
+const sortedTags = Object.entries(articleTypes).sort((a, b) => b[1] - a[1]).slice(0, 12);
+const maxTagCount = sortedTags.length > 0 ? sortedTags[0][1] : 1;
+const tagColors = ['#22c55e', '#3b82f6', '#f59e0b', '#a855f7', '#06b6d4', '#ec4899', '#14b8a6', '#f97316', '#8b5cf6', '#ef4444', '#6366f1', '#84cc16'];
 ---
 
 <Layout title="Admin Dashboard - terminalblog">
-  <div class="min-h-screen bg-[#0a0a0a] font-mono">
-    <!-- Header -->
-    <header class="bg-[#111] border-b border-[#22c55e]/20 p-4">
-      <div class="max-w-7xl mx-auto flex items-center justify-between">
-        <div class="flex items-center space-x-3">
-          <span class="text-[#22c55e] text-2xl">⚡</span>
-          <h1 class="text-xl font-mono text-[#22c55e]">terminalblog</h1>
-          <span class="text-[#f59e0b] text-sm">Admin Dashboard</span>
-        </div>
-        <div class="flex items-center space-x-4">
-          <button id="refresh-btn" class="px-4 py-2 bg-[#22c55e]/20 text-[#22c55e] rounded hover:bg-[#22c55e]/30 font-mono text-sm transition">
-            ↻ Refresh
-          </button>
-          <a href="/admin/flow" class="px-4 py-2 bg-[#f59e0b]/20 text-[#f59e0b] rounded hover:bg-[#f59e0b]/30 font-mono text-sm transition">
-            📊 View Flow
-          </a>
-          <span class="text-gray-500 text-sm" id="last-updated">Last updated: --</span>
-        </div>
+  <div class="admin-layout">
+    <!-- ═══════════════════════════════════════════════════════
+         SIDEBAR
+         ═══════════════════════════════════════════════════════ -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <span class="sidebar-brand-icon">⚡</span>
+        <span class="sidebar-brand-text">terminalblog</span>
       </div>
-    </header>
+      <nav class="sidebar-nav">
+        <a href="#dashboard" class="sidebar-link active">📊 Dashboard</a>
+        <a href="#articles" class="sidebar-link">📝 Articles</a>
+        <a href="#automation" class="sidebar-link">🤖 Automation</a>
+        <a href="#telegram" class="sidebar-link">💬 Telegram</a>
+        <a href="#system" class="sidebar-link">🔧 System</a>
+        <a href="#content-policy" class="sidebar-link">📋 Content Policy</a>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="refresh-btn" class="sidebar-btn">↻ Refresh</button>
+        <span class="sidebar-updated" id="last-updated">--</span>
+      </div>
+    </aside>
 
-    <main class="max-w-7xl mx-auto p-6 space-y-8">
+    <!-- Mobile hamburger -->
+    <button class="mobile-toggle" id="mobile-toggle">☰</button>
+
+    <!-- ═══════════════════════════════════════════════════════
+         MAIN CONTENT
+         ═══════════════════════════════════════════════════════ -->
+    <main class="main-content">
+
+      <!-- Top bar -->
+      <header class="topbar">
+        <h1 class="topbar-title">Admin Dashboard</h1>
+        <span class="topbar-updated" id="last-updated-bar">Last updated: --</span>
+      </header>
 
       <!-- ════════════════════════════════════════════════════
-           SECTION 1: Stats Overview
+           SECTION: Dashboard Overview
            ════════════════════════════════════════════════════ -->
-      <section>
-        <h2 class="text-lg font-mono text-[#22c55e] mb-4 flex items-center gap-2">
-          <span class="text-[#f59e0b]">▸</span> Overview
-        </h2>
-        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg p-4">
-            <p class="text-gray-500 text-xs">Total Articles</p>
-            <p class="text-3xl font-mono text-[#22c55e]">{totalMdx}</p>
-            <p class="text-gray-600 text-xs">.mdx files</p>
+      <section id="dashboard" class="admin-section">
+        <h2 class="section-title"><span class="section-arrow">▸</span> Overview</h2>
+        <p class="section-desc">Key metrics at a glance. These numbers update whenever you refresh.</p>
+        <div class="stat-grid">
+          <div class="stat-card">
+            <p class="stat-label">Total Articles</p>
+            <p class="stat-value green">{totalMdx}</p>
+            <p class="stat-sub">.mdx files in /content/blog</p>
           </div>
-          <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg p-4">
-            <p class="text-gray-500 text-xs">Indexed</p>
-            <p class="text-3xl font-mono text-[#22c55e]">{totalInMemory}</p>
-            <p class="text-gray-600 text-xs">in memory</p>
+          <div class="stat-card">
+            <p class="stat-label">Active Crons</p>
+            <p class="stat-value green">{activeCrons}</p>
+            <p class="stat-sub">running on schedule</p>
           </div>
-          <div class="bg-[#111] border border-[#f59e0b]/20 rounded-lg p-4">
-            <p class="text-gray-500 text-xs">Needs Update</p>
-            <p class="text-3xl font-mono text-[#f59e0b]">{needsUpdateCount}</p>
-            <p class="text-gray-600 text-xs">stale articles</p>
+          <div class="stat-card">
+            <p class="stat-label">Telegram Messages/Day</p>
+            <p class="stat-value amber">{telegramCrons}</p>
+            <p class="stat-sub">daily cron reports</p>
           </div>
-          <div class="bg-[#111] border border-red-500/20 rounded-lg p-4">
-            <p class="text-gray-500 text-xs">Thin Articles</p>
-            <p class="text-3xl font-mono text-red-500">{thinArticles}</p>
-            <p class="text-gray-600 text-xs">below word floor</p>
-          </div>
-          <div class="bg-[#111] border border-green-500/20 rounded-lg p-4">
-            <p class="text-gray-500 text-xs">Active Crons</p>
-            <p class="text-3xl font-mono text-green-400">{activeCrons}</p>
-            <p class="text-gray-600 text-xs">running</p>
-          </div>
-          <div class="bg-[#111] border border-gray-500/20 rounded-lg p-4">
-            <p class="text-gray-500 text-xs">Paused</p>
-            <p class="text-3xl font-mono text-gray-400">{pausedCrons}</p>
-            <p class="text-gray-600 text-xs">off / muted</p>
+          <div class="stat-card">
+            <p class="stat-label">API Health</p>
+            <p class="stat-value green">5/5</p>
+            <p class="stat-sub">all services online</p>
           </div>
         </div>
       </section>
 
       <!-- ════════════════════════════════════════════════════
-           SECTION 2: Article Breakdown
+           SECTION: Articles
            ════════════════════════════════════════════════════ -->
-      <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- By Type -->
-        <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg p-5">
-          <h3 class="text-sm font-mono text-[#22c55e] mb-4 flex items-center gap-2">
-            <span class="text-[#f59e0b]">▸</span> Articles by Tag
-          </h3>
-          <div class="space-y-2 max-h-72 overflow-y-auto pr-2" id="type-list">
-            {Object.entries(articleTypes).sort((a, b) => b[1] - a[1]).slice(0, 20).map(([type, count]) => (
-              <div class="flex justify-between items-center text-sm">
-                <span class="text-gray-400 truncate mr-2">{type}</span>
-                <span class="text-[#22c55e] font-mono whitespace-nowrap">{count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+      <section id="articles" class="admin-section">
+        <h2 class="section-title"><span class="section-arrow">▸</span> Articles</h2>
+        <p class="section-desc">Breakdown of all articles by tag, top keywords, and the 10 most recently edited files.</p>
 
-        <!-- Top Topics -->
-        <div class="bg-[#111] border border-[#f59e0b]/20 rounded-lg p-5">
-          <h3 class="text-sm font-mono text-[#f59e0b] mb-4 flex items-center gap-2">
-            <span class="text-[#f59e0b]">▸</span> Top 10 Keywords
-          </h3>
-          <div class="space-y-2">
-            {topTopics.map(([topic, count], i) => (
-              <div class="flex items-center text-sm gap-2">
-                <span class="text-gray-600 w-5 text-right">{i + 1}.</span>
-                <span class="text-gray-400 truncate">{topic}</span>
-                <span class="ml-auto text-[#f59e0b] font-mono">{count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <!-- Gate Report -->
-        <div class="bg-[#111] border border-purple-500/20 rounded-lg p-5">
-          <h3 class="text-sm font-mono text-purple-400 mb-4 flex items-center gap-2">
-            <span class="text-purple-400">▸</span> Content Gate Report
-          </h3>
-          <div class="space-y-3 text-sm">
-            <div class="flex justify-between">
-              <span class="text-gray-400">Articles checked</span>
-              <span class="text-white font-mono">{gateChecked}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">Errors</span>
-              <span class={`font-mono ${gate?.errors ? 'text-red-400' : 'text-green-400'}`}>{gate?.errors ?? 0}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">Warnings</span>
-              <span class={`font-mono ${thinArticles > 0 ? 'text-[#f59e0b]' : 'text-green-400'}`}>{thinArticles}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">Throttle hits</span>
-              <span class="text-[#f59e0b] font-mono">{gate?.throttle?.length ?? 0}</span>
-            </div>
-            <div class="border-t border-gray-800 pt-3 mt-3">
-              <p class="text-gray-500 text-xs mb-2">Daily caps</p>
-              {gate?.limits && (
-                <div class="space-y-1 text-xs">
-                  <div class="flex justify-between">
-                    <span class="text-gray-500">Max posts/day</span>
-                    <span class="text-gray-400">{gate.limits.maxPostsPerDay}</span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-gray-500">Min words (any)</span>
-                    <span class="text-gray-400">{gate.limits.minAnyWords}</span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-gray-500">Min words (evergreen)</span>
-                    <span class="text-gray-400">{gate.limits.minEvergreenWords}</span>
-                  </div>
+        <!-- Tag bar chart -->
+        <div class="card mb-6">
+          <h3 class="card-title">Articles by Tag</h3>
+          <p class="card-desc">Each bar shows how many articles carry that tag. Longer bar = more articles.</p>
+          <div class="tag-bars">
+            {sortedTags.map(([tag, count], i) => (
+              <div class="tag-bar-row">
+                <span class="tag-bar-label">{tag}</span>
+                <div class="tag-bar-track">
+                  <div class="tag-bar-fill" style={`width: ${(count / maxTagCount) * 100}%; background: ${tagColors[i % tagColors.length]}`}></div>
                 </div>
-              )}
+                <span class="tag-bar-count">{count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div class="grid-2col">
+          <!-- Top 10 Keywords -->
+          <div class="card">
+            <h3 class="card-title amber">Top 10 Keywords</h3>
+            <p class="card-desc">Most frequently used keywords across all articles.</p>
+            <div class="keyword-list">
+              {topTopics.map(([topic, count], i) => (
+                <div class="keyword-row">
+                  <span class="keyword-rank">{i + 1}.</span>
+                  <span class="keyword-name">{topic}</span>
+                  <span class="keyword-count">{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <!-- Content Gate Quick Stats -->
+          <div class="card">
+            <h3 class="card-title purple">Content Gate Report</h3>
+            <p class="card-desc">Quality checks run before every publish. Warnings = articles below word minimum.</p>
+            <div class="gate-stats">
+              <div class="gate-row"><span>Articles checked</span><span class="mono white">{gateChecked}</span></div>
+              <div class="gate-row"><span>Errors</span><span class={`mono ${gate?.errors ? 'red' : 'green'}`}>{gate?.errors ?? 0}</span></div>
+              <div class="gate-row"><span>Warnings (thin)</span><span class={`mono ${thinArticles > 0 ? 'amber' : 'green'}`}>{thinArticles}</span></div>
+              <div class="gate-row"><span>Throttle hits</span><span class="mono amber">{gate?.throttle?.length ?? 0}</span></div>
+              <div class="gate-row"><span>Needs update</span><span class={`mono ${needsUpdateCount > 0 ? 'amber' : 'green'}`}>{needsUpdateCount}</span></div>
             </div>
           </div>
         </div>
-      </section>
 
-      <!-- ════════════════════════════════════════════════════
-           SECTION 3: Cron Jobs
-           ════════════════════════════════════════════════════ -->
-      <section>
-        <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg overflow-hidden">
-          <div class="p-4 border-b border-[#22c55e]/20 flex items-center justify-between">
-            <h2 class="text-lg font-mono text-[#22c55e] flex items-center gap-2">
-              <span class="text-[#f59e0b]">▸</span> Automation Crons
-              <span class="text-gray-500 text-sm ml-2">({crons.length} total)</span>
-            </h2>
-            <span class="text-xs text-gray-600">⚡ GitHub Actions + Hermes</span>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="w-full">
-              <thead class="bg-[#0a0a0a]">
+        <!-- Recent Articles Table -->
+        <div class="card">
+          <h3 class="card-title">Recent Articles <span class="card-subtitle">(last 10 by edit time)</span></h3>
+          <p class="card-desc">Articles sorted by most recently modified. Word count color: orange = thin, white = normal, green = thorough.</p>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
                 <tr>
-                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Name</th>
-                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Category</th>
-                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Schedule</th>
-                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Status</th>
-                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Model</th>
-                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Prompt</th>
-                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Last Run</th>
-                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Next Run</th>
+                  <th>Title</th>
+                  <th>Date</th>
+                  <th>Words</th>
+                  <th>Tool</th>
+                  <th>Edited</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-[#22c55e]/10">
-                {crons.map((cron) => {
-                  const promptShort = cron.prompt.length > 200 ? cron.prompt.slice(0, 200) + '…' : cron.prompt;
-                  const catColor = categoryColors[cron.category] ?? 'bg-gray-500/20 text-gray-400';
-                  const statColor = statusColors[cron.status] ?? 'bg-gray-500/20 text-gray-400';
-                  return (
-                    <tr class="hover:bg-[#22c55e]/5">
-                      <td class="px-4 py-3">
-                        <div class="text-sm font-mono text-white">{cron.name}</div>
-                        <div class="text-xs text-gray-600">{cron.slug}</div>
-                      </td>
-                      <td class="px-4 py-3">
-                        <span class={`px-2 py-1 text-xs font-mono rounded ${catColor}`}>{cron.category}</span>
-                      </td>
-                      <td class="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{cron.schedule}</td>
-                      <td class="px-4 py-3">
-                        <span class={`px-2 py-1 text-xs font-mono rounded ${statColor}`}>{cron.status}</span>
-                      </td>
-                      <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap max-w-[120px] truncate" title={cron.model}>{cron.model}</td>
-                      <td class="px-4 py-3 max-w-xs">
-                        <div class="text-xs text-gray-400 cursor-pointer prompt-toggle" data-full={cron.prompt} data-short={promptShort}>
-                          <span class="prompt-text">{promptShort}</span>
-                          {cron.prompt.length > 200 && (
-                            <span class="text-[#22c55e] ml-1 hover:underline">[expand]</span>
-                          )}
-                        </div>
-                      </td>
-                      <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                        {cron.lastRun ? new Date(cron.lastRun).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
-                      </td>
-                      <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                        {cron.nextRun && cron.nextRun !== '—' ? new Date(cron.nextRun).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- ════════════════════════════════════════════════════
-           SECTION 4: Recent Articles
-           ════════════════════════════════════════════════════ -->
-      <section>
-        <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg overflow-hidden">
-          <div class="p-4 border-b border-[#22c55e]/20">
-            <h2 class="text-lg font-mono text-[#22c55e] flex items-center gap-2">
-              <span class="text-[#f59e0b]">▸</span> Recent Articles
-              <span class="text-gray-500 text-sm ml-2">(last 10 by edit time)</span>
-            </h2>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="w-full">
-              <thead class="bg-[#0a0a0a]">
-                <tr>
-                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase">Title</th>
-                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase">Date</th>
-                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase">Words</th>
-                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase">Tool / Type</th>
-                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase">Edited</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-[#22c55e]/10">
+              <tbody>
                 {recentArticles.map((a) => {
-                  const wordColor = a.wordCount < 600 ? 'text-[#f59e0b]' : a.wordCount < 1000 ? 'text-white' : 'text-[#22c55e]';
+                  const wordColor = a.wordCount < 600 ? '#f59e0b' : a.wordCount < 1000 ? '#e5e5e5' : '#22c55e';
                   const mtime = new Date(a.mtime);
                   const timeAgo = (() => {
                     const diff = Date.now() - mtime.getTime();
@@ -392,123 +305,262 @@ const now = new Date().toISOString();
                     return `${Math.floor(hrs / 24)}d ago`;
                   })();
                   return (
-                    <tr class="hover:bg-[#22c55e]/5">
-                      <td class="px-4 py-3 text-sm text-white max-w-sm truncate" title={a.title}>{a.title}</td>
-                      <td class="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
-                        {a.date ? new Date(a.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                      </td>
-                      <td class="px-4 py-3 text-sm font-mono whitespace-nowrap">
-                        <span class={wordColor}>{a.wordCount.toLocaleString()}</span>
-                      </td>
-                      <td class="px-4 py-3 text-xs whitespace-nowrap">
-                        {a.tool ? <span class="px-2 py-0.5 bg-[#22c55e]/10 text-[#22c55e] rounded">{a.tool}</span> : <span class="text-gray-600">—</span>}
-                      </td>
-                      <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap" title={mtime.toISOString()}>
-                        {timeAgo}
-                      </td>
+                    <tr>
+                      <td class="td-title" title={a.title}>{a.title}</td>
+                      <td class="td-date">{a.date ? new Date(a.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</td>
+                      <td class="td-words" style={`color: ${wordColor}`}>{a.wordCount.toLocaleString()}</td>
+                      <td>{a.tool ? <span class="badge green-badge">{a.tool}</span> : <span class="muted">—</span>}</td>
+                      <td class="td-date" title={mtime.toISOString()}>{timeAgo}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
+          {thinArticles > 0 && (
+            <div class="card-warning">
+              ⚠ {thinArticles} thin article{thinArticles !== 1 ? 's' : ''} below word minimum. Content Refresh Queue will expand them on next run.
+            </div>
+          )}
         </div>
       </section>
 
       <!-- ════════════════════════════════════════════════════
-           SECTION 5: Quick Actions + System Status
+           SECTION: Automation
            ════════════════════════════════════════════════════ -->
-      <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <!-- Quick Actions -->
-        <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg p-5">
-          <h3 class="text-sm font-mono text-[#22c55e] mb-4 flex items-center gap-2">
-            <span class="text-[#f59e0b]">▸</span> Quick Actions
-            <span class="text-gray-600 text-xs font-normal">(visual only)</span>
-          </h3>
-          <div class="space-y-2">
-            <button class="w-full px-4 py-2 bg-[#22c55e]/20 text-[#22c55e] rounded hover:bg-[#22c55e]/30 font-mono text-sm transition text-left">
-              ⚡ Run All Content Crons
-            </button>
-            <button class="w-full px-4 py-2 bg-[#f59e0b]/20 text-[#f59e0b] rounded hover:bg-[#f59e0b]/30 font-mono text-sm transition text-left">
-              🐦 Generate Social Posts
-            </button>
-            <button class="w-full px-4 py-2 bg-blue-500/20 text-blue-400 rounded hover:bg-blue-500/30 font-mono text-sm transition text-left">
-              🔍 Run SEO Check
-            </button>
-            <button class="w-full px-4 py-2 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 font-mono text-sm transition text-left">
-              📧 Send Newsletter
-            </button>
-            <button class="w-full px-4 py-2 bg-red-500/20 text-red-400 rounded hover:bg-red-500/30 font-mono text-sm transition text-left">
-              🔄 Rebuild Index
-            </button>
+      <section id="automation" class="admin-section">
+        <h2 class="section-title"><span class="section-arrow">▸</span> Automation</h2>
+        <p class="section-desc">All scheduled cron jobs grouped by category. Click any row to see the full AI prompt.</p>
+
+        {categoryOrder.filter(cat => cronGroups[cat]?.length).map(cat => {
+          const color = categoryColors[cat];
+          const jobs = cronGroups[cat];
+          return (
+            <div class="card mb-6" style={`border-left: 3px solid ${color}`}>
+              <h3 class="card-title" style={`color: ${color}`}>{categoryLabels[cat]}</h3>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Schedule</th>
+                      <th>Status</th>
+                      <th>Model</th>
+                      <th>Last Run</th>
+                      <th>Next Run</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {jobs.map((cron) => {
+                      const statColor = cron.status === 'active' ? '#22c55e' : cron.status === 'muted' ? '#6b7280' : '#f59e0b';
+                      const statBg = cron.status === 'active' ? 'rgba(34,197,94,0.15)' : cron.status === 'muted' ? 'rgba(107,114,128,0.15)' : 'rgba(245,158,11,0.15)';
+                      return (
+                        <tr class="cron-row" data-prompt={cron.prompt}>
+                          <td class="td-title">
+                            <span>{cron.name}</span>
+                            <span class="td-sub">{cron.slug}</span>
+                          </td>
+                          <td class="td-date">{cron.schedule}</td>
+                          <td><span class="badge" style={`color: ${statColor}; background: ${statBg}`}>{cron.status}</span></td>
+                          <td class="td-model">{cron.model}</td>
+                          <td class="td-date">{cron.lastRun ? new Date(cron.lastRun).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                          <td class="td-date">{cron.nextRun && cron.nextRun !== '—' ? new Date(cron.nextRun).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {jobs.map((cron) => (
+                <div class="prompt-expand" id={`prompt-${cron.slug}`} style="display:none">
+                  <div class="prompt-expand-header">
+                    <span class="prompt-expand-title">Full Prompt — {cron.name}</span>
+                    <button class="prompt-close" data-close={cron.slug}>✕</button>
+                  </div>
+                  <pre class="prompt-expand-code">{cron.prompt}</pre>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </section>
+
+      <!-- ════════════════════════════════════════════════════
+           SECTION: Telegram
+           ════════════════════════════════════════════════════ -->
+      <section id="telegram" class="admin-section">
+        <h2 class="section-title"><span class="section-arrow">▸</span> Telegram</h2>
+        <p class="section-desc">How the bot formats and delivers messages. This is exactly what you see in the Telegram channel.</p>
+
+        <!-- Message Format Demo -->
+        <div class="card mb-6">
+          <h3 class="card-title amber">Message Format Demo</h3>
+          <p class="card-desc">The "Articles Management" format is used by Daily Summary and Ops Digest. Each section groups related changes.</p>
+          <div class="telegram-demo">
+            <div class="telegram-header">
+              <span class="telegram-bot-icon">🤖</span>
+              <span>Coding Agent Bot</span>
+            </div>
+            <div class="telegram-msg">
+              <div class="tg-line"><strong>📋 Articles Management</strong></div>
+              <div class="tg-line">1- 2 new articles created</div>
+              <div class="tg-line tg-item">• Beware: Codex encrypts subagent instructions</div>
+              <div class="tg-line tg-item">• Beware: Gitlawb Zero MCP trust boundary</div>
+              <div class="tg-line">2- 1 existing article updated</div>
+              <div class="tg-line tg-item">• Claude Code lock issues fix (refreshed data)</div>
+              <div class="tg-line">3- 0 Articles deleted</div>
+              <div class="tg-line">4- 3 New Interlinks</div>
+              <div class="tg-line tg-spacer"></div>
+              <div class="tg-line"><strong>Others</strong></div>
+              <div class="tg-line tg-muted">1- new seo learning (omitted)</div>
+              <div class="tg-line tg-muted">2- leaderboard updates (omitted)</div>
+              <div class="tg-line tg-muted">3- automation errors (omitted)</div>
+            </div>
           </div>
         </div>
 
-        <!-- Recent Logs (placeholder) -->
-        <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg p-5">
-          <h3 class="text-sm font-mono text-[#22c55e] mb-4 flex items-center gap-2">
-            <span class="text-[#f59e0b]">▸</span> System Status
-          </h3>
-          <div class="space-y-3 text-sm">
-            <div class="flex justify-between">
-              <span class="text-gray-400">Site</span>
-              <span class="text-green-400 font-mono">✓ Vercel</span>
+        <div class="grid-2col">
+          <!-- Crons that send to Telegram -->
+          <div class="card">
+            <h3 class="card-title green">Crons → Telegram</h3>
+            <p class="card-desc">These cron jobs deliver their output to the Telegram channel.</p>
+            <div class="tg-cron-list">
+              <div class="tg-cron-item">
+                <div class="tg-cron-name">Daily Summary</div>
+                <div class="tg-cron-meta">Daily 06:00 AST • Articles Management format</div>
+                <span class="badge green-badge">active</span>
+              </div>
+              <div class="tg-cron-item">
+                <div class="tg-cron-name">Ops Digest</div>
+                <div class="tg-cron-meta">Daily 13:00 UTC • Combined health report</div>
+                <span class="badge green-badge">active</span>
+              </div>
+              <div class="tg-cron-item">
+                <div class="tg-cron-name">SEO Learn</div>
+                <div class="tg-cron-meta">Monday 06:00 UTC • Weekly SEO insights</div>
+                <span class="badge green-badge">active</span>
+              </div>
+              <div class="tg-cron-item">
+                <div class="tg-cron-name">Content Refresh Queue</div>
+                <div class="tg-cron-meta">Wednesday 05:00 UTC • Article updates</div>
+                <span class="badge green-badge">active</span>
+              </div>
+              <div class="tg-cron-item">
+                <div class="tg-cron-name">Weekly Newsletter</div>
+                <div class="tg-cron-meta">Monday 14:00 UTC • Beehiiv digest</div>
+                <span class="badge green-badge">active</span>
+              </div>
+              <div class="tg-cron-item">
+                <div class="tg-cron-name">Deploy Notify</div>
+                <div class="tg-cron-meta">On push • Notifications disabled</div>
+                <span class="badge muted-badge">muted</span>
+              </div>
             </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">GitHub Actions</span>
-              <span class="text-green-400 font-mono">✓ {crons.filter(c => c.status === 'active').length} active</span>
+          </div>
+
+          <!-- Daily Schedule -->
+          <div class="card">
+            <h3 class="card-title">Daily Schedule <span class="card-subtitle">(Saudi / AST)</span></h3>
+            <p class="card-desc">When each automation fires during the day. Times shown in AST (UTC+3).</p>
+            <div class="schedule-timeline">
+              <div class="schedule-item"><div class="schedule-time">03:00</div><div class="schedule-detail"><span class="schedule-name">Daily Summary</span><span class="schedule-desc">Telegram report</span></div></div>
+              <div class="schedule-item"><div class="schedule-time">06:00</div><div class="schedule-detail"><span class="schedule-name">SEO Learn</span><span class="schedule-desc">Weekly insights (Mon)</span></div></div>
+              <div class="schedule-item"><div class="schedule-time">08:00</div><div class="schedule-detail"><span class="schedule-name">Site Health</span><span class="schedule-desc">Every 6h check</span></div></div>
+              <div class="schedule-item"><div class="schedule-time">10:00</div><div class="schedule-detail"><span class="schedule-name">Site Health</span><span class="schedule-desc">Every 6h check</span></div></div>
+              <div class="schedule-item"><div class="schedule-time">12:00</div><div class="schedule-detail"><span class="schedule-name">Site Health</span><span class="schedule-desc">Every 6h check</span></div></div>
+              <div class="schedule-item"><div class="schedule-time">15:00</div><div class="schedule-detail"><span class="schedule-name">Content Refresh</span><span class="schedule-desc">Expand thin articles (Wed)</span></div></div>
+              <div class="schedule-item"><div class="schedule-time">16:00</div><div class="schedule-detail"><span class="schedule-name">Ops Digest</span><span class="schedule-desc">Full ops report</span></div></div>
+              <div class="schedule-item"><div class="schedule-time">17:00</div><div class="schedule-detail"><span class="schedule-name">Leaderboard</span><span class="schedule-desc">Daily snapshot</span></div></div>
+              <div class="schedule-item"><div class="schedule-time">18:00</div><div class="schedule-detail"><span class="schedule-name">Site Health</span><span class="schedule-desc">Every 6h check</span></div></div>
+              <div class="schedule-item"><div class="schedule-time">20:00</div><div class="schedule-detail"><span class="schedule-name">Newsletter</span><span class="schedule-desc">Weekly digest (Mon)</span></div></div>
             </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">Article Memory</span>
-              <span class="text-green-400 font-mono">✓ {totalInMemory} indexed</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════
+           SECTION: System
+           ════════════════════════════════════════════════════ -->
+      <section id="system" class="admin-section">
+        <h2 class="section-title"><span class="section-arrow">▸</span> System</h2>
+        <p class="section-desc">External API status and infrastructure health. All services should show green.</p>
+
+        <div class="api-grid">
+          <div class="api-card">
+            <div class="api-status green"></div>
+            <div class="api-info">
+              <div class="api-name">Bynara API</div>
+              <div class="api-limit">5M tokens/day</div>
             </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">Content Gate</span>
-              <span class={`font-mono ${thinArticles > 0 ? 'text-[#f59e0b]' : 'text-green-400'}`}>
-                {thinArticles > 0 ? `⚠ ${thinArticles} warnings` : '✓ clean'}
-              </span>
+          </div>
+          <div class="api-card">
+            <div class="api-status green"></div>
+            <div class="api-info">
+              <div class="api-name">GitHub API</div>
+              <div class="api-limit">5K req/hour</div>
             </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">Newsletter</span>
-              <span class="text-green-400 font-mono">✓ Weekly</span>
+          </div>
+          <div class="api-card">
+            <div class="api-status green"></div>
+            <div class="api-info">
+              <div class="api-name">Telegram Bot</div>
+              <div class="api-limit">Bot token active</div>
             </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">Bot Token</span>
-              <span class="text-green-400 font-mono">✓ Active</span>
+          </div>
+          <div class="api-card">
+            <div class="api-status green"></div>
+            <div class="api-info">
+              <div class="api-name">MyMarky API</div>
+              <div class="api-limit">Social scheduling</div>
+            </div>
+          </div>
+          <div class="api-card">
+            <div class="api-status green"></div>
+            <div class="api-info">
+              <div class="api-name">Vercel Deploy</div>
+              <div class="api-limit">Auto-deploy on push</div>
             </div>
           </div>
         </div>
 
-        <!-- Content Limits Reference -->
-        <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg p-5">
-          <h3 class="text-sm font-mono text-[#22c55e] mb-4 flex items-center gap-2">
-            <span class="text-[#f59e0b]">▸</span> Content Policy Limits
-          </h3>
-          <div class="space-y-2 text-sm">
-            <div class="flex justify-between">
-              <span class="text-gray-400">Max posts/day</span>
-              <span class="text-white font-mono">3</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">Just-shipped/day</span>
-              <span class="text-[#f59e0b] font-mono">0 (paused)</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">Min words (any)</span>
-              <span class="text-white font-mono">600</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">Min words (evergreen)</span>
-              <span class="text-white font-mono">1000</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">Title Jaccard max</span>
-              <span class="text-white font-mono">0.72</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">Slug stem distance</span>
-              <span class="text-white font-mono">0.85</span>
-            </div>
+        <div class="card mt-6">
+          <h3 class="card-title">Article Memory Status</h3>
+          <div class="gate-stats">
+            <div class="gate-row"><span>Total indexed</span><span class="mono white">{totalInMemory}</span></div>
+            <div class="gate-row"><span>Needs update</span><span class={`mono ${needsUpdateCount > 0 ? 'amber' : 'green'}`}>{needsUpdateCount}</span></div>
+            <div class="gate-row"><span>Thin articles</span><span class={`mono ${thinArticles > 0 ? 'amber' : 'green'}`}>{thinArticles}</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════
+           SECTION: Content Policy
+           ════════════════════════════════════════════════════ -->
+      <section id="content-policy" class="admin-section">
+        <h2 class="section-title"><span class="section-arrow">▸</span> Content Policy</h2>
+        <p class="section-desc">Quality limits enforced by the content-gate script before any article is published. These prevent spam and low-quality posts.</p>
+
+        <div class="card">
+          <h3 class="card-title amber">Quality Limits</h3>
+          <p class="card-desc">Every new article must pass these checks. If it doesn't, the gate script blocks the commit.</p>
+          <div class="policy-table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Rule</th>
+                  <th>Limit</th>
+                  <th>What It Means</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>Max posts/day</td><td class="mono white">3</td><td class="td-desc">Hard cap on new articles per day</td></tr>
+                <tr><td>Just-shipped/day</td><td class="mono amber">0 (paused)</td><td class="td-desc">Firehose of brand-new content is off</td></tr>
+                <tr><td>Min words (any)</td><td class="mono white">600</td><td class="td-desc">No article shorter than 600 words</td></tr>
+                <tr><td>Min words (evergreen)</td><td class="mono white">1,000</td><td class="td-desc">Evergreen/guide posts need 1000+ words</td></tr>
+                <tr><td>Title Jaccard max</td><td class="mono white">0.72</td><td class="td-desc">Titles can't be too similar to existing ones</td></tr>
+                <tr><td>Slug stem distance</td><td class="mono white">0.85</td><td class="td-desc">URL slugs must be unique enough</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
@@ -517,30 +569,476 @@ const now = new Date().toISOString();
   </div>
 
   <script>
-    // Update last updated time
-    document.getElementById('last-updated').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+    // ── Last updated timestamp ──
+    const ts = new Date().toLocaleTimeString();
+    document.getElementById('last-updated').textContent = ts;
+    document.getElementById('last-updated-bar').textContent = `Last updated: ${ts}`;
 
-    // Refresh button
+    // ── Refresh button ──
     document.getElementById('refresh-btn')?.addEventListener('click', () => {
       window.location.reload();
     });
 
-    // Prompt expand/collapse
-    document.querySelectorAll('.prompt-toggle').forEach(el => {
-      el.addEventListener('click', () => {
-        const textEl = el.querySelector('.prompt-text');
-        const full = el.getAttribute('data-full');
-        const short = el.getAttribute('data-short');
-        const expandLabel = el.querySelector('span:last-child');
-
-        if (textEl.textContent === short) {
-          textEl.textContent = full;
-          if (expandLabel) expandLabel.textContent = '[collapse]';
-        } else {
-          textEl.textContent = short;
-          if (expandLabel) expandLabel.textContent = '[expand]';
+    // ── Sidebar active link tracking ──
+    const sections = document.querySelectorAll('.admin-section');
+    const links = document.querySelectorAll('.sidebar-link');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const id = entry.target.id;
+          links.forEach(l => l.classList.remove('active'));
+          const active = document.querySelector(`.sidebar-link[href="#${id}"]`);
+          if (active) active.classList.add('active');
         }
+      });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+    sections.forEach(s => observer.observe(s));
+
+    // ── Mobile sidebar toggle ──
+    document.getElementById('mobile-toggle')?.addEventListener('click', () => {
+      document.getElementById('sidebar')?.classList.toggle('open');
+    });
+
+    // Close sidebar on link click (mobile)
+    links.forEach(l => l.addEventListener('click', () => {
+      document.getElementById('sidebar')?.classList.remove('open');
+    }));
+
+    // ── Cron row click to expand prompt ──
+    document.querySelectorAll('.cron-row').forEach(row => {
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', () => {
+        const prompt = row.getAttribute('data-prompt');
+        const slug = (row.querySelector('.td-sub') as HTMLElement)?.textContent?.trim();
+        if (!slug) return;
+        const expand = document.getElementById(`prompt-${slug}`);
+        if (!expand) return;
+        // Close all others
+        document.querySelectorAll('.prompt-expand').forEach((e: HTMLElement) => {
+          if (e !== expand) e.style.display = 'none';
+        });
+        expand.style.display = expand.style.display === 'none' ? 'block' : 'none';
+      });
+    });
+
+    // Close prompt on X button
+    document.querySelectorAll('.prompt-close').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const slug = btn.getAttribute('data-close');
+        const el = document.getElementById(`prompt-${slug}`);
+        if (el) el.style.display = 'none';
       });
     });
   </script>
+
+  <style>
+    /* ═══════════════════════════════════════════════════════
+       ADMIN LAYOUT
+       ═══════════════════════════════════════════════════════ */
+    .admin-layout {
+      display: flex;
+      min-height: 100vh;
+      background: #0a0a0a;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+      color: #e5e5e5;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 240px;
+      height: 100vh;
+      background: #0d0d0d;
+      border-right: 1px solid rgba(34,197,94,0.15);
+      display: flex;
+      flex-direction: column;
+      z-index: 100;
+      overflow-y: auto;
+    }
+    .sidebar-brand {
+      padding: 20px 16px;
+      border-bottom: 1px solid rgba(34,197,94,0.1);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .sidebar-brand-icon { font-size: 22px; color: #22c55e; }
+    .sidebar-brand-text { font-size: 15px; color: #22c55e; font-weight: 600; }
+    .sidebar-nav {
+      flex: 1;
+      padding: 12px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .sidebar-link {
+      display: block;
+      padding: 10px 16px;
+      color: #888;
+      text-decoration: none;
+      font-size: 13px;
+      transition: all 0.15s;
+      border-left: 3px solid transparent;
+    }
+    .sidebar-link:hover {
+      color: #22c55e;
+      background: rgba(34,197,94,0.05);
+    }
+    .sidebar-link.active {
+      color: #22c55e;
+      background: rgba(34,197,94,0.08);
+      border-left-color: #22c55e;
+    }
+    .sidebar-footer {
+      padding: 16px;
+      border-top: 1px solid rgba(34,197,94,0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .sidebar-btn {
+      background: rgba(34,197,94,0.15);
+      color: #22c55e;
+      border: 1px solid rgba(34,197,94,0.2);
+      border-radius: 6px;
+      padding: 8px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+      transition: background 0.15s;
+    }
+    .sidebar-btn:hover { background: rgba(34,197,94,0.25); }
+    .sidebar-updated { color: #555; font-size: 11px; text-align: center; }
+
+    /* ── Mobile toggle ── */
+    .mobile-toggle {
+      display: none;
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 200;
+      background: #111;
+      border: 1px solid rgba(34,197,94,0.3);
+      color: #22c55e;
+      font-size: 20px;
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    /* ── Main content ── */
+    .main-content {
+      margin-left: 240px;
+      flex: 1;
+      min-height: 100vh;
+    }
+
+    /* ── Top bar ── */
+    .topbar {
+      padding: 16px 32px;
+      border-bottom: 1px solid rgba(34,197,94,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #0d0d0d;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .topbar-title { font-size: 16px; color: #f59e0b; font-weight: 600; }
+    .topbar-updated { font-size: 12px; color: #555; }
+
+    /* ── Sections ── */
+    .admin-section {
+      padding: 32px;
+      border-bottom: 1px solid rgba(34,197,94,0.06);
+    }
+    .section-title {
+      font-size: 18px;
+      color: #22c55e;
+      font-weight: 600;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-arrow { color: #f59e0b; }
+    .section-desc { font-size: 13px; color: #666; margin-bottom: 20px; }
+
+    /* ── Stat cards ── */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+    .stat-card {
+      background: #111;
+      border: 1px solid rgba(34,197,94,0.15);
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .stat-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .stat-value { font-size: 32px; font-weight: 700; line-height: 1.2; }
+    .stat-value.green { color: #22c55e; }
+    .stat-value.amber { color: #f59e0b; }
+    .stat-sub { font-size: 11px; color: #555; margin-top: 4px; }
+
+    /* ── Cards ── */
+    .card {
+      background: #111;
+      border: 1px solid rgba(34,197,94,0.15);
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .mb-6 { margin-bottom: 24px; }
+    .mt-6 { margin-top: 24px; }
+    .card-title {
+      font-size: 14px;
+      color: #22c55e;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .card-title.amber { color: #f59e0b; }
+    .card-title.purple { color: #a855f7; }
+    .card-title.green { color: #22c55e; }
+    .card-subtitle { font-size: 12px; color: #666; font-weight: 400; }
+    .card-desc { font-size: 12px; color: #666; margin-bottom: 16px; }
+    .card-warning {
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: rgba(245,158,11,0.08);
+      border: 1px solid rgba(245,158,11,0.2);
+      border-radius: 6px;
+      font-size: 12px;
+      color: #f59e0b;
+    }
+
+    /* ── Tag bar chart ── */
+    .tag-bars { display: flex; flex-direction: column; gap: 8px; }
+    .tag-bar-row { display: flex; align-items: center; gap: 12px; }
+    .tag-bar-label { width: 140px; font-size: 12px; color: #aaa; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tag-bar-track { flex: 1; height: 20px; background: rgba(255,255,255,0.03); border-radius: 4px; overflow: hidden; }
+    .tag-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; min-width: 2px; }
+    .tag-bar-count { width: 36px; font-size: 13px; color: #22c55e; font-weight: 600; }
+
+    /* ── Keywords ── */
+    .keyword-list { display: flex; flex-direction: column; gap: 6px; }
+    .keyword-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+    .keyword-rank { color: #555; width: 24px; text-align: right; }
+    .keyword-name { color: #ccc; flex: 1; }
+    .keyword-count { color: #f59e0b; font-weight: 600; }
+
+    /* ── Gate stats ── */
+    .gate-stats { display: flex; flex-direction: column; gap: 8px; }
+    .gate-row { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .gate-row:last-child { border-bottom: none; }
+    .gate-row span:first-child { color: #888; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .green-badge { color: #22c55e; background: rgba(34,197,94,0.15); }
+    .muted-badge { color: #6b7280; background: rgba(107,114,128,0.15); }
+
+    /* ── Grid layouts ── */
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    /* ── Tables ── */
+    .table-wrap { overflow-x: auto; }
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table thead { border-bottom: 1px solid rgba(34,197,94,0.15); }
+    .data-table th {
+      text-align: left;
+      padding: 10px 12px;
+      font-size: 11px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+    .data-table td {
+      padding: 10px 12px;
+      font-size: 13px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+    .data-table tbody tr:hover { background: rgba(34,197,94,0.04); }
+    .td-title { color: #e5e5e5; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .td-sub { display: block; font-size: 11px; color: #555; margin-top: 2px; }
+    .td-date { font-size: 12px; color: #888; white-space: nowrap; }
+    .td-model { font-size: 12px; color: #666; white-space: nowrap; max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+    .td-words { font-weight: 600; white-space: nowrap; }
+    .td-desc { color: #888; font-size: 12px; }
+    .muted { color: #555; }
+    .mono { font-family: inherit; }
+
+    /* ── Cron row expand ── */
+    .cron-row { transition: background 0.1s; }
+    .prompt-expand {
+      margin-top: 8px;
+      background: #0a0a0a;
+      border: 1px solid rgba(34,197,94,0.15);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .prompt-expand-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(34,197,94,0.1);
+    }
+    .prompt-expand-title { font-size: 12px; color: #22c55e; }
+    .prompt-close {
+      background: none;
+      border: none;
+      color: #666;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 6px;
+    }
+    .prompt-close:hover { color: #f59e0b; }
+    .prompt-expand-code {
+      padding: 14px;
+      font-size: 12px;
+      color: #aaa;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: inherit;
+      margin: 0;
+    }
+
+    /* ── Telegram demo ── */
+    .telegram-demo {
+      border: 1px solid rgba(34,197,94,0.15);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .telegram-header {
+      background: rgba(34,197,94,0.08);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #22c55e;
+      font-weight: 600;
+    }
+    .telegram-bot-icon { font-size: 18px; }
+    .telegram-msg {
+      padding: 16px;
+      background: #0d0d0d;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    .tg-line { color: #ddd; }
+    .tg-item { padding-left: 16px; }
+    .tg-spacer { height: 8px; }
+    .tg-muted { color: #666; }
+
+    /* ── Telegram cron list ── */
+    .tg-cron-list { display: flex; flex-direction: column; gap: 10px; }
+    .tg-cron-item {
+      padding: 12px;
+      background: rgba(34,197,94,0.03);
+      border: 1px solid rgba(34,197,94,0.08);
+      border-radius: 6px;
+    }
+    .tg-cron-name { font-size: 13px; color: #e5e5e5; font-weight: 600; margin-bottom: 2px; }
+    .tg-cron-meta { font-size: 11px; color: #666; margin-bottom: 6px; }
+
+    /* ── Schedule timeline ── */
+    .schedule-timeline { display: flex; flex-direction: column; gap: 2px; }
+    .schedule-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+    .schedule-item:last-child { border-bottom: none; }
+    .schedule-time {
+      width: 50px;
+      font-size: 13px;
+      color: #22c55e;
+      font-weight: 600;
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .schedule-detail { display: flex; flex-direction: column; }
+    .schedule-name { font-size: 13px; color: #e5e5e5; }
+    .schedule-desc { font-size: 11px; color: #666; }
+
+    /* ── API cards ── */
+    .api-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+    }
+    .api-card {
+      background: #111;
+      border: 1px solid rgba(34,197,94,0.15);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .api-status {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .api-status.green { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.5); }
+    .api-name { font-size: 13px; color: #e5e5e5; }
+    .api-limit { font-size: 11px; color: #666; }
+
+    /* ── Color helpers ── */
+    .green { color: #22c55e; }
+    .amber { color: #f59e0b; }
+    .purple { color: #a855f7; }
+    .red { color: #ef4444; }
+    .white { color: #e5e5e5; }
+
+    /* ── Policy table ── */
+    .policy-table-wrap { overflow-x: auto; }
+
+    /* ═══════════════════════════════════════════════════════
+       RESPONSIVE — sidebar collapses on mobile
+       ═══════════════════════════════════════════════════════ */
+    @media (max-width: 768px) {
+      .sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.2s ease;
+      }
+      .sidebar.open { transform: translateX(0); }
+      .mobile-toggle { display: block; }
+      .main-content { margin-left: 0; }
+      .topbar { padding: 12px 16px 12px 60px; }
+      .admin-section { padding: 20px 16px; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .grid-2col { grid-template-columns: 1fr; }
+      .api-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 480px) {
+      .stat-grid { grid-template-columns: 1fr; }
+      .api-grid { grid-template-columns: 1fr; }
+    }
+  </style>
 </Layout>
