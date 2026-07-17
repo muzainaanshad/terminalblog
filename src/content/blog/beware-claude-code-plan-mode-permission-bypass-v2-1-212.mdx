@@ -1,0 +1,69 @@
+---
+title: "Beware: Claude Code v2.1.212 Quietly Patched a Plan-Mode Hole That Ran touch and rm With No Prompt"
+description: "Claude Code v2.1.212 (July 17, 2026) fixed a plan-mode bug where file-modifying Bash commands like touch and rm executed without a permission prompt — a fail-open gap that had been shipping for releases. Here is what changed, who was exposed, and how to verify your install."
+pubDate: "2026-07-17T12:00:00Z"
+updatedDate: "2026-07-17T12:00:00Z"
+tags: ["security", "beware", "claude-code", "permissions", "plan-mode", "patching"]
+tool: "claude-code"
+author: "kira_bug_hunter"
+image: "/api/og?title=Beware:%20Plan%20Mode%20Ran%20touch%20and%20rm%20Silently&tool=Claude%20Code"
+---
+
+You plan. You think the model is only *proposing* changes. Then it runs `rm` — and you never saw the prompt.
+
+That is the gap Claude Code **v2.1.212**, shipped July 17, 2026, quietly closed. Tucked into the release notes under "What's changed" is this line:
+
+> Fixed plan mode auto-running file-modifying Bash commands (e.g. `touch`, `rm`) without a permission prompt or SDK `canUseTool` callback.
+
+No CVE. No advisory. No loud "security update" banner. Just a one-liner in a routine release. But for anyone who runs Claude Code in plan mode — which is the *recommended* default for safe, review-before-act workflows — this is one of the more important fixes to land in recent weeks, because it inverts the core promise of plan mode.
+
+## The promise of plan mode
+
+Plan mode is supposed to be the safe room. You tell the agent to figure out an approach, it sketches a diff, and **nothing on disk changes until you approve.** The whole point is that file mutations require an explicit go-ahead — either an interactive permission prompt or, in headless/SDK use, a `canUseTool` callback you control.
+
+That contract is what lets teams point Claude Code at a real repo, switch to plan mode, and walk away from the keyboard without fear of a stray `rm -rf` mid-reasoning.
+
+## What was actually happening
+
+According to the v2.1.212 release notes, plan mode was **auto-running file-modifying Bash commands** — the notes name `touch` and `rm` explicitly — *without* raising a permission prompt and *without* firing the SDK `canUseTool` callback.
+
+Translate that:
+
+- In interactive use, commands that should have stopped and asked you ("Allow Bash: `rm tmp/x`?") instead executed silently.
+- In SDK/headless use, commands that should have been gated by your `canUseTool` handler instead bypassed it.
+
+`touch` sounds harmless until you realize it can create files, clobber timestamps, and prepare state the agent later acts on. `rm` needs no elaboration. The changelog only names two commands as examples — the wording ("e.g.") implies the class of affected commands is broader, and that the fix is about the *gating path*, not a per-command blocklist.
+
+This is a classic **fail-open** bug. The safe default (ask first) was not applied, and the failure was silent — no error, no log line you would have noticed, no prompt you could have declined.
+
+## Who was exposed
+
+- **Anyone on Claude Code v2.1.211 or earlier** who used plan mode with Bash access enabled. Releases 2.1.209 through 2.1.211 are the immediately preceding versions and all predate the fix.
+- **SDK/automation operators** who relied on `canUseTool` to enforce policy in plan mode. If your guardrail was "reject any destructive Bash in plan mode," it was being skipped.
+- **Teams that ship Claude Code inside CI or agent pipelines** where plan mode is used as a sandboxing layer. The bypass undermines the sandbox assumption.
+
+Notably, this matters most for the people doing everything *right*: using plan mode precisely because they wanted a non-destructive review step. The bug turned the safety feature into a blind spot.
+
+## How to confirm you're patched
+
+1. Update to **v2.1.212 or later**:
+   ```bash
+   claude --version   # should report 2.1.212+
+   npm i -g @anthropic-ai/claude-code@latest
+   ```
+2. In plan mode, ask Claude to run a file-modifying command like `touch /tmp/cc-plan-test`. You should now see a permission prompt (or an SDK `canUseTool` call) — **not** a silent execution.
+3. If you run headless, assert in your `canUseTool` handler that plan-mode Bash requests are intercepted and logged, and add a test that fails if they are not.
+
+## Why "no advisory" is the real story
+
+The fact that this shipped as an ordinary changelog line is the angle worth holding onto. Permission-bypass fixes in an agent that can execute shell commands are **materially different** from a UI tweak, yet they get the same release treatment as "fixed Ctrl+J inserting a newline." If you only read the headline version bumps, you will miss the fixes that actually move your risk posture.
+
+This is the third time in recent weeks a Claude Code permission/safety boundary has warranted a Beware. The earlier ones are worth reading together:
+
+- [Beware: Claude Code's permissions.deny Silently Fails on Absolute Paths](/blog/beware-claude-code-permissions-deny-absolute-path/) — your credential guard may be a no-op.
+- [Beware: Claude Code's disallowedTools Don't Reach Subagents](/blog/beware-claude-code-disallowedtools-not-inherited-by-subagents/) — your deny list is parent-only.
+- [Beware: Claude Code's Background Tasks Can SIGKILL Mid-Write and Corrupt Git](/blog/beware-claude-code-background-task-sigkill-git-corruption/) — long-running task hazards.
+
+## Takeaway
+
+Update to v2.1.212 today if you use plan mode at all. And stop treating "patch notes" as noise: for a shell-executing agent, a one-line "fixed auto-running Bash" entry is a security bulletin in disguise. Read every release's "Fixed" section, and build your own regression test for the permission boundaries you depend on — because the gap was shipping silently, and the next one might be too.
