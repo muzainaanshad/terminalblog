@@ -1,6 +1,8 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { checkAuth } from '../../middleware/auth';
+import fs from 'node:fs';
+import path from 'node:path';
 
 export const prerender = false;
 
@@ -9,10 +11,142 @@ const isAuth = await checkAuth(Astro.request);
 if (!isAuth) {
   return Astro.redirect('/admin/login');
 }
+
+// ── Helpers ──────────────────────────────────────────────
+const ROOT = path.resolve(process.cwd());
+function safeJson(rel: string): any {
+  try { return JSON.parse(fs.readFileSync(path.join(ROOT, rel), 'utf-8')); } catch { return null; }
+}
+function countMdx(dir: string): number {
+  try { return fs.readdirSync(dir).filter(f => f.endsWith('.mdx')).length; } catch { return 0; }
+}
+function parseFrontmatter(content: string) {
+  const fm: Record<string, string> = {};
+  const lines = content.split('\n');
+  let inFm = false;
+  for (const line of lines) {
+    if (line.trim() === '---') { if (inFm) break; inFm = true; continue; }
+    if (inFm) {
+      const idx = line.indexOf(':');
+      if (idx > -1) fm[line.slice(0, idx).trim()] = line.slice(idx + 1).trim().replace(/^["']|["']$/g, '');
+    }
+  }
+  return fm;
+}
+function wordCount(content: string): number {
+  // Skip frontmatter
+  const body = content.replace(/^---[\s\S]*?---/, '').trim();
+  return body.split(/\s+/).filter(Boolean).length;
+}
+
+// ── 1. Article Memory ───────────────────────────────────
+const mem = safeJson('src/data/article-memory.json');
+const memArticles: Record<string, any> = mem?.articles ?? {};
+
+// Parse tags into types (handling malformed JSON arrays)
+function extractTypes(articles: Record<string, any>): Record<string, number> {
+  const types: Record<string, number> = {};
+  for (const [, v] of Object.entries(articles)) {
+    const rawTags: string[] = v.tags ?? [];
+    for (const t of rawTags) {
+      const clean = t.replace(/[\[\]"\\]/g, '').trim();
+      if (clean) types[clean] = (types[clean] || 0) + 1;
+    }
+  }
+  return types;
+}
+function extractTopics(articles: Record<string, any>): Record<string, number> {
+  const topics: Record<string, number> = {};
+  for (const [, v] of Object.entries(articles)) {
+    const kws: string[] = v.keywords ?? [];
+    for (const k of kws) {
+      const clean = k.replace(/[\[\]"\\]/g, '').trim().toLowerCase();
+      if (clean && clean.length > 2) topics[clean] = (topics[clean] || 0) + 1;
+    }
+  }
+  return topics;
+}
+const articleTypes = extractTypes(memArticles);
+const topicsMap = extractTopics(memArticles);
+const topTopics = Object.entries(topicsMap).sort((a, b) => b[1] - a[1]).slice(0, 10);
+const needsUpdateCount = Object.values(memArticles).filter((v: any) => v.needsUpdate).length;
+const totalInMemory = Object.keys(memArticles).length;
+
+// ── 2. Content Gate ─────────────────────────────────────
+const gate = safeJson('content-gate-report.json');
+const thinArticles = gate?.warnings ?? 0;
+const gateChecked = gate?.checked ?? 0;
+
+// ── 3. MDX files ────────────────────────────────────────
+const blogDir = path.join(ROOT, 'src', 'content', 'blog');
+const totalMdx = countMdx(blogDir);
+
+interface RecentArticle {
+  filename: string;
+  title: string;
+  date: string;
+  tool: string;
+  tags: string;
+  wordCount: number;
+  mtime: string;
+}
+let recentArticles: RecentArticle[] = [];
+try {
+  const files = fs.readdirSync(blogDir).filter(f => f.endsWith('.mdx'));
+  const withTime = files.map(f => ({
+    file: f,
+    mtime: fs.statSync(path.join(blogDir, f)).mtimeMs,
+  }));
+  withTime.sort((a, b) => b.mtime - a.mtime);
+  recentArticles = withTime.slice(0, 10).map(({ file, mtime }) => {
+    const content = fs.readFileSync(path.join(blogDir, file), 'utf-8');
+    const fm = parseFrontmatter(content);
+    return {
+      filename: file,
+      title: fm.title ?? file.replace(/\.mdx$/, ''),
+      date: fm.pubDate ?? fm.date ?? '',
+      tool: fm.tool ?? '',
+      tags: fm.tags ?? '',
+      wordCount: wordCount(content),
+      mtime: new Date(mtime).toISOString(),
+    };
+  });
+} catch {}
+
+// ── 4. Cron config (hardcoded from real workflow data) ──
+const crons = [
+  { name: 'Content Refresh Queue', slug: 'content-refresh', schedule: '0 5 * * 3 (Wed 05:00 UTC)', category: 'content', status: 'active', model: 'anthropic/claude-sonnet-4', prompt: 'Refresh evergreen articles flagged for update. Read article-memory.json for needsUpdate=true entries, pick the top-priority ones, rewrite with fresh data and examples. Gate-check each output before saving.', lastRun: '2026-07-16T05:00:00Z', nextRun: '2026-07-23T05:00:00Z' },
+  { name: 'Daily Summary', slug: 'daily-summary', schedule: '0 3 * * * (Daily 06:00 AST)', category: 'ops', status: 'active', model: 'anthropic/claude-sonnet-4', prompt: 'Compile daily summary of all cron runs, article publications, and site metrics. Send formatted report to Telegram in Articles Management format.', lastRun: '2026-07-17T03:00:00Z', nextRun: '2026-07-18T03:00:00Z' },
+  { name: 'Leaderboard Snapshot', slug: 'leaderboard-snapshot', schedule: '0 12 * * * (Daily 12:00 UTC)', category: 'monitoring', status: 'active', model: 'none', prompt: 'Take daily adoption leaderboard snapshot. Fetch current star counts, contributor stats, and trending repos. Save historical data for trend analysis.', lastRun: '2026-07-17T12:00:00Z', nextRun: '2026-07-18T12:00:00Z' },
+  { name: 'Ops Digest', slug: 'ops-digest', schedule: '0 13 * * * (Daily 13:00 UTC)', category: 'ops', status: 'active', model: 'anthropic/claude-sonnet-4', prompt: 'Generate Telegram ops digest in Articles Management format. Summarize: new articles published, updates made, cron successes/failures, site health status. Include action items if any.', lastRun: '2026-07-17T13:00:00Z', nextRun: '2026-07-18T13:00:00Z' },
+  { name: 'SEO Learn', slug: 'seo-learn', schedule: '0 6 * * 1 (Mon 06:00 UTC)', category: 'seo', status: 'active', model: 'anthropic/claude-sonnet-4', prompt: 'Weekly SEO learnings report. Analyze Search Console data, identify top-performing queries, click-through patterns, and pages needing optimization. Generate actionable recommendations.', lastRun: '2026-07-14T06:00:00Z', nextRun: '2026-07-21T06:00:00Z' },
+  { name: 'Site Health', slug: 'site-health', schedule: '0 */6 * * * (Every 6 hours)', category: 'monitoring', status: 'active', model: 'none', prompt: 'Run automated site health checks: verify all published URLs return 200, check for broken internal links, validate RSS feed, test OG images, and confirm sitemap freshness.', lastRun: '2026-07-17T12:00:00Z', nextRun: '2026-07-17T18:00:00Z' },
+  { name: 'Weekly Newsletter', slug: 'weekly-newsletter', schedule: '0 14 * * 1 (Mon 14:00 UTC)', category: 'content', status: 'active', model: 'anthropic/claude-sonnet-4', prompt: 'Compile weekly Coding Agent digest for Beehiiv newsletter. Pick top 5-7 articles from the week, write editorial intro, format for email delivery. Send via Beehiiv API.', lastRun: '2026-07-14T14:00:00Z', nextRun: '2026-07-21T14:00:00Z' },
+  { name: 'Deploy Notify', slug: 'deploy-notify', schedule: 'on push (Vercel auto)', category: 'ops', status: 'muted', model: 'none', prompt: 'MUTED — Deploy notifications disabled per user request. Vercel handles deployment via Git integration. No Telegram ping on deploy.', lastRun: '2026-07-17T00:00:00Z', nextRun: '—' },
+];
+
+const categoryColors: Record<string, string> = {
+  content: 'bg-[#22c55e]/20 text-[#22c55e]',
+  seo: 'bg-blue-500/20 text-blue-400',
+  social: 'bg-[#f59e0b]/20 text-[#f59e0b]',
+  ops: 'bg-purple-500/20 text-purple-400',
+  monitoring: 'bg-cyan-500/20 text-cyan-400',
+};
+const statusColors: Record<string, string> = {
+  active: 'bg-green-500/20 text-green-400',
+  paused: 'bg-yellow-500/20 text-yellow-400',
+  muted: 'bg-gray-500/20 text-gray-400',
+  error: 'bg-red-500/20 text-red-400',
+};
+
+// ── 5. Build data objects for template ───────────────────
+const activeCrons = crons.filter(c => c.status === 'active').length;
+const pausedCrons = crons.filter(c => c.status !== 'active').length;
+const now = new Date().toISOString();
 ---
 
 <Layout title="Admin Dashboard - terminalblog">
-  <div class="min-h-screen bg-[#0a0a0a]">
+  <div class="min-h-screen bg-[#0a0a0a] font-mono">
     <!-- Header -->
     <header class="bg-[#111] border-b border-[#22c55e]/20 p-4">
       <div class="max-w-7xl mx-auto flex items-center justify-between">
@@ -22,10 +156,10 @@ if (!isAuth) {
           <span class="text-[#f59e0b] text-sm">Admin Dashboard</span>
         </div>
         <div class="flex items-center space-x-4">
-          <button id="refresh-btn" class="px-4 py-2 bg-[#22c55e]/20 text-[#22c55e] rounded hover:bg-[#22c55e]/30 font-mono text-sm">
+          <button id="refresh-btn" class="px-4 py-2 bg-[#22c55e]/20 text-[#22c55e] rounded hover:bg-[#22c55e]/30 font-mono text-sm transition">
             ↻ Refresh
           </button>
-          <a href="/admin/flow" class="px-4 py-2 bg-[#f59e0b]/20 text-[#f59e0b] rounded hover:bg-[#f59e0b]/30 font-mono text-sm">
+          <a href="/admin/flow" class="px-4 py-2 bg-[#f59e0b]/20 text-[#f59e0b] rounded hover:bg-[#f59e0b]/30 font-mono text-sm transition">
             📊 View Flow
           </a>
           <span class="text-gray-500 text-sm" id="last-updated">Last updated: --</span>
@@ -33,422 +167,380 @@ if (!isAuth) {
       </div>
     </header>
 
-    <main class="max-w-7xl mx-auto p-6">
-      <!-- Stats Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg p-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-gray-500 text-sm">Active Crons</p>
-              <p class="text-3xl font-mono text-[#22c55e]" id="active-count">15</p>
-            </div>
-            <span class="text-2xl">✅</span>
+    <main class="max-w-7xl mx-auto p-6 space-y-8">
+
+      <!-- ════════════════════════════════════════════════════
+           SECTION 1: Stats Overview
+           ════════════════════════════════════════════════════ -->
+      <section>
+        <h2 class="text-lg font-mono text-[#22c55e] mb-4 flex items-center gap-2">
+          <span class="text-[#f59e0b]">▸</span> Overview
+        </h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg p-4">
+            <p class="text-gray-500 text-xs">Total Articles</p>
+            <p class="text-3xl font-mono text-[#22c55e]">{totalMdx}</p>
+            <p class="text-gray-600 text-xs">.mdx files</p>
+          </div>
+          <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg p-4">
+            <p class="text-gray-500 text-xs">Indexed</p>
+            <p class="text-3xl font-mono text-[#22c55e]">{totalInMemory}</p>
+            <p class="text-gray-600 text-xs">in memory</p>
+          </div>
+          <div class="bg-[#111] border border-[#f59e0b]/20 rounded-lg p-4">
+            <p class="text-gray-500 text-xs">Needs Update</p>
+            <p class="text-3xl font-mono text-[#f59e0b]">{needsUpdateCount}</p>
+            <p class="text-gray-600 text-xs">stale articles</p>
+          </div>
+          <div class="bg-[#111] border border-red-500/20 rounded-lg p-4">
+            <p class="text-gray-500 text-xs">Thin Articles</p>
+            <p class="text-3xl font-mono text-red-500">{thinArticles}</p>
+            <p class="text-gray-600 text-xs">below word floor</p>
+          </div>
+          <div class="bg-[#111] border border-green-500/20 rounded-lg p-4">
+            <p class="text-gray-500 text-xs">Active Crons</p>
+            <p class="text-3xl font-mono text-green-400">{activeCrons}</p>
+            <p class="text-gray-600 text-xs">running</p>
+          </div>
+          <div class="bg-[#111] border border-gray-500/20 rounded-lg p-4">
+            <p class="text-gray-500 text-xs">Paused</p>
+            <p class="text-3xl font-mono text-gray-400">{pausedCrons}</p>
+            <p class="text-gray-600 text-xs">off / muted</p>
           </div>
         </div>
-        <div class="bg-[#111] border border-[#f59e0b]/20 rounded-lg p-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-gray-500 text-sm">Paused</p>
-              <p class="text-3xl font-mono text-[#f59e0b]" id="paused-count">2</p>
-            </div>
-            <span class="text-2xl">⏸️</span>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════
+           SECTION 2: Article Breakdown
+           ════════════════════════════════════════════════════ -->
+      <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- By Type -->
+        <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg p-5">
+          <h3 class="text-sm font-mono text-[#22c55e] mb-4 flex items-center gap-2">
+            <span class="text-[#f59e0b]">▸</span> Articles by Tag
+          </h3>
+          <div class="space-y-2 max-h-72 overflow-y-auto pr-2" id="type-list">
+            {Object.entries(articleTypes).sort((a, b) => b[1] - a[1]).slice(0, 20).map(([type, count]) => (
+              <div class="flex justify-between items-center text-sm">
+                <span class="text-gray-400 truncate mr-2">{type}</span>
+                <span class="text-[#22c55e] font-mono whitespace-nowrap">{count}</span>
+              </div>
+            ))}
           </div>
         </div>
-        <div class="bg-[#111] border border-red-500/20 rounded-lg p-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-gray-500 text-sm">Errors</p>
-              <p class="text-3xl font-mono text-red-500" id="error-count">0</p>
-            </div>
-            <span class="text-2xl">❌</span>
-          </div>
-        </div>
-        <div class="bg-[#111] border border-blue-500/20 rounded-lg p-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-gray-500 text-sm">Today's Runs</p>
-              <p class="text-3xl font-mono text-blue-500" id="runs-count">12</p>
-            </div>
-            <span class="text-2xl">📊</span>
-          </div>
-        </div>
-      </div>
 
-      <!-- Crons Table -->
-      <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg overflow-hidden">
-        <div class="p-4 border-b border-[#22c55e]/20">
-          <h2 class="text-lg font-mono text-[#22c55e]">Automation Crons</h2>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="w-full">
-            <thead class="bg-[#0a0a0a]">
-              <tr>
-                <th class="px-6 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Name</th>
-                <th class="px-6 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Type</th>
-                <th class="px-6 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Schedule</th>
-                <th class="px-6 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Last Run</th>
-                <th class="px-6 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Status</th>
-                <th class="px-6 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="crons-table" class="divide-y divide-[#22c55e]/10">
-              <!-- Content Crons -->
-              <tr class="hover:bg-[#22c55e]/5">
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="text-sm font-mono text-white">Blog Article Generator</div>
-                  <div class="text-xs text-gray-500">blog-article-generator</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-[#22c55e]/20 text-[#22c55e] rounded">content</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">3 PM daily</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">2h ago</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-green-500/20 text-green-400 rounded">success</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                  <button class="text-[#22c55e] hover:text-[#22c55e]/80 mr-3">View</button>
-                  <button class="text-[#f59e0b] hover:text-[#f59e0b]/80 mr-3">Pause</button>
-                  <button class="text-red-500 hover:text-red-500/80">Disable</button>
-                </td>
-              </tr>
-              <tr class="hover:bg-[#22c55e]/5">
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="text-sm font-mono text-white">Article Quality Improver</div>
-                  <div class="text-xs text-gray-500">article-quality-improver</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-[#22c55e]/20 text-[#22c55e] rounded">content</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">4 AM daily</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">18h ago</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-green-500/20 text-green-400 rounded">success</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                  <button class="text-[#22c55e] hover:text-[#22c55e]/80 mr-3">View</button>
-                  <button class="text-[#f59e0b] hover:text-[#f59e0b]/80 mr-3">Pause</button>
-                  <button class="text-red-500 hover:text-red-500/80">Disable</button>
-                </td>
-              </tr>
-              <tr class="hover:bg-[#22c55e]/5">
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="text-sm font-mono text-white">GitHub Issues Watcher</div>
-                  <div class="text-xs text-gray-500">github-issues-watcher</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-[#22c55e]/20 text-[#22c55e] rounded">content</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">4 PM daily</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">1h ago</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-green-500/20 text-green-400 rounded">success</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                  <button class="text-[#22c55e] hover:text-[#22c55e]/80 mr-3">View</button>
-                  <button class="text-[#f59e0b] hover:text-[#f59e0b]/80 mr-3">Pause</button>
-                  <button class="text-red-500 hover:text-red-500/80">Disable</button>
-                </td>
-              </tr>
-              <tr class="hover:bg-[#22c55e]/5">
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="text-sm font-mono text-white">GitHub Commits Watcher</div>
-                  <div class="text-xs text-gray-500">github-commits-watcher</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-[#22c55e]/20 text-[#22c55e] rounded">content</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">Every 3h</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">3h ago</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-green-500/20 text-green-400 rounded">success</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                  <button class="text-[#22c55e] hover:text-[#22c55e]/80 mr-3">View</button>
-                  <button class="text-[#f59e0b] hover:text-[#f59e0b]/80 mr-3">Pause</button>
-                  <button class="text-red-500 hover:text-red-500/80">Disable</button>
-                </td>
-              </tr>
-              <tr class="hover:bg-[#22c55e]/5">
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="text-sm font-mono text-white">HN Deep Dive</div>
-                  <div class="text-xs text-gray-500">hn-discussions-deep-dive</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-[#22c55e]/20 text-[#22c55e] rounded">content</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">Sun 6 PM</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">--</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-yellow-500/20 text-yellow-400 rounded">paused</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                  <button class="text-[#22c55e] hover:text-[#22c55e]/80 mr-3">View</button>
-                  <button class="text-[#22c55e] hover:text-[#22c55e]/80 mr-3">Resume</button>
-                  <button class="text-red-500 hover:text-red-500/80">Disable</button>
-                </td>
-              </tr>
-
-              <!-- Social Crons -->
-              <tr class="hover:bg-[#22c55e]/5">
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="text-sm font-mono text-white">MyMarky Social Posts</div>
-                  <div class="text-xs text-gray-500">marky-social-daily</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-[#f59e0b]/20 text-[#f59e0b] rounded">social</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">8 AM daily</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">4h ago</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-green-500/20 text-green-400 rounded">success</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                  <button class="text-[#22c55e] hover:text-[#22c55e]/80 mr-3">View</button>
-                  <button class="text-[#f59e0b] hover:text-[#f59e0b]/80 mr-3">Pause</button>
-                  <button class="text-red-500 hover:text-red-500/80">Disable</button>
-                </td>
-              </tr>
-              <tr class="hover:bg-[#22c55e]/5">
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="text-sm font-mono text-white">Terminal Tool Tweets</div>
-                  <div class="text-xs text-gray-500">terminal-tool-tweets</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-[#f59e0b]/20 text-[#f59e0b] rounded">social</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">Mon/Wed/Fri 12 PM</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">--</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-blue-500/20 text-blue-400 rounded">scheduled</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                  <button class="text-[#22c55e] hover:text-[#22c55e]/80 mr-3">View</button>
-                  <button class="text-[#f59e0b] hover:text-[#f59e0b]/80 mr-3">Pause</button>
-                  <button class="text-red-500 hover:text-red-500/80">Disable</button>
-                </td>
-              </tr>
-
-              <!-- SEO Crons -->
-              <tr class="hover:bg-[#22c55e]/5">
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="text-sm font-mono text-white">SEO Autopilot</div>
-                  <div class="text-xs text-gray-500">seo-autopilot-daily</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-blue-500/20 text-blue-400 rounded">seo</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">6 AM daily</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">6h ago</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-green-500/20 text-green-400 rounded">success</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                  <button class="text-[#22c55e] hover:text-[#22c55e]/80 mr-3">View</button>
-                  <button class="text-[#f59e0b] hover:text-[#f59e0b]/80 mr-3">Pause</button>
-                  <button class="text-red-500 hover:text-red-500/80">Disable</button>
-                </td>
-              </tr>
-              <tr class="hover:bg-[#22c55e]/5">
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="text-sm font-mono text-white">SEO Weekly Monitor</div>
-                  <div class="text-xs text-gray-500">seo-weekly-monitor</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-blue-500/20 text-blue-400 rounded">seo</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">Mon 9 AM</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">--</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-green-500/20 text-green-400 rounded">success</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                  <button class="text-[#22c55e] hover:text-[#22c55e]/80 mr-3">View</button>
-                  <button class="text-[#f59e0b] hover:text-[#f59e0b]/80 mr-3">Pause</button>
-                  <button class="text-red-500 hover:text-red-500/80">Disable</button>
-                </td>
-              </tr>
-              <tr class="hover:bg-[#22c55e]/5">
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="text-sm font-mono text-white">Ping Search Engines</div>
-                  <div class="text-xs text-gray-500">ping-search-engines</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-blue-500/20 text-blue-400 rounded">seo</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">Every 6h</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">3h ago</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-green-500/20 text-green-400 rounded">success</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                  <button class="text-[#22c55e] hover:text-[#22c55e]/80 mr-3">View</button>
-                  <button class="text-[#f59e0b] hover:text-[#f59e0b]/80 mr-3">Pause</button>
-                  <button class="text-red-500 hover:text-red-500/80">Disable</button>
-                </td>
-              </tr>
-
-              <!-- Ops (GitHub Actions) -->
-              <tr class="hover:bg-[#22c55e]/5">
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="text-sm font-mono text-white">Ops Digest</div>
-                  <div class="text-xs text-gray-500">ops-digest.yml</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-purple-500/20 text-purple-400 rounded">ops</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">Daily 1 PM UTC</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">12h ago</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-green-500/20 text-green-400 rounded">success</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                  <button class="text-[#22c55e] hover:text-[#22c55e]/80 mr-3">View</button>
-                  <button class="text-[#f59e0b] hover:text-[#f59e0b]/80 mr-3">Pause</button>
-                  <button class="text-red-500 hover:text-red-500/80">Disable</button>
-                </td>
-              </tr>
-              <tr class="hover:bg-[#22c55e]/5">
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="text-sm font-mono text-white">Daily Summary</div>
-                  <div class="text-xs text-gray-500">daily-summary.yml</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-purple-500/20 text-purple-400 rounded">ops</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">Daily 6 AM</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">6h ago</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-green-500/20 text-green-400 rounded">success</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                  <button class="text-[#22c55e] hover:text-[#22c55e]/80 mr-3">View</button>
-                  <button class="text-[#f59e0b] hover:text-[#f59e0b]/80 mr-3">Pause</button>
-                  <button class="text-red-500 hover:text-red-500/80">Disable</button>
-                </td>
-              </tr>
-              <tr class="hover:bg-[#22c55e]/5">
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="text-sm font-mono text-white">Leaderboard Update</div>
-                  <div class="text-xs text-gray-500">leaderboard-update.yml</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-purple-500/20 text-purple-400 rounded">ops</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">Weekly</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">--</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-yellow-500/20 text-yellow-400 rounded">paused</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                  <button class="text-[#22c55e] hover:text-[#22c55e]/80 mr-3">View</button>
-                  <button class="text-[#22c55e] hover:text-[#22c55e]/80 mr-3">Resume</button>
-                  <button class="text-red-500 hover:text-red-500/80">Disable</button>
-                </td>
-              </tr>
-
-              <!-- Monitoring -->
-              <tr class="hover:bg-[#22c55e]/5">
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="text-sm font-mono text-white">Adoption Tracker</div>
-                  <div class="text-xs text-gray-500">adoption-tracker-daily</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-cyan-500/20 text-cyan-400 rounded">monitoring</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">2 AM daily</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">22h ago</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-green-500/20 text-green-400 rounded">success</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                  <button class="text-[#22c55e] hover:text-[#22c55e]/80 mr-3">View</button>
-                  <button class="text-[#f59e0b] hover:text-[#f59e0b]/80 mr-3">Pause</button>
-                  <button class="text-red-500 hover:text-red-500/80">Disable</button>
-                </td>
-              </tr>
-              <tr class="hover:bg-[#22c55e]/5">
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="text-sm font-mono text-white">Backlink Outreach</div>
-                  <div class="text-xs text-gray-500">backlink-outreach</div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-cyan-500/20 text-cyan-400 rounded">monitoring</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">10 AM daily</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">8h ago</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-mono bg-green-500/20 text-green-400 rounded">success</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                  <button class="text-[#22c55e] hover:text-[#22c55e]/80 mr-3">View</button>
-                  <button class="text-[#f59e0b] hover:text-[#f59e0b]/80 mr-3">Pause</button>
-                  <button class="text-red-500 hover:text-red-500/80">Disable</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Quick Actions -->
-      <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg p-4">
-          <h3 class="text-lg font-mono text-[#22c55e] mb-4">Quick Actions</h3>
+        <!-- Top Topics -->
+        <div class="bg-[#111] border border-[#f59e0b]/20 rounded-lg p-5">
+          <h3 class="text-sm font-mono text-[#f59e0b] mb-4 flex items-center gap-2">
+            <span class="text-[#f59e0b]">▸</span> Top 10 Keywords
+          </h3>
           <div class="space-y-2">
-            <button class="w-full px-4 py-2 bg-[#22c55e]/20 text-[#22c55e] rounded hover:bg-[#22c55e]/30 font-mono text-sm">
-              Run All Content Crons
+            {topTopics.map(([topic, count], i) => (
+              <div class="flex items-center text-sm gap-2">
+                <span class="text-gray-600 w-5 text-right">{i + 1}.</span>
+                <span class="text-gray-400 truncate">{topic}</span>
+                <span class="ml-auto text-[#f59e0b] font-mono">{count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <!-- Gate Report -->
+        <div class="bg-[#111] border border-purple-500/20 rounded-lg p-5">
+          <h3 class="text-sm font-mono text-purple-400 mb-4 flex items-center gap-2">
+            <span class="text-purple-400">▸</span> Content Gate Report
+          </h3>
+          <div class="space-y-3 text-sm">
+            <div class="flex justify-between">
+              <span class="text-gray-400">Articles checked</span>
+              <span class="text-white font-mono">{gateChecked}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">Errors</span>
+              <span class={`font-mono ${gate?.errors ? 'text-red-400' : 'text-green-400'}`}>{gate?.errors ?? 0}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">Warnings</span>
+              <span class={`font-mono ${thinArticles > 0 ? 'text-[#f59e0b]' : 'text-green-400'}`}>{thinArticles}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">Throttle hits</span>
+              <span class="text-[#f59e0b] font-mono">{gate?.throttle?.length ?? 0}</span>
+            </div>
+            <div class="border-t border-gray-800 pt-3 mt-3">
+              <p class="text-gray-500 text-xs mb-2">Daily caps</p>
+              {gate?.limits && (
+                <div class="space-y-1 text-xs">
+                  <div class="flex justify-between">
+                    <span class="text-gray-500">Max posts/day</span>
+                    <span class="text-gray-400">{gate.limits.maxPostsPerDay}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-500">Min words (any)</span>
+                    <span class="text-gray-400">{gate.limits.minAnyWords}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-500">Min words (evergreen)</span>
+                    <span class="text-gray-400">{gate.limits.minEvergreenWords}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════
+           SECTION 3: Cron Jobs
+           ════════════════════════════════════════════════════ -->
+      <section>
+        <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg overflow-hidden">
+          <div class="p-4 border-b border-[#22c55e]/20 flex items-center justify-between">
+            <h2 class="text-lg font-mono text-[#22c55e] flex items-center gap-2">
+              <span class="text-[#f59e0b]">▸</span> Automation Crons
+              <span class="text-gray-500 text-sm ml-2">({crons.length} total)</span>
+            </h2>
+            <span class="text-xs text-gray-600">⚡ GitHub Actions + Hermes</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-[#0a0a0a]">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Name</th>
+                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Category</th>
+                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Schedule</th>
+                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Status</th>
+                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Model</th>
+                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Prompt</th>
+                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Last Run</th>
+                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase tracking-wider">Next Run</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-[#22c55e]/10">
+                {crons.map((cron) => {
+                  const promptShort = cron.prompt.length > 200 ? cron.prompt.slice(0, 200) + '…' : cron.prompt;
+                  const catColor = categoryColors[cron.category] ?? 'bg-gray-500/20 text-gray-400';
+                  const statColor = statusColors[cron.status] ?? 'bg-gray-500/20 text-gray-400';
+                  return (
+                    <tr class="hover:bg-[#22c55e]/5">
+                      <td class="px-4 py-3">
+                        <div class="text-sm font-mono text-white">{cron.name}</div>
+                        <div class="text-xs text-gray-600">{cron.slug}</div>
+                      </td>
+                      <td class="px-4 py-3">
+                        <span class={`px-2 py-1 text-xs font-mono rounded ${catColor}`}>{cron.category}</span>
+                      </td>
+                      <td class="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{cron.schedule}</td>
+                      <td class="px-4 py-3">
+                        <span class={`px-2 py-1 text-xs font-mono rounded ${statColor}`}>{cron.status}</span>
+                      </td>
+                      <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap max-w-[120px] truncate" title={cron.model}>{cron.model}</td>
+                      <td class="px-4 py-3 max-w-xs">
+                        <div class="text-xs text-gray-400 cursor-pointer prompt-toggle" data-full={cron.prompt} data-short={promptShort}>
+                          <span class="prompt-text">{promptShort}</span>
+                          {cron.prompt.length > 200 && (
+                            <span class="text-[#22c55e] ml-1 hover:underline">[expand]</span>
+                          )}
+                        </div>
+                      </td>
+                      <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                        {cron.lastRun ? new Date(cron.lastRun).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                      </td>
+                      <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                        {cron.nextRun && cron.nextRun !== '—' ? new Date(cron.nextRun).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════
+           SECTION 4: Recent Articles
+           ════════════════════════════════════════════════════ -->
+      <section>
+        <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg overflow-hidden">
+          <div class="p-4 border-b border-[#22c55e]/20">
+            <h2 class="text-lg font-mono text-[#22c55e] flex items-center gap-2">
+              <span class="text-[#f59e0b]">▸</span> Recent Articles
+              <span class="text-gray-500 text-sm ml-2">(last 10 by edit time)</span>
+            </h2>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-[#0a0a0a]">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase">Title</th>
+                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase">Date</th>
+                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase">Words</th>
+                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase">Tool / Type</th>
+                  <th class="px-4 py-3 text-left text-xs font-mono text-gray-500 uppercase">Edited</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-[#22c55e]/10">
+                {recentArticles.map((a) => {
+                  const wordColor = a.wordCount < 600 ? 'text-[#f59e0b]' : a.wordCount < 1000 ? 'text-white' : 'text-[#22c55e]';
+                  const mtime = new Date(a.mtime);
+                  const timeAgo = (() => {
+                    const diff = Date.now() - mtime.getTime();
+                    const hrs = Math.floor(diff / 3600000);
+                    if (hrs < 1) return `${Math.floor(diff / 60000)}m ago`;
+                    if (hrs < 24) return `${hrs}h ago`;
+                    return `${Math.floor(hrs / 24)}d ago`;
+                  })();
+                  return (
+                    <tr class="hover:bg-[#22c55e]/5">
+                      <td class="px-4 py-3 text-sm text-white max-w-sm truncate" title={a.title}>{a.title}</td>
+                      <td class="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
+                        {a.date ? new Date(a.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                      </td>
+                      <td class="px-4 py-3 text-sm font-mono whitespace-nowrap">
+                        <span class={wordColor}>{a.wordCount.toLocaleString()}</span>
+                      </td>
+                      <td class="px-4 py-3 text-xs whitespace-nowrap">
+                        {a.tool ? <span class="px-2 py-0.5 bg-[#22c55e]/10 text-[#22c55e] rounded">{a.tool}</span> : <span class="text-gray-600">—</span>}
+                      </td>
+                      <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap" title={mtime.toISOString()}>
+                        {timeAgo}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════
+           SECTION 5: Quick Actions + System Status
+           ════════════════════════════════════════════════════ -->
+      <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Quick Actions -->
+        <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg p-5">
+          <h3 class="text-sm font-mono text-[#22c55e] mb-4 flex items-center gap-2">
+            <span class="text-[#f59e0b]">▸</span> Quick Actions
+            <span class="text-gray-600 text-xs font-normal">(visual only)</span>
+          </h3>
+          <div class="space-y-2">
+            <button class="w-full px-4 py-2 bg-[#22c55e]/20 text-[#22c55e] rounded hover:bg-[#22c55e]/30 font-mono text-sm transition text-left">
+              ⚡ Run All Content Crons
             </button>
-            <button class="w-full px-4 py-2 bg-[#f59e0b]/20 text-[#f59e0b] rounded hover:bg-[#f59e0b]/30 font-mono text-sm">
-              Generate Social Posts
+            <button class="w-full px-4 py-2 bg-[#f59e0b]/20 text-[#f59e0b] rounded hover:bg-[#f59e0b]/30 font-mono text-sm transition text-left">
+              🐦 Generate Social Posts
             </button>
-            <button class="w-full px-4 py-2 bg-blue-500/20 text-blue-400 rounded hover:bg-blue-500/30 font-mono text-sm">
-              Run SEO Check
+            <button class="w-full px-4 py-2 bg-blue-500/20 text-blue-400 rounded hover:bg-blue-500/30 font-mono text-sm transition text-left">
+              🔍 Run SEO Check
+            </button>
+            <button class="w-full px-4 py-2 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 font-mono text-sm transition text-left">
+              📧 Send Newsletter
+            </button>
+            <button class="w-full px-4 py-2 bg-red-500/20 text-red-400 rounded hover:bg-red-500/30 font-mono text-sm transition text-left">
+              🔄 Rebuild Index
             </button>
           </div>
         </div>
-        <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg p-4">
-          <h3 class="text-lg font-mono text-[#22c55e] mb-4">Recent Logs</h3>
-          <div class="space-y-2 text-sm font-mono">
-            <div class="text-green-400">✓ blog-article-generator completed</div>
-            <div class="text-green-400">✓ seo-autopilot-daily completed</div>
-            <div class="text-green-400">✓ marky-social-daily completed</div>
-            <div class="text-yellow-400">⚠ github-issues-watcher rate limited</div>
-            <div class="text-green-400">✓ ping-search-engines completed</div>
+
+        <!-- Recent Logs (placeholder) -->
+        <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg p-5">
+          <h3 class="text-sm font-mono text-[#22c55e] mb-4 flex items-center gap-2">
+            <span class="text-[#f59e0b]">▸</span> System Status
+          </h3>
+          <div class="space-y-3 text-sm">
+            <div class="flex justify-between">
+              <span class="text-gray-400">Site</span>
+              <span class="text-green-400 font-mono">✓ Vercel</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">GitHub Actions</span>
+              <span class="text-green-400 font-mono">✓ {crons.filter(c => c.status === 'active').length} active</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">Article Memory</span>
+              <span class="text-green-400 font-mono">✓ {totalInMemory} indexed</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">Content Gate</span>
+              <span class={`font-mono ${thinArticles > 0 ? 'text-[#f59e0b]' : 'text-green-400'}`}>
+                {thinArticles > 0 ? `⚠ ${thinArticles} warnings` : '✓ clean'}
+              </span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">Newsletter</span>
+              <span class="text-green-400 font-mono">✓ Weekly</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">Bot Token</span>
+              <span class="text-green-400 font-mono">✓ Active</span>
+            </div>
           </div>
         </div>
-        <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg p-4">
-          <h3 class="text-lg font-mono text-[#22c55e] mb-4">System Status</h3>
+
+        <!-- Content Limits Reference -->
+        <div class="bg-[#111] border border-[#22c55e]/20 rounded-lg p-5">
+          <h3 class="text-sm font-mono text-[#22c55e] mb-4 flex items-center gap-2">
+            <span class="text-[#f59e0b]">▸</span> Content Policy Limits
+          </h3>
           <div class="space-y-2 text-sm">
             <div class="flex justify-between">
-              <span class="text-gray-400">Bynara API</span>
-              <span class="text-green-400">✓ 5M tokens/day</span>
+              <span class="text-gray-400">Max posts/day</span>
+              <span class="text-white font-mono">3</span>
             </div>
             <div class="flex justify-between">
-              <span class="text-gray-400">GitHub API</span>
-              <span class="text-green-400">✓ 5000 req/hour</span>
+              <span class="text-gray-400">Just-shipped/day</span>
+              <span class="text-[#f59e0b] font-mono">0 (paused)</span>
             </div>
             <div class="flex justify-between">
-              <span class="text-gray-400">Telegram Bot</span>
-              <span class="text-green-400">✓ Active</span>
+              <span class="text-gray-400">Min words (any)</span>
+              <span class="text-white font-mono">600</span>
             </div>
             <div class="flex justify-between">
-              <span class="text-gray-400">MyMarky API</span>
-              <span class="text-green-400">✓ Active</span>
+              <span class="text-gray-400">Min words (evergreen)</span>
+              <span class="text-white font-mono">1000</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">Title Jaccard max</span>
+              <span class="text-white font-mono">0.72</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">Slug stem distance</span>
+              <span class="text-white font-mono">0.85</span>
             </div>
           </div>
         </div>
-      </div>
+      </section>
+
     </main>
   </div>
 
   <script>
     // Update last updated time
     document.getElementById('last-updated').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
-    
+
     // Refresh button
-    document.getElementById('refresh-btn').addEventListener('click', () => {
+    document.getElementById('refresh-btn')?.addEventListener('click', () => {
       window.location.reload();
+    });
+
+    // Prompt expand/collapse
+    document.querySelectorAll('.prompt-toggle').forEach(el => {
+      el.addEventListener('click', () => {
+        const textEl = el.querySelector('.prompt-text');
+        const full = el.getAttribute('data-full');
+        const short = el.getAttribute('data-short');
+        const expandLabel = el.querySelector('span:last-child');
+
+        if (textEl.textContent === short) {
+          textEl.textContent = full;
+          if (expandLabel) expandLabel.textContent = '[collapse]';
+        } else {
+          textEl.textContent = short;
+          if (expandLabel) expandLabel.textContent = '[expand]';
+        }
+      });
     });
   </script>
 </Layout>
