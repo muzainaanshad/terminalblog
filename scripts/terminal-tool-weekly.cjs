@@ -53,7 +53,7 @@ const TOOLS = [
     hook: 'stop paying',
     tweet: `Stop paying for download managers\n\nsurge is a blazing fast TUI download manager in your terminal\n\nMulti-connection. Pause/resume. Speed graphs. Background server mode\n\nFree. Open source. Replaced my browser downloads completely`,
     reply: `github.com/surge-metrics/surge\nGo · MIT\nBrowser extension for Chrome/Firefox\nHeadless mode for servers`,
-    image: null, // will use website screenshot
+    image: 'https://cdn.terminaltrove.com/m/b2166050-e185-43ef-91bf-b8d026e818d5.png',
   },
   {
     name: 'lazyenv',
@@ -63,7 +63,7 @@ const TOOLS = [
     hook: 'somebody built this',
     tweet: `Somebody built a TUI for managing .env files\n\nlazyenv — browse, compare, and edit multiple .env files side by side in your terminal\n\nNo more "which env var is in which file" headaches\n\nTwo panel layout. Inline editing. Diff view`,
     reply: `github.com/LazyVim/lazyenv\nRust · MIT\nSide-by-side diff\nFuzzy matching`,
-    image: null,
+    image: 'https://cdn.terminaltrove.com/m/f4ca6aaa-6f74-4a17-a461-e50197804c2f.gif',
   },
   {
     name: 'nless',
@@ -73,7 +73,7 @@ const TOOLS = [
     hook: 'free alternative',
     tweet: `Free alternative to Excel for your logs\n\nnless — pipe in anything, wrangle it into columns\n\nFilter, sort, aggregate, and visualize log data right in your terminal\n\nBuilt for people who paste logs into Excel and hate it`,
     reply: `github.com/allinurl/nless\nGo · MIT\nColumn mode · Filters\nJSON/CSV/regex support`,
-    image: null,
+    image: 'https://cdn.terminaltrove.com/m/3a86e848-a726-4e47-a45e-fe92392dbc20.png',
   },
   {
     name: 'gistui',
@@ -83,7 +83,7 @@ const TOOLS = [
     hook: 'why is nobody talking about this',
     tweet: `Why is nobody talking about this?\n\ngistui — a terminal UI for managing GitHub Gists\n\nBrowse, diff, upload, download, create, and pin gists without opening a browser tab\n\nWord-level diffs before syncing\n\nIf you live in Gists this is a game changer`,
     reply: `github.com/akunzai/gistui\nGo · MIT\nFile pairing · Word diffs\nCross-platform`,
-    image: null,
+    image: 'https://cdn.terminaltrove.com/m/00d4ae16-92cb-46cb-bf18-752ad75030a9.png',
   },
   {
     name: 'netwatch',
@@ -93,7 +93,7 @@ const TOOLS = [
     hook: 'the terminal tool i use every day',
     tweet: `The terminal tool I use every day for networking\n\nnetwatch — real time network diagnostics in your terminal\n\nSee connections, bandwidth, latency, and packet loss live\n\nNo more guessing why your API call is slow`,
     reply: `github.com/netwatch-dev/netwatch\nRust · MIT\nReal-time graphs\nInterface filtering`,
-    image: null,
+    image: 'https://cdn.terminaltrove.com/m/f58b2ef2-6911-49f9-b654-46cf1744c031.png',
   },
 ];
 
