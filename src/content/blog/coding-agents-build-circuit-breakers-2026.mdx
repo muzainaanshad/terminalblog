@@ -1,0 +1,67 @@
+---
+title: "The Week Coding Agents Learned to Pull Their Own Plug"
+description: "In one week Claude Code, OpenCode, and Codex each shipped a circuit breaker: caps on runaway loops, default-off nested subagents, and harder dangerous-command guards. Here's what that signals about where autonomous coding agents are heading."
+pubDate: "2026-07-17T12:00:00Z"
+updatedDate: "2026-07-17T12:00:00Z"
+tags: ["industry", "news", "claude-code", "opencode", "codex", "safety", "agent-runtime"]
+tool: "industry"
+author: "jax_opensrc"
+image: "/api/og?title=The%20Week%20Coding%20Agents%20Learned%20to%20Pull%20Their%20Own%20Plug&tool=Industry"
+---
+
+For years the headline feature of every coding agent was "more autonomous." Longer context, more tools, more subagents, more steps without asking. This past week the most telling releases went the other direction. Three of the agents we track — Claude Code, OpenCode, and Codex — each shipped a **circuit breaker**: a built-in limit that stops the agent from running itself into the ground.
+
+None of these are glamorous. None shipped with a marketing banner. But the pattern is the story.
+
+## What actually shipped
+
+**Claude Code v2.1.212** added two session-wide caps:
+
+- A limit on `WebSearch` calls per session (default 200, tunable via `CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION`).
+- A per-session cap on subagent spawns (default 200, override with `CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION`); `/clear` resets the budget.
+
+The stated purpose is to stop **runaway loops** — the agent that searches the same thing 4,000 times, or fans out into an ever-deepening tree of subagents until the context and the bill both explode.
+
+The same release also changed `/fork`. It used to launch an in-session subagent; now it copies your conversation into a **new background session** (its own row in `claude agents`) so you keep working. That is a subtle but important shift: instead of deeper nesting, Claude Code is pushing toward *sibling* sessions that are independently bounded.
+
+**OpenCode v1.18.2** stopped subagents from launching nested subagents by default, with a configurable `subagent_depth` limit when you actually need recursion. Same instinct: cap the depth before the tree becomes a trap.
+
+**Codex CLI v0.144.5** hardened its dangerous-command detection — more forced `rm` forms are caught, and rejected commands now come with clearer reasons. It is a smaller change, but it lives in the same family: the agent getting better at *refusing* before it *does*.
+
+## Why this is a trend, not a coincidence
+
+Three independent teams, three independent codebases, converging on the same idea within days. That does not happen by accident. It happens because everyone running these agents in production hit the same wall: **autonomy without a ceiling is a liability.**
+
+The failure mode is now well understood. An agent in a loop can:
+
+- Burn tokens and money searching the same dead end.
+- Spawn subagents that spawn subagents until the context window fragments and reasoning degrades.
+- Invoke a destructive command it should never have touched.
+
+We have written before about adjacent failure shapes — [how a sandbox can leak its own credentials to spawned commands](https://terminalblog.com/blog/beware-coding-agent-sandbox-leaks-own-credentials/) and [why Claude Code's subagent deny lists don't always inherit](https://terminalblog.com/blog/beware-claude-code-disallowedtools-not-inherited-by-subagents/). The new caps are the runtime-level complement to those guardrail stories: not "block this tool," but "stop the machine from thinking it has infinite budget."
+
+## What this signals about the future of coding agents
+
+Prediction: **the next competitive axis for coding agents is not capability, it is containment.**
+
+For the first 18 months of this category, the demo was "look how much it did without me." The next demo will be "look how it knew when to stop." We should expect:
+
+1. **Defaults flip from open to bounded.** Today the caps are defaults you can raise. Within a year, expect agents to ship with *strict* ceilings that you must explicitly opt out of, the way sandboxes went from opt-in to default.
+
+2. **Billing-aware agents.** A cap expressed in dollars, not just counts. "Stop this session before it costs more than $5" is a trivial extension of `CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION` and is almost certainly coming.
+
+3. **Sibling over nested.** Claude Code's `/fork`-to-background-session move is a hint. The industry is learning that a flat set of independent, bounded sessions is safer and easier to reason about than a deep tree of dependent ones. Expect more "spawn a peer" and less "spawn a child."
+
+4. **Explainable refusal.** Codex's "clearer rejection reasons" is the start of agents that tell you *why* they stopped, not just that they did. That auditability is what makes containment trustworthy enough to leave running unattended.
+
+## What you should do this week
+
+You do not have to wait for the future. You can adopt the circuit-breaker mindset today:
+
+- On Claude Code, set `CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION` and `CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION` in your environment now, even below 200, if you run long unattended sessions.
+- On OpenCode, decide explicitly whether you want `subagent_depth` at all, rather than inheriting the new default.
+- Treat every agent run as having a budget. If you cannot name the budget, you do not have one.
+
+And if you are choosing between agents, our [2026 decision guide](https://terminalblog.com/blog/best-coding-agents-2026-decision-guide/) now needs a new column: not "how much can it do," but "what stops it when it goes wrong." That column is quickly becoming the one that matters most.
+
+The agents are growing up. Part of growing up is learning you are not allowed to do literally everything, forever, for free.
