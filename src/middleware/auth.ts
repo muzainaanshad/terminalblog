@@ -19,7 +19,7 @@
 
 import type { MiddlewareHandler } from 'astro';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'terminalblog2026';
+const ADMIN_PASSWORD = 'Nopassword.123';
 
 export const checkAuth = async (request: Request): Promise<boolean> => {
   const cookie = request.headers.get('cookie') || '';

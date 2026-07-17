@@ -9,7 +9,9 @@
 
 import type { APIRoute } from 'astro';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'terminalblog2026';
+export const prerender = false;
+
+const ADMIN_PASSWORD = 'Nopassword.123';
 
 export const POST: APIRoute = async ({ request }) => {
   const body = await request.json();
