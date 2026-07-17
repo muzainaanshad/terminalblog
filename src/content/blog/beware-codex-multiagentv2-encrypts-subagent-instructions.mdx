@@ -1,0 +1,93 @@
+---
+title: "Beware: Codex MultiAgentV2 Encrypts What Your Parent Agent Told Its Subagents — And You Can't Read It Locally"
+description: "On GPT-5.6-Sol and Terra, Codex CLI 0.144.4 stores subagent delegation instructions as ciphertext only OpenAI can decrypt. You can see that a handoff happened, not what was delegated. Here's the blast radius and how to keep your workflows auditable."
+pubDate: "2026-07-17T05:00:00Z"
+tags: ["beware", "codex", "security", "subagents", "audit", "compliance"]
+tool: "codex"
+author: "kira"
+image: "/api/og?title=Beware+Codex+MultiAgentV2+Encrypts+Subagent+Instructions&tool=codex"
+---
+
+Here is a diagnostic scenario that used to be routine and is now, on certain Codex models, close to impossible. A multi-agent pipeline runs overnight. In the morning a file is gone that should not be, or a subagent produced wrong output, or the run died halfway through. You open the session log to answer the first question any operator asks: **what was the subagent actually told to do?**
+
+On GPT-5.6-Sol and GPT-5.6-Terra, as of Codex CLI 0.144.4 (shipped July 14, 2026), the answer is no longer in your log. The delegation instruction is ciphertext, and only OpenAI holds the key.
+
+This is not a leak, a crash, or a supply-chain trick. It is a deliberate protocol change that quietly removes local auditability from the most capable Codex models — and it lands under you by model selection, not by any flag you toggled.
+
+## What actually changed
+
+The component at the center is Codex's **MultiAgentV2** orchestration layer — the newer path that lets the runtime, rather than your declared config, decide how to split work across subagents. MultiAgentV2 governs three delegation message types:
+
+- `spawn_agent` — launches a subagent and hands it its first task
+- `send_message` — routes instructions to an already-running subagent
+- `followup_task` — assigns more work to one that is waiting
+
+Under the old design, when a parent model called any of those tools, the instruction text flowed through as a **readable argument** and was written to your local session history in plaintext. You could grep it, diff it, replay it.
+
+Under MultiAgentV2, the Responses API encrypts the `message` argument on OpenAI's infrastructure before it ever reaches your locally running Codex CLI. Codex receives only ciphertext, forwards ciphertext to the receiving subagent, and the Responses API decrypts it internally — on OpenAI's servers — at the moment it reaches the subagent model.
+
+The storage format shifted to match. Inside the `InterAgentCommunication` object, the plaintext `content` field is left as an empty string; the ciphertext goes into `encrypted_content`. That format persists through history, rollouts, trace reduction, **and** the OpenTelemetry export Codex pipes out — so there is no secondary local path to recover the plaintext. This behavior is documented in [GitHub Issue #28058](https://github.com/openai/codex/issues/28058), opened June 13 by Ignat Remizov, CTO at payment service Zolvat.
+
+Crucially, **this is not end-to-end encryption**. OpenAI's servers perform the decryption. What is removed is *your* ability to read the instruction — not OpenAI's.
+
+## The trap: it's tied to model choice, not a setting
+
+The most dangerous part of this change is how invisibly it activates. You do not enable encryption. You pick a model:
+
+| Model | Path | Delegation text |
+|-------|------|-----------------|
+| GPT-5.6-Sol | MultiAgentV2 (mandatory) | **Encrypted** — ciphertext only |
+| GPT-5.6-Terra | MultiAgentV2 (mandatory) | **Encrypted** — ciphertext only |
+| GPT-5.6-Luna | MultiAgentV1 | Plaintext, inspectable |
+
+A developer who switches from Luna to Sol or Terra to chase capability does not configure anything about auditability — the behavior changes under them. And because Codex CLI 0.144.4 bundles a model catalog that specifies Sol and Terra as mandatory MultiAgentV2 users, there is no manual opt-out for those models. Picking the model *is* opting into the encrypted path.
+
+What stays readable in your local record: completion notifications and status updates from subagents (Codex generates those itself), your original prompt, and all MultiAgentV1 traffic. What goes opaque: everything a parent agent told a subagent to do, across all three delegation message types.
+
+## The blast radius
+
+### Debugging gets materially harder
+
+When a multi-agent run misbehaves, several very different failures look identical from the outside once the instruction is ciphertext:
+
+- Did the **parent** frame the task incorrectly?
+- Did the **subagent** misread a correctly-worded instruction?
+- Did it execute in an unexpected environment?
+
+Each has a different fix. Without the delegation text, you are reasoning backward from the subagent's *behavior* instead of reading the *cause*. Reproduction is worse: you can't re-supply the exact instruction that triggered the failure, because you never had it.
+
+If you have ever relied on session logs to postmortem an agent that deleted the wrong thing — and you should have, see our writeup on why [confessor-style audit trails of what an agent touched](/blog/confessor-audit-what-ai-coding-agent-touched/) matter — that capability is now partial on Sol and Terra.
+
+### Compliance: the EU AI Act deadline
+
+This is the sharpest edge. The EU AI Act's full obligations for high-risk AI systems take effect **August 2, 2026**. Article 12 requires high-risk systems to maintain logs detailed enough to reconstruct *what the system did and why*.
+
+Whether a given Codex pipeline is "high-risk" depends on deployment context — code for critical infrastructure, financial services, employment decisions, and similar categories can trigger the classification. For teams that have determined their workflows are in scope, MultiAgentV2 delegation text is *precisely* the record Article 12 traceability calls for, and it is no longer available locally. Notably, an earlier evaluation had singled out Codex's OpenTelemetry export as the coding-agent feature closest to Article 12 readiness — before Sol and Terra were placed on the mandatory encrypted path. The traces it praised now contain ciphertext where the delegation instructions used to be.
+
+OpenAI has not publicly stated whether its enterprise Compliance Platform retains readable copies that local logs don't. Until it does, you cannot assume a server-side audit trail exists on your behalf.
+
+## Why would Codex do this? Two credible theories
+
+OpenAI shipped the change silently — in [PR #26210](https://github.com/openai/codex/pull/26210), merged June 5 — with a "Why" section that offered no rationale. Two explanations circulate, and they are not mutually exclusive:
+
+1. **Privacy hardening.** OpenAI already encrypts intermediate reasoning states so they can move across API calls without exposing sensitive content in shared logs. Delegation messages can contain descriptions of unreleased code, failure details, or filenames under investigation. Ciphertext keeps those unreadable even if a session log is shared for debugging.
+
+2. **Competitive protection of inference patterns.** How a frontier model decomposes a complex task into parallel delegation instructions reveals something about how it frames problems — a signal a competitor could exploit for distillation. Distillation is *the* frontier-AI controversy of 2026, and community forums noted that unauthorized API-pooling operations relying on session access appeared to stop working around when the encryption shipped, which lends weight to the access-control reading.
+
+Neither theory is confirmed. Neither is implausible. What matters for operators is that the *effect* — a local audit gap — is real regardless of intent.
+
+## What to do about it
+
+You cannot decrypt the ciphertext. You can, however, keep your workflows auditable:
+
+- **Pin GPT-5.6-Luna for pipelines that must be auditable.** Luna stays on MultiAgentV1, where delegation text remains plaintext and inspectable. If traceability is a hard requirement, treat model selection as a compliance control, not a performance knob.
+- **Log at your own boundary.** Capture the task descriptions *your* orchestration layer generates before it hands them to Codex, and record subagent inputs/outputs on your side of the API. If you own the harness, you own an audit copy the encryption can't touch. This is the same discipline behind keeping [what each agent touched fully accountable](/blog/confessor-audit-what-ai-coding-agent-touched/).
+- **Prefer explicit, user-declared delegation over runtime-decided splits** where you can, so you at least know the shape of the work allocation even if V2 hides the message body. Our rundown of [which agents actually expose subagents, cron, and routing](/blog/coding-agent-features-comparison-2026/) is a useful map of where control lives.
+- **Watch Issue #28058.** Remizov's proposed fix does *not* ask OpenAI to roll back the encrypted delivery channel — it asks for a **parallel plaintext audit copy** written to local history and traces, so the subagent still gets encrypted instructions while you can read what was delegated after the fact. As of July 16, the issue remained open with no linked fix. Add your use case if you're affected; a documented compliance need is the strongest argument for the separated audit channel.
+- **Re-underwrite the dependency.** This is the second time in a week Codex logging behavior has surprised operators — see our note on how a [Codex crash spilled its own system instructions](/blog/codex-crash-leaks-system-instructions/), and how [Codex's PreToolUse path handled raw commands](/blog/codex-pretooluse-hook-raw-command-leak/). Treat log fidelity as something to verify per release, not assume.
+
+## The pattern to internalize
+
+The specific bug here is narrow: three delegation message types on two models store their payloads as ciphertext. The pattern is broader and worth naming. As agents move from single-shot assistants to **runtime-orchestrated fleets**, the vendor increasingly decides not just how work is split, but *what you're allowed to see about how it was split*. Auditability stops being a property of the log format and becomes a property of the model you happened to select.
+
+For hobby projects, that's a curiosity. For anyone running Codex in a pipeline that has to answer "what did this agent decide to do, and why" — to a teammate, an incident review, or a regulator 17 days from now — it's a gap you need to close before it closes a runbook for you.
