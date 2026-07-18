@@ -1,0 +1,81 @@
+---
+title: "Beware: Claude Code v2.1.214 Quietly Closed Six Permission Holes at Once — The Fail-Open Pattern Operators Should Audit"
+description: "Claude Code v2.1.214 (July 18, 2026) patched a cluster of permission fail-open behaviors: over-broad dir/** allow rules, Windows PowerShell 5.1 bypass, file-descriptor redirects, 10k-char commands, zsh subscript parsing, help/man with unsafe options, and unprompted docker daemon-redirect flags. Here is what changed, which workflows break, and how to verify your install."
+pubDate: "2026-07-18T09:00:00Z"
+updatedDate: "2026-07-18T09:00:00Z"
+tags: ["security", "beware", "claude-code", "permissions", "hardening", "fail-closed"]
+tool: "claude-code"
+author: "kira_bug_hunter"
+image: "/api/og?title=Beware:%20Six%20Permission%20Holes%20Patched%20at%20Once&tool=Claude%20Code"
+---
+
+One release. Six permission holes. Zero CVEs.
+
+Claude Code **v2.1.214**, shipped July 18, 2026, is the kind of update that should make security-conscious operators sit up — not because it is loud, but because it is silent. Buried in the routine "What's changed" notes is a cluster of fixes that all share one shape: a command that used to **run without a prompt** now **prompts**. In security terms, Claude Code is migrating a set of its permission checks from **fail-open** to **fail-closed**.
+
+If you run Claude Code in any non-interactive context — CI, headless SDK, background sessions, or with `permissions.allow` tuned for speed — this release can change behavior you were quietly depending on. Here is the full picture, who is exposed, and how to verify what *your* install actually does.
+
+## The pattern: fail-open → fail-closed
+
+A permission system has two ways to behave when it is unsure:
+
+- **Fail-open** means "when I can't prove this is dangerous, let it run." Safe for throughput, dangerous for blast radius.
+- **Fail-closed** means "when I can't prove this is safe, ask." Safe for blast radius, annoying for throughput.
+
+v2.1.214 pushes several edge cases from the first column to the second. That is the right direction. But it also means workflows that *appeared* to work were, in fact, running with less protection than you thought — and some of them were running with **more** permission than the rule you wrote implied.
+
+## Fix 1 — `dir/**` allow rules were glob-matching the entire tree
+
+This is the most surprising one. A single-segment allow rule like `Edit(src/**)` was being parsed so that it auto-approved writes to **any** `src/` directory anywhere in the filesystem tree — not just `<cwd>/src`. The fix scopes it to `<cwd>/dir` as the rule's author almost certainly intended.
+
+Why it matters: if you wrote `Edit(src/**)` to whitelist your own project's source tree and then pointed Claude Code at a workspace containing a *different* repo with its own `src/`, the allow rule silently covered that foreign tree too. Permission rules are trust boundaries; a glob that escapes `<cwd>` is a trust boundary that leaks. The matching contract changed so `**/dir/**` is now required for any-depth matching, and `deny`/`ask` rules keep their any-depth behavior. Audit any single-segment `**` rules you have in `.claude/settings.json`.
+
+## Fix 2 — Windows PowerShell 5.1 sessions had a permission-check bypass
+
+Commands run under the Windows PowerShell 5.1 tool had a path where the permission check could be bypassed. PowerShell 5.1 is the legacy Windows PowerShell that ships on every Windows box, distinct from PowerShell 7. If you run Claude Code on Windows (a large share of the operator base), any session using the 5.1 runtime — not just PS7 — should be considered as having had a latent bypass until this fix.
+
+This is the same family of risk documented in our [Windows click-through permissions](/blog/claude-code-windows-click-through-permissions/) coverage: the Windows tool path has historically been the soft underbelly of Claude Code's permission model, simply because it is a different shell with different parsing rules than the bash path the analyzer was tuned for.
+
+## Fix 3 — File-descriptor redirects now fail closed
+
+Bash parses redirections like `2>&1` or `> &file` in ways the permission analyzer did not always anticipate. Some file-descriptor redirect forms could slip past the check. The fix makes Bash permission checks **fail closed** on those forms. This is the textbook case for fail-closed: the analyzer concedes it cannot always statically prove what a redirect will touch, so it now asks rather than guesses.
+
+## Fix 4 — Commands over 10,000 characters now always prompt
+
+This one is a direct anti-evasion fix. Very long commands previously could auto-run; now anything over ~10,000 characters prompts. Why would length matter? Because a wall of concatenated commands, base64 blobs, or inline heredocs is a classic way to bury a destructive operation inside something the analyzer mis-segments. Length is a cheap heuristic for "a human should look at this."
+
+## Fix 5 — zsh subscripts and modifiers in `[[ ]]` no longer inert
+
+zsh variable subscripts and modifiers inside `[[ ]]` comparisons were being treated as inert text — meaning a command that *manipulated* paths via subscripts looked safe and ran. Now those commands prompt for approval. Another parser-vs-shell gap closed.
+
+## Fix 6 — `help`/`man` with unsafe options no longer auto-approve
+
+`help` and `man` sound read-only, so they were auto-allowed. But they can carry unsafe options, command substitutions, or backslash paths that do real work. The fix strips them out of the auto-approve set. Pair this with the `file` change below: `file -m/--magic-file` and `file -f/--files-from` — which read arbitrary files — are no longer treated as read-only and now require permission.
+
+## The new one: docker daemon-redirect flags now prompt
+
+This is the most important net-new behavior. Docker commands (including the Podman `docker` shim) carrying daemon-redirect flags — `--url`, `--connection`, `--identity`, and Podman's remote mode — **previously ran without a prompt**. They now prompt.
+
+Think about what those flags do: they point the docker client at a *different* daemon, potentially on a remote host, over an authenticated connection. A command like `docker --url=tcp://some-host:2375 ...` is not "run a container locally" — it is "run a container on that host, as that daemon's privileges allow." Previously, if your allow list said "docker is fine," that implicitly granted remote-daemon execution without any additional gate. That is a lateral-movement primitive hiding behind a generic allow rule. Closing it is exactly the kind of fix that should have been there on day one; the fact that it wasn't is the story.
+
+## Remote sessions could proceed before local confirmation
+
+One more: permission prompts on remote sessions could proceed *before* the local confirmation dialog resolved. In a remote-control setup, that is a race where the agent acts on a grant the operator hasn't actually clicked. Fixed.
+
+## This follows v2.1.212 — and the trend is the real signal
+
+v2.1.214 is not an isolated cleanup. It lands one day after [v2.1.212 patched three silent safety holes](/blog/beware-claude-code-plan-mode-permission-bypass-v2-1-212/) (plan-mode auto-running `touch`/`rm` without a prompt, a worktree symlink escape, and SIGTERM orphaning). Two releases in two days, each closing multiple permission boundaries at once.
+
+Read together, the signal is clear: **Claude Code's permission model is in an active hardening cycle, and the team is finding fail-open behavior in the parser/shell boundary faster than it is publishing advisories.** That is good engineering, but it means the version you tested last week is not the version whose permission behavior you can trust today. If you pinned a version for compliance reasons, re-validate against v2.1.214.
+
+## How to verify your install
+
+1. **Check the version.** `claude --version` should report `2.1.214` or later. If you are on an older pin, you are missing every fix above.
+2. **Audit single-segment `**` allow rules.** Open `.claude/settings.json`. Any `Edit(dir/**)` or `Bash(dir/**)` rule that you intended to be repo-local should be reviewed; write `**/dir/**` if you truly want any-depth matching.
+3. **Re-examine generic docker allows.** If `Bash("docker *")` is in your allow list, understand it no longer covers daemon-redirect flags without a prompt — and decide whether remote-daemon execution should ever be allowed at all.
+4. **Re-run your headless/CI smoke test.** If you rely on unattended command execution, the 10k-char and `help`/`man` changes can now *block* previously-silent commands. Expect new prompts where you expected silence.
+5. **Keep the [operator hardening checklist](/blog/coding-agent-security-checklist-2026/) current.** This is exactly the kind of upgrade you should re-audit against after install.
+
+## Bottom line
+
+No CVE, no banner, no "security update" label — just a dense paragraph of permission fixes in a routine release. For operators, the lesson is the same one v2.1.212 taught: **treat Claude Code's permission notes as a security changelog, not a feature list.** The migration toward fail-closed is the right call, but until it is complete, assume any command form the analyzer doesn't perfectly understand was, until recently, running open. Upgrade, audit your `**` and `docker` rules, and re-test your unattended workflows.

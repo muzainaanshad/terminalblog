@@ -326,4 +326,6 @@ async function main() {
   console.log(`Duration: 4 weeks (${startDay} to ${getDateForDay(startDay, 27)})`);
 }
 
+module.exports = { TWITTER_POSTS, LINKEDIN_POSTS };
+
 main().catch(e => { console.error('Fatal:', e.message); process.exit(1); });
