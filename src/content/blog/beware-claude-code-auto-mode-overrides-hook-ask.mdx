@@ -1,0 +1,97 @@
+---
+title: "Beware: Claude Code's Auto Mode Could Silently Override Your PreToolUse Hook 'Ask' Guard — Your Hook Floor Was a No-Op"
+description: "Claude Code v2.1.211 fixed a flaw where auto mode overrode a PreToolUse hook's 'ask' decision for unsandboxed Bash. If you configured a hook to stop and prompt you before risky commands, auto mode could bypass it and proceed. Here is what it means for your security workflow."
+pubDate: "2026-07-18T10:00:00Z"
+updatedDate: "2026-07-18T10:00:00Z"
+tags: ["security", "beware", "claude-code", "permissions", "hooks", "hardening"]
+tool: "claude-code"
+author: "jax_opensrc"
+image: "/api/og?title=Beware:%20Auto%20Mode%20Overrode%20Your%20Hook%20Ask&tool=Claude%20Code"
+---
+
+Another quiet line in the Claude Code v2.1.211 changelog deserves more attention than it got: *"Fixed auto mode overriding a PreToolUse hook's `ask` decision for unsandboxed Bash — a hook `ask` now floors the decision at a prompt."*
+
+If you have ever configured a `PreToolUse` hook to force a pause — a "stop and ask me before any unsandboxed Bash runs" guard — this matters directly. Until v2.1.211, **auto mode could wave your hook aside and let the command run without the prompt you explicitly required.** Your guardrail had a silent bypass, and auto-pilot was the one holding the keys.
+
+## What a PreToolUse hook `ask` is supposed to do
+
+Claude Code lets you attach `PreToolUse` hooks to tool calls. A hook can return one of three decisions:
+
+- **allow** — let the tool call proceed.
+- **deny** — block it.
+- **ask** — stop and surface a prompt to the human before deciding.
+
+The `ask` decision is the one operators reach for when they do not want to hard-block a command but also do not want the agent to run it unprompted. "I trust the agent most of the time, but if it touches unsandboxed Bash, I want to see it first." That is a classic guardrail posture: let the machine move fast, but floor risky operations at a human checkpoint.
+
+The changelog fix confirms the intended behavior: a hook `ask` should **floor the decision at a prompt**. No matter what else wants to auto-approve, the hook's request to pause wins. Before v2.1.211, that was not what happened for unsandboxed Bash under auto mode.
+
+## What actually broke
+
+Auto mode is Claude Code's hands-off mode — the agent keeps working, approving routine calls so you are not interrupted. The bug: when a `PreToolUse` hook returned `ask` for an **unsandboxed Bash** command, auto mode overrode that decision. The hook said "pause and ask," auto mode said "no, keep going," and auto mode won.
+
+The result is a guardrail that looked like it was configured but was not actually enforced:
+
+- You set a hook to `ask` before unsandboxed Bash — a reasonable, common hardening step.
+- The agent enters auto mode (or auto mode is the default in your environment).
+- The hook fires, returns `ask` — and is ignored.
+- The unsandboxed Bash command runs without the prompt you required.
+
+There is no dramatic error. There is no "hook denied" log. There is just a command executing that you expected to be gated behind a human checkpoint. The gap is silent, which is exactly the kind of gap that erodes trust in your own safety configuration.
+
+## Why "unsandboxed Bash" is the worst case
+
+Of all the tools an agent can call, unsandboxed Bash is the highest-risk surface. It is a real shell on your machine, with your credentials, your filesystem, and your network. A denied or `ask`-gated Bash call is the single most important boundary most teams configure.
+
+So the bug did not nibble at the edges. It bypassed the human checkpoint precisely on the tool you most want checked. If your mental model was "my hook forces a prompt before any real shell command," auto mode quietly voided that assumption — for the exact commands where a voided assumption hurts most.
+
+## How this fits the pattern of Claude Code guardrail gaps
+
+This is not the first time a Claude Code safety control has turned out to be narrower than it reads. The same cluster of lessons keeps showing up:
+
+- A `permissions.deny` rule written with an absolute path can silently match nothing (see [Beware: permissions.deny fails on absolute paths](/blog/beware-claude-code-permissions-deny-absolute-path/)).
+- `disallowedTools` are not inherited by subagents spawned via the Agent tool (see [Beware: disallowedTools not inherited by subagents](/blog/beware-claude-code-disallowedtools-not-inherited-by-subagents/)).
+- Approval previews relayed to chat could be spoofed with invisible Unicode (see [Beware: approval previews spoofed with invisible Unicode](/blog/beware-claude-code-approval-preview-unicode-spoof/)).
+
+The throughline: **a control you configure is only as strong as the path that actually enforces it.** Each of these cases looked right in the config and was wrong in the execution. The hook-`ask` override is the newest entry, and it is the most subtle because it sits at the intersection of two features — hooks *and* auto mode — that most operators assume cooperate.
+
+## Build the corrected mental model
+
+The lesson is not "Claude Code is unsafe." It is that **auto-approval features and hook guardrails can conflict, and the conflict can resolve against your guardrail.** Treat any "ask" hook as a request the runtime *might* honor, not a guarantee — until you have proven it holds under your actual mode settings.
+
+Specifically:
+
+- **A hook `ask` is not a firewall.** It is a signal. Something has to enforce it. Before v2.1.211, auto mode did not.
+- **Auto mode is an approval source.** When you turn it on, you are delegating the "allow" decision to the runtime. Any other control that wants to *also* decide — like a hook — can be overridden unless the runtime is built to floor it. As of v2.1.211, it is.
+- **Test the guard in the mode you actually run.** A hook that floors correctly in interactive mode can behave differently in auto mode. Verify under the conditions you ship.
+
+## Practical mitigations you can apply now
+
+**1. Update to v2.1.211 or later.** This is the direct fix. `claude --version` should report ≥ 2.1.211. The changelog explicitly states a hook `ask` now floors the decision at a prompt, so the override is closed.
+
+**2. Don't let a hook `ask` be your only boundary for unsandboxed Bash.** Hooks are convenience, not a security perimeter. Put the real guard outside the agent: a wrapped shell script that refuses `rm -rf` / force-push, read-only cloud credentials with separate break-glass, a CI gate that rejects pushes from the working tree. The agent's own approval system should be defense-in-depth, not the only line.
+
+**3. Prefer `deny` over `ask` for commands you never want auto-run.** An `ask` depends on a human being present and the prompt actually surfacing. A `deny` is unconditional. If a command should never run without explicit, out-of-band action, deny it and require a manual step outside Claude Code.
+
+**4. Keep dangerous work sandboxed.** Unsandboxed Bash is where this bug bit. Where possible, route risky commands through a sandbox or a container with no long-lived secrets and no production access. The blast radius of a bypassed guard is whatever the shell can reach.
+
+**5. Audit your hooks against your modes.** List every `PreToolUse`/`PostToolUse` hook you rely on for safety. For each one, ask: does it still enforce under auto mode, under subagents, under the Agent tool? The gaps are almost never where the docs point you — they are at the seams between features.
+
+## Who is at risk
+
+- **Teams** running Claude Code in auto mode (or with auto-approve defaults) who also configured hook-based guardrails. The two features were the conflict site.
+- **Operators** who treat a hook `ask` as a hard checkpoint before shell commands. It was not, under auto mode, before this fix.
+- **Anyone** whose safety story depends on "the agent pauses before risky Bash." Under auto mode, that pause could be skipped.
+
+If you only ever run interactive mode and approve each call yourself, your exposure was lower — but the moment auto mode is on (and it is increasingly the default for "let it run"), this is the gap you were running.
+
+## The verdict
+
+This is a real, shipped security fix, not a hypothetical. v2.1.211 makes a `PreToolUse` hook `ask` decision floor at a prompt even under auto mode, closing a silent bypass where unsandboxed Bash could run without the checkpoint you required. The broader signal is the durable one: **your agent's guardrails are only as real as the path that enforces them**, and auto-approval features can quietly override the very hooks you set to protect yourself. Update, favor `deny` over `ask` for truly risky commands, and keep your real security boundaries outside the agent's own approval system.
+
+For the full operator isolation model, start from the [coding agent security checklist](/blog/coding-agent-security-checklist-2026/) — and pair it with the related guardrail gaps above before you trust any single control.
+
+A hook that asks but is never heard is not a guardrail. It is a suggestion the agent is free to ignore.
+
+---
+
+*Ever wonder if Claude gives a better answer than GPT for a specific coding problem? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** lets you compare 9+ premium models side-by-side in one chat. No more juggling tabs.*
