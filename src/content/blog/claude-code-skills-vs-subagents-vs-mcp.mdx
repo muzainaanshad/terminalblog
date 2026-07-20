@@ -1,0 +1,234 @@
+---
+title: "Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide"
+description: "Skills, subagents, and MCP servers extend Claude Code in three different ways. Here's how each one works, when to pick which, and the mistakes that waste the most time."
+pubDate: "2026-07-20T12:00:00Z"
+tags: ["claude-code", "guide", "skills", "subagents", "mcp", "architecture", "best-practices"]
+tool: "claude-code"
+author: "ada"
+image: "/api/og?title=Claude+Code+Skills+vs+Subagents+vs+MCP"
+---
+
+## Related articles
+
+- [AGENTS.md Complete Guide — Make Every Coding Agent Follow Your Repo Rules](/blog/agents-md-complete-guide/)
+- [Claude Code deep dive: Anthropic's coding agent](/blog/deep-dive-claude-code-anthropic-coding-agent/)
+- [Goose vs Claude Code: plugins, skills, and extensibility](/blog/goose-vs-claude-code-extensibility/)
+- [Beware: Claude Code's Auto Mode Could Silently Override Your PreToolUse Hook](/blog/beware-claude-code-auto-mode-overrides-hook-ask/)
+- [Coding agent features in 2026: who actually has cron, subagents, and multi-provider routing](/blog/coding-agent-features-in-2026/)
+
+---
+
+Every coding agent writes code. Few of them do it the way *your* team needs unless you extend them. Claude Code gives you three extension primitives — **skills**, **subagents**, and **MCP servers** — and most developers reach for the wrong one. They write an MCP server when they needed a 40-line `SKILL.md`. They build a skill when the job actually needed an isolated context window. Or they skip all three and paste the same instructions into every prompt.
+
+This guide covers what each primitive actually does, how to decide which one to build, the cost of getting it wrong, and how they compose together. Everything here is pinned to Claude Code 2.x (field-tested around v2.1.214), the Agent Skills open standard, and MCP spec 2025-11-25 (with the 2026-07-28 stateless revision shipping July 28).
+
+## The one-line version
+
+| Primitive | Core job | Cost when idle |
+|-----------|----------|----------------|
+| **Skill** | Change *how* Claude does a task | ~100 tokens (metadata only) |
+| **Subagent** | Protect your context window from a noisy task | ~0 until delegated |
+| **MCP server** | Give Claude access to a system it cannot touch | Tool schemas load up front |
+
+If you remember nothing else: **skills change behavior, subagents protect context, MCP servers add capability.** Most real setups use all three. The mistake that wastes the most time is reaching for the wrong one.
+
+## What a skill is
+
+A skill is a folder with a `SKILL.md` file at its root. The Markdown body is the instruction — a procedure, a rubric, a checklist, a formatting rule — that Claude loads only when it matches a relevant situation. That last part is the key design choice: skill descriptions sit in your context at all times (~100 tokens each), but the full content only loads when Claude invokes the skill. You get deep expertise available on demand without paying for it on every turn.
+
+Skills follow the [Agent Skills open standard](https://agentskills.io), which means the same `SKILL.md` works across Claude Code, Codex, Goose, and other compatible agents. For the full picture on how the skill system works inside Claude Code, see the [Hermes skill system deep dive](/blog/hermes-skill-system-plugins-extending-agent/).
+
+### What skills are good at
+
+- **Runbooks and procedures.** "How we do database migrations," "how to write a PR description," "how to check accessibility before merging." Turn the checklist into a skill, and the agent follows it every time — not just when you remember to paste it.
+- **Formatting and conventions.** Code style rules, commit message format, file naming patterns. These are pure instructions; the agent already has every tool to execute them.
+- **Domain expertise.** Security review rubrics, performance benchmarks to check, architecture decision records. Load the knowledge only when the task calls for it.
+- **Cross-project portability.** Skills live in `~/.claude/skills/` for personal use or `.claude/skills/` for project-specific ones. Write once, use everywhere.
+
+### What skills cannot do
+
+Skills are instructions, not connections. They can orchestrate tools that Claude already has (files, shell, grep), but they cannot reach a database, call an API, or talk to a system outside the repo. If you find yourself trying to make a skill "connect" to something, you have found the MCP-shaped hole.
+
+Skills also run in Claude's main context window. A long skill loads its full content into the same window Claude uses for the rest of your conversation. For jobs that generate a lot of intermediate output — reading dozens of files, running exploratory searches, producing large summaries — a skill will crowd your context with debris. That is the subagent-shaped hole.
+
+### Minimal skill example
+
+```
+.mclaude/skills/
+  commit-message/
+    SKILL.md
+```
+
+```markdown
+---
+name: commit-message
+description: "Generate a conventional commit message from staged changes"
+---
+
+1. Run `git diff --cached` to see staged changes.
+2. Summarize what changed in one sentence (the subject line).
+3. Use conventional-commit format: `type(scope): description`
+4. Types: feat, fix, refactor, docs, test, chore.
+5. Subject line must be under 72 characters.
+6. If the diff touches more than 3 files, add a body explaining
+   the motivation in 1-3 sentences.
+```
+
+That is a complete, functional skill. No running process, no code, no connection to anything external. Just instructions that change how Claude behaves when the situation matches.
+
+## What a subagent is
+
+A subagent is a separate Claude instance with its own context window, its own system prompt, and its own tool allowlist. The main session hands it a task, the subagent does all its work (reading files, running searches, hitting dead ends) inside its own window, and only the summary comes back. Your main context never sees the messy middle.
+
+Claude Code ships built-in subagents — **Explore** (for file system exploration) and **Plan** (for architectural thinking) — and you can create custom ones in `.claude/agents/`. Each agent is a Markdown file with YAML frontmatter.
+
+### When to build a subagent
+
+The trigger for a subagent is not "this task is hard." It is "this task is *noisy.*" Noise means the work generates a lot of intermediate output — 40 file reads, a giant log, an exploratory grep across the whole codebase — and none of that intermediate material is relevant to the next conversation turn. A subagent buys you:
+
+- **Context isolation.** The noisy work stays in its own window. Your main conversation stays clean.
+- **Cheap-model routing.** Subagents can route grunt work to Haiku instead of burning Opus on log reading. Set `model: haiku` in the frontmatter.
+- **Constrained tool access.** Give the subagent only the tools it needs. A research agent does not need file-write permissions.
+
+### Good subagent candidates
+
+- **Codebase exploration.** "Find every file that imports this module" — dozens of reads, one-line answer.
+- **Log investigation.** "Read the last 500 lines of server.log and summarize what failed."
+- **Security audit of a dependency.** Read many files, check many paths, report the findings.
+- **Parallel work.** Run a reviewer agent on a build agent's output, each in a clean window.
+
+### Subagent example
+
+```
+.claude/agents/
+  log-investigator.md
+```
+
+```markdown
+---
+name: log-investigator
+description: "Read application logs and summarize failures"
+model: haiku
+tools: ["Read", "Grep", "Bash"]
+---
+
+You are a log investigation agent. Given a log file path and
+optionally a time window, read the file, identify all error
+lines, cluster them by root cause, and return a structured summary:
+
+1. Total errors found
+2. Top 3 root causes (with first occurrence line number)
+3. Suggested next step for each root cause
+Be concise. No intermediate reasoning in the output.
+```
+
+The subagent returns a two-line summary instead of 40 file reads. The main session never sees the log content.
+
+### Key constraints
+
+- Subagents **do not see your conversation history.** Each starts fresh (unless you use a "fork" which inherits the parent).
+- Subagents **cannot grant new capabilities.** Their tool allowlist is a subset of what the session already has.
+- Subagents **cannot reach external systems.** For that, you need MCP.
+
+## What an MCP server is
+
+MCP (Model Context Protocol) gives Claude access to systems it cannot otherwise touch — databases, APIs, SaaS platforms, live services. Where skills and subagents operate entirely within the tools Claude already has (files, shell, grep), MCP adds genuinely new capabilities.
+
+An MCP server is a running process (stdio or HTTP) that exposes a list of tools. When Claude calls one of those tools, the request routes to the server, which talks to the external system and returns the result. The server's tool schemas load into your context up front, which is important to understand: every MCP server costs context even when idle.
+
+The MCP spec is undergoing its biggest revision on July 28, 2026. The [2026-07-28 release candidate](https://modelcontextprotocol.io) drops session state, adds caching headers (`ttlMs`), and introduces MCP Apps for server-rendered UI. If you are building MCP servers for production, that stateless revision eliminates the sticky-session problem entirely.
+
+### When to build an MCP server
+
+Build an MCP server when you need a **connection** — when no prompt, no context window, and no skill can solve the problem because the thing you need is a live system. Good MCP server candidates:
+
+- **Databases.** Query Postgres, Elasticsearch, or your internal data warehouse directly.
+- **SaaS platforms.** Linear, GitHub, Stripe, Jira. Many now ship official MCP servers you just register.
+- **Live metrics and monitoring.** Dashboards, Prometheus endpoints, PagerDuty.
+- **Workflows with side effects.** Creating a ticket, opening a PR, triggering a deploy through an API rather than a shell.
+
+The tell for an MCP server: no prompt you could write and no context window you could clear would help, because what you need is a connection.
+
+### The most common mistake
+
+**Building an MCP server for something that is not a capability.** Teams write a whole stdio server whose only job is to return a block of instructions or a coding standard. That is a skill. An MCP server is justified by a connection or a side effect, not by "I want Claude to know this." If your server never touches anything outside the repo, it should have been a `SKILL.md`.
+
+### Context cost matters
+
+Unlike a skill's ~100-token metadata footprint, every MCP server's tool schemas load into context up front. A chatty server with 30 tools can crowd out real reasoning and even trip the tool-use limit. This is a live enough problem to have its own fix: [reducing the number of MCP tools Claude loads](/blog/reduce-mcp-tools-claude-code/). Prefer fewer, well-scoped servers over one omnibus server.
+
+## The decision flowchart
+
+When you need to extend Claude Code, follow this order — cheapest and least powerful first:
+
+```
+START: What does the task need?
+  │
+  ├─ Just instructions / procedure / convention?
+  │   → SKILL. Cheapest to write, cheapest to run, portable.
+  │
+  ├─ Instructions + the work generates lots of noise?
+  │   → SUBAGENT. Isolates the context, routes to cheap model.
+  │
+  ├─ Access to an external system Claude can't reach?
+  │   → MCP SERVER. The only one that adds a new capability.
+  │
+  └─ Multiple of the above?
+      → COMPOSE. All three are first-class composable.
+```
+
+In practice: **start with a skill.** If the skill has nothing to orchestrate because the tool does not exist, you have found your MCP server. If the skill works but drowns your context, wrap it in a subagent. That order keeps your setup honest.
+
+## How they compose together
+
+The three primitives are not mutually exclusive. A single task can pull all three:
+
+1. **An MCP server** exposes your database and provides query tools.
+2. **A skill** teaches Claude your query conventions — how to read the schema, what columns to check, how to format results.
+3. **A subagent** runs the entire investigation in an isolated window so a 20-query exploration returns as a two-line finding.
+
+Claude Code even lets a skill run inside a subagent (`context: fork` in skill frontmatter), and a subagent can preload skills at startup (`skills` field in agent frontmatter). The composition is first-class, not a hack.
+
+| Combination | How it works |
+|-------------|-------------|
+| Skill + Subagent | Subagent preloads the skill content at startup; subagent controls the system prompt, skill adds domain knowledge |
+| Skill + MCP | Skill teaches Claude *how* to use the MCP server's tools (conventions, formatting, error handling) |
+| Subagent + MCP | Subagent gets its own tool allowlist that includes MCP tools; isolated exploration of live systems |
+| All three | MCP provides the connection, skill provides the knowledge, subagent provides the isolation |
+
+For a practical example of hooks wiring into this composition, see our [Beware article on Claude Code's Auto Mode overriding hook guards](/blog/beware-claude-code-auto-mode-overrides-hook-ask/) — hooks are the fourth primitive that fire checks the agent cannot skip.
+
+## Common mistakes
+
+**Writing an MCP server to inject instructions.** This is the single most common miss. If the server never touches anything outside the repo, it was a skill. You paid the context cost for 20+ tool schemas when 100 tokens of metadata would have done the job.
+
+**Using a subagent for simple tasks.** A subagent creates an entirely new context window. For "format this JSON" or "run this command," that is unnecessary overhead. Just use Claude directly.
+
+**Skipping the skill and pasting instructions into every prompt.** This is the "I don't need skills" trap. It works for a day. By week two, you have 15 different places you paste the same checklist and half of them are stale.
+
+**Overloading MCP tool count.** More tools is not more capability. Each tool schema consumes context. A 30-tool MCP server competes with your actual task for reasoning space. Scope your servers tightly.
+
+**Forgetting context cost of MCP.** Unlike skills (100 tokens idle) and subagents (~0 idle), MCP tool schemas load every turn. Factor this into your context budget.
+
+## Where each fits in the Claude Code architecture
+
+Claude Code's extension surface is layered:
+
+| Layer | Primitive | What it controls |
+|-------|-----------|-----------------|
+| Execution | **Skills** | How a task is performed (procedure, rubric, format) |
+| Isolation | **Subagents** | Where work happens (which context window) |
+| Integration | **MCP servers** | What systems Claude can reach (external capabilities) |
+| Enforcement | **Hooks** | When checks fire (PreToolUse, PostToolUse, Stop) |
+
+Hooks are worth mentioning because they close the loop: a skill teaches Claude how, a subagent isolates where, MCP connects to what, and a hook enforces when — including running tests on every pass so the agent cannot ship broken code. See the [Hermes skill system overview](/blog/hermes-skill-system-plugins-extending-agent/) for how all four layers wire together in practice.
+
+## Getting started checklist
+
+1. **Audit your prompt duplication.** If you paste the same instructions more than twice, write a skill. 10 minutes of work, permanent context savings.
+2. **Check your context pressure.** If Claude loses the thread on long tasks, identify the noisy work and move it to a subagent.
+3. **List your external connections.** Any system Claude needs to query that it cannot reach with file/shell/grep is an MCP candidate. Check if an [official MCP server exists](https://github.com/modelcontextprotocol/servers) before building one.
+4. **Start with one skill.** Pick the procedure you repeat most often, write a `SKILL.md`, and use it for a week. The payoff is immediate.
+5. **Watch your context budget.** Skills cost almost nothing. Subagents cost nothing until used. MCP servers cost tool-schema tokens every turn. Budget accordingly.
+
+The mistake is overthinking the architecture before shipping anything. One well-written skill beats a theoretical plan for three. Build what you need now, compose as complexity grows.
