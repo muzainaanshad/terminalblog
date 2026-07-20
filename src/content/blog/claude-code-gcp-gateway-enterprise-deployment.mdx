@@ -2,7 +2,7 @@
 title: "Claude Code Just Landed on GCP — Enterprise AI Deployment Gets Real"
 description: "Anthropic shipped a Claude Gateway reference deployment for Google Cloud Platform. Bring Claude Code to your enterprise infrastructure."
 pubDate: "2026-06-29T12:00:00Z"
-updatedDate: "2026-07-18T04:00:00Z"
+updatedDate: "2026-07-20T12:00:00Z"
 updated: true
 tags: ["claude-code", "gcp", "gateway", "enterprise", "deployment", "viral"]
 tool: "claude-code"
@@ -23,6 +23,26 @@ The Claude Gateway is the middleware layer that sits between Claude Code and you
 
 The GCP deployment rebrands this as "Agent Platform" — a clear signal that Anthropic sees Claude Code as an enterprise platform, not just a developer tool. The rebrand is covered in more detail in the companion piece on the [Claude Gateway becoming a full Agent Platform](/blog/claude-code-agent-platform-gateway-gcp/).
 
+## Getting Started: What You Need
+
+Before deploying, you'll need:
+- A GCP project with billing enabled
+- The `gcloud` CLI authenticated to your project
+- Claude Code installed locally (for testing against the gateway)
+- Your Anthropic API key stored in GCP Secret Manager
+
+The deployment is straightforward — all assets live in the Claude Code repository under the gateway examples directory:
+
+```bash
+cd claude-code/gateway-examples/gcp
+gcloud run deploy claude-gateway \
+  --source . \
+  --region us-central1 \
+  --allow-unauthenticated  # or configure IAP for auth
+```
+
+After deploy, point your local Claude Code at the gateway URL instead of hitting the Anthropic API directly. The gateway handles auth token exchange, so your developers never see raw API keys.
+
 ## Why This Matters for Enterprises
 
 Claude Code is already the most popular coding agent on the market, primarily because of Claude's strong capabilities. But enterprise adoption requires infrastructure — security controls, audit trails, and integration with existing cloud environments.
@@ -32,7 +52,18 @@ The GCP Gateway addresses all three:
 - **Audit**: Every action is logged and searchable
 - **Control**: Network policies restrict what the agent can access
 
-## How It Works
+## Cost Considerations
+
+Running the gateway on Cloud Run is pay-per-use — you only pay for actual request processing time. For a team of 10-20 developers using Claude Code daily, expect:
+
+- **Cloud Run**: ~$5-20/mo for the gateway service itself
+- **Secret Manager**: Negligible (pennies per secret version)
+- **Cloud Logging**: Scales with audit volume; ~$0.50/GB ingested
+- **Cloud Endpoints**: Free tier covers most team usage
+
+The gateway doesn't add API costs — those flow through to Anthropic as before. What it buys you is control: you can enforce model restrictions, rate limits, and cost caps at the gateway level before they reach your API budget.
+
+## How It Works in Detail
 
 The deployment uses:
 - **Cloud Run** for the gateway service (auto-scaling, pay-per-use)
@@ -42,6 +73,6 @@ The deployment uses:
 
 All assets are in the Claude Code repository under the gateway examples directory. Deploy with a single `gcloud run deploy` command.
 
-This is the kind of infrastructure investment that separates "tools developers try" from "tools enterprises adopt." The same enterprise-control story shows up elsewhere on the site — the [Hermes security writeup on credential guards and provider isolation](/blog/hermes-security-credential-guards-provider-isolation/) makes the same point about keeping secrets out of the agent's hands, and the [Claude Code vs GitHub Copilot CLI comparison](/blog/claude-code-vs-copilot-cli/) frames how different vendors approach the enterprise boundary. The GCP gateway is Anthropic's answer: managed, logged, and network-restricted by default.
+This is the kind of infrastructure investment that separates "tools developers try" from "tools enterprises adopt." The same enterprise-control story shows up elsewhere on the site — the [Hermes security writeup on credential guards and provider isolation](/blog/hermes-security-credential-guards-provider-isolation/) makes the same point about keeping secrets out of the agent's hands, the [Claude Code vs GitHub Copilot CLI comparison](/blog/claude-code-vs-copilot-cli/) frames how different vendors approach the enterprise boundary, and the [2026 coding agent security checklist](/blog/coding-agent-security-checklist-2026/) covers the full hardening checklist your team should run before deploying any agent in production. The GCP gateway is Anthropic's answer: managed, logged, and network-restricted by default.
 
 ---
