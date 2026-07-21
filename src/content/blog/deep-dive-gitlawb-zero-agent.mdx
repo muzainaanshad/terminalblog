@@ -1,12 +1,13 @@
 ---
+---
 title: "Gitlawb Zero Deep Dive: The Decentralized Coding Agent You Own"
 description: "Gitlawb Zero is an MIT-licensed terminal coding agent with durable local sessions, multi-provider model support, and a decentralized git network for AI agents."
 pubDate: "2026-07-03T16:00:00Z"
-updatedDate: "2026-07-18T04:00:00Z"
-updated: true
+updatedDate: "2026-07-21T11:30:00Z"
 tags: ["deep-dive", "pillar", "gitlawb-zero-architecture", "decentralized", "agent-network"]
 tool: "gitlawb-zero"
 author: "jax"
+updated: true
 ---
 
 Gitlawb Zero is an MIT-licensed terminal coding agent that answers to you — your model, your machine, your rules. Published as npm package `@gitlawb/zero`, it gives developers durable local sessions with full model choice and a decentralized git network.
@@ -15,19 +16,29 @@ Gitlawb Zero is an MIT-licensed terminal coding agent that answers to you — yo
 
 Zero is built around the principle that you should own your coding agent completely. It runs locally, stores session data on your machine, and supports any model provider you choose.
 
-**Model Freedom** — Bring OpenAI, Anthropic, Gemini, Groq, OpenRouter, DeepSeek, Mistral, xAI, Qwen, Kimi, GitHub Models, Ollama, LM Studio, or any OpenAI-/Anthropic-compatible endpoint. No lock-in.
+**Model Freedom** — Bring OpenAI, Anthropic, Gemini, Groq, OpenRouter, DeepSeek, Mistral, xAI, Qwen, Kimi, GitHub Models, Ollama, LM Studio, or any OpenAI-/Anthropic-compatible endpoint. No lock-in. This is the widest model support of any terminal agent — where Claude Code locks you to Anthropic and Codex locks you to OpenAI, Zero treats every provider as a first-class citizen.
 
-**Durable Sessions** — Sessions persist locally. Close the terminal, come back tomorrow, and your agent remembers the context. This is powered by a local session store that keeps conversation history and working state between runs.
+**Durable Sessions** — Sessions persist locally. Close the terminal, come back tomorrow, and your agent remembers the context. This is powered by a local session store that keeps conversation history and working state between runs. Unlike cloud-based agents where context resets on disconnect, Zero's sessions are yours as long as the files exist on disk.
 
 **Decentralized Git Network** — gitlawb is building a decentralized git network where AI agents and developers share workflows, generate apps, publish code, and open PRs on a peer-to-peer infrastructure. This is a fundamentally different approach from platform-bound agents.
 
-## Commands
+## Security posture
+
+Zero's security story has matured fast. The v0.4.0 release closed a sandbox bypass where a cloned repo could re-enable MCP servers that were explicitly disabled — the kind of privilege-escalation bug that matters when agents run with filesystem access. Permission payload validation, stale-lock DoS prevention, and a Windows taskkill hijack fix all shipped in the same batch, signaling that the team treats least-privilege as a design constraint, not an afterthought. For comparison, the [coding-agent security checklist for 2026](/blog/coding-agent-security-checklist-2026/) lays out the broader threat model Zero's sandbox hardening addresses.
+
+The [Hermes credential-guard and provider-isolation piece](/blog/hermes-security-credential-guards-provider-isolation/) covers how a different project approaches the same boundary — separating what the agent can read from what it can write. Zero's approach is more aggressive: deny-by-default, explicit allow, with a lock file that tracks granted permissions across sessions.
+
+## Architecture
+
+Zero's architecture is intentionally simple compared to framework-heavy agents. There is no plugin marketplace, no extension API, no runtime injection layer. The TUI is the interface, the session store is the persistence, and the model provider is configured at install time (or switched per-session with `--model`).
 
 ```
 zero                  Interactive TUI mode
 zero --one-shot       Single-shot query mode
 zero --model <model>  Specify model provider
 ```
+
+The `--one-shot` mode is useful for scripting and CI integration: pipe in a prompt, get a response, no interactive session created. This makes Zero usable as a subprocess in larger automation pipelines without the overhead of maintaining a persistent agent session.
 
 ## Installation
 
@@ -36,10 +47,18 @@ npm install -g @gitlawb/zero
 zero
 ```
 
-Supports Linux, macOS, and Windows on x64 and arm64 — and, as of the latest release, Android via Termux (see the [Termux support writeup](/blog/gitlawb-zero-android-termux-support/)).
+Supports Linux, macOS, and Windows on x64 and arm64 — and, as of the latest release, Android via Termux (see the [Termux support writeup](/blog/gitlawb-zero-android-termux-support/)). The Termux port is notable because it means Zero runs on a phone — a use case no other major terminal agent supports.
 
-## Zero vs Other Agents
+## Where Zero sits in the market
 
-Zero is closest to Kilo in philosophy — prioritizing simplicity and user ownership over framework complexity. But it adds durable sessions and the broader gitlawb decentralized network, making it more ambitious in scope. For teams that value model freedom and local control above all, Zero is compelling.
+Zero is closest to [Kilo in philosophy](/blog/kilo-vs-gitlawb-zero/) — prioritizing simplicity and user ownership over framework complexity. But it adds durable sessions and the broader gitlawb decentralized network, making it more ambitious in scope. For teams that value model freedom and local control above all, Zero is compelling.
 
-Unlike agents tied to a specific platform or CI/CD system, Zero works everywhere and answers to no one but you. Its security-first posture is the project's sharpest differentiator: the [0.4.0 sandbox hardening batch](/blog/gitlawb-zero-0-4-0-npm-sandbox/) shows the team treating sandbox denials and least-privilege as first-class concerns, and the [gitlawb-zero vs Codex comparison](/blog/gitlawb-zero-vs-codex/) frames the local-first-versus-cloud-parallelism divide directly. The [runner-hang fix](/blog/gitlawb-zero-askUser-runner-hang-fix/) and the [--auto commit messages feature](/blog/gitlawb-zero-auto-commit-messages/) round out the picture of a project optimizing for trustworthy, owned-by-you daily use.
+The [gitlawb-zero vs Codex comparison](/blog/gitlawb-zero-vs-codex/) frames the local-first-versus-cloud-parallelism divide directly. Codex gives you parallel cloud workers and a managed infrastructure; Zero gives you ownership and portability. The choice depends on whether you trust the cloud to be available when you need it.
+
+The [Hermes Agent vs Gitlawb Zero comparison](/blog/hermes-vs-gitlawb-zero/) draws the same line from the automation angle: Hermes is the platform with cron, memory, and orchestration; Zero is the tool with sessions and model freedom. Different bets on what "agent ownership" means.
+
+## Recent improvements
+
+The development cadence has been aggressive. Recent releases shipped auto-commit messages (so the agent proposes commit messages based on the diff it just created), context preservation across exec prompts (the agent remembers what it did when you interrupt and redirect), and a provider-picker terminal UX that makes switching models mid-session a single keystroke instead of an environment variable edit. The [--auto commit messages feature](/blog/gitlawb-zero-auto-commit-messages/) and the [runner-hang fix](/blog/gitlawb-zero-askUser-runner-hang-fix/) round out the picture of a project optimizing for trustworthy, owned-by-you daily use.
+
+Unlike agents tied to a specific platform or CI/CD system, Zero works everywhere and answers to no one but you. For developers who want an agent that behaves like a local tool rather than a cloud service, Zero is the strongest option in the terminal agent category today.
