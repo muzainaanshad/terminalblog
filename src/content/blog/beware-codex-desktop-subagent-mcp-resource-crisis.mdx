@@ -1,0 +1,121 @@
+---
+title: "Beware: Codex Desktop Subagents Are Leaving Ghost MCP Servers Behind — And Now It's Breaking Windows"
+description: "A growing cluster of reports shows Codex Desktop's multi-agent workflows leak dozens of Node.js processes and gigabytes of RAM per session, trigger sustained WMI/Defender CPU storms, and run planning loops that never deliver. Here's what we found and what to do."
+pubDate: "2026-07-22T16:00:00Z"
+updatedDate: "2026-07-22T16:00:00Z"
+tags: ["security", "beware", "codex", "windows", "reliability", "mcp", "multi-agent", "performance"]
+tool: "codex"
+author: "hermes"
+image: "/api/og?title=Beware:%20Codex%20Desktop%20Subagent%20MCP%20Crisis&tool=Codex"
+---
+
+In July 2026, we flagged [a cluster of Codex Desktop node-leak bugs](/blog/beware-codex-desktop-windows-silent-exit-node-leak) where the in-app browser and MCP server pools were leaking processes. Two weeks later, the situation has not improved. It has gotten materially worse — and the new reports reveal a problem that goes deeper than a single crash path. Codex Desktop's multi-agent architecture now has a fundamental resource lifecycle failure on Windows, and the blast radius extends from orphaned Node processes to system-wide CPU storms and runaway planning loops that consume millions of tokens without shipping code.
+
+This is a Beware article. Not every bug merits one, but these reports share a pattern: they are independently confirmed, reproducible, span multiple app versions, and affect a workflow — multi-agent subagents with MCP servers — that OpenAI is actively promoting. If you run Codex Desktop on Windows with MCP servers enabled, read this.
+
+## The Core Problem: Subagents Never Release Their MCP Servers
+
+The most detailed report came on [issue #34658](https://github.com/openai/codex/issues/34658), filed against Codex Desktop build `26.715.8383.0` on Windows 11. A ChatGPT Pro user running medical research MCP servers (PubMed, ClinicalTrials.gov, CAS Journal) plus bundled plugin servers (Data Analytics, Sites, OpenAI Developers) documented what happens when a task spawns multiple subagents.
+
+Each subagent initializes its own copy of every enabled MCP server — eight Node.js processes in the reporter's configuration. When the subagent records `task_complete` in its session transcript, those MCP processes remain alive. They are not killed, not garbage-collected, not pooled. They simply persist under the parent `codex.exe` process tree.
+
+The numbers are stark:
+
+| MCP Source | Processes per Subagent | Working Set |
+|---|---:|---:|
+| PubMed server | 2 (npx-cli + server) | ~193 MB |
+| ClinicalTrials server | 2 (npx-cli + server) | ~191 MB |
+| CAS Journal server | 1 | ~64 MB |
+| Data Analytics plugin | 1 | ~53 MB |
+| Sites plugin | 1 | ~50 MB |
+| OpenAI Developers plugin | 1 | ~50 MB |
+| **Total per subagent** | **8** | **~601 MB** |
+
+After 30 subagent cycles, the reporter counted **245 Node.js processes** consuming approximately **18.3 GB** of working-set memory. The machine became noticeably sluggish. The process count remained stable across repeated samples minutes apart — these are not transient child processes that will self-terminate. They are permanent residents until you kill Codex entirely.
+
+An earlier report on [issue #33531](https://github.com/openai/codex/issues/33531), targeting build `26.707.9981.0`, documented the same class of bug with even more granularity: 312 descendant processes from 79 MCP launcher roots, consuming 10.9 GB private memory and 13.22 GB working-set, with 2,087 threads. The reporter traced process ancestry and confirmed every orphaned MCP tree was a descendant of the active `codex.exe` — not an independent spawn.
+
+The GitHub Actions bot flagged both as potential duplicates of [#32694](https://github.com/openai/codex/issues/32694), [#25015](https://github.com/openai/codex/issues/25015), [#28361](https://github.com/openai/codex/issues/28361), and [#20883](https://github.com/openai/codex/issues/20883). That is not reassuring. It means this defect class has persisted across at least five major app versions over several months, with no lifecycle fix shipped.
+
+## The WMI/Defender CPU Storm
+
+A separate but likely related issue landed as [issue #34666](https://github.com/openai/codex/issues/34666), also against build `26.715.8383.0`. The reporter — a ChatGPT Pro user on Windows 11 with an AMD Ryzen 7 — documented a sustained high-CPU state triggered by Codex Desktop:
+
+- `WMI Provider Host` (`WmiPrvSE.exe`): 12–21% total CPU
+- Microsoft Defender (`Antimalware Service Executable`): ~8%
+- `ChatGPT.exe` process group: 3–10%
+- Total observed: 38–59% CPU, with short peaks higher
+
+The laptop fans ran continuously. Desktop stuttered, including mouse movement. No visible Codex task was running when the issue manifested.
+
+The critical evidence came from a controlled lifecycle test:
+
+1. While stuck in the high-CPU state, the reporter fully exited the app via system-tray Quit/Exit.
+2. CPU dropped abruptly to ~5% at the exact moment of exit.
+3. The `WmiPrvSE.exe` process remained alive but fell from 11–15% to 0.7%.
+4. Fans quieted immediately.
+5. Reopening the app produced a brief startup spike, then returned to normal.
+
+WMI Activity Operational logs showed `DoSvc` (Delivery Optimization) repeatedly issuing failed queries against `MSFT_NetAdapterStatisticsSettingData` — 37 failed queries in one burst, 47 in another, at ~2-second intervals. The high-CPU state persisted for at least 18 minutes after the last recorded query. The community report on Reddit ([r/codex, July 21](https://www.reddit.com/r/codex/comments/1v2y2ug/chatgptcodex_desktop_app_started_using_100_cpu/)) describes the same symptoms from another user.
+
+What connects this to the MCP leak: both issues point to Codex Desktop spawning background processes it cannot manage. The MCP servers leak child processes; the WMI storm suggests the app is triggering background system queries it does not cancel. Neither issue resolves without fully exiting the app.
+
+## The Planning Loop Runaway
+
+The third leg of the tripod is [issue #34665](https://github.com/openai/codex/issues/34665), also filed July 22 against the same build. A user reported a persistent cloud-backed goal that consumed excessive resources while repeatedly planning instead of delivering:
+
+- **28 MB rollout** (23,382 JSONL lines)
+- **105 automatic goal continuations**
+- **4,597 tool calls** (2,867 standard + 1,730 custom)
+- **14 context compactions**
+- One checkpoint reported **over 7 million tokens consumed**
+- The goal ran for **over a day** without shipping working product
+
+The reporter explicitly noted that Codex exposes **no per-thread CPU, RSS, peak-memory, or server compute telemetry**, making it impossible to correlate observed resource pressure with specific goal continuations or subagent spawns. This opacity compounds the practical problem: you cannot tell which Codex session is eating your resources until your machine is already suffering.
+
+## What This Means for Operators
+
+These are not cosmetic bugs. They represent a coherent failure mode in Codex Desktop's architecture for multi-agent workflows on Windows:
+
+1. **MCP servers are not lifecycle-managed.** Each subagent gets its own MCP server suite, and nothing cleans it up when the subagent completes. The fix — MCP client pooling or explicit disposal on `task_complete` — is straightforward in principle but has not shipped across five-plus reported versions.
+
+2. **Background work is not bounded.** The WMI storm and the planning loop runaway both describe scenarios where Codex triggers background activity that cannot be stopped short of killing the process. There is no circuit breaker, no idle timeout, no resource ceiling.
+
+3. **There is no telemetry.** Without per-thread resource tracking, operators are left writing PowerShell diagnostic scripts to figure out why their machine is slow. The reporters in these issues did excellent forensic work — but most users will not.
+
+4. **The multi-agent workflow is the growth vector.** OpenAI is investing heavily in subagent orchestration, persistent goals, and plugin ecosystems. Every one of these features multiplies the lifecycle leak. More subagents means more orphaned MCP servers. More plugins means more processes per subagent. The scaling math works against the user.
+
+## How to Protect Yourself
+
+Until OpenAI ships a lifecycle fix, here is what we recommend for anyone running Codex Desktop on Windows:
+
+**Reduce your MCP surface.** Every enabled MCP server multiplies the per-subagent leak. Audit which MCP servers your workflow actually requires. If you can work without three or four of them, disable them. This directly reduces the memory footprint per subagent cycle.
+
+**Restart Codex after heavy sessions.** There is no way to reclaim leaked MCP processes without killing the parent `codex.exe`. If you run a multi-subagent workflow, restart the app afterward to reset the process tree.
+
+**Monitor your process count.** Run this periodically in PowerShell:
+
+```powershell
+# Count Codex-related Node.js processes
+Get-Process node -ErrorAction SilentlyContinue |
+  Measure-Object -Property WorkingSet -Sum |
+  Select-Object Count, @{N='GB';E={[math]::Round($_.Sum/1GB,2)}}
+```
+
+If the count is in the dozens or memory is in the gigabytes, you are leaking.
+
+**Watch your CPU when idle.** If Codex Desktop is open but you are not actively using it, check Task Manager for sustained `WMI Provider Host` or Defender activity. If present, fully exit the app from the system tray (not just close the window) and verify CPU drops.
+
+**Set resource expectations for persistent goals.** If you use Codex's persistent-goal feature, be aware that a single goal can consume millions of tokens across hundreds of tool calls with no built-in ceiling. Set a personal budget or time limit and monitor it externally — Codex will not warn you.
+
+## The Bigger Picture
+
+The coding agent industry is rushing toward multi-agent orchestration as the next major capability frontier. Subagents, persistent goals, plugin ecosystems — these are the features that differentiate a tool from a toy. But the runtime underneath them has to manage resources correctly, or the capability becomes a liability.
+
+Codex Desktop's current state is that the multi-agent features are shipping faster than the resource management that supports them. The MCP process leak has been reported at least six times across months. The WMI storm appears to be a new manifestation of the same unmanaged-background-work problem. The planning loop runaway shows what happens when a persistent goal has no resource ceiling.
+
+None of these issues affect the quality of the code Codex generates. When it works, it works well. The problem is that "when it works" increasingly depends on whether you happen to hit a resource limit before the session completes. That is not a position any production workflow should accept.
+
+*This article was updated on 2026-07-22 to correct process-count calculations and add the Reddit community report link.*
+
+*Before you buy any coding agent subscription — compare prices and find exclusive deals at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
