@@ -1,358 +1,397 @@
 #!/usr/bin/env node
 /**
- * Social Media Engine v2 — S.G.T.M.S. Framework
- * Volume-first, feed-first algorithm strategy.
+ * social-engine.cjs — S.G.T.M.S. Social Media Engine
  * 
- * Modes:
- *   --batch N         Generate N posts using S.G.T.M.S. variations
- *   --linkedin        Generate LinkedIn "nobody tells you" post
- *   --hot-take        Generate quick hot take for Twitter
- *   --publish ID      Publish a scheduled post immediately
- *   --dry             Preview only
+ * Generates and schedules posts via MyMarky API.
  * 
  * Usage:
- *   node scripts/social-engine.cjs --batch 6
- *   node scripts/social-engine.cjs --linkedin
- *   node scripts/social-engine.cjs --hot-take
- *   node scripts/social-engine.cjs --publish <post-id>
+ *   node scripts/social-engine.cjs --batch N    # Schedule N Twitter posts
+ *   node scripts/social-engine.cjs --linkedin   # Schedule 1 LinkedIn post
+ *   node scripts/social-engine.cjs --dry-run    # Preview without scheduling
  */
 
 const https = require('https');
-const fs = require('fs');
-const path = require('path');
+const http = require('http');
 
-const ROOT = path.join(__dirname, '..');
+// ── Config ──────────────────────────────────────────────────────────────
 const BIZ_ID = '598a98f9-9ff9-4fa5-90a2-2ad0e313417e';
-const KEY = 'mk_live_w61K61zmWDi-I-pviWXoYQX7UmU2mJ-xOAVyNdsKVpY';
-const API = 'https://api.mymarky.ai/api';
+const API_KEY = 'mk_live_w61K61zmWDi-I-pviWXoYQX7UmU2mJ-xOAVyNdsKVpY';
+const API_BASE = 'https://api.mymarky.ai';
 
-// ── S.G.T.M.S. Repeatable Formats ──
-// These are PROVEN formats that consistently perform.
-// We rotate through them instead of generating new concepts daily.
+// Schedule slots (UTC) — these are Saudi morning slots
+// 9 AM SAST = 6 AM UTC, 1 PM SAST = 10 AM UTC, 5 PM SAST = 2 PM UTC
+const TWITTER_SLOTS_UTC = [
+  'T06:00:00Z',  // 9 AM Saudi
+  'T10:00:00Z',  // 1 PM Saudi
+  'T14:00:00Z',  // 5 PM Saudi
+];
 
-const FORMATS = {
-  // Top of Funnel — Discovery (60% of posts)
-  hot_take: {
-    funnel: 'discovery',
-    platforms: ['twitter', 'linkedin'],
-    templates: [
-      'Hot take: {opinion}\n\nNo {common_assumption}.\n\nThe reality is {counter_intuitive_truth}',
-      'Unpopular opinion: {opinion}\n\nHere is why nobody talks about this:',
-      '{bold_claim}.\n\nFight me in the replies.',
-    ],
+const LINKEDIN_SLOT_UTC = 'T08:00:00Z'; // 11 AM Saudi
+
+// ── Content Library ─────────────────────────────────────────────────────
+// Rotate formats: hot_take, stop_paying, nobody_tells_you, cant_believe,
+//                 why_nobody, git_history, mistake_list
+
+const TWITTER_POSTS = [
+  // ── hot_take ──
+  {
+    format: 'hot_take',
+    text: 'Hot take: most code reviews are just performance art.\n\nThe reviewer approves everything anyway.\nThe author already knows the issues.\nBoth sides pretend it matters.\n\nThe real review happens in the PR description.',
   },
-  stop_paying: {
-    funnel: 'discovery',
-    platforms: ['twitter', 'linkedin', 'instagram'],
-    templates: [
-      'Stop paying for {paid_thing}.\n\nHere is a free alternative that does the same job:',
-      'Why are you still paying for {paid_thing}?\n\n{free_alternative} does it for free.',
-      '{paid_thing} costs ${price}/mo.\n\n{free_alternative} costs $0.\n\nSame features. Sometimes better.',
-    ],
+  {
+    format: 'hot_take',
+    text: 'Unpopular opinion: your IDE is slowing you down.\n\nMost developers use 5% of VS Code features.\nThe other 95% is bloat.\n\nLearn 10 terminal commands. You will be faster.',
   },
-  nobody_tells_you: {
-    funnel: 'discovery',
-    platforms: ['linkedin', 'twitter'],
-    templates: [
-      'I have been {doing_x} for {time_period}.\n\nHere is what nobody tells you:\n\n1. {insight_1}\n2. {insight_2}\n3. {insight_3}\n4. {insight_4}\n5. {insight_5}',
-      '{time_period} of {doing_x}. The honest truth:\n\n• {insight_1}\n• {insight_2}\n• {insight_3}\n• {insight_4}\n• {insight_5}',
-    ],
+  {
+    format: 'hot_take',
+    text: 'Hot take: "clean code" is a scam.\n\nNot clean code itself.\nThe obsession with it.\n\nShipping working code beats perfect code every time.\nUsers do not care about your variable names.',
   },
-  cant_believe: {
-    funnel: 'discovery',
-    platforms: ['twitter', 'facebook'],
-    templates: [
-      'I cannot believe this is free.\n\n{tool_name} just {what_it_does}.\n\nNo catch. No freemium. Just free.',
-      'Wait — {tool_name} is free?\n\n{what_it_does}.\n\nI have been paying for this?',
-    ],
+  {
+    format: 'hot_take',
+    text: 'Hot take: senior devs write less code.\n\nNot because they are lazy.\nBecause they deleted more than they wrote.\n\nThe best code is code that does not exist.',
   },
-  why_nobody: {
-    funnel: 'discovery',
-    platforms: ['twitter', 'linkedin'],
-    templates: [
-      'Why is nobody talking about {tool_name}?\n\n{what_it_does}.\n\nI switched last week and {result}.',
-      'The most underrated {category} tool in 2026:\n\n{tool_name}\n\n{why_its_good}',
-    ],
-  },
-  git_history: {
-    funnel: 'discovery',
-    platforms: ['twitter'],
-    templates: [
-      'My git history looks like a crime scene:\n\n"fix"\n"fix fix"\n"actually fix"\n"please work"\n"it works on my machine"\n"final fix" <- this one broke prod',
-      'Commit messages at 3 AM:\n\n"stuff"\n"why"\n"help"\n"it works now leave me alone"\n"this should not work but it does"',
-    ],
+  {
+    format: 'hot_take',
+    text: 'The hottest take in 2026:\n\nGit blame is a feature, not a shaming tool.\n\nIt shows who to ask questions to.\nThat is knowledge transfer, not blame assignment.',
   },
 
-  // Mid-Funnel — Nurture (30% of posts)
-  deep_dive: {
-    funnel: 'nurture',
-    platforms: ['linkedin'],
-    templates: [
-      'I spent {time} researching {topic}.\n\nHere are {number} things I learned:\n\n{findings}',
-      '{topic} — the complete breakdown:\n\n{findings}',
-    ],
+  // ── stop_paying ──
+  {
+    format: 'stop_paying',
+    text: 'Stop paying for:\n\n• Grammarly ($12/mo)\n• Notion ($10/mo)\n• Figma ($15/mo)\n\nAlternatives:\n• LanguageTool (free)\n• Obsidian (free)\n• Penpot (free)\n\n$37/mo saved. $444/yr.',
   },
-  before_after: {
-    funnel: 'nurture',
-    platforms: ['linkedin', 'twitter'],
-    templates: [
-      'Before I discovered {tool}:\n{before_state}\n\nAfter:\n{after_state}\n\nThe difference is real.',
-    ],
+  {
+    format: 'stop_paying',
+    text: 'Stop paying for a Docker GUI.\n\npodman + podman-compose\n• Rootless by default\n• No daemon needed\n• Drop-in Docker replacement\n\nFree. Faster. More secure.',
   },
-  mistake_list: {
-    funnel: 'nurture',
-    platforms: ['twitter', 'linkedin', 'instagram'],
-    templates: [
-      '{number} {topic} mistakes I see every day:\n\n{mistakes}',
-      'Stop making these {number} {topic} mistakes:\n\n{mistakes}',
-    ],
+  {
+    format: 'stop_paying',
+    text: 'Stop paying for Postman.\n\nUse httpie or curl.\n\nhttp POST api.example.com name=test\n\ncurl -X POST api.example.com -d name=test\n\nFree. Works in terminal. No account needed.',
+  },
+  {
+    format: 'stop_paying',
+    text: 'Stop paying for cloud IDEs.\n\nSSH + tmux + vim = free remote dev.\n\n• No browser lag\n• No subscription\n• Works offline\n• Your terminal, your rules',
   },
 
-  // Bottom of Funnel — Conversion (10% of posts)
-  recommendation: {
-    funnel: 'conversion',
-    platforms: ['twitter', 'linkedin', 'instagram', 'facebook'],
-    templates: [
-      'If you are building with {technology}, you need to read this:\n\n{article_title}\n\n{url}',
-      'New post: {article_title}\n\n{key_insight}\n\n{url}',
-    ],
+  // ── nobody_tells_you ──
+  {
+    format: 'nobody_tells_you',
+    text: 'Nobody tells you about:\n\n• git stash -p (partial stash)\n• git log --diff-filter=D (find deleted files)\n• git blame -L 10,20 file.js (range blame)\n• git reflog (time machine)\n\n90% of devs never touch these.',
   },
-};
+  {
+    format: 'nobody_tells_you',
+    text: 'Nobody tells you:\n\nThe best terminal shortcut is not a shortcut.\n\nIt is muscle memory.\n\nAfter 2 weeks of daily terminal use, your fingers move faster than your brain.\n\nThat is when you get dangerous.',
+  },
+  {
+    format: 'nobody_tells_you',
+    text: 'Nobody tells you this about AI coding agents:\n\nThey are bad at your codebase.\nThey are good at patterns.\n\nFeed them examples, not instructions.\nShow, do not tell.',
+  },
+  {
+    format: 'nobody_tells_you',
+    text: 'Nobody tells you:\n\ngit commit -m "WIP" is a valid workflow.\n\nCommit early. Commit often.\nCommit before you think you are done.\n\nYou can always rebase later.',
+  },
 
-// ── Pre-written content (no AI needed for volume) ──
-const PRE_WRITTEN = {
-  hot_take: [
-    { text: 'Hot take: the best code review feedback is silence.\n\nNo comments = clean code.\n\nA code review with 47 comments is not a review — it is a rewrite request in disguise.', platforms: ['twitter', 'linkedin'] },
-    { text: 'Hot take: the best debugging tool is sleep.\n\nYou will stare at a bug for 3 hours, go to bed, and solve it in 5 minutes the next morning.\n\nYour brain processes code while you sleep.', platforms: ['twitter', 'linkedin'] },
-    { text: 'Hot take: most "senior" developers are just junior developers who learned to say "it depends" with confidence.', platforms: ['twitter'] },
-    { text: 'Hot take: the best documentation is a well-named variable.\n\nIf your code needs a README to understand, your variable names are too clever.', platforms: ['twitter', 'linkedin'] },
-    { text: 'Hot take: AI coding agents are not replacing developers.\n\nThey are replacing the 80% of development time spent figuring out what to type.', platforms: ['twitter', 'linkedin'] },
-    { text: 'Hot take: code that needs comments to explain what it does is badly written code.\n\nCode that needs comments to explain WHY — that is good documentation.', platforms: ['twitter'] },
-    { text: 'Hot take: the hardest part of programming is not writing code.\n\nIt is deciding what NOT to build.', platforms: ['twitter', 'linkedin'] },
-  ],
-  stop_paying: [
-    { text: 'Stop paying for ChatGPT Plus.\n\nClaude Code with the free tier does the same thing.\n\nI saved $20/mo and the code quality is better.', platforms: ['twitter', 'linkedin'] },
-    { text: 'Stop paying for Grammarly.\n\nHemingway Editor does it for free.\n\nSimpler. Faster. No browser extension needed.', platforms: ['twitter', 'linkedin', 'instagram'] },
-    { text: 'Stop paying for Notion.\n\nObsidian does everything Notion does.\n\nAnd your data stays on your machine.', platforms: ['twitter', 'linkedin'] },
-    { text: 'Stop paying for a VPN.\n\nWireGuard + a $5/mo VPS gives you a personal VPN.\n\nFaster than any commercial VPN. You own the server.', platforms: ['twitter'] },
-    { text: 'Stop paying for Slack.\n\nMatrix + Element gives you the same thing.\n\nSelf-hosted. E2E encrypted. Free forever.', platforms: ['twitter', 'linkedin'] },
-  ],
-  nobody_tells_you: [
-    { text: 'I have been building AI coding agents for 6 months.\n\nHere is what nobody tells you:\n\n1. The hardest part is not the AI — it is the tool integration\n2. Most agents fail at multi-file edits\n3. The ones that work feel like magic\n4. You will spend 80% of your time debugging tool calls\n5. When it works, you will never go back to manual coding', platforms: ['linkedin'] },
-    { text: '6 months of running a tech blog with AI agents. The honest truth:\n\n• AI writes 90% of drafts. I edit 10%.\n• SEO still matters more than content quality\n• Consistency beats virality every time\n• The algorithm rewards speed, not perfection\n• Most "viral" posts are just relatable observations', platforms: ['linkedin'] },
-    { text: '2 years of remote work. Here is what nobody tells you:\n\n• The hardest part is not distractions — it is loneliness\n• A standing desk changed my life more than any productivity app\n• You need to "leave work" even when work is 10 steps away\n• Async communication is a skill, not a preference\n• The best remote workers are the best writers', platforms: ['linkedin'] },
-    { text: 'I have been using terminal tools for 3 years.\n\nWhat nobody tells you:\n\n• The learning curve is worth it\n• You will type faster than any GUI user\n• Tab completion is addictive\n• Once you go CLI, you never go back\n• Your productivity doubles in 2 weeks', platforms: ['linkedin', 'twitter'] },
-    { text: '1 year of open source contribution. The real truth:\n\n• Most maintainers are overwhelmed, not unfriendly\n• Documentation PRs are the fastest way to get accepted\n• Your first PR will have 47 review comments\n• That is normal. That is how you learn.\n• The community is smaller than you think', platforms: ['linkedin'] },
-  ],
-  cant_believe: [
-    { text: 'I cannot believe this is free.\n\nOllama runs LLMs on your laptop.\n\nNo API keys. No monthly fee. Just install and run.\n\nI have been paying for Claude API when this exists?', platforms: ['twitter', 'facebook'] },
-    { text: 'Wait — Cursor has a free tier?\n\nAI code completion inside VS Code.\n\nI have been paying for GitHub Copilot when this exists?', platforms: ['twitter'] },
-    { text: 'I cannot believe this is free.\n\nVercel deploys your site in 30 seconds.\n\nSSL. CDN. Preview deployments. All free.\n\nI was paying $20/mo for a VPS that did less.', platforms: ['twitter', 'linkedin', 'facebook'] },
-    { text: 'Wait — Linear is free for small teams?\n\nIssue tracking that does not make you want to quit.\n\nI have been using Jira when this exists?', platforms: ['twitter', 'linkedin'] },
-  ],
-  why_nobody: [
-    { text: 'Why is nobody talking about ripgrep?\n\nIt is 10x faster than grep.\n\nI switched last week and my search times dropped from seconds to milliseconds.', platforms: ['twitter'] },
-    { text: 'The most underrated terminal tool in 2026:\n\nbat — a better cat.\n\nSyntax highlighting. Line numbers. Git integration.\n\nWhy was I using cat this whole time?', platforms: ['twitter', 'instagram'] },
-    { text: 'Why is nobody talking about Neovim?\n\nFull IDE experience in the terminal.\n\nOnce you learn the basics, you will never touch a mouse again.', platforms: ['twitter'] },
-    { text: 'The most underrated AI tool in 2026:\n\nClaude Code Skills.\n\nCustom instructions that make your coding agent 10x smarter.\n\nMost people do not even know they exist.', platforms: ['twitter', 'linkedin'] },
-  ],
-  git_history: [
-    { text: 'My git history looks like a crime scene:\n\n"fix"\n"fix fix"\n"actually fix"\n"please work"\n"it works on my machine"\n"final fix" <- this one broke prod', platforms: ['twitter'] },
-    { text: 'Commit messages at 3 AM:\n\n"stuff"\n"why"\n"help"\n"it works now leave me alone"\n"this should not work but it does"', platforms: ['twitter'] },
-    { text: 'My terminal history after a debugging session:\n\nnpm start\nnpm run dev\nnode index.js\nnode --inspect index.js\ncurl localhost:3000\ncurl -v localhost:3000\nnpm test\nrm -rf node_modules\nnpm install\nnpm start', platforms: ['twitter'] },
-  ],
-  mistake_list: [
-    { text: '5 terminal mistakes I see every day:\n\n1. Using `ls` when `ls -la` exists\n2. Not using `&&` to chain commands\n3. Forgetting `cd -` to go back\n4. Not setting up aliases\n5. Typing full paths instead of using `~`', platforms: ['twitter', 'instagram'] },
-    { text: '5 git mistakes that waste hours:\n\n1. Not using `git stash` before switching branches\n2. Committing directly to main\n3. Not using `git bisect` to find bugs\n4. Forgetting `git pull --rebase`\n5. Not setting up `.gitignore` properly', platforms: ['twitter', 'linkedin'] },
-    { text: '5 coding habits that slow you down:\n\n1. Not using a linter\n2. Manually formatting code\n3. Not using keyboard shortcuts\n4. Reading docs instead of examples\n5. Over-engineering before validating', platforms: ['twitter', 'linkedin', 'instagram'] },
-  ],
-  recommendation: [
-    { text: 'If you are building a SaaS, you need to read this:\n\nBest Coding Agents 2026 — Decision Guide\n\nThe honest comparison nobody else is doing.\n\nhttps://terminalblog.com/blog/best-coding-agents-2026-decision-guide/', platforms: ['twitter', 'linkedin', 'facebook'] },
-    { text: 'New post: AGENTS.md Complete Guide\n\nMake every coding agent follow your repo rules.\n\nThis one file changes how AI writes code in your project.\n\nhttps://terminalblog.com/blog/agents-md-complete-guide/', platforms: ['twitter', 'linkedin'] },
-    { text: 'New post: Coding Agent Security Checklist 2026\n\nThe operator hardening guide.\n\nIf you run Claude Code, Codex, or any agent — read this.\n\nhttps://terminalblog.com/blog/coding-agent-security-checklist-2026/', platforms: ['twitter', 'linkedin'] },
-  ],
-};
+  // ── cant_believe ──
+  {
+    format: 'cant_believe',
+    text: 'I cannot believe this is free:\n\n• Neovim\n• tmux\n• fzf\n• ripgrep\n• bat\n\nAll open source. All faster than paid alternatives.\n\nThe terminal is the best IDE and it costs $0.',
+  },
+  {
+    format: 'cant_believe',
+    text: 'I cannot believe developers still:\n\n• Manually resolve merge conflicts\n• Do deployments on Fridays\n• Skip writing tests because "it is fast"\n• Push to main without a PR\n\nSome things never change.',
+  },
+  {
+    format: 'cant_believe',
+    text: 'I cannot believe how much time I wasted on:\n\n• Choosing the perfect font\n• Configuring dotfiles\n• Making the perfect color scheme\n\nJust use defaults and ship code.',
+  },
 
-// ── API helpers ──
-function apiCall(method, apiPath, body = null) {
+  // ── why_nobody ──
+  {
+    format: 'why_nobody',
+    text: 'Why nobody talks about:\n\nThe 30 minutes before you start coding.\n\nReading the issue.\nChecking git log.\nUnderstanding context.\n\nThat is where real debugging happens.',
+  },
+  {
+    format: 'why_nobody',
+    text: 'Why nobody talks about how slow code review kills teams:\n\n• PR sits for 3 days\n• Author context-switches\n• Merge conflict appears\n• Another 2 days to fix\n\nAverage PR cycle: 5 days for a 10-line change.',
+  },
+  {
+    format: 'why_nobody',
+    text: 'Why nobody talks about tmux:\n\nIt is not exciting.\nIt is not new.\nIt just works.\n\nAnd it saves you 1000+ clicks per year.',
+  },
+
+  // ── git_history ──
+  {
+    format: 'git_history',
+    text: 'My git history this week:\n\n"initial setup"\n"it works"\n"actually working"\n"fix typo"\n"please work"\n"it works on my machine"\n"FINAL final fix"\n\nEvery developer. Every week.',
+  },
+  {
+    format: 'git_history',
+    text: 'Reading old git commits is therapy:\n\n2024: "fix bug"\n2025: "fix the actual bug this time"\n2026: "add comment explaining why this works"\n\nGrowth is real.',
+  },
+  {
+    format: 'git_history',
+    text: 'The best git commit message I ever wrote:\n\n"Revert "Revert "Revert "Fix"""\n\nSometimes you just have to go back.',
+  },
+
+  // ── mistake_list ──
+  {
+    format: 'mistake_list',
+    text: '5 mistakes I made so you do not have to:\n\n1. Pushing without pulling first\n2. Not checking the diff before commit\n3. force push on shared branches\n4. Hardcoding API keys\n5. Deploying on Friday at 5 PM\n\nAll preventable. All painful.',
+  },
+  {
+    format: 'mistake_list',
+    text: '3 mistakes junior devs always make:\n\n1. Not reading error messages fully\n2. Copying Stack Overflow without understanding\n3. Over-engineering a simple solution\n\nI did all three for 2 years straight.',
+  },
+  {
+    format: 'mistake_list',
+    text: 'The mistake every dev makes with AI tools:\n\nPrompting: "write me a function"\n\nInstead of:\n"Given this interface, write a function that handles X edge cases and follows this pattern from our codebase"\n\nSpecificity = quality.',
+  },
+];
+
+const LINKEDIN_POSTS = [
+  {
+    format: 'nobody_tells_you',
+    text: `I have been building with AI coding agents for 8 months. Here is what nobody tells you:
+
+1. They are terrible at your specific codebase out of the box. You need to teach them. AGENTS.md files, CLAUDE.md, cursor rules — these are not optional. They are the difference between "wow" and "why did it delete my router."
+
+2. The 30-minute context setup saves 3 hours of debugging. Before letting an agent touch your code, give it the architectural context. Tell it what NOT to change. Show it the patterns it should follow.
+
+3. Code review becomes MORE important, not less. AI writes faster, so you review more code. The skill is not writing — it is reviewing. Know your codebase well enough to spot when an agent hallucinates a function that does not exist.
+
+4. The real productivity gain is not speed. It is the mental bandwidth. When an agent handles boilerplate, tests, and documentation, you spend your energy on the hard problems. That is where the magic happens.
+
+5. You will write worse code if you trust it blindly. The developers who benefit most from AI agents are the ones who already knew how to write good code. The agent amplifies your skill, it does not replace it.
+
+The tool is only as good as the person wielding it.`,
+  },
+  {
+    format: 'nobody_tells_you',
+    text: `I switched from GUI tools to terminal-only workflow 2 years ago. Here is what nobody tells you:
+
+1. The first week is painful. You will miss your buttons. You will Google the same command 5 times. That is normal. Muscle memory takes 2 weeks, not 2 months.
+
+2. You will never go back. Once you can navigate your entire dev environment without touching a mouse, everything else feels slow. GUIs have a ceiling. Terminals do not.
+
+3. The productivity boost is not about typing speed. It is about context switching. Terminal = keyboard. GUI = keyboard + mouse + window switching. Every context switch costs 15 minutes of focus.
+
+4. Pair programming changes completely. Screen sharing a terminal session is cleaner than sharing an IDE. Two people can follow the same command flow without UI distractions.
+
+5. Your debugging improves. When you cannot click through a debugger, you learn to read logs, trace code paths, and think about state. That is a stronger skill than any IDE feature.
+
+The terminal is not old school. It is the most modern tool we have.`,
+  },
+  {
+    format: 'nobody_tells_you',
+    text: `I have been reviewing code for 6 years. Here is what nobody tells you:
+
+1. The best code review takes 10 minutes. If it takes an hour, the PR is too big. Split it.
+
+2. The most valuable comment is "why?" not "change this." Help the author understand the reasoning, not just the fix.
+
+3. Style nitpicks destroy morale. Reserve reviews for logic, security, and architecture. Use a linter for style.
+
+4. Approving fast is underrated. A PR that sits for 3 days costs the team more than a quick approve with a small follow-up suggestion.
+
+5. The reviewer learns more than the author. Every review teaches you patterns, anti-patterns, and context about parts of the codebase you did not write.
+
+6. The best teams review code synchronously. 15 minutes of talking replaces 3 days of async comments.
+
+Code review is not a gate. It is a conversation.`,
+  },
+];
+
+// ── API Helpers ─────────────────────────────────────────────────────────
+
+function apiRequest(method, path, body = null) {
   return new Promise((resolve, reject) => {
-    const data = body ? JSON.stringify(body) : null;
-    const opts = {
-      hostname: 'api.mymarky.ai',
-      path: `/api${apiPath}`,
+    const url = new URL(`${API_BASE}${path}`);
+    const options = {
+      hostname: url.hostname,
+      path: url.pathname + url.search,
       method,
       headers: {
-        'Authorization': `Bearer ${KEY}`,
+        'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json',
-        ...(data ? { 'Content-Length': Buffer.byteLength(data) } : {}),
       },
+      timeout: 30000,
     };
-    const req = https.request(opts, (res) => {
-      let body = '';
-      res.on('data', c => body += c);
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => data += chunk);
       res.on('end', () => {
-        try { resolve({ status: res.statusCode, data: JSON.parse(body) }); }
-        catch { resolve({ status: res.statusCode, data: body }); }
+        try {
+          resolve({ status: res.statusCode, body: JSON.parse(data) });
+        } catch (e) {
+          resolve({ status: res.statusCode, body: data });
+        }
       });
     });
+
     req.on('error', reject);
-    if (data) req.write(data);
+    req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
+
+    if (body) req.write(JSON.stringify(body));
     req.end();
   });
 }
 
-function getTodaySlots(count) {
-  const now = new Date();
-  const slots = [];
-  // Post at: 8 AM, 12 PM, 4 PM, 8 PM Saudi (5, 9, 13, 17 UTC)
-  const hours = [5, 9, 13, 17];
-  for (const h of hours) {
-    const d = new Date(now);
-    d.setUTCHours(h, 0, 0, 0);
-    if (d > now) slots.push(d.toISOString());
-  }
-  if (slots.length < count) {
-    for (const h of hours) {
-      const d = new Date(now);
-      d.setDate(d.getDate() + 1);
-      d.setUTCHours(h, 0, 0, 0);
-      slots.push(d.toISOString());
-      if (slots.length >= count) break;
-    }
-  }
-  return slots.slice(0, count);
+async function getScheduledPosts() {
+  const resp = await apiRequest('GET', `/api/businesses/${BIZ_ID}/posts?status=SCHEDULED&limit=50`);
+  if (resp.status !== 200) return [];
+  return resp.body.data || [];
 }
 
-// ── Main ──
+function isDuplicate(newText, existingPosts) {
+  const newFirst60 = newText.slice(0, 60).toLowerCase();
+  return existingPosts.some(p => {
+    const cap = (p.caption || '').slice(0, 60).toLowerCase();
+    return cap === newFirst60;
+  });
+}
+
+function getNextSlot(slots, index) {
+  const now = new Date();
+  const slot = slots[index % slots.length];
+  const baseDate = new Date(now);
+  baseDate.setUTCHours(0, 0, 0, 0);
+
+  // Find next occurrence of this slot
+  let candidate = new Date(baseDate.toISOString().slice(0, 10) + slot);
+  if (candidate <= now) {
+    candidate.setUTCDate(candidate.getUTCDate() + 1);
+  }
+  return candidate.toISOString();
+}
+
+// ── Main ────────────────────────────────────────────────────────────────
+
 async function main() {
   const args = process.argv.slice(2);
-  const dry = args.includes('--dry');
-  const batch = args.includes('--batch');
-  const linkedin = args.includes('--linkedin');
-  const hotTake = args.includes('--hot-take');
-  const publish = args.includes('--publish');
-  const count = batch ? parseInt(args[args.indexOf('--batch') + 1] || '6') : 0;
+  const isDryRun = args.includes('--dry-run');
+  const isLinkedIn = args.includes('--linkedin');
+  const batchIdx = args.indexOf('--batch');
+  const batchCount = batchIdx >= 0 ? parseInt(args[batchIdx + 1], 10) : (isLinkedIn ? 1 : 0);
 
-  console.log('=== Social Engine v2 (S.G.T.M.S.) ===');
+  if (!isLinkedIn && batchCount === 0) {
+    console.error('Usage: node scripts/social-engine.cjs --batch N | --linkedin [--dry-run]');
+    process.exit(1);
+  }
 
-  if (batch) {
-    console.log(`\nGenerating ${count} posts with S.G.T.M.S. variations...`);
-    const slots = getTodaySlots(count);
-    const allPosts = Object.values(PRE_WRITTEN).flat();
-    const shuffled = [...allPosts].sort(() => Math.random() - 0.5);
-    const selected = shuffled.slice(0, count);
+  // Fetch existing scheduled posts for dedup
+  console.log('Fetching existing scheduled posts for dedup...');
+  const existing = await getScheduledPosts();
+  console.log(`Found ${existing.length} scheduled posts\n`);
+
+  const results = [];
+
+  if (isLinkedIn) {
+    // Pick a LinkedIn post not yet scheduled
+    const usedCaptions = existing.map(p => (p.caption || '').slice(0, 60).toLowerCase());
+    const available = LINKEDIN_POSTS.filter(p => !usedCaptions.includes(p.text.slice(0, 60).toLowerCase()));
+
+    if (available.length === 0) {
+      console.log('All LinkedIn posts already scheduled. Nothing to do.');
+      return;
+    }
+
+    const post = available[Math.floor(Math.random() * available.length)];
+    const schedTime = getNextSlot([LINKEDIN_SLOT_UTC], 0);
+
+    console.log(`[LINKEDIN] format=${post.format}`);
+    console.log(`Text preview: ${post.text.slice(0, 120)}...`);
+    console.log(`Scheduled: ${schedTime}\n`);
+
+    if (isDryRun) {
+      console.log('DRY RUN — would schedule this post.');
+      results.push({ platform: 'linkedin', status: 'dry_run', text: post.text.slice(0, 80) });
+    } else {
+      try {
+        const resp = await apiRequest('POST', `/api/businesses/${BIZ_ID}/posts`, {
+          caption: post.text,
+          restrict_publish_to: ['linkedIn'],
+          status: 'SCHEDULED',
+          scheduled_publish_time: schedTime,
+        });
+        if (resp.status === 201) {
+          console.log(`✅ LinkedIn post scheduled: ${resp.body.id}`);
+          results.push({ platform: 'linkedin', status: 'scheduled', id: resp.body.id });
+        } else {
+          console.error(`❌ Failed (${resp.status}): ${JSON.stringify(resp.body).slice(0, 200)}`);
+          results.push({ platform: 'linkedin', status: 'error', error: resp.body });
+        }
+      } catch (e) {
+        console.error(`❌ Error: ${e.message}`);
+        results.push({ platform: 'linkedin', status: 'error', error: e.message });
+      }
+    }
+  }
+
+  if (batchCount > 0) {
+    // Select N unique Twitter posts not already scheduled
+    const shuffled = [...TWITTER_POSTS].sort(() => Math.random() - 0.5);
+    const selected = [];
+
+    for (const post of shuffled) {
+      if (selected.length >= batchCount) break;
+      if (!isDuplicate(post.text, existing) && !isDuplicate(post.text, selected.map(p => ({ caption: p.text })))) {
+        selected.push(post);
+      }
+    }
+
+    if (selected.length === 0) {
+      console.log('All Twitter posts already scheduled. Nothing to do.');
+      return;
+    }
+
+    console.log(`Selected ${selected.length} Twitter posts:\n`);
 
     for (let i = 0; i < selected.length; i++) {
       const post = selected[i];
-      const slot = slots[i] || new Date(Date.now() + (i * 3600000)).toISOString();
-      const platforms = post.platforms || ['twitter', 'linkedin', 'facebook', 'instagram'];
+      const schedTime = getNextSlot(TWITTER_SLOTS_UTC, i);
 
-      console.log(`\n[${i + 1}/${count}] ${post.text.slice(0, 60)}...`);
-      console.log(`  Platforms: ${platforms.join(', ')}`);
-      console.log(`  Scheduled: ${slot}`);
+      console.log(`[${i + 1}/${selected.length}] format=${post.format}`);
+      console.log(`Text: ${post.text.slice(0, 100)}...`);
+      console.log(`Scheduled: ${schedTime}`);
 
-      if (dry) {
-        console.log('  [DRY RUN] Would create post');
-        continue;
-      }
-
-      const body = {
-        caption: post.text,
-        restrict_publish_to: platforms,
-        scheduled_publish_time: slot,
-      };
-
-      const result = await apiCall('POST', `/businesses/${BIZ_ID}/posts`, body);
-      if (result.data?.id) {
-        console.log(`  ✅ Created: ${result.data.id}`);
+      if (isDryRun) {
+        console.log('DRY RUN — would schedule.\n');
+        results.push({ platform: 'twitter', status: 'dry_run', text: post.text.slice(0, 80) });
       } else {
-        console.log(`  ❌ Error: ${JSON.stringify(result.data).slice(0, 200)}`);
+        try {
+          const resp = await apiRequest('POST', `/api/businesses/${BIZ_ID}/posts`, {
+            caption: post.text,
+            restrict_publish_to: ['twitter'],
+            status: 'SCHEDULED',
+            scheduled_publish_time: schedTime,
+          });
+          if (resp.status === 201) {
+            console.log(`✅ Scheduled: ${resp.body.id}\n`);
+            results.push({ platform: 'twitter', status: 'scheduled', id: resp.body.id });
+          } else {
+            console.error(`❌ Failed (${resp.status}): ${JSON.stringify(resp.body).slice(0, 200)}\n`);
+            results.push({ platform: 'twitter', status: 'error', error: resp.body });
+          }
+        } catch (e) {
+          console.error(`❌ Error: ${e.message}\n`);
+          results.push({ platform: 'twitter', status: 'error', error: e.message });
+        }
       }
-
-      await new Promise(r => setTimeout(r, 1000)); // Rate limit
-    }
-    console.log(`\nDone. ${count} posts scheduled.`);
-  }
-
-  if (linkedin) {
-    console.log('\nGenerating LinkedIn "nobody tells you" post...');
-    const posts = PRE_WRITTEN.nobody_tells_you;
-    const post = posts[Math.floor(Math.random() * posts.length)];
-
-    if (dry) {
-      console.log(`\n[DRY RUN]\n${post.text}`);
-      return;
-    }
-
-    const body = {
-      caption: post.text,
-      restrict_publish_to: ['linkedin'],
-    };
-
-    const result = await apiCall('POST', `/businesses/${BIZ_ID}/posts`, body);
-    if (result.data?.id) {
-      console.log(`✅ Created: ${result.data.id}`);
-      // Publish immediately
-      const pub = await apiCall('POST', `/businesses/${BIZ_ID}/posts/${result.data.id}/publish`);
-      if (pub.data?.status === 'PUBLISHED') {
-        console.log('📤 Published to LinkedIn');
-      }
-    } else {
-      console.log(`❌ Error: ${JSON.stringify(result.data).slice(0, 200)}`);
     }
   }
 
-  if (hotTake) {
-    console.log('\nGenerating hot take for Twitter...');
-    const posts = PRE_WRITTEN.hot_take;
-    const post = posts[Math.floor(Math.random() * posts.length)];
-
-    if (dry) {
-      console.log(`\n[DRY RUN]\n${post.text}`);
-      return;
-    }
-
-    const body = {
-      caption: post.text,
-      restrict_publish_to: ['twitter'],
-    };
-
-    const result = await apiCall('POST', `/businesses/${BIZ_ID}/posts`, body);
-    if (result.data?.id) {
-      console.log(`✅ Created: ${result.data.id}`);
-      const pub = await apiCall('POST', `/businesses/${BIZ_ID}/posts/${result.data.id}/publish`);
-      if (pub.data?.status === 'PUBLISHED') {
-        console.log('📤 Published to Twitter');
-      }
-    } else {
-      console.log(`❌ Error: ${JSON.stringify(result.data).slice(0, 200)}`);
-    }
-  }
-
-  if (publish) {
-    const postId = args[args.indexOf('--publish') + 1];
-    if (!postId) {
-      console.error('Usage: --publish <post-id>');
-      process.exit(1);
-    }
-    console.log(`\nPublishing post ${postId}...`);
-    const pub = await apiCall('POST', `/businesses/${BIZ_ID}/posts/${postId}/publish`);
-    console.log(JSON.stringify(pub.data, null, 2));
-  }
-
-  if (!batch && !linkedin && !hotTake && !publish) {
-    console.log('\nUsage:');
-    console.log('  --batch N          Generate N posts (S.G.T.M.S. variations)');
-    console.log('  --linkedin         Publish LinkedIn "nobody tells you" post');
-    console.log('  --hot-take         Publish hot take to Twitter');
-    console.log('  --publish ID       Publish a scheduled post immediately');
-    console.log('  --dry              Preview only');
-    console.log('\nFormats: hot_take, stop_paying, nobody_tells_you, cant_believe, why_nobody, git_history, mistake_list, recommendation');
-    console.log('\nFunnel stages:');
-    console.log('  Discovery (60%): hot_take, stop_paying, cant_believe, why_nobody, git_history');
-    console.log('  Nurture (30%): nobody_tells_you, deep_dive, before_after, mistake_list');
-    console.log('  Conversion (10%): recommendation');
-  }
+  // Summary
+  console.log('─'.repeat(50));
+  console.log('SUMMARY');
+  console.log('─'.repeat(50));
+  const scheduled = results.filter(r => r.status === 'scheduled').length;
+  const errors = results.filter(r => r.status === 'error').length;
+  const dryRuns = results.filter(r => r.status === 'dry_run').length;
+  console.log(`Scheduled: ${scheduled} | Errors: ${errors} | Dry runs: ${dryRuns}`);
 }
 
-main().catch(e => { console.error('Error:', e.message); process.exit(1); });
+main().catch(e => {
+  console.error('Fatal:', e);
+  process.exit(1);
+});
