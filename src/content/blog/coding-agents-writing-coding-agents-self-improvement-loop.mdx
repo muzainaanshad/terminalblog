@@ -1,0 +1,74 @@
+---
+title: "Coding Agents Writing Coding Agents: The Self-Improvement Loop"
+description: "yoyo-evolve went from 200 lines to 115K lines with every commit agent-written. Cursor runs 1,000 agent commits per second. Here's what the self-referential coding loop means for developers."
+pubDate: "2026-07-23T14:00:00Z"
+tags: ["trend", "self-evolving-agents", "yoyo-evolve", "GenericAgent", "cursor-swarm", "orchestration", "economics"]
+tool: "industry"
+author: "terminalblog"
+image: "/api/og?title=Agents+Writing+Agents+Self-Improvement+Loop&tool=trend"
+---
+
+## The $1,077 Codebase
+
+On March 1, 2026, a developer named Yuan Hao pushed 200 lines of Rust to GitHub. The repo was called yoyo-evolve, and the premise was simple: a coding agent that reads its own source code, picks what to improve, implements the change, runs tests, and commits. Every few hours. On its own.
+
+Four months later, the agent — not the human — has written 115,806 lines of Rust across 77 source files, supported by 4,317 passing tests. Total compute cost: $1,077.59. The human's contribution since day one has been the original 200 lines and the decision to let it run.
+
+This is not a novelty project. It is the clearest working example of a structural shift happening across the entire coding-agent ecosystem: agents are no longer just tools that help humans write code. They are becoming participants in a self-referential loop where agents write, test, review, and evolve code that other agents consume.
+
+## Three Projects, One Pattern
+
+The self-improvement loop is not confined to a single repo. Three independent projects, built by different teams on different continents, all arrived at the same pattern from different directions.
+
+**yoyo-evolve** (1,846 stars, Rust) is the purest example. The agent uses a tool called RTK for token compression, has a `/spawn` system for delegating subtasks to child agents, and now supports parallel and background sub-agent execution. Every feature in the 90+ command set was added by the agent itself through an evolution pipeline: plan, implement, respond. The human reviews periodically. The agent does not wait.
+
+**GenericAgent** (13,500+ stars, Python) takes a different approach. Its core is approximately 3,000 lines of code with an agent loop of roughly 100 lines. Every time it solves a new task, it crystallizes the execution path into a reusable Skill — a persistent, composable unit of capability. The longer you use it, the more skills accumulate, forming a personal skill tree grown entirely from execution. It shipped a desktop GUI in May 2026, a TUI v3 in late May, and a "Morphling mode" that absorbs entire external repositories by extracting goals and tests from them. The self-evolution is not a side effect. It is the design goal.
+
+**Cursor's agent swarm** (research post, July 2026) scaled the pattern to fleet level. Cursor built a swarm of planner and worker agents that reimplemented SQLite in Rust from an 835-page prose specification. The swarm peaked at 1,000 commits per second on a custom version control system. It used a "Field Guide" — a shared context document owned entirely by agents, auto-injected into every agent at session start — to capture surprises and reduce future token usage. Review agents with decorrelated perspectives (different models, different training, different prompt framing) caught errors that self-review would miss. The system is explicitly designed to let agents shape the environment for future agents.
+
+## The Economics: Frontier Brains, Cheap Hands
+
+The structural enabler for this loop is not just capability — it is cost. Cursor's swarm blog post contained data that has not gotten enough attention.
+
+They ran the same task (implement SQLite from docs) across four model configurations:
+
+| Configuration | Cost | Quality |
+|---|---|---|
+| GPT-5.5 planner + GPT-5.5 workers | $10,565 | ~80% pass rate |
+| Grok 4.5 solo | mid-range | ~80% pass rate |
+| Opus 4.8 planner + Composer 2.5 workers | $1,339 | ~80% pass rate |
+| Fable 5 planner + Composer 2.5 workers | higher | ~85% pass rate |
+
+The critical insight: every mix produced similar quality. The cost varied by 8x. In the Opus hybrid run, the entire worker fleet cost $411 — because once a frontier planner has collapsed ambiguity into explicit instructions, cheaper models just follow them.
+
+This is the economic foundation of the self-improvement loop. The agent writing code does not need to be the smartest model in the stack. It needs to be fast, cheap, and reliable. Intelligence concentrates in the planning layer. Execution distributes to commodity models. The loop becomes sustainable.
+
+## What This Means for the Developer
+
+The practical implications break down into three categories.
+
+**Your codebase may already be partially agent-written.** Roborev (1,563 stars, Go) exists specifically because agent-written code needs continuous review. It installs as a git hook, reviews every commit in the background, and surfaces issues in seconds. It supports Claude Code, Codex, Gemini, Copilot, Cursor, Kiro, and seven other agent surfaces. If you are using any of these tools, some percentage of the code in your repo was written by an agent — and the tools to review that code at agent speed are already shipping.
+
+**The bottleneck is shifting from execution to specification.** Cursor's analysis is blunt: "What was scarce in this experiment, and what we expect to be scarce in software engineering going forward, is the right description of intent." The swarm took 835 pages of prose and produced a database. The humans who wrote the spec did the hard work. The agents did the tedious work. If you can describe what you want precisely enough for an agent to follow, the agent can now do the rest.
+
+**Model routing is the new compiler optimization.** Cursor Router (launched July 22, 2026) trained on 600,000+ live requests to classify each incoming task and route it to the most cost-effective model. Simple work goes to cheap models. UI updates go to models with the best taste. Complex reasoning goes to frontier models. The result: frontier-level quality at 30–50% lower cost. This is not a nice-to-have. At agent scale — thousands of commits per session — routing decisions are the difference between a $1,339 run and a $10,565 run.
+
+## The Risks Nobody Is Discussing
+
+Self-improving agents create a category of risk that does not exist with conventional tools.
+
+**Ossification.** Cursor documented that agents trained on human codebases learn not to touch core code even when it needs to change. Their fix: "license intentional breakage," where an agent can make a focused patch outside its scope, leave a comment explaining why, and let the compiler propagate the consequences. This is a governance primitive that did not exist six months ago.
+
+**Split-brain design.** When two planners implement the same concept in different ways in different parts of the codebase, you get architectural schizophrenia. Cursor's solution: planners record decisions in shared design docs, and code carries compile-checked references back to its doc. When planners contradict each other, a reconciler merges the docs.
+
+**Megafiles.** When every agent adds small amounts to the same popular file, no single agent is responsible for keeping it small. The file becomes a bottleneck. Cursor flags bloated files, blocks new commits, and spawns a decomposition agent.
+
+**Context drift in long-running agents.** GenericAgent's solution is the Skill crystallization — extracting reusable patterns from each task so future trajectories are shorter. Cursor's solution is the Field Guide — a shared memory that grows with the project. Both are responses to the same fundamental problem: agents lose track of what they have learned.
+
+## Where This Goes
+
+The coding-agent ecosystem in July 2026 looks nothing like the one from January 2026. The shift is not from worse tools to better tools. It is from tools to participants. The agent is no longer a copilot that suggests the next line. It is a worker that completes the task, a reviewer that audits its own output, and an optimizer that learns from each cycle.
+
+For developers, the practical move is clear: start specifying, not coding. Learn to write precise, testable task descriptions. Set up review infrastructure for agent-written code before you need it. And pay attention to the economics of model routing, because the cost difference between a smart routing strategy and a naive one is measured in thousands of dollars per session.
+
+The 200-line Rust project that became 115,000 lines for $1,077 is not a gimmick. It is a preview of how software will be built.
