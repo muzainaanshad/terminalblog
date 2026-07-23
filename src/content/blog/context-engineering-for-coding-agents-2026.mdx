@@ -1,0 +1,182 @@
+---
+title: "Context Engineering for Coding Agents: How to Make Every Token Count"
+description: "Practical patterns for structuring your codebase, prompts, and project files so coding agents produce better code with fewer wasted tokens. Covers AGENTS.md optimization, prompt framing, context window tricks, and the mistakes that silently tank agent quality."
+pubDate: "2026-07-22"
+updatedDate: "2026-07-22"
+tags: ["guide", "pillar", "context-engineering", "best-practices", "workflow", "optimization"]
+author: "ada"
+image: "/api/og?title=Context+Engineering+for+Coding+Agents"
+---
+
+## Related articles
+
+- [AGENTS.md Complete Guide — Make Every Coding Agent Follow Your Repo Rules](/blog/agents-md-complete-guide/)
+- [Claude Code skills vs subagents vs MCP: which extension primitive fits](/blog/claude-code-skills-vs-subagents-vs-mcp/)
+- [Case for lightweight coding agents in 2026](/blog/case-for-lightweight-coding-agents-2026/)
+- [Feature every coding agent is missing](/blog/feature-every-coding-agent-missing/)
+
+---
+
+Your coding agent just spent 40,000 tokens reading files, exploring dead ends, and producing a two-line diff. The code was wrong. You ask again, get a different wrong answer, and burn another 30,000 tokens. This is not a model problem. This is a context engineering problem.
+
+Context engineering is the discipline of **structuring what your coding agent sees** so it produces correct output on the first attempt. It is not prompt engineering (which is about phrasing) and it is not code architecture (which is about the product). It is the intersection: how you present your project, your expectations, and your constraints to an agent that can only work with what it reads.
+
+This guide covers practical patterns that cut wasted tokens by 50-70% in real projects.
+
+## Why context engineering matters now
+
+The term surfaced in mid-2026 when teams running multiple coding agents noticed a pattern: the same model produced dramatically different results depending on how the project was structured. A well-organized repo with clear instruction files yielded 3x fewer revision cycles than a messy repo with the same code quality.
+
+Three forces make this urgent:
+
+1. **Token costs are real.** Claude Sonnet 4 at $3/M input tokens means a 50K-token context load costs $0.15 per attempt. Ten failed attempts is $1.50 of pure waste. At scale, bad context design is a line item.
+
+2. **Context windows are finite.** Even with 200K windows, agents that load entire files, test outputs, and error logs have less room for the reasoning that actually produces good code. Every byte of irrelevant context is a byte that could have been useful.
+
+3. **Agent harnesses are opaque.** You do not control what the agent reads internally. Subagents, tool calls, and automatic file discovery all consume context invisibly. The only way to control this is to shape what is available before the agent starts reading.
+
+## The context engineering stack
+
+Think of your project in four layers, each designed to feed the agent the right information at the right time.
+
+### Layer 1: The always-on brief (AGENTS.md / CLAUDE.md)
+
+This file is loaded automatically into every session. It is the single most leveraged piece of context engineering in any project.
+
+**What belongs here:**
+
+- One paragraph: what this repo is and what it does
+- Stack summary (languages, framework versions, package manager)
+- Critical commands (install, test, lint, build) with exact syntax
+- Non-negotiable rules (never force push, no prod secrets, naming conventions)
+- Where to find detailed docs (explicit paths, not vague references)
+
+**What does not belong here:**
+
+- Full architecture documents (too long, rarely read carefully)
+- Historical context or design decisions (use git log for that)
+- Task-specific instructions (those go in the prompt)
+
+**The 50-line rule:** If your AGENTS.md exceeds 50 lines, split it. Root file for universal rules. Subdirectory files (`packages/api/AGENTS.md`) for package-specific invariants. Agents that support nested instruction files will layer them automatically. Those that do not will at least load the root file.
+
+A common mistake is writing "see `docs/architecture.md`" and assuming the agent will read it. It will not. If the information matters, either paste the relevant section directly into AGENTS.md or use the `@path` syntax your harness supports for explicit file inclusion.
+
+### Layer 2: The project layout
+
+Your directory structure is context. Agents infer project architecture from folder names, file organization, and where things live. A flat `src/` with 200 files tells the agent nothing. A structured layout tells it everything without a single instruction.
+
+**Patterns that help agents:**
+
+```
+src/
+  components/     # UI components (React)
+  hooks/          # Custom React hooks
+  lib/            # Shared utilities
+  api/            # Backend routes
+  models/         # Database models
+  types/          # TypeScript types
+tests/
+  unit/           # Unit tests
+  integration/    # Integration tests
+scripts/          # Dev scripts, not production code
+```
+
+When an agent needs to add an API endpoint, it immediately knows: routes go in `src/api/`, models in `src/models/`, tests in `tests/integration/`. This eliminates the "where should I put this?" exploratory phase that burns context.
+
+**The test proximity rule:** Co-locate test files next to their source files only if your framework enforces it (Go, Rust). Otherwise, put tests in a parallel structure. Agents that see `src/api/users.ts` and `tests/integration/users.test.ts` form the connection faster than agents that see `src/api/users.ts` and `tests/integration/14_test_user_endpoint_v2.test.ts`.
+
+### Layer 3: Prompt framing
+
+The prompt is the tactical layer. It is where you tell the agent what specific task to do, given the context it has already loaded.
+
+**The three-part prompt pattern:**
+
+1. **What exists:** One sentence about the current state of the code you are changing. Not a full file dump — just the relevant fact. "The `UserSerializer` class in `src/api/serializers.py` handles JSON output for the users endpoint."
+
+2. **What you want:** The exact behavior change or addition, stated concretely. Not "improve the serializer" but "add a `roles` field to the UserSerializer output that includes the user's team membership from the `TeamMembership` model."
+
+3. **Constraints:** What the agent must not do. "Do not change the existing field order. Do not modify the test for the profile endpoint. Run `pytest tests/test_users.py` after the change."
+
+This structure works because it mirrors how agents process instructions: orient first, act second, verify third. Skipping the orientation step forces the agent to re-orient itself using its context window, which is slower and less reliable.
+
+**What to avoid in prompts:**
+
+- **File dumps.** Pasting 200 lines of code into a prompt wastes context that could be used for reasoning. Let the agent read the file using its tools. If you must reference specific lines, use line numbers: "see `src/api/serializers.py:45-62`."
+
+- **Vague intent.** "Make it better" or "optimize this" forces the agent to guess. Agents that guess use more tokens exploring possibilities and are more likely to produce something you did not want.
+
+- **Chain-of-thought requests.** Asking the agent to "think step by step" or "explain your reasoning" adds tokens to every response without improving code quality. If you want reasoning, ask for a summary after the code is written, not before.
+
+### Layer 4: Context window management
+
+This is the hidden layer — managing what the agent sees across a long session.
+
+**The checkpoint pattern:** For tasks that span many files or require multiple steps, create natural checkpoints. After the agent completes a subtask, summarize what was done and start a fresh context. In Claude Code, this means starting a new conversation after a logical unit of work. In Hermes, this means using subagents that return only synthesized results.
+
+This matters because agents degrade over long sessions. The accumulation of tool outputs, error messages, and intermediate reasoning crowds the context window with debris. A 10-message conversation about refactoring a module may have 60K tokens of context, but only 5K of that is still relevant.
+
+**The file-read discipline:** Agents read entire files by default. If you have a 500-line file and only need to change lines 200-210, explicitly tell the agent which lines to read. "Read `src/parser.ts:195-215` and add error handling for the null case." This saves ~480 lines of context per file read.
+
+**Subagent delegation for noisy tasks:** When a task requires extensive exploration — searching for patterns across 50 files, reading 10 different modules to understand dependencies, generating a migration plan — delegate it to a subagent. The subagent does the noisy work in its own context window. Only the summary comes back. Your main session stays clean.
+
+## Five mistakes that silently waste context
+
+### 1. Loading README.md into AGENTS.md
+
+Your README is for humans browsing GitHub. It contains badges, installation instructions for multiple platforms, contribution guidelines, and license text. None of this helps an agent write code. AGENTS.md should contain the subset of information the agent actually needs to make decisions.
+
+### 2. Unbounded file reads
+
+A common anti-pattern: "Read the entire `src/` directory and understand the architecture." This loads thousands of lines of code into context, most of which is irrelevant to the current task. Instead, ask the agent to read specific files or specific line ranges.
+
+### 3. Redundant error context
+
+When a test fails, agents often read the full traceback, the entire test file, the source file, and the config file. For a simple assertion failure, you only need the assertion line and the actual vs expected values. Train yourself (and your prompts) to provide minimal diagnostic context.
+
+### 4. Ignoring instruction file drift
+
+AGENTS.md files rot. Commands change, new patterns emerge, old rules become irrelevant. An outdated instruction file is worse than no instruction file because the agent follows bad instructions confidently. Review your AGENTS.md monthly. If it references a command that no longer exists or a pattern you no longer use, the agent will too.
+
+### 5. No separation between permanent and task-specific context
+
+Everything you put in AGENTS.md loads every session. If your project has a temporary migration script, a one-time database change, or an experimental feature flag, do not put those in AGENTS.md. Put them in the task prompt or in a temporary file that the agent reads only when needed.
+
+## Measuring context efficiency
+
+You cannot improve what you do not measure. Here are the metrics that matter:
+
+**Tokens per correct change.** The total tokens consumed (input + output) divided by the number of correctly implemented changes. This captures both prompt efficiency and agent accuracy. A well-contexted project should see this number decrease over time.
+
+**Revision cycles.** The number of times you have to correct the agent before it produces the right output. One revision is normal. Three revisions indicate a context problem, not an agent problem.
+
+**Exploration ratio.** The proportion of tokens spent on file reads and searches versus actual code generation. If an agent reads 10 files to write 20 lines, the exploration ratio is high. This suggests the project layout or instruction file is not guiding the agent effectively.
+
+## Context engineering by agent type
+
+Not all agents handle context the same way. Adjust your approach:
+
+**IDE-integrated agents (Cursor, Copilot)** have access to the full project through their indexing system. Your context engineering focus should be on the rules files (`.cursorrules`, instruction files) and ensuring the index is up to date. These agents do not need explicit file paths because they can search.
+
+**Terminal agents (Claude Code, Codex, Hermes)** read files explicitly. Your context engineering focus should be on AGENTS.md quality, clear file paths in prompts, and subagent delegation for noisy tasks. These agents benefit most from the three-part prompt pattern.
+
+**Cloud agents (OpenClaw, Codex Cloud)** run in isolated environments. Your context engineering focus should be on ensuring the full context is available in the environment. These agents often start without your local project context, so the instruction files must be self-contained.
+
+## The practical checklist
+
+Before your next coding agent session:
+
+1. Is your AGENTS.md under 50 lines with only agent-relevant information?
+2. Can the agent find any file it needs from the directory structure alone?
+3. Does your prompt follow the three-part pattern (state, intent, constraint)?
+4. Are you referencing specific line ranges instead of full files?
+5. Will you checkpoint before the session exceeds 10 messages?
+6. Have you reviewed AGENTS.md in the last 30 days?
+
+Context engineering is not a one-time setup. It is an ongoing practice that improves with every session. The agents that produce the best code are not the ones with the best models — they are the ones operating in the best-structured environments.
+
+## Further reading
+
+- [AGENTS.md Complete Guide](/blog/agents-md-complete-guide/) — the full reference for writing instruction files
+- [Claude Code skills vs subagents vs MCP](/blog/claude-code-skills-vs-subagents-vs-mcp/) — choosing the right extension primitive
+- [Feature every coding agent is missing](/blog/feature-every-coding-agent-missing/) — what the current generation still cannot do
+- [Coding agent pricing guide 2026](/blog/coding-agent-pricing-guide-2026/) — understanding the cost of context
