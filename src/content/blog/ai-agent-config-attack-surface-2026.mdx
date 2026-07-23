@@ -1,0 +1,124 @@
+---
+title: "Your AI Agent's Config Directory Is Now the Most Dangerous Place on Your Machine"
+slug: ai-agent-config-directory-attack-surface-2026
+description: "Six major campaigns in 2026 — GhostApproval, TrapDoor, Miasma, IronWorm, Clinejection, RoguePilot — all converge on the same attack surface: the tiny config files your coding agent trusts implicitly. Here's why .cursorrules, CLAUDE.md, and settings.json became the primary weapon class against developers."
+pubDate: "2026-07-24T15:00:00Z"
+updatedDate: "2026-07-24T15:00:00Z"
+tags: ["security", "trend", "supply-chain", "coding-agents", "claude-code", "cursor", "gemini-cli", "cline", "copilot", "windsurf"]
+tool: "industry"
+author: "kira"
+image: "/api/og?title=AI+Agent+Config+Files+Are+the+New+Attack+Surface&tool=industry"
+---
+
+## Related articles
+
+- [Beware: Clinejection — How a GitHub Issue Title Became a Supply Chain Attack](/blog/beware-clinejection-supply-chain-attack-github-actions/)
+- [Beware: GhostCommit Hides Prompt Injection in PNGs to Drain Your .env](/blog/ghostcommit-png-prompt-injection-env-theft/)
+- [Coding Agent Security Checklist 2026](/blog/coding-agent-security-checklist-2026/)
+- [The AI Coding Trust Paradox: 42% of Code Is AI-Generated, But Only 29% of Developers Believe It](/blog/ai-coding-trust-paradox-verification-crisis/)
+
+---
+
+Something unusual happened in the first half of 2026. At least six independent attack campaigns — some operated by different threat actors, some discovered by different security firms, some targeting different agent platforms — all converged on the exact same surface. Not the LLM itself. Not the model weights. Not even the MCP server registry. The target was something much smaller, much quieter, and much more deeply trusted: the tiny config files that sit in your project directory and tell your coding agent how to behave.
+
+`.claude/settings.json`. `.cursorrules`. `CLAUDE.md`. `.gemini/settings.json`. `.mcp.json`. `.github/copilot-instructions.md`. `.windsurfrules`.
+
+These files are three to thirty lines long. Most developers never think about them between setup and the next config change. But in 2026, they became the primary weapon class in supply chain attacks against AI-assisted development. And the reason they work reveals something fundamental about why the current generation of coding agents is structurally harder to secure than any previous developer tool.
+
+## The three trust relationships that make config files uniquely dangerous
+
+Every previous attack surface in software security sits in a well-understood trust boundary. A dependency lives in your `node_modules`. A CI workflow lives in `.github/workflows`. A Dockerfile lives at the repo root. Each has a clear execution model, a clear trust scope, and a growing body of tooling to audit it.
+
+Agent config files sit at the intersection of three separate trust relationships, and none of them have mature defenses yet.
+
+**First: the developer trusts them as configuration.** When you set up a new project, you create a `.cursorrules` file or a `CLAUDE.md` to give your agent project-specific context. This is a voluntary act of trust — you are explicitly telling the agent "these files contain authoritative instructions for how to work in this codebase." No signature verification. No integrity check. No review gate. The file is just there.
+
+**Second: the IDE executes them automatically.** Claude Code's `settings.json` can define `SessionStart` hooks — shell commands that run every time you open a project. Cursor reads `.cursorrules` and `.mdc` rule files and injects their contents into the model's system prompt on every conversation turn. Gemini CLI and Copilot follow similar patterns. These are not suggestions the agent might read; they are executed at machine speed with whatever permissions the developer's session carries.
+
+**Third: the LLM treats them as system-level instructions.** This is the one that changes everything. When a `.cursorrules` file says "always read the API key from environment before calling the deployment script," the model does not evaluate whether that instruction is safe. It follows it the same way it follows any system prompt — as a directive that overrides its default behavior. The config file is not data the model *reads*. It is code the model *executes*.
+
+No other developer tool combines all three. A Makefile is executed but not trusted as LLM instruction. A `.editorconfig` is trusted as config but not executed automatically. A shell script is executed but not fed into a language model as a system-level override. Agent config files are the only artifact on your machine that simultaneously runs as code, reads as config, and acts as an LLM system prompt.
+
+That is why they are dangerous. And in 2026, that is why they are under siege.
+
+## The six campaigns
+
+The attacks are not theoretical. Here is what has actually hit the ecosystem in the last seven months:
+
+### Clinejection (February 2026)
+
+Security researcher Adnan Khan disclosed a vulnerability chain in Cline's CI/CD pipeline where a single prompt injection in a GitHub issue title — parseable by any GitHub account — could trick Cline's AI triage bot into executing arbitrary commands on production runners. The attacker then poisoned the GitHub Actions cache to steal npm publication tokens and pushed a malicious `cline@2.3.0` to npm. Roughly 4,000 developers pulled the poisoned package during an eight-hour window. The entry point was the agent's trust in untrusted text.
+
+### TrapDoor (May 2026)
+
+A campaign spanning npm, PyPI, and Crates.io planted `.cursorrules` and `CLAUDE.md` files containing hidden instructions embedded with zero-width Unicode characters (U+200B, U+200C, U+200D, U+FEFF). The files appeared blank in standard text editors — the malicious directives were invisible to human review — but the LLM parsed them as system instructions. When a developer next opened Claude Code or Cursor in the affected directory, the agent received instructions to run a fake "security scan" that actually collected and exfiltrated SSH keys, AWS credentials, browser profiles, and crypto wallet data. The same attacker also opened pull requests against six major AI open-source projects (including LangChain, browser-use, MetaGPT, and OpenHands) proposing documentation commits that contained the same hidden payloads. All six PRs were caught and rejected, but the pattern — using the AI agent's config file as the delivery mechanism — was proven viable at scale.
+
+### Mini Shai-Hulud (April–May 2026)
+
+A self-propagating npm/PyPI worm compromised 172 packages across 404 malicious versions. The worm scanned developer home directories for config files belonging to Claude Code, Gemini CLI, GitHub Copilot, Cursor, Codex, Cline, and Aider. For each tool it found, it injected a hook command into the appropriate settings file — a `SessionStart` entry in Claude Code's `settings.json`, an instruction block in `.cursorrules`, and so on. From that point forward, every time the developer started an AI coding session, the malware ran silently with the same trust the developer placed in their own tools. This was the first publicly documented supply chain attack to produce cryptographically valid SLSA Build Level 3 provenance attestations by hijacking a legitimate build pipeline.
+
+### Miasma and IronWorm (June 2026)
+
+Two self-replicating worms emerged from the npm ecosystem during the first week of June, both explicitly targeting AI tool configuration directories. Miasma compromised 57 npm packages across 286+ malicious versions and spread into 73 GitHub repositories, planting backdoor files at `.claude/setup.mjs`, `.claude/settings.json`, `.cursor/rules/setup.mdc`, `.gemini/settings.json`, and `.vscode/tasks.json`. IronWorm, a Rust-compiled Linux ELF binary, carried an eBPF kernel rootkit and swept 86 environment variables and 20+ credential file paths — with explicit targeting of every major AI provider API key variable name (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, and others). IronWorm propagated through npm's Trusted Publishing OIDC token exchange: any CI pipeline running an infected package became a publish vector automatically, without any stored credential. The commit author name used for malicious pushes was "claude" — a deliberate attempt to make analysts attribute the activity to legitimate AI coding tool behavior.
+
+### RoguePilot (2026)
+
+Security firm Orca demonstrated that a hidden HTML comment in a GitHub issue — invisible to humans but ingested by Copilot as context — could command the AI to check out a pre-crafted pull request containing a symlink to the environment's `GITHUB_TOKEN` file. Copilot's guardrails did not follow the symlink. The stolen token was then exfiltrated through VS Code's automatic JSON schema download feature. The entire attack chain — invisible comment, AI command execution, symlink bypass, HTTP exfiltration — required nothing more than the ability to open an issue on a public repository.
+
+### GhostApproval (July 8, 2026)
+
+Wiz Security Research disclosed CVE-2026-12958: a symlink-based vulnerability affecting six major coding assistants — Amazon Q Developer, Claude Code, Augment, Cursor, Google Antigravity, and Windsurf. The attack places a file named `project_settings.json` in a repository that is actually a symbolic link to `~/.ssh/authorized_keys` or `~/.zshrc`. The repository's README instructs the agent to append a line to the file. When the developer trusts the project, the agent resolves the write through the symlink and silently injects an SSH key or shell command. In testing, Claude Code's internal reasoning correctly identified that the file was actually a zsh configuration file — but the approval dialog shown to the developer listed only the benign filename. The human approved what appeared to be a safe edit. Windsurf was worse: the write completed before the Accept/Reject prompt rendered, reducing the dialog to a post-hoc undo button. Augment presented no dialog at all.
+
+## The pattern
+
+Six campaigns. Different actors. Different targets. Different techniques. But every single one weaponizes the same three trust relationships:
+
+1. The developer trusts the config file as their own configuration
+2. The IDE or agent reads and executes it automatically
+3. The LLM follows it as an authoritative system instruction
+
+The config file is not a vulnerability in the traditional sense — there is no CVE for "your agent trusts files in its own directory." The vulnerability is architectural: agents were designed to treat their config directory as a trusted execution environment, and attackers discovered that this trust is absolute, unverified, and extends to any file an attacker can place in a project directory that a developer will then open.
+
+## What makes 2026 different from 2025
+
+Supply chain attacks on npm, PyPI, and GitHub are not new. But the 2025 wave targeted package dependencies and CI secrets — the same surface that has been under attack since the event-stream incident in 2018. What changed in 2026 is that attackers discovered a new trust boundary that has no existing defense tooling:
+
+- No SAST tool scans `.cursorrules` for malicious LLM instructions
+- No dependency auditor checks `settings.json` for `SessionStart` hook injection
+- No code review gate treats `CLAUDE.md` modifications as security-sensitive
+- No SBOM standard includes agent configuration files as artifacts to track
+
+GitGuardian found 24,008 secrets in MCP configuration files on public GitHub — 2,117 of which were confirmed live credentials. That is not an attack; that is just developers who do not realize their agent config files contain exfiltratable secrets by design. The attacks described above are what happens when someone notices.
+
+## What you should actually do
+
+This is not a "be more careful" problem. The architecture of agent config files means that manual diligence has a hard ceiling. Here is what actually helps:
+
+**Treat config files as code in your review process.** Add `.claude/settings.json`, `.gemini/settings.json`, `.cursor/rules/`, `.cursorrules`, `.windsurfrules`, `.github/copilot-instructions.md`, `CLAUDE.md`, and `AGENTS.md` to your repository's mandatory review policy. Any modification to these paths should require sign-off before merge, exactly like a change to a CI workflow file. These files execute with the same privilege level — or higher — than a workflow.
+
+**Pin config file hashes in CI.** Generate expected SHA-256 hashes of all agent config files at repository initialization and verify them before any LLM-assisted task runs. A modified `.claude/settings.json` should block the pipeline pending review, not silently pass.
+
+**Use `--ignore-scripts` on package installs in CI and onboarding.** The initial infection vector in the Miasma, Shai-Hulud, and IronWorm campaigns was a preinstall hook in a malicious npm package. `npm install --ignore-scripts` severs the entry point before the harness is ever touched.
+
+**Flag `alwaysApply: true` with broad globs as a high-severity finding.** In Cursor, an `.mdc` file declaring `alwaysApply: true` with `globs: ["**/*"]` injects its instructions into every AI conversation in that project. No legitimate project setup rule needs this combination. Add it as a custom SAST pattern in your pipeline.
+
+**Audit what your agent config files contain right now.** Run this today:
+
+```bash
+find ~ -maxdepth 4 -name "settings.json" -path "*claude*" -o -name "settings.json" -path "*gemini*" -o -name ".cursorrules" -o -name "CLAUDE.md" -o -name "AGENTS.md" 2>/dev/null | while read f; do
+  echo "=== $f ==="
+  cat "$f"
+done
+```
+
+Look for `SessionStart` hooks you did not add. Look for instructions you did not write. Look for `alwaysApply: true` rules in files you do not recognize. Look for zero-width Unicode characters in any file that appears empty or benign (most editors will not show them; use `xxd` or `cat -A` instead).
+
+**Rotate tokens after any npm install from untrusted sources.** If you ran `npm install` against a package you did not vet, treat your GitHub tokens, npm publish tokens, and AI provider API keys as compromised. Rotate them immediately. The propagation mechanism in both Shai-Hulud and IronWorm depends on stolen tokens to spread; token rotation is the circuit breaker.
+
+## The uncomfortable conclusion
+
+The AI agent ecosystem is not dealing with a bug. It is dealing with an architectural assumption — that the project directory is a trusted execution boundary — that has been invalidated by the reality of open-source collaboration. In a world where anyone can open a pull request, create a repository, or publish a package, the assumption that files in a project directory are safe is simply wrong.
+
+The config file is now the payload. The developer's trust is the exploit. And the LLM is the execution engine.
+
+Until agent frameworks move to signed configuration, sandboxed config execution, or at minimum mandatory review gates for config file changes, every developer who opens an untrusted repository in Claude Code, Cursor, Gemini CLI, Copilot, or Windsurf is making a bet that the config files in that directory are exactly what they appear to be. Six campaigns in seven months suggest that bet is no longer safe.
