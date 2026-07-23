@@ -36,8 +36,34 @@ grep -Rni "mcpServers" ~/.claude.json ~/.claude/settings.json 2>/dev/null
 
 - Don't fan out >1 concurrent sub-agent against a single stateful MCP server until a fix ships.
 - After every write through MCP, re-fetch and assert the returned entity ID matches the requested one before trusting downstream logic.
-- For Jira/linear-style connectors, add a post-write verification step that fails the turn on ID mismatch.
+- For Jira/Linear-style connectors, add a post-write verification step that fails the turn on ID mismatch.
 - Downgrade to the last known-good Claude Code build if parallel MCP workflows are critical to you.
+
+## What this looks like in practice
+
+Say you have three sub-agents each editing a different Jira ticket through the same MCP server. Agent A requests ticket PROJ-101, Agent B requests PROJ-202, Agent C requests PROJ-303. Each one issues an `editJiraIssue` call. When the responses come back, Agent A might receive the confirmation payload for PROJ-202 instead of PROJ-101. The actual edit on the Jira side landed correctly on PROJ-101 — but the agent now *believes* it edited the wrong ticket. Any downstream logic that uses the response (logging, chaining edits, updating a summary doc) will operate on incorrect assumptions.
+
+This is especially dangerous in automated pipelines. If your Claude Code workflow runs a triage agent that reads a ticket, edits it, and then posts a summary comment based on the response payload, a mismatched response means the summary comment references the wrong ticket entirely — a silent data-quality failure that's hard to catch without explicit ID assertions.
+
+## Detection pattern for any MCP server
+
+The mismatch is only dangerous when you *trust* the response without verifying. Here's a portable pattern you can wrap around any MCP tool call:
+
+```bash
+# After any write, immediately re-read and compare
+# 1. Issue the write (e.g., editJiraIssue for PROJ-101)
+# 2. Issue a read for the same ID (getJiraIssue for PROJ-101)
+# 3. Assert the read-back matches what you expected
+
+# Quick shell check: if your MCP server exposes a CLI
+# read-after-write verification script:
+EXPECTED_ID="PROJ-101"
+RETURNED_ID=$(your-mcp-cli get-issue $EXPECTED_ID | jq -r '.id')
+if [ "$RETURNED_ID" != "$EXPECTED_ID" ]; then
+  echo "MISMATCH: requested $EXPECTED_ID, got $RETURNED_ID"
+  echo "Likely hit claude-code#77039 — do not trust downstream logic"
+fi
+```
 
 ## Why it happened
 

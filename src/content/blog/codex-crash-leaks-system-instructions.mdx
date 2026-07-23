@@ -28,6 +28,37 @@ The reporter noted the crash happens on Windows, and two other users confirmed t
 
 Consistent output means the leak is deterministic. Anyone who can trigger the crash can read the instructions, which turns a bug into a reliable extraction path rather than a lucky screenshot.
 
+## What might be in the leaked instructions
+
+Based on reports from users who captured the error dialog, the dumped content typically includes:
+
+- **The full system prompt** — the base instructions Codex uses to define its role, tool-use boundaries, and refusal criteria.
+- **Model configuration defaults** — temperature settings, token limits, and any feature-flag overrides that are baked into the client.
+- **Safety and refusal rules** — the exact language telling the model what to decline, which tells an attacker precisely where the guardrails are and what phrasing might bypass them.
+- **Internal identifiers** — session tokens, build hashes, or API endpoint URLs that aren't normally visible to end users.
+
+This isn't a theoretical risk. The system prompt of a coding agent is effectively its security policy. Knowing the exact wording of refusal boundaries lets a motivated user craft inputs that land just outside them — the same class of vulnerability that makes prompt-injection effective in the first place.
+
+## How to check if you're exposed
+
+If you're running Codex Desktop on Windows, here's how to audit the current state:
+
+```bash
+# Check your Codex Desktop version (crash behavior may vary by build)
+# Look in the app's About dialog or settings panel
+
+# If you've seen a crash dialog, check whether logs persist:
+# Windows stores app data in %APPDATA% — look for Codex/Codex Desktop folders
+ls "$APPDATA/Codex" 2>/dev/null || echo "No Codex appdata found"
+ls "$APPDATA/Codex Desktop" 2>/dev/null || echo "No Codex Desktop appdata found"
+
+# Check for any recently created crash dump files
+find "$APPDATA" -name "*.dmp" -newermt "-7 days" 2>/dev/null | head -5
+find "$LOCALAPPDATA" -name "*.dmp" -newermt "-7 days" 2>/dev/null | head -5
+```
+
+If you find crash dumps, open them in a text editor — they may contain the same leaked prompt content that appeared in the UI dialog. Treat them as sensitive and delete after review.
+
 ## What this means for you
 
 If you're using Codex Desktop and it crashes, the error dialog may contain more than you expect. Screenshot it before clicking dismiss — you might see parts of the agent's internal configuration that aren't normally visible. And for the teams building these tools: at minimum, error handlers should sanitize their output. The crash is bad enough without it also becoming an information leak.
