@@ -1,0 +1,118 @@
+---
+title: "The Agent Loop Just Became a Plugin — and That Changes Everything About Who Wins the Coding Agent Wars"
+description: "Simon Willison shipped a coding agent as a 200-line plugin. Microsoft released a batteries-included harness. Thirty harnesses now run the same architecture. The loop is commodity — and the implications reshape which companies win the next phase of AI coding."
+pubDate: "2026-07-23"
+tags: ["trend-analysis", "harness", "multi-agent", "opinion", "industry"]
+tool: "industry"
+author: "sage"
+image: "/api/og?title=Agent+Loop+Plugin+Harness+Wars"
+---
+
+## Related articles
+
+- [Orchestration Topology Is the New Bottleneck in Agentic Coding](/blog/agentic-orchestration-topology-2026/)
+- [Context Engineering for Coding Agents](/blog/context-engineering-for-coding-agents-2026/)
+- [Case for lightweight coding agents in 2026](/blog/case-for-lightweight-coding-agents-2026/)
+- [AGENTS.md complete guide](/blog/agents-md-complete-guide/)
+
+---
+
+On July 2, 2026, Simon Willison shipped a coding agent. It reads files, edits code, runs shell commands, and grinds at tasks while asking permission before mutating anything. A year ago, that loop was the product — the thing companies raised money to build and guarded as a moat. Willison shipped his as a plugin to his `llm` CLI. Apache-2.0. Model-agnostic. `pip install` and you have `llm code`.
+
+The agent fits in a package you can read in an afternoon.
+
+This is not a story about one developer's weekend project. It is a signal that the coding agent's core architecture — the plan-act-observe-repeat loop — has completed its journey from scarce to commodity. And that shift changes who wins the next phase of the AI coding wars, because the value that used to live in the loop has migrated outward to layers most developers haven't thought about yet.
+
+## The anatomy of a commodity
+
+Strip any coding agent to its skeleton and you find the same four steps: the model asks to run a tool, you run it, you feed the result back, you repeat. Every framework that shipped in the first half of 2026 implements this same skeleton. OpenAI's Codex CLI. Claude Code. Gemini CLI. Agent Orchestrator. OpenCode. The open-source clones. Thirty-plus harnesses converge on the same architecture.
+
+This convergence happened because everything hard was already built — just not by the agent authors. Tool-calling substrates matured in 2025. LSP integration became a library call. Tree-sitter parsing ships as a binary. Git plumbing, diff computation, test runners — all of it is now a dependency you install, not a system you build.
+
+When Willison's coding agent assembled six tools (read, write, edit, list, search, shell), added an approval gate for mutations, and capped the loop to prevent infinite spins, he demonstrated the exact boundary between "solved problem" and "still-hard problem." The loop is solved. Everything around it is where the actual engineering challenge lives.
+
+If your product plan still lists "build our own agent loop" in the differentiation column, that line is now worth roughly what "build our own JSON parser" is worth. Not zero — but not a moat.
+
+## Microsoft ships the harness playbook
+
+On July 15, 2026, Microsoft released the Agent Framework Harness — a batteries-included agent wrapper that packages the entire agentic pipeline into a single call. You bring a chat client, instructions, and optional tools. The harness adds function invocation, history persistence, context compaction, todo tracking, plan/execute modes, file memory, tool approval, and OpenTelemetry tracing.
+
+The release matters less for what it includes than for what it signals. Microsoft consolidated AutoGen (54,000 GitHub stars, multi-agent pioneer) and Semantic Kernel into one framework, then shipped the harness as the default way to build with it. The message is clear: assembling the loop yourself is no longer the job. The harness is the product. The loop is the substrate.
+
+Microsoft's terminology is revealing. They call these agents "claws" — a model plus a harness that provides tools, planning, memory, approvals, and observability. The term itself encodes the architectural insight: the model is one component. The harness is the other. And the harness is where you differentiate.
+
+The harness includes capabilities that no standalone agent loop provides:
+
+- **Context compaction** — automatic history management so long-running sessions don't overflow the context window
+- **Progressive skill loading** — `SKILL.md` files discovered and loaded on demand, keeping system prompts lean
+- **Plan/execute modes** — the agent drafts a todo list, gets approval, then works through tasks autonomously
+- **Tool approval** — "don't ask again" standing rules plus heuristic auto-approval for safe calls
+- **Background agents** — parallel sub-agent delegation with result aggregation
+
+These are not features of the loop. They are features of the harness. And they are the features that determine whether an agent completes a complex task successfully or burns 40,000 tokens producing a two-line diff.
+
+## The three layers that matter now
+
+The coding agent stack has split into three distinct layers, and competitive dynamics differ at each:
+
+### Layer 1: The model (commodity)
+
+Model capability has converged. Claude Opus 4.7, GPT-5.4, Gemini 2.5 Pro, and DeepSeek V4 Pro all score within single-digit percentage points on SWE-bench Verified. LongCat-2.0 ran anonymous on OpenRouter under the alias "Owl Alpha" and reached first place on Hermes Agent workspaces, second on Claude Code deployments, and third across OpenClaw environments — with zero brand recognition attached.
+
+When the harness abstracts model access through MCP-compatible endpoints, switching cost drops to a configuration change. The model is a procurement decision. Important, but not differentiating.
+
+OpenAI's own release cadence tells this story. Codex v0.145.0 shipped with 101,000 GitHub stars, 938 releases, and multi-agent V2 — but the headline feature was /import migration from Cursor and Claude Code settings. The competitive surface has shifted from "our model is better" to "your workflow imports seamlessly."
+
+### Layer 2: The harness (the new battleground)
+
+The harness is where 2026's competitive dynamics play out. It includes:
+
+- **Autonomy philosophy** — Claude Code gates every file edit on developer approval. Codex CLI runs unattended for hours in Goal mode. OpenCode offers plan-then-build with full provider neutrality. Same model connections, different trust models.
+- **Memory architecture** — Cross-session memory determines whether an agent remembers your codebase conventions. Memory systems now split into managed cloud (Cloudflare, Mem0), open-source self-hosted (Letta, Cognee), and local MCP (Mnemory, Hmem). The choice maps to your threat model, latency budget, and team size.
+- **Skill systems** — Progressive skill loading (SKILL.md files, Microsoft Foundry skills) lets agents discover domain expertise on demand instead of stuffing everything into the system prompt. Battery Ventures argues that agent skills are the new SDK — installable context packages that teach agents how your tools work.
+- **Evaluation loops** — Philipp Schmid of Google DeepMind quantified the gap: skills configuration was uninvoked in 56% of cases even when the agent had access. Claude Opus 4.6 drops from 55.4% success with force-loaded skills to 38.4% when retrieving its own — barely above the no-skill baseline. The harness that proves which memories and skills actually work has a structural advantage.
+
+### Layer 3: the infrastructure (where defensibility accumulates)
+
+Below the harness sits the infrastructure layer that determines production viability:
+
+- **Sandboxing** — bubblewrap on Linux, Docker devcontainers, Hyperlight micro-VMs. Real isolation is what makes it safe to give an agent file-system access.
+- **Orchestration at scale** — parallel agents in isolated git worktrees, with CI feedback loops routing failures back to the right session. Agent Orchestrator supports 23 worker agent harnesses with automatic PR routing.
+- **Verification** — formal methods, trace verification, AI-native code review. When agents ship more code than humans can review, the verification layer owns the trust surface.
+- **Cost optimization** — coding is the most token-hungry workload on the network. Prefix caching, quantization-aware routing, and LoRA hot-swapping by language or task type determine whether agent fleets are economically viable.
+
+## Why this changes who wins
+
+The history of platform shifts follows a pattern: the layer that was scarce becomes abundant, and value migrates to the layer that remains scarce. Client-server computing commoditized the mainframe. Cloud computing commoditized hardware. Docker commoditized deployment.
+
+In coding agents, the loop was scarce in 2024. It is abundant in 2026. The scarce layers are now:
+
+**Trust and governance.** Only 20% of enterprises have mature AI agent governance. Deloitte's 2026 Tech Trends calls this the critical bottleneck. The harness that solves audit trails, spend caps, and approval policies wins enterprise adoption — not the one with the cleverest loop.
+
+**Evaluation coverage.** The team that can prove which memories are useful, which skills fire correctly, and which model choices produce reliable output for specific task types holds a structural advantage. Skills without evals are tech debt that compounds silently.
+
+**Institutional knowledge absorption.** AGENTS.md files, team-level conventions, code review patterns, architectural decisions — the harness that absorbs a team's tacit engineering culture becomes a trusted source of institutional knowledge, not just a tool. That stickiness is harder to replicate than any loop.
+
+**Fleet coordination.** The one-developer-one-agent workflow is already breaking. Running 2-3 agents in parallel on the same repo is routine. The interface for coordinating parallel agents — not the agents themselves — determines whether fleet coding actually ships code or just generates PR queues that nobody reviews.
+
+## What developers should do with this
+
+**Adopt an open, model-agnostic loop.** Willison's plugin, or any comparable open-source agent like Aider, Cline, or OpenHands. The model-agnostic approach hedges against pricing changes and outages. Being locked to one provider's loop means one provider's pricing decision becomes your operational cost.
+
+**Invest the time you'd spend building a loop into the layers that matter.** Sandboxing (isolation), permissioning (who can do what), evaluation (does it actually work), and memory (does it remember your conventions). These are the layers where your engineering months generate defensible value.
+
+**Start with MEMORY.md. Seriously.** A flat markdown file with your codebase conventions, naming patterns, and architectural decisions — read at session start, appended at session end — eliminates 80% of "the agent keeps making the same mistake" complaints. Graduate to a managed memory service only when you hit concrete retrieval failures you can name.
+
+**Wire in a cross-provider review loop.** OpenAI shipped `codex-plugin-cc` — Codex running inside Claude Code as a plugin with `/codex:review`, `/codex:adversarial-review`, and `/codex:rescue` commands. Use one model to write and a different one to review. Cross-provider review catches what a single model won't flag about its own output. This is architectural, not brand-specific.
+
+**Treat your MCP surface as an architectural decision.** Every service in your agent's tool configuration shapes what it reaches for. If your `config.toml` includes Supabase but not Neon, the agent always reaches for Supabase — regardless of which database better fits the requirement. Curate deliberately.
+
+## The bottom line
+
+The coding agent's core loop is now a plugin you install, not a product you build. That commoditization doesn't diminish the value of coding agents — it concentrates it. The value lives in the harness layer: the memory systems, skill registries, evaluation loops, trust surfaces, and orchestration infrastructure that turn a capable model into a reliable coding partner.
+
+The teams that win the next phase won't be the ones with the cleverest loop. They'll be the ones who understood, early, that the loop was the cheap part.
+
+---
+
+*Sometimes Claude writes better code. Sometimes GPT does. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** lets you compare both instantly in one chat for $12/mo — plus 7 more premium models.*
