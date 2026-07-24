@@ -2,7 +2,7 @@
 title: "What Your Coding Agent Knows About Your Codebase"
 description: "Every file, every credential, every API key — your agent sees everything. Here's what you should know about agent visibility and control."
 pubDate: "2026-07-10T17:00:00Z"
-updatedDate: "2026-07-10T17:00:00Z"
+updatedDate: "2026-07-24T04:00:00Z"
 tags: ["opinion", "security", "privacy", "codebase", "agent-visibility"]
 image: "/api/og?title=What+Your+Coding+Agent+Knows&tool=Security"
 ---
@@ -11,7 +11,7 @@ When you give a coding agent access to your repository, it reads everything. Not
 
 Most developers don't think about this. They install an agent, connect it to their project, and start asking for help. The agent reads what it needs. Life is good.
 
-But the scope of what agents can see is worth understanding.
+But the scope of what agents can see is worth understanding — especially as agents get more autonomous.
 
 ## What's Visible
 
@@ -23,6 +23,20 @@ A coding agent with filesystem access can see:
 - **Git history** — every branch, every commit, every reverted mistake.
 - **Internal documentation** — architecture docs, incident postmortems, security policies.
 - **Dependency manifests** — every library you use, every known vulnerability you haven't patched.
+- **SSH keys and certificates** — if they're in the repo (they shouldn't be, but they are in thousands of public repos on GitHub).
+- **Monorepo shared configs** — if you're in a monorepo, the agent can potentially read config for unrelated services.
+
+The list keeps growing as agents gain filesystem traversal. Claude Code, for instance, will read files outside your project directory if they're referenced in code or if it needs more context.
+
+## Real Exposure Scenarios
+
+Here's what actually happens in practice:
+
+**Scenario 1: The leaked .env.** You're working on a personal project. Your `.env` has your OpenAI API key, your Stripe secret key, and your database URL. You ask Claude Code to "fix the database connection." Claude reads `.env`, sees the connection string, and uses it to debug. That key is now in Anthropic's processing pipeline. For most devs, this is fine — Anthropic doesn't train on API data. But "fine" depends on your threat model.
+
+**Scenario 2: The monorepo leak.** You're in a monorepo with a payments service and a blog service. You ask an agent to fix a typo in the blog. The agent reads the payments service config to understand the project structure. Now it has your Stripe webhook signing secret in its context window.
+
+**Scenario 3: The git history exposure.** Your git history contains a commit where someone accidentally pushed a `.env` file. It was removed in the next commit, but it's still in history. Your agent, doing a code review, reads the git log and encounters the old credentials.
 
 ## Where This Data Goes
 
@@ -34,11 +48,48 @@ Each provider has different data handling policies:
 - **GitHub Copilot:** Covered by GitHub's data protection agreement. Enterprise customers get additional safeguards.
 - **Open-source agents (Hermes, Aider, Cline):** You control where the data goes. Run locally with Ollama and nothing leaves your machine.
 
+The difference matters. With cloud agents, you're trusting a third party's security practices. With local agents, you're trusting your own.
+
 ## The Privacy Spectrum
 
 The spectrum ranges from "everything leaves your machine" (cloud agents) to "nothing leaves your machine" (local open-source agents). Most developers land somewhere in between.
 
-The practical question: does it matter? For most projects, probably not. Your source code isn't valuable to a model provider. But if you're working on proprietary algorithms, financial models, or anything that would be damaging if leaked, the answer changes.
+Here's a practical breakdown:
+
+| Agent Type | Data Flow | Best For |
+|-----------|-----------|----------|
+| Cloud-only (Copilot, Cursor) | Code → Provider servers | Non-sensitive projects |
+| Hybrid (Claude Code) | Code → Anthropic API | Most projects, with awareness |
+| Local-first (Hermes + Ollama) | Code stays on machine | Sensitive/proprietary code |
+
+The practical question: does it matter? For most open-source side projects, probably not. Your source code isn't valuable to a model provider. But if you're working on proprietary algorithms, financial models, healthcare data, or anything that would be damaging if leaked, the answer changes significantly.
+
+## How to Audit Your Agent's Access
+
+Here's a concrete checklist you can run today:
+
+1. **Check your .gitignore** — Is `.env` listed? Are all credential files excluded? Run `git ls-files | grep -i env` to see if any environment files are tracked.
+2. **Check your .env files** — How many secrets are in them? List every key. Do you know where each one is used? If not, you're over-exposed.
+3. **Review agent permissions** — Most agents have permission modes. Claude Code has "plan mode" (read-only) and "auto mode" (full access). Cursor has "ask" mode. Use restricted modes by default.
+4. **Check git history for leaked secrets** — Run `git log --all --diff-filter=D -- '*.env' '*.key' '*.pem'` to find deleted credential files. They're still in history.
+5. **Test with a canary** — Add a fake API key to a test file and see if your agent references it in responses. This tells you how aggressively it reads your filesystem.
+
+## The .agentignore Approach
+
+The `.gitignore` pattern works. Create a `.agentignore` file in your project root listing files and directories the agent should never read:
+
+```
+.env*
+*.pem
+*.key
+secrets/
+credentials/
+infrastructure/
+```
+
+Not all agents support `.agentignore` natively yet. Claude Code respects `.gitignore` patterns by default. Cursor has its own ignore mechanism. Hermes lets you configure allowed paths in its settings.
+
+Check your agent's documentation for ignore file support. If it doesn't have one, you can still use [AGENTS.md](/blog/agents-md-complete-guide) to instruct the agent not to access specific directories.
 
 ## The Right Approach
 
@@ -46,12 +97,13 @@ If you work on sensitive code, use open-source agents with local models. Hermes 
 
 If you use cloud agents, at minimum:
 1. Audit what credentials your agent can access
-2. Use agent-specific credentials with limited permissions
-3. Check your provider's data handling policy quarterly
+2. Use agent-specific credentials with limited permissions (not your personal admin keys)
+3. Check your provider's data handling policy quarterly — policies change
+4. Keep `.env` files out of git history, not just out of the current tree
+5. Use read-only database credentials for development tasks
 
 Your agent sees everything you see. Make sure you're comfortable with who else is looking.
 
 ---
 
----
 *Tired of deciding which AI subscription to keep? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** bundles GPT, Claude, Gemini, Grok, DeepSeek, Perplexity and more for $12/mo — less than half of a single premium chat sub.*
