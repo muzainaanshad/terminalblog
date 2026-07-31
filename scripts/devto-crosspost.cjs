@@ -126,13 +126,14 @@ async function main() {
       .replace(/\]\(\.\.\/([^)]+)\)/g, '](https://terminalblog.com/$1)')
       .replace(/\]\(\.\/([^)]+)\)/g, '](https://terminalblog.com/blog/$1)');
 
+    const attribution = `> *Originally published at [terminalblog.com](https://terminalblog.com/blog/${slug}/).*\n\n`;
     const article = {
       title,
       published: true,
       tags,
       canonical_url: canonical,
       description: fields.description || title,
-      body_markdown: fixedBody,
+      body_markdown: attribution + fixedBody,
     };
 
     if (dry) {
