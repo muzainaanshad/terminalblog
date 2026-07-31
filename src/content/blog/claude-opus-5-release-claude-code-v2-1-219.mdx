@@ -1,0 +1,145 @@
+---
+title: "Claude Opus 5 Arrives: Near-Fable Intelligence at Half the Price, Plus Claude Code v2.1.219"
+description: "Anthropic shipped Claude Opus 5 on July 24 — new state-of-the-art on coding benchmarks, 1M context, no data retention, and it's now the default in Claude Code. Here's what changed and what it means."
+pubDate: "2026-07-31T10:00:00Z"
+updatedDate: "2026-07-31T10:00:00Z"
+tags: ["claude-code", "anthropic", "opus-5", "model-release", "coding-agent"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Opus+5+Release&tool=claude-code"
+---
+
+Anthropic dropped Claude Opus 5 on July 24, 2026. Same day, Claude Code v2.1.219 landed with Opus 5 as the default Opus model. This is not a incremental model bump — it is the biggest leap in the Opus family since 4.5, and it changes the math on every coding agent comparison post you have read this year.
+
+If you use Claude Code, Claude Max, or Claude Pro, you already have access. If you are evaluating which agent to adopt, this release deserves a fresh look.
+
+## What Opus 5 Actually Is
+
+Claude Opus 5 is a mid-tier Opus model sitting between Sonnet and Fable. Anthropic's pitch is simple: near-Fable 5 intelligence at half the price. The benchmarks back it up.
+
+**Key numbers:**
+
+- **$5 per million input tokens, $25 per million output tokens** — same price as Opus 4.8
+- **1M token context window** — same as Opus 4.8, handles massive codebases
+- **Fast mode** runs ~2.5× faster at 2× base price (same deal as 4.8)
+- **No data retention requirement** — unlike Fable 5 and Mythos 5, which have 30-day retention policies
+- **Safety classifiers intervene ~85% less often** than with Fable 5 — fewer blocked prompts, fewer interruptions
+
+That last point matters for coding agents specifically. Fable 5's aggressive safety classifiers have been a friction point in Claude Code workflows, where long autonomous sessions need tools and file access without constant permission prompts. Opus 5's lower classifier trigger rate means smoother autonomous runs.
+
+## The Benchmarks That Matter for Coding
+
+Opus 5 is not just marginally better than Opus 4.8. On the benchmarks developers actually care about, the gap is structural:
+
+**Frontier-Bench v0.1:** Opus 5 surpasses all other models. On cost-per-task, it more than doubles Opus 4.8's performance. On CursorBench 3.2, at max effort, Opus 5 lands within 0.5% of Fable 5's peak score — at half the cost per task.
+
+**ARC-AGI 3:** Opus 5's score is three times higher than the next-best model. This is the benchmark where models have to solve novel problems they have never seen before. A 3× lead is not a rounding error.
+
+**Zapier AutomationBench:** Opus 5's pass rate is ~1.5× the next-best model at the same cost per task. Even at its lowest effort setting, Opus 5 passes more tasks than any other model at any effort level.
+
+**OSWorld 2.0 (computer use):** Opus 5 outperforms every model at any given cost, beating Fable 5's best result at roughly one-third the cost.
+
+**Real-world reports from early-access customers:** Cursor calls it "just under Fable 5" on CursorBench with many of the same behaviors. Lovable reports 22% improvement over Opus 4.7 on their hardest agentic coding tasks, with far less variance run-to-run. A trading firm built a market data feed in a single session — previous models could not complete the task even with extensive plans.
+
+## Claude Code v2.1.219: The Ops Update
+
+The Claude Code update shipped the same day as Opus 5. Beyond making `claude-opus-5` the default Opus model, it ships a cluster of workflow and security features:
+
+**New features:**
+- `sandbox.network.strictAllowlist` — deny non-allowlisted hosts for sandboxed commands without prompting. If you are running agents on shared infrastructure or in CI, this is the network egress control you have been asking for.
+- `DirectoryAdded` hook — fires after `/add-dir` or SDK `register_repo_root` registers a new working directory mid-session. Hooks can now react to context expansion, not just tool calls.
+- `mcp_server_errors` in headless stream-json — lists which `--mcp-config` entries were skipped by validation. No more silent MCP failures in CI.
+- `workflowSizeGuideline` setting — set the advisory Dynamic workflow size from any settings file. Dynamic workflows now default to medium (aim for fewer than 15 agents).
+- Nested subagent forwarding in stream-json — subagents at depth-2+ now appear when `--forward-subagent-text` is set.
+- Subagents can now spawn nested subagents up to depth 3 (was depth 1). Set `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1` to revert.
+
+**Fixes:**
+- Fixed `claude -p` text output dropping the answer when a turn dies on a mid-stream API error. Previously, partial results were silently lost.
+- Fixed permissions approved during self-hosted runner restarts being dropped on resume. Your approvals now persist.
+- Fixed Fable model row showing "Requires usage credits" for plans that include it.
+- Fixed `claude mcp list` and `/mcp` now showing HTTP status and error text for failed servers, plus warnings for MCP config values with hidden whitespace.
+- Fixed Remote Control clients keeping stale fast-mode status after model switches or reconnects.
+- Fixed Vim mode: pressing ← on empty prompt now returns to agent view from NORMAL mode.
+- Fixed `CLAUDE_CODE_GIT_BASH_PATH` on Windows — paths that are not bash/sh binaries are now ignored with a warning instead of being used.
+- Fixed screen-reader mode rewriting entire input line on every keystroke.
+
+**Changes:**
+- Dynamic workflows default to medium size. Pick another size via `/config`.
+- Removed Opus 4.7 from fast mode. `/fast` now applies to Opus 5 and Opus 4.8 only.
+- `/model` picker highlights only the newest model name.
+- Managed MCP allowlist/denylist `${VAR}` entries now resolve from startup environment and managed-settings env.
+- Updated `claude-api` skill to default to Claude Opus 5.
+
+## Pi and Other Agents: Opus 5 Adoption
+
+The ecosystem moved fast. Within five days of Opus 5's launch:
+
+- **Pi v0.82.1** (July 25) added Opus 5 support on Anthropic and Amazon Bedrock with adaptive thinking, inference profiles, and prompt caching.
+- **Pi v0.82.0** (July 24) shipped constrained tool sampling, OpenRouter and Kimi Code sign-in, and session-aware streaming bash integrations.
+- **Pi v0.83.0** (July 29) added credential export for external clients (`pi auth print-api-key`), headless OpenRouter sign-in for SSH sessions, and Opus 5 through GitHub Copilot.
+
+If you run Pi alongside Claude Code, you now have Opus 5 on both. The credential export feature in v0.83.0 is worth noting — `pi auth print-api-key` and `pi auth print-bearer-token` let you pipe Pi's configured credentials into other tools, with automatic OAuth refresh and minimum-validity enforcement. For SSH workflows where you cannot use a browser redirect for login, the headless OpenRouter sign-in fills a real gap.
+
+## What This Changes for the "Which Agent?" Question
+
+If you are choosing between Claude Code, Cursor, and Copilot, Opus 5 shifts the calculus:
+
+**For Claude Code users:** This is an unambiguous upgrade. Opus 5 is now the default. You get better coding benchmarks, fewer safety interruptions, and the same price. The nested subagent depth increase to 3 and the network strict allowlist are operational improvements that matter for team workflows.
+
+**For Cursor users:** Cursor already supports Opus 5 through its model picker. The DX Heroes field report noted that "Claude Opus 4.8 was the shared backbone" between Claude Code and Copilot — Opus 5 extends that. If you use Cursor for daily editing and Claude Code for heavy refactors, both tools now run on the same model.
+
+**For Copilot users:** Opus 5 is available through Copilot's model picker. Pi v0.83.0 explicitly adds Opus 5 via GitHub Copilot with adaptive thinking and a 1M context window. The pricing conversation gets interesting here — Opus 5's no-retention-policy position makes it the strongest model you can run through Copilot without triggering Fable 5's 30-day data retention.
+
+**For teams evaluating adoption:** Opus 5's 85% reduction in classifier interventions compared to Fable 5 means fewer blocked prompts in autonomous sessions. If your team's frustration with Fable 5 has been about constant safety interruptions killing long-running agent tasks, Opus 5 is the fix Anthropic built for that exact problem.
+
+## Quick Setup
+
+If you already have Claude Code, you already have Opus 5. To confirm:
+
+```bash
+# Check your current model
+claude --model
+
+# Switch to Opus 5 if not default
+claude --model claude-opus-5
+```
+
+For API users, the model identifier is `claude-opus-5`:
+
+```bash
+curl https://api.anthropic.com/v1/messages \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -d '{
+    "model": "claude-opus-5",
+    "max_tokens": 4096,
+    "messages": [{"role": "user", "content": "Hello"}]
+  }'
+```
+
+For the Claude Code sandbox network allowlist (new in v2.1.219):
+
+```json
+{
+  "sandbox.network.strictAllowlist": [
+    "api.anthropic.com",
+    "github.com"
+  ]
+}
+```
+
+To set subagent nesting back to depth 1 if you want tighter control:
+
+```bash
+export CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1
+```
+
+## The Bottom Line
+
+Claude Opus 5 is not a marginal model update. It is the new default for one of the most widely used coding agents, shipped at the same price as its predecessor with meaningfully better benchmarks across coding, knowledge work, and autonomous task completion. The no-retention-policy and reduced classifier intervention rate make it practically better for coding agent workflows, not just theoretically better on benchmarks.
+
+Claude Code v2.1.219 pairs it with operational improvements that teams have been asking for — sandbox network control, nested subagents, better MCP error reporting, and permission persistence across runner restarts. If you have been waiting for a reason to move off Fable 5 for daily work, this is it.
+
+---
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
