@@ -1,0 +1,100 @@
+---
+title: "Codex 0.146.0 Adds Agent Plugins, Session Naming, and Thread Forking"
+description: "OpenAI's latest stable Codex release introduces a plugin ecosystem, named sessions, and thread forking — three features that reshape how you use the terminal agent."
+pubDate: "2026-07-31T10:00:00Z"
+updatedDate: "2026-07-31T10:00:00Z"
+tags: ["codex", "openai", "release", "agent-plugins", "session-management"]
+tool: "codex"
+author: "sage"
+image: "/api/og?title=Codex+0.146+Plugins+Sessions+Forks&tool=codex"
+---
+
+OpenAI shipped Codex 0.146.0 on July 29, 2026. It is the most feature-dense stable release since Codex went full Rust. Three changes stand out: an Agent Plugins system that lets third parties publish tool bundles, session naming so you can find your work later, and thread forking for exploring alternate approaches without losing your place.
+
+If you use Codex daily, these land immediately. If you are evaluating Codex against Claude Code or Cursor, this release narrows the gap on extensibility — the one area where Goose and Hermes were pulling ahead.
+
+## Agent Plugins: Codex Gets an Ecosystem
+
+The headline feature is Agent Plugins. Codex now supports plugin manifests — structured files that describe a plugin's tools, permissions, and resource requirements. You can publish workspace plugins (private, team-scoped) or contribute to marketplaces. The initial marketplaces cover Amazon Bedrock and Claude Code, meaning plugins built for those platforms can run inside Codex with minimal porting.
+
+Why this matters for beginners: before 0.146.0, extending Codex meant writing custom shell scripts or wiring MCP servers manually. Agent Plugins formalize the process. A plugin bundles its tools, declares what it needs, and Codex handles discovery, loading, and lifecycle. It is the difference between duct-taping integrations together and installing an npm package.
+
+For teams, workspace plugin publishing means your internal deployment tool, your custom linting agent, or your company-specific code review bot can live inside the same Codex workflow your developers already use. No separate CLI. No separate config. Same terminal, same agent.
+
+The plugin system also integrates with Codex's existing skills discovery. When an executor provides skills — reusable task templates — Codex now discovers them automatically and includes them in skill selection. The reciprocal rank fusion algorithm picks the best skill for a given request from both built-in and plugin-provided options.
+
+## Session Naming: Find Your Work Later
+
+If you have ever restarted Codex and lost track of which session was which, this one fixes it. You can now name sessions with `/new` or `/clear`. Name a session "auth-refactor" or "api-v2" and it sticks. You can also pin important threads and switch between side conversations without closing the active one.
+
+Codex previously treated sessions as ephemeral. You started one, worked in it, and moved on. There was no labeling, no pinning, no way to jump back to an old session by name. For developers running multiple parallel agents — Codex's signature feature — this was a real pain point. You would have five sessions open and no idea which one was handling the database migration.
+
+Session naming pairs naturally with thread forking (see below). Name your main thread, fork it to explore an alternate approach, and switch back if the fork does not pan out. The named session stays pinned so you never lose the original.
+
+## Thread Forking: Explore Without Committing
+
+Thread forking lets you branch a conversation into an alternate path. Start a session, reach a decision point, and fork instead of continuing. The fork creates a copy of the conversation history — you explore a different approach, and if it works, you continue there. If it does not, you switch back to the original.
+
+Codex adds two flavors: regular forks (which appear in your thread listing) and temporary forks (which do not). Temporary forks are disposable exploration. Try a risky refactor, see if it works, discard it if it does not. Regular forks are for serious branches you want to keep.
+
+Forked threads carry full paginated history. You can page through the conversation before the fork point, see what the agent decided, and understand why it went in a particular direction. For complex tasks that span many turns, this context matters. Starting a new session from scratch loses all of it.
+
+## Other Changes Worth Noting
+
+The release also ships several smaller improvements that add up:
+
+**WebSocket remote execution.** The app server now connects to remote Code Mode hosts over WebSocket. If you run Codex on a remote machine — a beefy Linux box, a cloud instance, a team server — the connection is persistent and bidirectional. No more polling or reconnection hacks.
+
+**Web search for custom providers.** If you use a custom model provider that supports web search, Codex now enables it natively. No MCP server required. This matters for providers like Fireworks, Together, or any OpenAI-compatible endpoint that exposes search capabilities.
+
+**Proxy support hardened.** The HTTP client pool now honors system proxy settings across authentication, plugin downloads, MCP authorization, remote execution, WebSockets, redirects, and LM Studio connections. If you work behind a corporate proxy, previous versions silently broke in various scenarios. 0.146.0 fixes them all.
+
+**Windows improvements.** Navigation keys, process-tree termination with job objects, and proxy settings during security reviews all got fixed. Windows Codex has been catching up fast.
+
+**Skill catalog preservation.** Under tight context budgets, Codex now retains more skill entries by dropping descriptions before dropping the catalog entry itself. If you use many skills, you will notice fewer "skill not available" moments.
+
+## How It Compares
+
+Codex's plugin story is now competitive with Goose's declarative provider system and Hermes's skill hub. Goose has had extensibility since its early days — MCP servers, custom extensions, and a provider marketplace. Hermes formalized skills as reusable, shareable packages. Codex was the outlier: powerful parallel execution but limited extensibility.
+
+Agent Plugins close that gap. The difference is positioning. Goose's plugins focus on model providers and data sources. Hermes's skills focus on workflow automation. Codex's plugins lean toward tool integration and marketplace distribution. They solve different problems, and developers who use multiple agents benefit from all three.
+
+For a deeper look at how Codex stacks up, see our [Codex vs Copilot CLI terminal battle](/blog/codex-vs-copilot-cli-terminal-battle/) and the [Codex parallel agent future analysis](/blog/codex-parallel-agent-future/).
+
+## Getting Started
+
+Update to 0.146.0 with:
+
+```bash
+npm install -g @openai/codex
+```
+
+Or if you installed via the standalone binary:
+
+```bash
+codex update
+```
+
+Name a session:
+
+```bash
+/new auth-refactor
+```
+
+Fork a thread:
+
+```bash
+# In an active session, use the thread controls to fork
+```
+
+Agent Plugins are available through the marketplace UI inside Codex. Workspace plugins require a manifest file in your project root.
+
+## The Bottom Line
+
+Codex 0.146.0 is not a flashy release. There are no new model announcements or pricing changes. It is an infrastructure release — the kind that makes daily usage better without making headlines. Agent Plugins open the door to an extensibility ecosystem. Session naming and thread forking fix the two biggest workflow pain points. Proxy and Windows fixes remove friction for teams in regulated environments.
+
+If you have been waiting for Codex to catch up on extensibility, this is the release that does it. If you are already using Codex, update today. The session naming alone is worth it.
+
+---
+
+*Looking to compare AI models without switching tabs? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you GPT, Claude, Gemini, Grok, DeepSeek, and Perplexity in one place for $12/mo.*
