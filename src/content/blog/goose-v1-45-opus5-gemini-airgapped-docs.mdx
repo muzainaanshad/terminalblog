@@ -1,0 +1,82 @@
+---
+title: "Goose v1.45.0 Brings Opus 5, Gemini Models, and Air-Gapped Docs Access"
+description: "The open-source Rust coding agent adds Claude Opus 5 with adaptive thinking, Gemini model support, offline documentation, and the ability to disable built-in skills — all in one release."
+pubDate: "2026-07-31T11:00:00Z"
+updatedDate: "2026-07-31T11:00:00Z"
+tags: ["goose", "release", "opus-5", "gemini", "air-gapped", "coding-agent"]
+tool: "goose"
+author: "sage"
+image: "/api/og?title=Goose+v1.45+Opus+5+Gemini&tool=goose"
+---
+
+Goose v1.45.0 landed on July 29, 2026, and it is the most feature-packed release since the 51,000-star Rust coding agent hit v1.40. Two headline additions — Claude Opus 5 support and Gemini model compatibility — make Goose a more serious contender for teams that want a model-agnostic agent. But the quieter changes are the ones that matter most to operators: air-gapped documentation access, structured summaries for long sessions, and the ability to turn off built-in skills you never use.
+
+If you run Goose daily, this is a must-update. If you are evaluating Goose against Claude Code or Codex, the Opus 5 support alone changes the calculus.
+
+## Claude Opus 5 Support with Adaptive Thinking
+
+Goose now runs Claude Opus 5 natively, including adaptive thinking mode. Adaptive thinking lets the model decide how much reasoning to apply per step — light touch for simple file reads, deep chains for multi-file refactors. Previously, Goose treated all model calls uniformly. Opus 5's adaptive mode means Goose can leverage the model's own judgment about when to think harder, which saves tokens on routine tasks without sacrificing quality on complex ones.
+
+For beginners: adaptive thinking is like the difference between reading a recipe once versus studying it before cooking. Simple tasks get a quick glance. Hard tasks get the full attention. Goose v1.45.0 lets Opus 5 decide which is which, automatically.
+
+This also means Goose users on Claude Max or Pro plans can now use Opus 5 at the same price tier as Opus 4.8 ($5/$25 per Mtok, or $10/$50 in fast mode). The one-million-token context window is the same. The lower safety classifier trigger rate — roughly 85% fewer interruptions than Fable 5 — makes long autonomous Goose sessions smoother.
+
+## Gemini Model Support
+
+Goose v1.45.0 adds official support for the latest Gemini models. If your team uses Google's models through Vertex AI or the Gemini API, Goose can now route requests to Gemini directly without custom adapters.
+
+The Gemini integration works the same way as Claude and OpenAI providers in Goose: you configure the API key, select the model, and Goose handles the rest. The agent logic, tool calls, and file operations all stay the same — only the underlying model changes. This is the model-agnostic promise that Goose was built on, and v1.45.0 extends it to Google's ecosystem.
+
+For teams running multi-model setups — Claude for complex refactoring, Gemini for bulk code generation, a local model for sensitive files — Goose is now one of the few agents that can switch between all three without changing tools.
+
+## Air-Gapped Documentation with GOOSE_DOCS_ROOT
+
+Enterprise and government teams, this one is for you. Goose v1.45.0 introduces `GOOSE_DOCS_ROOT`, an environment variable that points Goose's documentation system to a local path instead of fetching from the internet.
+
+In practice, this means Goose can operate in fully air-gapped environments — no internet required. You download the documentation once, set the variable, and Goose accesses everything locally. The agent still works normally: it reads docs, references tool documentation, and uses the knowledge base to answer questions about your codebase. It just does not phone home to get that information.
+
+Why this matters: many regulated industries prohibit AI coding agents from making outbound internet calls. Before v1.45.0, Goose needed internet access to load its documentation context. Now it does not. If your security team has been blocking Goose adoption because of network requirements, this release removes that objection.
+
+## Structured Summary Output for Long Sessions
+
+Compaction — the process of summarizing a long conversation to fit within context limits — has always been a weak point for coding agents. The summaries are often vague, losing specific details about decisions, file paths, and code changes.
+
+Goose v1.45.0 introduces structured summary output with template rendering. When a session hits the context limit, Goose now generates a summary using a structured template instead of free-form text. The template preserves key information: which files were modified, what decisions were made, what the current task state is, and what remains to be done.
+
+For beginners: imagine your coding agent session as a whiteboard. After a few hours, the whiteboard is full. Compaction is like erasing the board and writing key notes in the corner. The old approach wrote vague notes like "worked on auth module." The new approach writes "modified `src/auth/login.ts` — added JWT validation, tests passing, pending: refresh token rotation." The second version is actually useful when you come back to the session.
+
+## Disable Built-In Skills
+
+Goose ships with a set of built-in skills — pre-packaged tool bundles for common tasks like file operations, shell commands, and web searches. In v1.45.0, you can now disable individual built-in skills you do not want.
+
+This sounds minor. It is not. The skill catalog consumes context budget. Every enabled skill adds metadata that the model sees on every request. If you never use Goose's built-in browser automation skill but keep it enabled, you are paying token cost for something that adds no value. Disabling unused skills frees that budget for the tools and plugins you actually use.
+
+For teams with custom skills or organization-specific tool bundles, disabling the built-in skills that conflict with your workflow prevents the model from choosing a built-in tool over your custom one. It is a small configuration change with a meaningful impact on agent behavior.
+
+## Other Changes in v1.45.0
+
+The release also includes several quality-of-life improvements:
+
+- **Model command tab completion and provider switching.** The `model` command now supports tab completion for model names and lets you switch providers mid-session without restarting. Previously, changing from Claude to a local Ollama model meant restarting Goose.
+- **Stable agent event message identity.** Event messages now have consistent identifiers across the session lifecycle. This fixes issues where automation scripts that watched Goose's event stream lost track of messages after compaction.
+- **rmcp 2.0 upgrade.** Goose bumped to the latest version of the Rust MCP library, bringing compatibility with newer MCP server features and fixing several connection stability issues.
+- **Dark theme refinements.** The desktop UI got dark mode fixes for consistent message surfaces and compliance with accessibility contrast ratios.
+- **Korean translation fixes.** Several untranslated entries and terminology inconsistencies in the Korean localization were corrected.
+
+## Should You Update?
+
+If you run Goose in production or as your primary coding agent, yes. The Opus 5 support is a significant capability upgrade, and the air-gapped docs access opens Goose to enterprise environments that were previously blocked.
+
+If you are evaluating Goose for the first time, v1.45.0 is the best entry point. The model flexibility — Claude Opus 5, Gemini, and any local model through Ollama — is now unmatched by any single competitor. Claude Code ties you to Anthropic models. Codex ties you to OpenAI. Goose lets you choose.
+
+To update, run:
+
+```bash
+goose update
+```
+
+Or download the latest release from the [Goose GitHub releases page](https://github.com/aaif-goose/goose/releases/tag/v1.45.0).
+
+---
+
+*Built by Y Combinator alumni, **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you every major AI model in one chat for $12/mo. Compare answers side-by-side and pick the best one for your task.*
