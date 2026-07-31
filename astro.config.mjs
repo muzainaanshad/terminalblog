@@ -4,6 +4,8 @@ import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
 import vercel from '@astrojs/vercel';
 import { defineConfig, fontProviders } from 'astro/config';
+import astroRelatedContent from '@philnash/astro-related-content';
+import seoGraph from '@jdevalk/astro-seo-graph/integration';
 
 import tailwindcss from '@tailwindcss/vite';
 
@@ -45,6 +47,24 @@ export default defineConfig({
     mdx(),
     sitemap({
       filter: (page) => !SITEMAP_EXCLUDE.has(page),
+    }),
+    astroRelatedContent({
+      artifactDir: '.astro-related-content',
+      collections: [{ collection: 'blog' }],
+      embeddings: {
+        model: 'Xenova/all-MiniLM-L6-v2',
+        device: 'cpu',
+        dtype: 'fp32',
+        pooling: 'mean',
+        batchSize: 1,
+      },
+    }),
+    seoGraph({
+      indexNow: {
+        key: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6',
+        host: 'terminalblog.com',
+        siteUrl: 'https://terminalblog.com',
+      },
     }),
   ],
 
