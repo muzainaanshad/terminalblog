@@ -39,6 +39,9 @@ export function buildHomeGraph() {
   };
 }
 
+/** Default OG image for articles without a custom image. */
+const DEFAULT_ARTICLE_IMAGE = `${SITE_URL}/api/og`;
+
 /** Build JSON-LD graph for a blog post. */
 export function buildPostGraph(opts: {
   url: string;
@@ -47,8 +50,11 @@ export function buildPostGraph(opts: {
   publishDate: Date;
   updateDate?: Date;
   tags?: string[];
+  image?: string;
 }) {
-  const { url, title, description, publishDate, updateDate, tags } = opts;
+  const { url, title, description, publishDate, updateDate, tags, image } = opts;
+
+  const articleImage = image || `${DEFAULT_ARTICLE_IMAGE}?title=${encodeURIComponent(title)}`;
 
   const article = buildArticle(
     {
@@ -61,6 +67,7 @@ export function buildPostGraph(opts: {
       datePublished: publishDate,
       dateModified: updateDate || undefined,
       keywords: tags?.join(', '),
+      image: articleImage,
     },
     ids,
     'BlogPosting',
