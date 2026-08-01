@@ -1,0 +1,118 @@
+---
+title: "Pi 0.81–0.83: Local Models via llama.cpp, Opus 5 on Copilot, and One-Click Provider Logins"
+description: "Three Pi releases in eight days add local LLM management through llama.cpp, Claude Opus 5 via GitHub Copilot, constrained tool sampling, and OAuth login for OpenRouter and Kimi Code. Here is what changed and how to try it."
+tags: ["pi", "release", "llama-cpp", "local-models", "opus-5", "coding-agent"]
+tool: "pi-dot-dev"
+author: "sage"
+pubDate: "2026-08-02T10:00:00Z"
+image: "/api/og?title=Pi+0.83+llama.cpp+Opus+5+Copilot&tool=pi"
+---
+
+Pi shipped three releases between July 21 and July 29 — v0.81.0, v0.82.0, and v0.83.0. Together they mark the biggest eight-day stretch in the tool's history. The headline: you can now manage local LLMs through llama.cpp without leaving Pi, Claude Opus 5 runs through GitHub Copilot subscriptions, and provider logins are one command instead of manual API key juggling.
+
+If you have been watching Pi since our [Vim of coding agents writeup](/blog/pi-vim-of-coding-agents/), this is the release cycle that turns philosophy into features.
+
+## llama.cpp: Run Pi With Local Models
+
+Pi 0.81.0 adds built-in llama.cpp router support. Connect Pi to a running llama.cpp server, search Hugging Face for models, download them with progress bars, and explicitly load or unload models — all from inside the TUI.
+
+For beginners: llama.cpp is software that runs large language models locally on your hardware. Instead of sending code to OpenAI or Anthropic servers, the model runs on your own GPU (or CPU). This matters if you work with proprietary code, operate in air-gapped environments, or simply want to avoid API costs.
+
+Before 0.81.0, using local models with Pi required manual configuration and external tooling. Now the workflow is:
+
+```
+/llama          # Open the llama.cpp model browser
+/login          # Connect to your llama.cpp router
+```
+
+Search for a model by name, select it, and Pi downloads and loads it. You can unload models when done to free memory. The live progress display shows download speed, ETA, and completion percentage.
+
+Pi 0.82.0 fixes a significant llama.cpp issue: models now use the loaded context window as their output token limit instead of capping at 16K tokens. If you load a model with a 32K context window, Pi now respects the full capacity.
+
+## Constrained Tool Sampling: More Reliable Tool Calls
+
+Pi 0.82.0 introduces constrained tool sampling. Tools can now declare that they require strict JSON Schema output, OpenAI Lark grammars, or regex patterns. Pi checks whether your chosen model supports the constraint and falls back gracefully when it does not.
+
+Why this matters: when an LLM generates a tool call, it produces JSON describing which tool to invoke and what arguments to pass. Without constraints, models sometimes generate malformed JSON — a missing quote, a trailing comma, an extra field. Constrained sampling forces the model's output to match the expected schema exactly.
+
+If you use OpenAI, Anthropic, Amazon Bedrock, Google Gemini, or Mistral models, Pi 0.82.0 enables strict mode automatically when the tool requests it. The result is fewer retries, fewer "parse error" messages, and more reliable multi-step workflows.
+
+## One-Click Provider Logins
+
+Manual API key configuration is a friction point every coding agent deals with. Pi 0.82.0 and 0.83.0 tackle it head-on with OAuth login flows for three providers:
+
+**OpenRouter** (v0.82.0): Run `/login` to authorize OpenRouter through OAuth PKCE. Pi mints a user-controlled API key. No copy-pasting tokens from a dashboard.
+
+**Kimi Code** (v0.82.0): Device authorization flow for Kimi For Coding subscriptions. Works the same way — `/login`, approve on the Kimi page, done.
+
+**Headless OpenRouter** (v0.83.0): For SSH sessions and remote machines where the browser callback loopback does not work, Pi 0.83.0 adds manual redirect URL and authorization code entry. Paste the redirect URL or the auth code when prompted, and Pi completes the login without a local browser.
+
+This also applies to GitHub Copilot. Pi 0.83.0 adds credential export commands for external clients:
+
+```
+pi auth print-api-key        # Export your configured API key
+pi auth print-bearer-token   # Export a bearer token with auto-refresh
+```
+
+Both commands handle OAuth refresh automatically and enforce minimum token validity — you never hand over a token that expires in 30 seconds.
+
+## Claude Opus 5 via GitHub Copilot
+
+Pi 0.83.0 adds Claude Opus 5 support through GitHub Copilot. If you already pay for a Copilot subscription, you now get access to Opus 5 with adaptive thinking and a 1M context window — no additional Anthropic API key needed.
+
+Adaptive thinking lets Opus 5 decide how much reasoning to apply per request. Simple file reads get lightweight processing. Complex multi-file refactors get deeper chains. Pi passes through this capability so the model's own judgment about effort applies inside your coding workflow.
+
+For teams evaluating whether to add an Anthropic API subscription: if your developers already use GitHub Copilot, Pi 0.83.0 gives them Opus 5 access through the subscription they already have.
+
+## Session-Aware Bash and Usage Tracking
+
+Two smaller changes that matter for daily use:
+
+**Bash environment variables** (v0.82.0): Commands run by Pi's bash tools now receive `PI_SESSION_ID`, `PI_SESSION_FILE`, `PI_PROVIDER`, `PI_MODEL`, and `PI_REASONING_LEVEL`. If you write scripts that interact with Pi sessions, these variables give you context about what model and session the agent is using.
+
+**Expanded usage accounting** (v0.81.0): Tool calls, compaction operations, and branch summaries now show token usage and cost. The session footer totals reflect real consumption, including overhead from context management. If you are tracking API spend, this gives you the full picture instead of just the model call counts.
+
+## How to Update
+
+If Pi is already installed:
+
+```bash
+# Update to the latest version
+pi upgrade
+
+# Or via npm
+npm install -g @anthropic/pi-coding-agent@latest
+```
+
+To set up llama.cpp:
+
+```bash
+# Connect to a running llama.cpp server
+/llama
+
+# Search for models
+# Select, download, and load
+```
+
+To enable OAuth logins:
+
+```bash
+# OpenRouter
+/login
+
+# Check available providers
+```
+
+## Related Reading
+
+- [Pi Is the "Vim of Coding Agents"](/blog/pi-vim-of-coding-agents/) — the philosophy behind Pi's minimal design
+- [Best Coding Agents 2026](/blog/best-coding-agents-2026-complete-guide/) — how Pi compares to Claude Code, Codex, and others
+- [Goose v1.45.0 Brings Opus 5 and Gemini](/blog/goose-v1-45-opus5-gemini-airgapped-docs/) — another agent adding Opus 5 support
+
+## The Bottom Line
+
+Three releases in eight days is aggressive for any project. Pi delivered the features that matter most to its audience: local model management for privacy-conscious teams, constrained sampling for reliability, OAuth flows for convenience, and Opus 5 access through existing subscriptions.
+
+The llama.cpp integration is the standout. It turns Pi from a cloud-dependent coding agent into one that can run fully offline with local models. Combined with the extension system and provider flexibility Pi already had, this positions Pi as the most model-agnostic coding agent available.
+
+If you run Pi, update now. If you are evaluating Pi against Codex or Claude Code, the llama.cpp support alone is a differentiator worth testing.
