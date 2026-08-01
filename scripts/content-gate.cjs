@@ -28,7 +28,7 @@ const TODAY = new Date().toISOString().slice(0, 10);
 const CODING_AGENT_TOOLS = new Set([
   'claude-code', 'hermes', 'cursor', 'opencode', 'mimo', 'kilo',
   'pi-dot-dev', 'oh-my-pi', 'gitlawb-zero', 'codex', 'goose',
-  'openclaw', 'codebuff', 'ampcode', 'copilot-cli', 'industry',
+  'openclaw', 'codebuff', 'ampcode', 'copilot-cli', 'cline', 'industry',
 ]);
 
 const OFF_NICHE_HINTS = [
