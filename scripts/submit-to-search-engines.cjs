@@ -233,7 +233,10 @@ async function submitToSeznam(urls) {
 
 function getChangedUrls() {
   // Read sitemap to get all URLs (dist after build)
-  let sitemapPath = path.join(ROOT, 'dist', 'sitemap-0.xml');
+  let sitemapPath = path.join(ROOT, 'dist', 'client', 'sitemap-0.xml');
+  if (!fs.existsSync(sitemapPath)) {
+    sitemapPath = path.join(ROOT, 'dist', 'sitemap-0.xml');
+  }
   if (!fs.existsSync(sitemapPath)) {
     sitemapPath = path.join(ROOT, 'public', 'sitemap-0.xml');
   }
