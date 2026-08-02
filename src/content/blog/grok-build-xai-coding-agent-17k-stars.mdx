@@ -1,82 +1,110 @@
 ---
-title: "Grok Build: xAI's Coding Agent Hits 17K Stars in One Week"
+title: "Grok Build: xAI Open-Sources Coding Agent After Repo Upload Scandal"
 slug: grok-build-xai-coding-agent-17k-stars
 pubDate: 2026-07-18
-description: "xAI just dropped Grok Build — a terminal-based coding agent that's already the most starred AI coding tool on GitHub. Here's what it does differently."
-tags: ["grok", "xai", "coding-agents", "news", "comparison"]
+updatedDate: 2026-08-02
+description: "xAI open-sourced Grok Build under Apache 2.0 after a security researcher caught it uploading entire Git repositories — 5.1 GiB per session — to Google Cloud Storage. Here's what happened and what it means for coding agent operators."
+tags: ["grok", "xai", "coding-agents", "security", "open-source"]
 ---
 
-xAI just dropped **Grok Build** — a terminal-based coding agent that hit 17,000 GitHub stars in its first week. That makes it the fastest-growing AI coding tool in 2026.
+xAI's **Grok Build** coding agent went from 17K GitHub stars to one of the biggest coding agent security stories of 2026 — in three days. On July 12, a security researcher caught Grok Build silently uploading entire Git repositories (full commit history, deleted credentials, files the AI never touched) to a Google Cloud Storage bucket. By July 15, xAI had open-sourced the entire agent harness under Apache 2.0.
 
-But is it actually good, or is it just Elon's name doing the marketing?
+This is the full timeline, what was exposed, and what to do if you ran Grok Build before July 13.
 
-## What Grok Build Actually Is
+## What Happened: The 72-Hour Timeline
 
-Grok Build is a TUI (Terminal User Interface) for interacting with Grok 4 for code generation, debugging, and refactoring. It runs entirely in your terminal — no VS Code extension, no browser tab.
+| Date | Event |
+|------|-------|
+| **July 12** | Security researcher cereblab publishes wire-level analysis of Grok Build CLI v0.2.93 |
+| **July 13** | xAI silently disables repo uploads via server-side flag |
+| **July 14** | xAI responds publicly, points users to `/privacy` command |
+| **July 15** | xAI publishes 844,530 lines of Rust under Apache 2.0 on GitHub |
+| **July 16** | Repository accumulates 4,400+ stars and 655 forks within 48 hours |
 
-**Key features:**
+The speed of the open-source release — hours after the crisis peaked — suggests it was either in progress or a deliberate response. Either way, it changed the trajectory of the incident from "cover-up" to "accountability."
 
-- Fullscreen terminal interface with mouse support
-- Built-in file tree navigation
-- Multi-file editing with diff previews
-- Context-aware (reads your project structure)
-- Supports Grok 4 and Grok 4 Mini models
+## What Was Actually Being Uploaded
 
-## How It Compares to Claude Code and Codex
+The researcher routed Grok Build through mitmproxy and watched two simultaneous network channels fire on every session:
 
-| Feature | Grok Build | Claude Code | Codex CLI |
-|---------|-----------|-------------|-----------|
-| Interface | Fullscreen TUI | Terminal | Terminal |
-| Model | Grok 4 | Claude Sonnet/Opus | GPT-4o/o3 |
-| Mouse support | ✅ | ❌ | ❌ |
-| File tree | ✅ Built-in | ❌ | ❌ |
-| Diff preview | ✅ | ❌ | ❌ |
-| Price | Free tier available | $20/mo Pro | $200/mo Pro |
-| Open source | ❌ | ❌ | ❌ |
+1. **Channel A** (`POST /v1/responses`): ~192 KB of actual task content — the code the model needed to do its job.
+2. **Channel B** (`POST /v1/storage`): **5.10 GiB** across 73 chunks to `gs://grok-code-session-traces/`.
 
-The mouse support and built-in file tree are genuinely nice UX touches that Claude Code and Codex don't have.
+That is a **27,800× ratio** between what the coding task required and what xAI's servers received.
 
-## The Catch
+The upload was a **Git bundle** — a single file containing every tracked file plus the repository's complete commit history. To prove the scope, the researcher planted a canary file at `src/_probe/never_read_canary.txt` and instructed Grok Build never to open it. The agent complied, replying "OK." But the canary file appeared in the captured bundle anyway — along with months of commit history, `.env` files with API keys, and every other tracked file.
 
-Grok Build is **not open source**. It's a closed-source binary that talks to xAI's API. This is different from Claude Code (which at least has a published binary) and Codex (which is also closed but from OpenAI).
+The test was replicated on a second, unrelated codebase with identical results.
 
-For developers who care about supply chain security, this matters. You're running a binary from xAI that has full access to your filesystem.
+## The Privacy Toggle That Did Nothing
 
-## Performance
+Grok Build had a visible **"Improve the model"** setting — the standard opt-out that developers reasonably assumed controlled data collection. **It did not stop the upload.**
 
-In my testing:
+The upload was controlled by a completely separate, invisible server-side flag: `disable_codebase_upload: true`. xAI flipped that flag on July 13, and uploads stopped — no client update required. Which also means no client update is required to re-enable them.
 
-- **Code generation**: Comparable to Claude Sonnet 4 for Python and TypeScript
-- **Context window**: 1M tokens (same as Claude)
-- **Speed**: Faster than Claude Code for simple tasks, slower for complex refactoring
-- **Accuracy**: Makes fewer hallucinated API calls than Codex, but more than Claude
+The `/privacy` CLI command that xAI pointed users to after the incident is a **retention toggle** — it governs whether transmitted data is used for model training. It does not and never did control whether your repository leaves your machine. These are two separate systems, and only one was ever exposed to users as a setting.
 
-## Who Should Use It
+## What the Open Source Release Gives You
 
-**Good for:**
-- Developers who want a free/cheap coding agent
-- xAI ecosystem users
-- Terminal enthusiasts who want mouse support
-- Quick prototyping and scaffolding
+xAI published Grok Build at `github.com/xai-org/grok-build` under Apache 2.0 — roughly 844,530 lines of Rust covering:
 
-**Not great for:**
-- Enterprise (no SSO, audit logs)
-- Security-conscious teams (closed source)
-- Complex multi-file refactoring (Claude Code is better)
-- Teams already invested in OpenAI/Anthropic ecosystem
+- **Agent loop**: context assembly, model response parsing, tool-call dispatch
+- **Tools**: file reading, editing, searching, shell command execution
+- **Terminal UI**: fullscreen TUI with plan review and inline diff viewer
+- **Extension system**: skills, plugins, hooks, MCP servers, subagents
 
-## The Real Story
+The practical benefits are real:
 
-Grok Build's 17K stars in one week tell you more about xAI's marketing machine than the tool's quality. It's a solid coding agent — but it's not 17K-stars-better than Claude Code.
+- **Auditable**: You can read exactly what the agent sends and receives
+- **Local inference**: Point it at Ollama or any OpenAI-compatible local server via `~/.grok/config.toml` — zero cloud traffic if you want it that way
+- **Self-compile**: Build from source with `cargo build --release` on macOS or Linux
 
-What it *does* prove is that the coding agent market is fragmenting. We're moving from "which AI to use" to "which terminal UI do you prefer." That's actually healthy competition.
+The limits are equally real:
 
-## Verdict
+- **Upload code still exists**: The function `upload_session_state()` in `upload/trace.rs` now returns a hard-coded `session_state_upload_unavailable` error — meaning the code is present but blocked at the function level
+- **Server-side control**: The upload mechanism is disabled by a flag on xAI's servers, not removed from the client
+- **No external contributions**: Issues and pull requests are disabled on GitHub; the repository is a read-only mirror from an internal monorepo
+- **Grok 4.5 remains closed**: You can audit the harness, not the model itself
 
-Grok Build is worth trying if you're curious. The TUI is genuinely nice, the free tier is generous, and Grok 4 is a competitive model. But it's not replacing Claude Code for serious work anytime soon.
+As security firm Hive Security noted, the server-side flag is "a mitigation that matters, but not a durable client-side security boundary."
 
-**Rating: 7/10** — Good UX, competitive model, closed source is a downside.
+## How Grok Build Compares After the Open-Source Release
+
+The terminal coding agent market now has three major open-source or source-available entries:
+
+| Agent | Language | Licence | Contributions | Primary Model |
+|-------|----------|---------|---------------|---------------|
+| **Codex CLI** | Rust | Apache 2.0 | Accepted | GPT-5.6 Sol/Terra/Luna |
+| **Grok Build** | Rust | Apache 2.0 | Rejected | Grok 4.5 |
+| **Claude Code** | ⚠️ Closed | Proprietary | N/A | Claude Opus 5 |
+
+The convergence on Rust is notable — both Codex CLI and Grok Build chose Rust for the agent harness, prioritizing memory safety, single-binary distribution, and terminal rendering performance.
+
+Grok Build also borrowed tool implementations directly from Codex CLI. The `THIRD_PARTY_NOTICES.md` lists `apply_patch`, `grep_files`, `list_dir`, and `read_file` as "modified ports" from OpenAI Codex under Apache §4(b). The file-system and search primitives that coding agents need have converged to a near-identical interface.
+
+One architectural divergence matters: Grok Build uses the **Agent Client Protocol (ACP)** for multi-surface access, while Codex CLI uses OpenAI's Responses API. ACP means any compliant client — TUI, IDE plugin, CI harness — can drive the same agent process. Codex CLI achieves similar reach through surface-specific integrations.
+
+## If You Ran Grok Build Before July 13
+
+**Treat everything in your tracked files and commit history as potentially compromised.** That means:
+
+1. **Rotate all credentials** — API keys, database passwords, cloud tokens, webhook secrets — including ones you deleted from working files months ago, because Git history doesn't forget
+2. **Check for SSH keys or service account credentials** committed at any point in the repository's history
+3. **Audit any repo you ran Grok Build in** using `git log --all --full-history` for credentials
+4. **Do not wait on xAI's deletion promise** — no certificate, audit log, or third-party attestation has been published to verify data was actually purged
+
+Simon Willison reported that at least one user ran the tool in their home directory, exposing SSH keys, a password manager database, and personal files. If you ran it anywhere outside a clean, credential-free project directory, the scope is wider than you think.
+
+The practical fix for ongoing use: **compile Grok Build from source and run it against a self-hosted inference server**. This removes xAI from the data pipeline entirely, which is the only way to guarantee nothing leaves your machine.
+
+## The Bigger Picture
+
+Grok Build was the outlier — security researchers tested Claude Code and Codex under equivalent conditions and found no repository bundles being transmitted. But the absence of a standard is the real issue.
+
+Ninety-two percent of US developers now use AI coding tools daily. Every one of those tools is a network-capable process running in your codebase with access to your filesystem. None of them are required to disclose what they transmit, to whom, or under what conditions.
+
+The Grok Build incident didn't create that problem. It just made it impossible to ignore.
 
 ---
 
-*Want to try it? `npm install -g @xai/grok-build` — requires xAI API key.*
+*Updated August 2, 2026 with the full security incident timeline, open-source release details, and credential rotation guidance. Originally published July 18, 2026.*
