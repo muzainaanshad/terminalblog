@@ -1,0 +1,131 @@
+---
+title: "Qwen3.8-Max Ships With 2.4T Parameters, 16-Day Autonomous Coding Demo, and Open Weights Coming Next Week"
+description: "Alibaba's Qwen3.8-Max runs autonomous coding projects for 16 days straight, beats Claude Opus 4.8 on Terminal Bench, and will open-source its weights — but every benchmark number is vendor-run."
+pubDate: "2026-08-04T12:00:00Z"
+updatedDate: "2026-08-04T12:00:00Z"
+tags: ["qwen", "alibaba", "model-release", "autonomous-coding", "benchmarks", "open-weights", "coding-agent"]
+tool: "industry"
+author: "dev_explorer"
+image: "/api/og?title=Qwen3.8-Max+2.4T+Parameters+Autonomous+Coding+16+Days&tool=qwen"
+---
+
+Alibaba's Qwen team released Qwen3.8-Max on August 3, 2026, and the headline isn't a benchmark score — it's a 16-day autonomous coding run that produced 265 commits, 127 pull requests, and 151 issues with zero human intervention. The model is a 2.4 trillion parameter mixture-of-experts with 95 billion active parameters, a 1-million-token context window, and pricing at $2 per million input tokens and $6 per million output. Open weights drop next week, making this the first Max-class Qwen model to leave the closed API.
+
+For coding agent operators, three things matter: the model integrates with Claude Code, Codex, Qoder CLI, Qwen Code, and OpenClaw today; the autonomous coding demonstrations are publicly auditable on GitHub; and every benchmark number in the launch table was run by Alibaba, with no independent verification as of this writing.
+
+## The 16-Day oh-my-cli Run
+
+The most detailed showcase is a project called oh-my-cli, built from an empty repository. The model set up an issue state machine, dispatcher, monitor, and watchdog into a single execution loop. New requirements land in GitHub Issues, an agent claims them through a state machine moving through `ready → leased → active`, triggers end-to-end tests and CI checks, and merges the pull request after passing.
+
+Self-testing ran on every update — build, unit test, end-to-end, and desktop lifecycle validation — with failures routed back to the originating issue for another pass. Community feedback and developer experience were converted into executable work that continuously evolved capabilities like `/goal`, `/resume`, Dynamic Workflow, and Session Replay.
+
+By July 30, after roughly 16 days of continuous autonomous operation, the repository had accumulated 265 commits, 127 PRs, and 151 issues. The full trace is public at [qwen-code-dev-bot/oh-my-cli](https://github.com/qwen-code-dev-bot/oh-my-cli), which makes this one of the most auditable autonomous coding demonstrations to date. You can read the PR descriptions, check whether the issues are real or filler, and evaluate the code quality yourself.
+
+For context, this is exactly the kind of long-horizon autonomous task that coding agents like Claude Code and Codex have been building toward — but typically measured in hours, not days. Whether the 16-day run produced genuinely useful software or just impressive commit counts is something you can judge by reading the repo.
+
+## Reproducing a Research Paper, Then Beating It
+
+The second coding showcase targeted a harder class of work: reproducing a machine learning research paper from scratch with no starter code and no pipeline. The paper was "Unified Data Selection for LLM Reasoning," which addresses which training examples are worth keeping when you have far more data than you can afford to train on.
+
+Over approximately 125 hours of continuous effort, Qwen3.8-Max wrote roughly 7,600 lines of code, took over 1,100 actions, and ran 33 rounds of GPU training. The first 37 hours rebuilt the paper's full pipeline and confirmed its six main findings, including a +7.7% gain over random data selection on the AIME24 math benchmark.
+
+Then the model went further. Over the next 88 hours it ran four rounds of hypothesis-test-analyse cycles, testing 18 of its own improvement ideas. The winning approach — counting "hard decision points" more precisely — pushed AIME24 from a 49.58% baseline to 52.29%, a 2.71-point gain attributed entirely to the model's own iteration.
+
+| Round | Best idea | AIME24 Score | Gain vs baseline |
+|-------|-----------|-------------|-----------------|
+| Baseline | Paper's method reproduced | 49.58% | — |
+| 1 | Split data by difficulty before selecting | 50.42% | +0.84 |
+| 2 | Weight examples by entropy–score gap | 51.67% | +2.09 |
+| 3 | Tune selection width | 51.25% | +1.67 |
+| 4 | Count hard decision points (nhighgate) ★ | 52.29% | +2.71 |
+
+This is the kind of self-improving research loop that separates frontier models from capable-but-static ones. Whether it generalizes beyond this specific paper is unknown, but the methodology — run the experiment, analyze what failed, form a new hypothesis, try again — is exactly how human researchers work.
+
+## A Real Competition Against 526 Human Teams
+
+The third showcase put Qwen3.8-Max into a live data science competition: the WWW2025 Multimodal Dialogue Intent Recognition Challenge on Alibaba Cloud's Tianchi platform, with 526 human teams competing.
+
+Under a strict 24-hour limit and with no human help, the model read the competition rules and built a complete solution. For text, it fine-tuned and ensembled BERT, MacBERT, and RoBERTa models. For product screenshots, it fine-tuned Qwen2.5-VL-7B with a Chinese-CLIP fallback. It fused everything into a weighted-voting system calibrated through cross-validation.
+
+Across 45 submissions, accuracy climbed from 0.60 to 0.853, beating 458 of 526 human teams — 87% of the field. That's a strong result, though it's worth noting this was a specific competition with a fixed task on a single platform, not a general measure of coding ability.
+
+## The Benchmark Table: Strong But Not a Sweep
+
+Alibaba published a full benchmark table. Here are the coding-relevant numbers, with the honest context:
+
+| Benchmark | Qwen 3.8-Max | Claude Opus 4.8 | Fable 5 | GPT-5.6 Sol |
+|-----------|-------------|-----------------|---------|-------------|
+| Terminal Bench 2.1 | 86.6 | 84.6 | 84.6 | 88.8 |
+| SWE-bench Pro | 67.7 | 69.2 | 80.0 | 64.6 |
+| PaperBench | 93.0 | 80.3 | 88.8 | 90.5 |
+| GPQA Diamond | 92.6 | 92.0 | 92.6 | 94.1 |
+| IFBench | 82.8 | 62.2 | 63.5 | 72.7 |
+
+What the table shows:
+
+- **Terminal Bench 2.1 (86.6):** Beats both Claude Opus 4.8 and Fable 5 (both 84.6). GPT-5.6 Sol still leads at 88.8. This is a second-place finish on an agentic terminal benchmark, not a clean sweep.
+- **SWE-bench Pro (67.7):** Mid-pack. Ahead of GPT-5.6 Sol (64.6), behind Opus 4.8 (69.2), and a full 12 points behind Fable 5 (80.0). On repository-scale bug fixing, Qwen3.8-Max trails the frontier.
+- **PaperBench (93.0):** The model's strongest row, beating everything in the comparison set. Aligns with the paper reproduction showcase.
+- **IFBench (82.8):** A significant lead over all competitors, suggesting strong instruction-following capability.
+
+The generational jump from Qwen3.7-Max is real: Terminal Bench went from 74.5 to 86.6, SWE-bench Pro from 60.6 to 67.7, and PaperBench from 64.8 to 93.0. But "beats Claude on Terminal Bench" and "trails Fable 5 badly on SWE-bench Pro" are both true simultaneously, and the second claim will appear in far fewer headlines.
+
+### The Caveat That Matters Most
+
+Every number in this table was run by Alibaba. Most coding benchmarks ran on the Claude Code harness — Anthropic's own agent framework — pointed at Qwen3.8-Max through its Anthropic-compatible API. That's a fair-play move (same harness for all models), but harness choice can swing agentic results by several points, and these are vendor-reported numbers on a vendor-chosen harness. As of August 4, 2026, no independent evaluations from Artificial Analysis, community leaderboards, or third-party benchmarks exist.
+
+The one independent data point available — a real-world architecture evaluation from Yotta Labs — scored Qwen3.8-Max preview at 80/100, slightly behind Kimi K3 at 83/100 on the same task. That's a single data point from a preview version, but it suggests the model sits near the frontier rather than clearly above it.
+
+## How to Use It Today
+
+Qwen3.8-Max is available now on Alibaba Cloud Model Studio (model ID: `qwen3.8-max`) with both OpenAI-compatible and Anthropic-compatible APIs. You need a DashScope API key from [home.qwencloud.com](https://home.qwencloud.com).
+
+### Claude Code
+
+Point Claude Code at Qwen's Anthropic-compatible endpoint:
+
+```bash
+export ANTHROPIC_BASE_URL=https://dashscope-intl.aliyuncs.com/apps/anthropic
+export ANTHROPIC_AUTH_TOKEN=<your-dashscope-key>
+export ANTHROPIC_MODEL=qwen3.8-max
+```
+
+This is the exact configuration Alibaba used for its coding benchmarks, so it has the least daylight between vendor numbers and your experience.
+
+### Codex and Other Agents
+
+Qwen3.8-Max supports OpenAI-compatible chat completions and responses APIs, so it works with any agent that accepts a custom OpenAI endpoint. The model also plugs into Qoder CLI, Qwen Code, and OpenClaw with first-party configurations.
+
+### Pricing
+
+$2 per million input tokens, $6 per million output tokens. At these prices, Qwen3.8-Max undercuts Claude Opus 4.8 ($5/$25) and Fable 5 while claiming competitive Terminal Bench performance. The cost advantage matters for long autonomous runs — a 16-day session would be prohibitively expensive at Opus pricing.
+
+### Open Weights Next Week
+
+The weights will release on Hugging Face and ModelScope next week, marking the first time Alibaba has open-sourced a Max-class model. This is the moment when outside labs can actually verify the gate counts, accuracy curves, and multi-day autonomous runs outside Alibaba's own infrastructure. If the open weights deliver on the API numbers, Qwen3.8-Max becomes the strongest open-weight coding model available — ahead of Qwen3.7-Max, Kimi K2, and any open alternative.
+
+## What This Means for Coding Agent Operators
+
+If you run coding agents daily, Qwen3.8-Max is worth evaluating for three reasons:
+
+1. **Cost.** At $2/$6 per Mtok, long autonomous sessions become economically viable. A 16-day run that would cost hundreds of dollars on Opus pricing becomes manageable.
+
+2. **Terminal performance.** The Terminal Bench 86.6 score suggests strong agentic capability — the kind of task where the model navigates a terminal, runs commands, and iterates on failures. If you use Claude Code or Codex for terminal-driven workflows, this is the class of task where Qwen3.8-Max claims to compete.
+
+3. **Model flexibility.** The Anthropic-compatible API means you can swap Qwen3.8-Max into your existing Claude Code setup with three environment variables. No code changes, no new tools, just a different backend.
+
+What to wait for: independent benchmarks. The gap between Terminal Bench (86.6, strong) and SWE-bench Pro (67.7, mid-pack) suggests the model's strengths are in agentic workflows rather than deep repository-level bug fixing. If your primary use case is fixing GitHub issues in large codebases, Fable 5's 80.0 on SWE-bench Pro still sets the bar. Wait for independent SWE-bench runs before committing production workloads.
+
+The open weights release next week will be the real test. Vendor-run benchmarks on vendor-selected harnesses are marketing materials. Community verification is evidence. Bookmark the [oh-my-cli repo](https://github.com/qwen-code-dev-bot/oh-my-cli), watch for Artificial Analysis numbers, and evaluate with your own prompts before making migration decisions.
+
+---
+
+*The smartest developers don't pick one AI — they use them all. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** brings 9+ premium models into one chat for $12/mo. Compare Qwen3.8-Max against Opus 5 and Fable 5 side-by-side.*
+
+## Related articles
+
+- [Claude Opus 5 Arrives: Near-Fable Intelligence at Half the Price](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Claude Code vs Codex: Terminal Agent Battle](/blog/claude-code-vs-codex-terminal-battle/)
+- [Unsloth's New Qwen3.6 Quantizations Run 2.5x Faster on Your Existing GPU](/blog/unsloth-qwen3-6-quantizations-2-5x-gpu-speed/)
+- [Kimi K2: 1 Trillion Parameters, Open Weights, and the Price Rebellion](/blog/kimi-k2-7-copilot-open-weight-price-rebellion/)
+- [Best Coding Agents 2026: Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
