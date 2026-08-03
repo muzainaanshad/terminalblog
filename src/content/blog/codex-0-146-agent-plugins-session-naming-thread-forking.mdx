@@ -1,17 +1,60 @@
 ---
-title: "Codex 0.146.0 Adds Agent Plugins, Session Naming, and Thread Forking"
-description: "OpenAI's latest stable Codex release introduces a plugin ecosystem, named sessions, and thread forking — three features that reshape how you use the terminal agent."
+title: "Codex 0.145–0.146: Voice Coding, Agent Plugins, Multi-Agent V2, and More"
+description: "OpenAI shipped two packed Codex releases in one week — voice-controlled coding via GPT-Live, an Agent Plugins ecosystem, stabilized multi-agent V2, session naming, thread forking, and one-click migration from Cursor and Claude Code."
 pubDate: "2026-07-31T10:00:00Z"
-updatedDate: "2026-07-31T10:00:00Z"
-tags: ["codex", "openai", "release", "agent-plugins", "session-management"]
+updatedDate: "2026-08-04T10:00:00Z"
+tags: ["codex", "openai", "release", "agent-plugins", "session-management", "voice-coding", "multi-agent", "migration"]
 tool: "codex"
 author: "sage"
-image: "/api/og?title=Codex+0.146+Plugins+Sessions+Forks&tool=codex"
+image: "/api/og?title=Codex+0.145+0.146+Voice+Plugins+V2&tool=codex"
 ---
 
-OpenAI shipped Codex 0.146.0 on July 29, 2026. It is the most feature-dense stable release since Codex went full Rust. Three changes stand out: an Agent Plugins system that lets third parties publish tool bundles, session naming so you can find your work later, and thread forking for exploring alternate approaches without losing your place.
+OpenAI shipped two feature-packed Codex releases in the same week. Codex CLI 0.145.0 landed on July 21 with audio input, realtime voice conversations, stabilized multi-agent V2, and one-click migration from Cursor and Claude Code. Eight days later, 0.146.0 arrived with Agent Plugins, session naming, and thread forking.
 
-If you use Codex daily, these land immediately. If you are evaluating Codex against Claude Code or Cursor, this release narrows the gap on extensibility — the one area where Goose and Hermes were pulling ahead.
+If you use Codex daily, both releases matter. If you are evaluating Codex against Claude Code or Cursor, the combination narrows the gap on extensibility and adds a capability neither competitor offers yet: voice-controlled coding.
+
+## Voice Coding: Talk to Your Agent
+
+The biggest headline from 0.145.0 is audio input. Codex now accepts voice commands and common local audio formats as direct input. You can speak a task description, dictate a code review question, or talk through a refactoring plan — and Codex processes it the same way it handles typed prompts.
+
+This is powered by streaming realtime V3 conversations. Realtime V3 is OpenAI's latest audio processing pipeline, and in Codex it enables natural back-and-forth without the latency penalty you might expect. The agent transcribes your speech, reasons about it, and responds with tool outputs that include audio — meaning Codex can talk back.
+
+Why this matters for beginners: voice input removes the friction of precise prompting. Instead of carefully crafting a prompt describing a bug, you can say "look at the authentication middleware and tell me why tokens expire too early" and get a directed investigation. It is not a replacement for reading code, but it lowers the barrier for getting an agent to start digging.
+
+The ChatGPT desktop app (build 26.715, July 23) extends this further with GPT-Live full-duplex voice. You can speak and the agent listens simultaneously — no turn-taking pauses. On macOS, Screen Context lets Codex see your frontmost window while you talk through it. OpenAI showed two developers in the same room giving different voice instructions to the same Codex session simultaneously. It is the closest thing to pair programming with an AI that does not require a keyboard.
+
+Voice is available on Plus, Pro, Business, Edu, and Enterprise plans. On iOS, you can direct Codex tasks via Remote while voice mode handles the input.
+
+## Multi-Agent V2 Goes Stable
+
+Codex 0.145.0 stabilizes the multi-agent V2 experience. If you were using the opt-in multi-agent mode before, you know it was rough around the edges. The stable release brings:
+
+**Configurable sub-agent models.** You can now assign different models to different sub-agents. Give your planning agent a reasoning-heavy model and your execution agent a fast, cheap one. This is the kind of fine-grained control that power users have been requesting since multi-agent first shipped.
+
+**Reasoning levels per agent.** Set how much "thinking" each sub-agent does. A code-generation agent might need high reasoning; a file-search agent does not. This directly impacts latency and cost.
+
+**Concurrency controls.** You decide how many sub-agents run in parallel. Codex's parallel execution was always its signature feature, but without concurrency limits, a complex task could spawn more agents than your API budget or machine could handle.
+
+**Restored roles and improved navigation.** The agent navigator — the UI that shows you what each sub-agent is doing — got a rewrite. Sub-agent roles are clearly labeled and the status flow is easier to follow.
+
+For beginners: multi-agent means Codex can break a complex task into parts and run them simultaneously. One sub-agent writes tests, another refactors the implementation, a third updates documentation — all in parallel. V2 makes this practical by letting you control costs and monitor progress.
+
+## /import: Migrate from Cursor and Claude Code
+
+One of the most practical additions in 0.145.0 is the expanded `/import` command. Codex can now pull in settings, MCP servers, plugins, sessions, commands, and project-scoped memories from:
+
+- **Cursor** — your model preferences, MCP configurations, and extension settings
+- **Claude Code** — your project rules, MCP servers, and session history
+
+This is a one-command migration. If your team is switching from Cursor to Codex, or adding Codex alongside Claude Code, you do not have to rebuild your configuration from scratch. Run `/import`, select the source, and Codex maps your existing setup into its own format.
+
+Why this matters: configuration migration has been the hidden cost of switching coding agents. Every agent has its own MCP setup, its own rules files, its own model preferences. /import acknowledges that developers do not live in a single-agent world and makes Codex a good citizen in a multi-tool workflow.
+
+## Amazon Bedrock Support
+
+Codex 0.145.0 adds experimental Amazon Bedrock login and custom endpoint support. If your organization runs on AWS, you can now authenticate with Bedrock directly from the Codex CLI and use GPT-5.6 Sol as the default Bedrock model.
+
+This matters for enterprise teams that cannot send code to OpenAI's servers but can use Bedrock's managed infrastructure. Custom endpoint support means any OpenAI-compatible API — Azure, self-hosted, or third-party — works with Codex natively.
 
 ## Agent Plugins: Codex Gets an Ecosystem
 
@@ -55,9 +98,11 @@ The release also ships several smaller improvements that add up:
 
 ## How It Compares
 
-Codex's plugin story is now competitive with Goose's declarative provider system and Hermes's skill hub. Goose has had extensibility since its early days — MCP servers, custom extensions, and a provider marketplace. Hermes formalized skills as reusable, shareable packages. Codex was the outlier: powerful parallel execution but limited extensibility.
+Codex's combined 0.145–0.146 release puts it in a different conversation. Goose has had extensibility since its early days — MCP servers, custom extensions, and a provider marketplace. Hermes formalized skills as reusable, shareable packages. Claude Code has the tightest model integration and the fastest release cadence. Cursor dominates the IDE layer.
 
-Agent Plugins close that gap. The difference is positioning. Goose's plugins focus on model providers and data sources. Hermes's skills focus on workflow automation. Codex's plugins lean toward tool integration and marketplace distribution. They solve different problems, and developers who use multiple agents benefit from all three.
+But neither Goose, Hermes, nor Claude Code offer voice-controlled coding. Codex is the first major coding agent to ship native audio input with realtime V3. The /import command from Cursor and Claude Code is also unique — no other agent actively helps you migrate from its competitors.
+
+Agent Plugins close the extensibility gap. The difference is positioning: Goose plugins focus on model providers, Hermes skills focus on workflow automation, Codex plugins lean toward tool integration and marketplace distribution. They solve different problems, and developers who use multiple agents benefit from all three.
 
 For a deeper look at how Codex stacks up, see our [Codex vs Copilot CLI terminal battle](/blog/codex-vs-copilot-cli-terminal-battle/) and the [Codex parallel agent future analysis](/blog/codex-parallel-agent-future/).
 
@@ -91,9 +136,9 @@ Agent Plugins are available through the marketplace UI inside Codex. Workspace p
 
 ## The Bottom Line
 
-Codex 0.146.0 is not a flashy release. There are no new model announcements or pricing changes. It is an infrastructure release — the kind that makes daily usage better without making headlines. Agent Plugins open the door to an extensibility ecosystem. Session naming and thread forking fix the two biggest workflow pain points. Proxy and Windows fixes remove friction for teams in regulated environments.
+Codex 0.145–0.146 together represent the most significant feature expansion since Codex went full Rust. Voice coding changes how you interact with the agent. Multi-agent V2 makes parallel execution practical and cost-controlled. /import removes the switching cost from Cursor and Claude Code. Agent Plugins open an extensibility ecosystem. Session naming and thread forking fix the two biggest workflow pain points.
 
-If you have been waiting for Codex to catch up on extensibility, this is the release that does it. If you are already using Codex, update today. The session naming alone is worth it.
+If you have been waiting for Codex to match Goose's extensibility or differentiate beyond parallel execution, this is the week it happened. Update to 0.146.0 with `npm install -g @openai/codex` and try voice input first — it is the feature you did not know you needed.
 
 ---
 
