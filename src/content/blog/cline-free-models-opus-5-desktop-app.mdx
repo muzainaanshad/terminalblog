@@ -1,17 +1,43 @@
 ---
-title: "Cline v4.0.12 Goes Free: Zero-Cost Models, Opus 5 Support, and a Desktop App"
-description: "Cline adds free built-in models, Claude Opus 5 across six providers, and a standalone desktop app — making the open-source coding agent accessible to anyone without API keys."
+title: "Cline v4.1: A Plan Mode That Blocks File Edits, Free Models, and Opus 5"
+description: "Cline v4.1 makes plan mode a real read-only checkpoint, adds free built-in models and Claude Opus 5 across six providers, and ships a desktop app with OAuth-ready MCP servers — the easiest coding agent to try safely."
 pubDate: "2026-08-01T12:00:00Z"
-updatedDate: "2026-08-01T12:00:00Z"
-tags: ["cline", "free-models", "opus-5", "desktop-app", "coding-agent", "release"]
+updatedDate: "2026-08-08T10:00:00Z"
+tags: ["cline", "free-models", "opus-5", "desktop-app", "coding-agent", "release", "safety"]
 tool: "cline"
 author: "sage"
-image: "/api/og?title=Cline+v4.0.12+Free+Models+Opus+5&tool=cline"
+image: "/api/og?title=Cline+v4.1+Safe+Plan+Mode+Free+Models&tool=cline"
 ---
 
-Cline v4.0.12 shipped on July 28, 2026, and it changes the entry barrier for the most popular open-source coding agent. The headline: free built-in models that work without API keys. Combined with Claude Opus 5 support across every major provider (added in v4.0.11) and a standalone desktop app (v0.0.7), Cline just became the easiest coding agent to try — and one of the most capable.
+Cline v4.0.12 shipped on July 28, 2026, and it changed the entry barrier for the most popular open-source coding agent. The headline: free built-in models that work without API keys. Combined with Claude Opus 5 support across every major provider (added in v4.0.11) and a standalone desktop app (v0.0.7), Cline became the easiest coding agent to try — and one of the most capable.
 
-If you have been waiting to try an autonomous coding agent but did not want to set up API keys or pay for tokens, this release is for you.
+The follow-up releases — v4.1.4, v4.1.5, and v4.1.6, all shipped August 5–6 — add something beginners should know about before anything else: **plan mode can no longer touch your files**. This page covers both the free-access story from v4.0.12 and the new safety changes that make Cline a safer first coding agent.
+
+If you have been waiting to try an autonomous coding agent but did not want to set up API keys or pay money, this release line is for you.
+
+## Plan Mode Now Blocks File Edits — The Big v4.1 Change
+
+If you are new to Cline, the first thing to understand is Plan/Act mode. In **Plan mode** the agent can look around — read files, search your codebase, run read-only commands — and propose a plan, but it should not change anything yet. In **Act mode** it actually edits files, runs commands, and gets the job done. The idea is a checkpoint: you review the plan before the agent touches anything.
+
+Before v4.1.4, that checkpoint had two holes. First, the model could decide mid-conversation to switch itself from Plan to Act. Second, plan mode tried to stop file-editing commands with prompts and warnings — which works most of the time but is not a guarantee.
+
+Cline v4.1.4 closes both holes:
+
+- **File-editing shell commands are hard-blocked in plan mode.** File manipulation, in-place editors (`sed -i`, `perl -i`), redirection into files (`> file`), mutating git subcommands (`git reset --hard`), and package installs are refused outright. Read-only investigation still works — the agent can still `cat`, `grep`, and plan.
+- **Model-initiated plan-to-act switching is removed.** Only you can switch modes now. The model cannot quietly promote itself from "planning" to "editing."
+
+For a beginner, this is the most important safety change Cline has shipped in months. When you are still learning what an autonomous agent will do, you want the agent to be physically unable to start editing before you say go. That is exactly what plan mode is now.
+
+The release notes also fix a related annoyance: a turn that ends with a blocked command no longer counts as a failed turn. You see the plan, review it, and switch to Act yourself — and Act re-runs the plan instead of appearing to do nothing.
+
+## v4.1.5 and v4.1.6: Clearer Limits, Consistent Reasoning
+
+The two follow-up releases refine the experience rather than add new features, but two changes matter for beginners:
+
+- **Free-model notices explain themselves.** When a free model promotion ends, you now get a dedicated notice with a button to pick another model, instead of a confusing generic error. The same clarity applies when you hit a free-tier limit — Cline tells you when it resets.
+- **Reasoning settings behave the same on every provider.** Effort levels and "reasoning on/off" toggles now map to a shared path across all AI SDK providers — including local setups like Ollama — instead of each provider interpreting them differently. If "high effort" works on one model, it works on the next one you switch to.
+
+v4.1.4 also hardened reliability in ways you will only notice when things go wrong: running out of context now compacts the conversation and retries once instead of failing with a raw provider error, and empty model responses are retried on every provider, not just Ollama. Both were common "the agent just died" experiences for newcomers.
 
 ## Free Cline Models: Zero API Keys Required
 
@@ -58,6 +84,8 @@ The desktop app also fixed regional routing for Qwen, Moonshot, Z AI, and MiniMa
 
 Why this matters: the VS Code extension is powerful but tied to one editor. The desktop app works alongside any editor — VS Code, JetBrains, Neovim, Zed, or none at all. It is also the path to using Cline's CLI for headless automation, CI pipelines, and scripts.
 
+**Desktop v0.0.10 (August 7)** adds OAuth for remote MCP servers, which is beginner-relevant because MCP is how Cline talks to external tools and data sources. You can now authorize a remote MCP server right from Settings → MCP, see its auth status, and cancel or retry a pending authorization. Servers that need a pre-registered client ID/secret are supported too, and stored tokens are invalidated when a server's client configuration changes. MCP errors also now appear on the individual server card instead of as a page-level error — so when something is misconfigured, you can see which server is at fault instead of hunting for a vague failure.
+
 ## CLI Reliability Fixes
 
 v4.0.12 fixed a bug where Claude Code responses that were already streamed would be discarded when the CLI exited with a max-turns error. Before the fix, if the agent hit the turn limit mid-response, you lost the work it had already done. Now the response is preserved — you keep the code changes even if the session ends abruptly.
@@ -90,7 +118,7 @@ Cline is not the only agent offering free or cheap access. Opencode, Pi, and Her
 
 The Opus 5 support also narrows the gap with Claude Code. Cline can now run the same model that Claude Code uses, across the same providers, with the same context window. The difference is in workflow: Claude Code is terminal-native and excels at headless automation. Cline is IDE-native and excels at visual review with diff previews and checkpoint restores. Both are Apache 2.0 or equivalent. Neither locks you in.
 
-For teams evaluating coding agents, Cline v4.0.12 makes the "try it on a real project" test free. No procurement cycle, no API key budget request, no credit card. Pick the free model and see what the agent does with your codebase.
+For teams evaluating coding agents, Cline v4.1 makes the "try it on a real project" test free — and safer. No procurement cycle, no API key budget request, no credit card. Pick the free model, keep the agent in plan mode while you get comfortable, and see what it does with your codebase.
 
 ## Related Reading
 - [What Developers Say About Claude Code vs Cursor](/blog/what-devs-say-claude-code-vs-cursor)
