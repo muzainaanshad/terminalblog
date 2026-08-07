@@ -1,0 +1,101 @@
+---
+title: "Claude Code v2.1.224: Self-Hosted Runners, Cross-Session Messaging, and Tighter Secret Handling"
+description: "Anthropic's August 7 Claude Code release lets you run sessions on your own machines, lets agents message each other, and masks JWT and AWS credentials in sandboxed commands. A beginner-friendly walkthrough."
+pubDate: "2026-08-07T10:00:00Z"
+updatedDate: "2026-08-07T10:00:00Z"
+tags: ["claude-code", "anthropic", "release", "self-hosted", "security", "agent-to-agent"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+v2.1.224+Self-Hosted+Runners&tool=claude-code"
+---
+
+Anthropic shipped Claude Code v2.1.224 on August 7, 2026 — the first release built on top of last week's v2.1.223 permission-bypass fixes. If v2.1.219 was the model update (Opus 5 as default) and v2.1.223 was the security hardening, v2.1.224 is the one that changes *where* Claude Code runs and *who it can talk to*: you can now run sessions on your own machines, let sessions message each other across your fleet, and keep JWT and AWS credentials out of your logs while sandboxed commands still work.
+
+It also quietly fixes a sandbox escape that security researchers had been warning about. Here is what changed, in plain language.
+
+## Run Claude Code on machines you control
+
+The headline feature is `claude self-hosted-runner`. Up to now, Claude Code web, mobile, and desktop sessions mostly ran on Anthropic's infrastructure — you interacted through their cloud sandboxes. v2.1.224 (Team and Enterprise plans) lets you turn your own machines or containers into runners where those sessions execute.
+
+Think of a runner as a worker that says "I'm available — send sessions here." You point it at hardware you own (a beefy dev box, a VM in your VPC, a CI runner), and Claude Code web, mobile, and desktop sessions run there instead of in someone else's cloud. Your code, your credentials, and your network stay inside your boundary.
+
+For a beginner the mental model is simple: **the conversation UI is separate from the machine doing the work.** This is the same pattern as self-hosted GitHub Actions runners or self-hosted VS Code — and it is the pattern enterprises need before they will let an agent near production code.
+
+## Sessions that message each other (safely)
+
+The second big feature is cross-session `SendMessage`. Claude Code sessions can now send messages to *other* Claude Code sessions — on any of your machines — and discover them with `ListAgents` (macOS and Linux for now).
+
+Why would you want that? A few realistic patterns:
+
+- A long-running session on your server finishes a build and messages your laptop session with the result.
+- An orchestrator session delegates a task to a worker session on another machine and collects the answer.
+- A review session asks a coding session "did you touch `auth.ts`?" before approving.
+
+Anthropic built a guardrail into the messaging, and beginners should know it: messages sent to a session that is running with **bypassed permissions** are *held for your approval* instead of being delivered silently. That's the `crossSessionInbound` and `dialogExpiry` settings — the defaults mean a remote agent cannot quietly execute something on an unlocked session. You review, then it lands.
+
+## Install plugins from a plain zip
+
+Plugins in Claude Code used to come from git repos or npm packages. v2.1.224 adds an `archive` plugin source: you can install a plugin from a zip file served over HTTPS, no git or npm involved.
+
+For teams that want to hand out internal tools without a package registry, this is the fast path. The important part for safety: you can **pin the zip by SHA-256 hash**, so Claude Code verifies the file it downloads is exactly the file you approved — a supply-chain guard that matters more every quarter. If you are just starting out, prefer plugins with a pinned hash; it is a two-line setting and it removes an entire class of "the download was swapped" attacks.
+
+## Secrets stay out of your logs
+
+Sandboxed commands get a serious credential-masking upgrade:
+
+- **JWT-aware masking** — with `decode: "jwt"` and `maskClaims`, Claude Code recognizes JWT-shaped secrets in output and masks the claims you choose, instead of blurring the whole token.
+- **AWS SigV4 re-signing** — with `awsPairs`/`sigv4`, requests are re-signed so real AWS credentials never appear in plaintext in the sandbox.
+- **Structured env extraction** — `extract`/`onExtractNoMatch` let you pull credentials out of structured values (JSON configs, env files) and mask them too.
+
+Why beginners should care: the classic failure mode is an agent that prints `AWS_SECRET_ACCESS_KEY=...` into a log or a transcript, and now that secret is out in the world. These options (which require `network.tlsTerminate` and are honored only from user, managed, or `--settings` settings — so a project file cannot sneak them in) make "the agent saw my keys" much less likely to become "the agent leaked my keys."
+
+## Fixes worth knowing about
+
+Two fixes deserve attention beyond the features:
+
+1. **Sandbox deny bypass closed.** Filesystem deny entries written with a trailing slash — like `denyRead: "~/.aws/"` — could be *silently bypassed* on Linux and macOS. That is exactly the kind of bug where you think a folder is blocked and it is not. v2.1.224 fixes the bypass so a deny with a trailing slash actually denies. If you run Claude Code with a sandbox config, re-test your deny rules after updating — this is the fix that makes the rules real.
+2. **Project-path collision fixed.** Project paths longer than 200 characters could resolve to *another project's* session directory when they shared a sanitized prefix. Sessions, renames, forks, deletes, and `/resume` no longer cross project boundaries — important if you work in deep monorepos with long paths.
+
+Also fixed: sandbox violation details now actually appear in Bash tool results (so you can see *why* a command was blocked), MCP tools that connect mid-turn are announced to the model instead of silently deferred, and plugin install records no longer get corrupted when the same plugin is installed in multiple projects.
+
+For AWS users, `ANTHROPIC_BEDROCK_REGION_PREFIX` lets you prefer a specific cross-region inference profile instead of whatever `AWS_REGION` implies.
+
+## Getting started
+
+Update and check your version:
+
+```bash
+npm update -g @anthropic-ai/claude-code
+claude --version   # should report 2.1.224
+```
+
+Then try the new pieces in order:
+
+```bash
+# 1. See what self-hosted runners involve (Team/Enterprise)
+claude self-hosted-runner --help
+
+# 2. Install a plugin from a zip with a pinned hash
+claude plugin install https://example.com/plugin.zip --source archive --sha256 <hash>
+
+# 3. Check cross-session messaging is available on your platform
+claude --help | grep -i sendmessage
+```
+
+If you use sandbox deny rules, this is the release to re-test them on — the trailing-slash fix changes behavior you may have been relying on (or wrongly trusting).
+
+## The bottom line
+
+v2.1.224 is a "where does the work happen" release: self-hosted runners for the enterprise, cross-session messaging for multi-agent workflows, zip plugins for distribution, and a real security pass on credentials and sandbox denies. For a beginner, the two things to remember are the approval gate on cross-session messages (remote agents cannot run wild on unlocked sessions) and re-validating your deny rules after updating.
+
+---
+
+*Looking to compare AI models without switching tabs? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you GPT, Claude, Gemini, Grok, DeepSeek, and Perplexity in one place for $12/mo.*
+
+## Related articles
+
+- [Claude Opus 5 Arrives — plus Claude Code v2.1.219](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Beware: Claude Code Worktree Sandbox Escape (CVE-2026-55607)](/blog/beware-cve-2026-55607-claude-code-worktree-sandbox-escape/)
+- [Claude Code agent platform: gateway + GCP deployment](/blog/claude-code-agent-platform-gateway-gcp/)
+- [Coding Agents: The Security Hardening Wave](/blog/coding-agents-security-hardening-wave/)
+- [Claude Code vs OpenAI Codex: terminal battle](/blog/claude-code-vs-codex/)
