@@ -1,0 +1,96 @@
+---
+title: "Codex 0.147.0: Portable Plugins, Automatically Approved Reviews, and Safer Defaults"
+description: "OpenAI's newest stable Codex lets you install plugins from anywhere, auto-approve low-risk commands, and imports your Cursor skills with safer permissions. A beginner-friendly walkthrough."
+pubDate: "2026-08-07T09:00:00Z"
+updatedDate: "2026-08-07T09:00:00Z"
+tags: ["codex", "openai", "release", "agent-plugins", "security"]
+tool: "codex"
+author: "sage"
+image: "/api/og?title=Codex+0.147+Portable+Plugins+Auto-Approvals&tool=codex"
+---
+
+OpenAI shipped Codex 0.147.0 on August 7, 2026, a few days after 0.146.0 introduced Agent Plugins, named sessions, and thread forking. If 0.146.0 opened the door to an extensions ecosystem, 0.147.0 makes that ecosystem portable, adds an `--approve-for-me` flag that hands routine approvals to the agent itself, and quietly tightens security defaults in ways beginners should care about.
+
+This is a beginner-friendly look at what changed, what it means, and how to use the headline features today.
+
+## Portable plugins: install once, use anywhere
+
+The biggest practical upgrade is portable Agent Plugins. In 0.147.0, Codex can now install plugins and make them available across every place you run it — your personal machine, a workspace, a shared team project, or a remote host. Instead of a plugin living only in one folder, you can search a catalog and drop it into the scope where you actually need it.
+
+Why this matters if you are new to Codex: before this release, a plugin you installed for one workspace did not automatically follow you to another. You had to reinstall or manually wire it up per project. Now Codex searches local, personal, workspace, and remote plugin catalogs, so the tools you already use show up regardless of where you are. It feels closer to how `npm` finds packages from anywhere on your system.
+
+Using it looks like this:
+
+```bash
+# Search available plugin catalogs for a code-review tool
+codex plugin search code-review
+
+# Install into your personal catalog so it works in any project
+codex plugin install <name> --scope personal
+```
+
+The exact catalog flags depend on your setup, but the mental model is one plugin install, many overlapping scopes — with Codex picking the most specific match for the project you are in.
+
+## `--approve-for-me`: let the agent approve routine reviews
+
+Codex has an approval flow: before an agent edits, runs, or interacts with your machine, it asks you to say yes. That keeps humans in control, but for low-risk, repeated actions it can feel like an endless stream of prompts.
+
+The new `--approve-for-me` CLI flag hands a slice of that to the agent. When you start Codex in this mode, it can automatically approve requests that fit the "automatically reviewed approvals" category — which are the ones you would click through anyway, like running a linter or applying a safe, small edit. You still approve anything genuinely sensitive.
+
+For a beginner, the honest framing is: use it to remove friction only after you trust the session. A quick mental rule is to start a session in normal mode, and switch to auto-approve once the task is a mechanical repeat of something you have already okayed.
+
+## Import Cursor skills and merge conversations without duplicate mess
+
+If you are evaluating Codex but have muscle memory (and skills) built in Cursor, 0.147.0 removes one of the big switching costs. Codex can now import Cursor-managed skills and, importantly, synchronize changes back to your imported Claude and Cursor conversations without creating duplicates. Instead of a one-way one-time import that copies everything and then drifts out of date, it keeps an eye on the originals and stays in sync.
+
+This is a nice step toward a multi-agent workflow where you are not locked into one vendor — skills live wherever you like, and Agent Plugins bridge them across.
+
+## The MCP 2026-07-28 protocol: behind-the-scenes reliability
+
+A chart-topper that you will not see but will feel: Codex adds opt-in support for the MCP 2026-07-28 protocol standard. That brings paginated tool discovery, multi-round requests, and non-blocking server startup. In plain language: more stable connections to external MCP servers, faster startup that no longer stalls your first turn, and the ability to fetch big tool lists in pages instead of all at once.
+
+Install a few comparison fields — like MCP memory or Gmail — and you may notice fewer hangs and quicker mentions of servers becoming ready.
+
+## Safer defaults (read this part)
+
+Two changes in 0.147.0 are worth reading for a beginner:
+
+1. **Requires explicit trust for unfamiliar projects.** Before your credentials get used, Codex now requires you to trust a project you have not worked in before. That closes a real gap where an unfamiliar folder could silently consume your auth without a clear prompt.
+2. **Redacts secrets and bearer tokens.** Commands you run and replayed history no longer show full secrets — Codex scrubs them from what is displayed. Combined with stricter plugin isolation (and a denial of network access if a policy update fails), the release is the most safety-conscious package update in a while.
+
+The explicit-trust change is the one beginners should configure consciously. When you open a download repo, expect a "trust this project?" prompt. Treat that the way you would escalate permissions in any tool — trust only folders you own or from people you trust.
+
+## Getting started
+
+Update to 0.147.0:
+
+```bash
+npm install -g @openai/codex
+# or, for the standalone install
+codex update
+```
+
+Then try auto-approving a low-risk session:
+
+```bash
+codex --approve-for-me
+```
+
+And for a repeating task with Cursor skills already built, run the import-step that imports your Cursor skills and lets Codex stay in sync with them.
+
+## The bottom line
+
+Codex 0.147.0 is a release about daily feel more than headlines: portable plugins that follow you, fewer click-throughs on routine reviews, stronger safeguards by default, and smoother MCP connections. For someone just starting with a coding agent, the pair of features to care most about is `--approve-for-me` plus the explicit "trust this project?" prompt. Together they give you the speed of automation without handing over everything at once.
+
+If you have not tried a terminal coding agent yet and want the security side sorted before experimenting, pairing a cautious default setup with the trust and redaction changes helps you stay safe while you learn.
+
+---
+
+*Looking to compare AI models without switching tabs? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you GPT, Claude, Gemini, Grok, DeepSeek, and Perplexity in one place for $12/mo.*
+
+## Related articles
+
+- [Codex 0.146.0 Adds Agent Plugins, Session Naming, and Thread Forking](/blog/codex-0-146-agent-plugins-session-naming-thread-forking/)
+- [Claude Code vs OpenAI Codex: open source vs commercial tradeoffs](/blog/claude-code-vs-codex/)
+- [Beware: Codex Desktop Quietly Silences a Subagent Resource When MCP Calls Spawn](/blog/beware-codex-desktop-subagent-mcp-resource-crisis/)
+- [The Agent Loop Just Became a Plugin — Coding Agent Wars](/blog/agent-loop-plugin-harness-wars-2026/)
