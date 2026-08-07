@@ -1,5 +1,7 @@
 # Hermes session handoff (2026-07-14 — end of Grok session)
 
+> **UPDATE 2026-08-07 (cron job):** Repo transferred `Anshad2u/terminalblog` → **`muzainaanshad/terminalblog`** (origin force-pushed/rewritten; local master reset to `origin/master`). Old local history preserved in branch `backup/old-master-2026-08-07` + `/tmp/wip-2026-08-07.patch`. **Vercel Git auto-deploy is BROKEN after transfer** — pushes do not trigger deploys (`vercel git connect` fails: Vercel GH app lacks access; needs dashboard re-link by operator). Until fixed: deploy manually with `vercel --prod --yes` after pushing.
+
 **Why this file exists:** Operator continues in Hermes. Read this **first** every content/ops job.
 
 ## Mission
