@@ -1,0 +1,87 @@
+---
+title: "Deep Agents Code (dcode) Approval Modes: Manual, Auto, YOLO — The Practical Guide"
+description: "LangChain's terminal agent dcode has exactly three approval modes: Manual, classifier-backed Auto, and YOLO. Here's what each gates, how to enable them, how the Auto classifier works, and when each mode is safe to run."
+pubDate: "2026-08-08T02:05:00Z"
+tags: ["guide", "deep-agents", "approval-modes", "auto-mode", "security", "langchain"]
+tool: "deepagents"
+author: "jax"
+image: "/api/og?title=Deep+Agents+Code+Approval+Modes+Guide&tool=deepagents"
+---
+
+Deep Agents Code — the LangChain terminal agent you install with `curl -LsSf https://langch.in/dcode | bash` and run as `dcode` — is built around one answer to the question every coding agent has to answer: how much can the model do without asking you first? Roughly inspired by Claude Code, it ships with the same human-in-the-loop (HITL) shape as its peers, then adds something most competitors don't have: a classifier-backed **Auto** mode that reviews its own gated actions mid-session.
+
+This guide covers the three approval modes — **Manual**, **Auto**, and **YOLO** — what exactly gets gated, how the Auto classifier works under the hood, and how to pick a mode that fits the job instead of defaulting to "confirm everything" or "confirm nothing".
+
+## What counts as a gated action
+
+`dcode` gates anything with a side effect:
+
+- Editing or deleting files — `write_file`, `edit_file`, `delete`
+- Running shell commands — `execute`
+- Making web requests — `web_search`, `fetch_url`
+- Delegating work to subagents — `task`, plus async task tools
+- Non-read-only MCP tools
+
+Read-only tools — `ls`, `read_file`, `glob`, `grep` — always run without prompting, because they can't change anything. Everything above is what the approval modes govern. On top of that, deepagents-code **trusts the directory you run it in**: project artifacts are read before any approval prompt, so a malicious repo checked out and opened in `dcode` can shape what the model sees. For untrusted repositories, the docs are blunt — use a [remote sandbox](https://docs.langchain.com/oss/deepagents/code/remote-sandboxes) so execution stays isolated. The threat model is documented in the project's `THREAT_MODEL.md`.
+
+## The three modes
+
+| Mode | What it does | How to enable |
+|---|---|---|
+| **Manual** (default) | Asks for approval before every gated action | Nothing — it's the default |
+| **Auto** | Approves routine actions automatically; a classifier model reviews anything uncertain; falls back to you after repeated denials or failures | `dcode -y` with `DEEPAGENTS_CODE_EXPERIMENTAL=1`, or `[startup] mode = "auto"` |
+| **YOLO** | Runs every gated action with no review at all | `dcode --yolo` + one-time risk acknowledgment |
+
+You can flip between Manual and Auto mid-session with `Shift+Tab` or `Ctrl+T`. **YOLO can't be entered with the keyboard toggle** — it's a deliberate, launch-time decision. And once you leave YOLO (the toggle drops you to Manual), you can't get back to it without restarting.
+
+Flag precedence is explicit: `--yolo` beats `-y`/`--auto-approve`, which beats `[startup].mode` in `config.toml`.
+
+## How Auto actually works
+
+Auto keeps the exact same gated-action rules as Manual; it only changes *who reviews them.* Everything flows through two stages:
+
+1. **Routine actions run immediately.** A write to `src/parser.py` or a read-only git command like `git status` proceeds without a prompt. The classifier treats these as safe-by-convention.
+2. **Everything else goes to the classifier model.** Sensitive targets — `.github/workflows/ci.yml`, mutating commands like `git commit` — get reviewed by a model that checks whether the action matches what you literally asked for. The docs are explicit about the authorization rule: **only your literal prompt can authorize an action.** If the model denies a call, the agent gets an error result and revises its plan.
+
+After repeated denials or classifier failures, Auto stops and shows you the normal approval prompt for the next batch, then keeps running in Auto. The classifier also **revalidates before side effects**: the decision plan is bound to the thread, mode, batch, and exact gated calls. If you flip to Manual while a classifier review is in flight, an earlier Auto decision cannot silently execute — the ordinary approval UI opens instead. That replay/mode-race protection is the piece that makes Auto structurally different from a dumb "approve everything under threshold" flag.
+
+### The classifier model is its own trust boundary
+
+By default, the Auto classifier uses **the same model as the main agent** — which means the thing writing the code and the thing reviewing it are one and the same, and your review quality tracks your main model. You can point classification at a cheaper, faster model:
+
+```
+dcode -y --auto-classifier-model openai:gpt-5.6-luna
+/auto model openai:gpt-5.6-luna   # TUI, applies immediately; /auto model clear resets
+export DEEPAGENTS_CODE_AUTO_CLASSIFIER_MODEL="openai:gpt-5.6-luna"
+# or in ~/.deepagents/config.toml:
+# [models]
+# auto_classifier = "openai:gpt-5.6-luna"
+```
+
+Precedence: `/auto model` (immediate) → `--auto-classifier-model` flag (interactive sessions only) → env var → `config.toml` → inherit the main model.
+
+Two security details worth knowing. First, a **project `.env` cannot set the classifier config** — only your shell, `~/.deepagents/.env`, the CLI flag, or the TUI command can. A cloned repo can't point the review that authorizes its own tool calls at a weaker model. Second, the classifier is *fail-closed*: if the model can't be resolved (bad spec, missing credentials), reviewed actions are **denied**, and repeated failures escalate to you. The review deadline is `DEEPAGENTS_CODE_AUTO_CLASSIFIER_TIMEOUT` (1–300 seconds); a batch that misses its deadline is denied as `classifier_unavailable` rather than run.
+
+The official docs are blunt about what Auto is: "an authorization heuristic for a local coding agent — **not** sandbox containment, an operating-system boundary, or a guarantee that model-generated actions are safe." Auto is also interactive-only: it falls back to Manual without the `DEEPAGENTS_CODE_EXPERIMENTAL=1` opt-in, and it's disabled while a remote `--sandbox` is active.
+
+## When to use which mode
+
+- **Manual** — default for mixed-trust repos you don't operate daily, anything early in a project, and the teaching case: you see every action a model wants to take. This is what you want when working in repos you don't fully trust on a machine worth protecting.
+- **Auto** — good default for a repo you own and understand. You approve the shape of work up front; the classifier keeps `git commit`, CI-file edits, and destructive commands visible (reviewed by a model *and* re-rated against your literal prompt) while green-lighting routine writes. Watch for the "my literal prompt is the authorization budget" rule — phrase tasks tightly if the classifier second-guesses you.
+- **YOLO** — only for fully disposable environments or trusted single-command jobs where you accept complete autonomy. In headless/CI use, YOLO isn't even the right switch, because Auto and YOLO are both interactive-mode features.
+
+## Headless, CI, and non-interactive runs
+
+Auto and YOLO are **not available non-interactively**: `dcode -n` (or piped stdin) and ACP server mode get fail-closed routing instead — a headless MCP guard rejects dynamically gated MCP calls when no approval UI exists, and shell access is controlled with `--shell-allow-list`. That's the correct design: you should never get YOLO behavior in a pipeline by accident. When you run with `--yolo`, LangSmith trace metadata records `dcode_auto_approve=True`, so runs that executed tools without HITL approval are filterable in traces rather than invisible.
+
+Useful operational commands while you're at it: `dcode config show` reports every resolved option and its source (with secrets redacted — safe to paste into a bug report), `dcode config path` shows where config lives, and `/reload` re-reads `.env` files mid-session when you rotate keys.
+
+## Where the model falls short: fine-grained policies
+
+Today's modes are binary at the whole-session level: confirm everything, let the classifier decide, or disable gating. There's no shipped way to declare *"auto-approve `write_file`/`edit_file` under `src/**` and `tests/**`, but always confirm `execute` calls containing `rm`, `curl`, or `git push`."* That's an [open feature request on the deepagents repo (#4844)](https://github.com/langchain-ai/deepagents/issues/4844) — a project-level `permissions.toml` with deterministic, git-reviewable rules — which LangChain says it's tracking internally. Until it lands, teams running `dcode --non-interactive` in CI lean on the fail-closed headless path plus shell allow-lists, which is the safer half of what a permissions file would give you anyway.
+
+## Bottom line
+
+Deep Agents Code's approval modes are a clean ladder: **Manual when you don't trust the context, Auto when you trust the repo but want a guardrail that closes when you assert, YOLO only when nothing on the machine matters.** Most teams should live in Manual + Auto and let YOLO be a rare, explicit, restart-scoped choice. If you're comparing against other tools' auto-approval features, the [Claude Code vs Codex approval-safety writeup](/blog/claude-code-vs-codex-terminal-battle/) and our [auto-mode RCE analysis](/blog/beware-friendly-fire-auto-mode-auto-review-rce/) show how fragile permissive modes get in the wild — useful context before you point a classifier at `git commit` for the first time.
+
+For the broader picture of what Auto sits inside, the [coding-agent security checklist for 2026](/blog/coding-agent-security-checklist-2026/) maps the same trust decisions across a dozen tools, and the [agents.md guide](/blog/agents-md-complete-guide/) covers the per-project instructions layer that pairs with approval modes.

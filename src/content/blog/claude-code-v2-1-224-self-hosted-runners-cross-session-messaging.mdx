@@ -1,8 +1,8 @@
 ---
 title: "Claude Code v2.1.224: Self-Hosted Runners, Cross-Session Messaging, and Tighter Secret Handling"
-description: "Anthropic's August 7 Claude Code release lets you run sessions on your own machines, lets agents message each other, and masks JWT and AWS credentials in sandboxed commands. A beginner-friendly walkthrough."
+description: "Anthropic's August 7 Claude Code release lets you run sessions on your own machines, lets agents message each other, and masks JWT and AWS credentials in sandboxed commands. Updated with v2.1.225/226: gateway spend limits, workspace trust prompts, and a wave of reliability fixes."
 pubDate: "2026-08-07T10:00:00Z"
-updatedDate: "2026-08-07T10:00:00Z"
+updatedDate: "2026-08-08T08:00:00Z"
 tags: ["claude-code", "anthropic", "release", "self-hosted", "security", "agent-to-agent"]
 tool: "claude-code"
 author: "sage"
@@ -60,13 +60,33 @@ Also fixed: sandbox violation details now actually appear in Bash tool results (
 
 For AWS users, `ANTHROPIC_BEDROCK_REGION_PREFIX` lets you prefer a specific cross-region inference profile instead of whatever `AWS_REGION` implies.
 
+## What landed a day later: v2.1.225 and v2.1.226
+
+Anthropic followed v2.1.224 within 24 hours with **v2.1.225** (August 8) and then **v2.1.226** (bug fixes and reliability improvements). The follow-ups don't add headline features, but they fix the sharp edges of the new release — and two of them change how the previous sections behave in practice.
+
+**Gateway spend limits now show up in Claude Code's usage warnings.** If you run Claude Code through the agent gateway, the "limit reached" message now names the actual cap, when it resets, and any message your operator attached. For teams, this turns an anonymous "you're out" into actionable info. (The gateway itself needs to be on 2.1.225 for this to work.)
+
+**`claude agents` now asks before trusting an untrusted directory.** Previously the workspace trust prompt applied to `claude` but not to `claude agents`; v2.1.225 makes the behavior match. If you spin up agents in downloaded or cloned directories, you'll see the same "trust this folder?" gate as a normal session.
+
+**Two OAuth fixes matter for automation.** A transient 401 could replace your long-lived `CLAUDE_CODE_OAUTH_TOKEN` with a short-lived token from a stored login — silently breaking headless sessions until restart. That's fixed. And MCP OAuth servers on macOS would intermittently burst 401s, "as if never authenticated," after a keychain read timed out — also fixed. If your CI or background sessions used to die mysteriously, update and re-test.
+
+**Auto mode stops counting its own permission refusals.** v2.1.224's auto mode counted a safety-filter refusal of *its own permission check* toward the consecutive-block limit — the action was still denied, but the model was told to retry instead of move on. v2.1.225 fixes the accounting so a denied action ends the loop cleanly.
+
+**Cross-session messaging gets the polish it needed.** Messages sent to headless sessions (or during startup) no longer sit parked without a notice or expiry, and `SendMessage` can now *start* a conversation with your Remote Control sessions on other machines by name instead of only replying after they message you first. There's also a guard so a Remote Control recipient you already confirmed is never silently swapped for a same-named session on the current machine.
+
+**Self-hosted runner failure mode fixed.** If `claude self-hosted-runner` couldn't create or write its `--base-dir`, it used to register and then fail every session. It now exits at startup with a clear error — annoying, but diagnosable.
+
+Other fixes worth knowing: conversation history no longer breaks on Remote Control session resume after very large conversations were compacted; hovering a session in another project no longer changes the directory the next agent starts in; web sessions are no longer misreported as stuck (which re-sent a growing event backlog on every reconnect); and in VS Code, the Focus view no longer folds away the latest to-do list or a pending question's context.
+
+**The practical takeaway:** if you adopted v2.1.224 for self-hosted runners or cross-session messaging, update to v2.1.225 before relying on it in CI — the OAuth, headless-message, and runner `--base-dir` fixes are exactly the kind of bugs that only show up in automation. And if your gateway enforces spend limits, the new warning text tells you the cap, reset time, and who to ask.
+
 ## Getting started
 
 Update and check your version:
 
 ```bash
 npm update -g @anthropic-ai/claude-code
-claude --version   # should report 2.1.224
+claude --version   # should report 2.1.226 (2.1.225 + 2.1.226 fix packages)
 ```
 
 Then try the new pieces in order:
