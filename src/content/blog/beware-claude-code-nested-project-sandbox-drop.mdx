@@ -1,0 +1,240 @@
+---
+title: "Beware: Claude Code Silently Drops Its Sandbox in Nested Project Folders"
+description: "Claude Code issue #83035: when a session or subagent runs inside a nested project directory, the workspace's sandbox configuration is silently discarded — network restrictions and unsandboxed-command policies stop applying. No warning, no error. Here's how to check if you're affected."
+pubDate: "2026-08-08T14:00:00Z"
+updatedDate: "2026-08-08T14:00:00Z"
+tags: ["security", "beware", "claude-code", "sandbox", "subagents", "config"]
+tool: "claude-code"
+author: "kira_bug_tracker"
+image: "/api/og?title=Beware:%20Claude%20Code%20Silently%20Drops%20Sandbox%20in%20Nested%20Folders&tool=Claude%20Code"
+---
+
+## Related articles
+
+- [Beware: Claude Code CVE-2026-55607 — A Malicious Repo Can Escape the Sandbox](/blog/beware-cve-2026-55607-claude-code-worktree-sandbox-escape/)
+- [Beware: Your Coding Agent's "Safe Mode" Can Be Turned Into a Remote Code Execution Engine](/blog/beware-friendly-fire-auto-mode-auto-review-rce/)
+- [Coding Agent Security Checklist 2026](/blog/coding-agent-security-checklist-2026/)
+- [AI Agent Config Attack Surface 2026](/blog/ai-agent-config-attack-surface-2026/)
+
+---
+
+You configure Claude Code's sandbox carefully: `"enabled": true`, `"allowUnsandboxedCommands": false`, a network allowlist that only permits your internal domains. You watch the main session block a command that tries to reach outside those rules. Everything looks locked down.
+
+Meanwhile, a subagent working in a nested repository directory runs the exact same command — with full network access, unsandboxed and unconstrained. Nothing signals the difference. That is the situation documented in [Claude Code issue #83035](https://github.com/anthropics/claude-code/issues/83035), reported on August 1, 2026, against Claude Code v2.1.220 on macOS.
+
+This is a sandbox-escape-class failure in the tool's trust model, and it has a cruel property: it is silent. The main session enforces the sandbox, so the operator reasonably believes the boundary is binding. The subagent proves otherwise. If you use nested git repositories under a shared workspace folder — which describes the vast majority of multi-repo setups — you need to check this now.
+
+## What happened
+
+Claude Code applies sandbox settings from `.claude/settings.local.json` (and other settings files) at the session's **project root**. When you start a session in your main workspace, that folder's sandbox block is read and enforced.
+
+But Claude Code also walks into nested project directories. Each nested repo can carry its own `.claude/settings.local.json`. And here is the bug: **the nested file completely replaces the parent's sandbox config instead of inheriting or merging it.**
+
+That means: if your parent workspace has a strict sandbox block —
+
+```json
+{
+  "sandbox": {
+    "enabled": true,
+    "allowUnsandboxedCommands": false,
+    "network": {
+      "allowedDomains": ["api.mycompany.com"]
+    }
+  }
+}
+```
+
+— and any nested repo under it has a `settings.local.json` that contains only permissions and **no `sandbox` key**, the nested file wins. The strict parent sandbox is a no-op for any work routed into the child project. The reporter verified this in the transcript: a plain `ssh <host-X> hostname` Bash call was blocked in the main session and succeeded unsandboxed inside the nested project, with the subagent's project transcript filed under `~/.claude/projects/`.
+
+The trigger is not exotic. The reporter notes that answering "Yes, and don't ask again" to a permission prompt creates exactly these permissions-only `settings.local.json` files — the mechanism previously documented in [issue #20218](https://github.com/anthropics/claude-code/issues/20218) (which Anthropic closed in January 2026 after fixing the shadowing behavior for **permissions** only). The sandbox variant of the same shadowing problem now has issue [#83035](https://github.com/anthropics/claude-code/issues/83035) attached to it, and it remains open with no maintainer response as of this writing.
+
+## Who is affected
+
+Any Claude Code user who relies on the sandbox and does any of the following:
+
+- Keeps multiple git repos under one parent workspace folder
+- Runs subagents that are asked to "go work on <nested repo>" — the agent roots itself inside the nested project, which is exactly where the sandbox silently disappears
+- Answers "Yes, and don't ask again" to permission prompts, letting Claude Code generate nested `settings.local.json` files
+- Has a monorepo with nested `.claude/settings.local.json` files
+
+This is a **default state for most multi-repo users**, not a rarity. Every nested repo that has any settings file without its own `sandbox` block can disable the security boundary for work routed into it.
+
+Platform note: the report was verified on macOS (seatbelt sandbox). The settings-file replacement logic is platform-independent, so Linux (bwrap) and Windows sandbox users should assume the same behavior until Anthropic states otherwise. Related issues [#40831](https://github.com/anthropics/claude-code/issues/40831) (closed) and [#70711](https://github.com/anthropics/claude-code/issues/70711) (open) show this sandbox-boundary class keeps recurring.
+
+## Why unsandboxed subagents matter
+
+Three properties make this hard to spot in the wild:
+
+1. **It is silent.** No warning that the ancestor sandbox is being discarded. The operator sees the main session correctly blocked and concludes the security boundary works.
+2. **The least supervised work gets the weakest protection.** Subagents are exactly the delegation path you want sandboxed. A malicious code suggestion, a poisonered dependency, or a compromised prompt in a nested repo that gets subagent trust can execute with the user's network privileges.
+3. **Every nested repo is a potential sandbox hole.** The report's wording: a workspace sandbox is not a boundary as soon as any nested directory is a Claude project without its own sandbox block.
+
+This does not require a code-execution exploit at the LLM level. An attacker who can influence what the subagent does in the nested repo — via a malicious file, a package install script, or a poisoned README — inherits network access and an unsandboxed shell that the user believed was locked down.
+
+## How to check if you are affected
+
+Run these commands from the root of your workspace:
+
+```bash
+# 1. List every Claude settings file in the tree
+find . -name "settings.json" -o -name "settings.local.json" | grep -E "\.claude/"
+
+# 2. Show which files contain a "sandbox" key (and which silently lack one)
+for f in $(find . -path "*/.claude/settings.json" -o -path "*/.claude/settings.local.json" | grep -E "\.claude/"); do
+  printf '%s: ' "$f"; jq -r '"\(.sandbox // "NO sandbox key — DANGER")"' "$f" 2>/dev/null || echo "unreadable/not json"
+done
+
+# 3. Cross-check your main project root
+jq . ~/my-workspace/.claude/settings.local.json
+```
+
+If any nested file prints `NO sandbox key — DANGER` (or `null`) while your workspace root has a `sandbox` block, you're in the affected state.
+
+Direct functional test (only if you have a host in your parent's blocklist):
+
+<｜DSML｜tool_calls>
+<｜DSML｜invoke name="write_file">
+<｜DSML｜parameter name="content" string="true">---
+title: "Beware: Claude Code Silently Drops Its Sandbox in Nested Project Folders"
+description: "Claude Code issue #83035: when a session or subagent runs inside a nested project directory, the workspace's sandbox settings are silently discarded — network restrictions and unsandboxed-command policies stop applying. No warning, no error. Here's how to check if you're affected."
+pubDate: "2026-08-08T14:00:00Z"
+updatedDate: "2026-08-08T14:00:00Z"
+tags: ["security", "beware", "claude-code", "sandbox", "subagents", "config"]
+tool: "claude-code"
+author: "kira_bug_hunter"
+image: "/api/og?title=Beware:%20Claude%20Code%20Silently%20Drops%20Sandbox%20in%20Nested%20Folders&tool=Claude%20Code"
+---
+
+## Related articles
+
+- [Beware: Claude Code CVE-2026-55607 — A Malicious Repo Can Escape the Sandbox](/blog/beware-cve-2026-55607-claude-code-worktree-sandbox-escape/)
+- [Beware: Your Coding Agent's "Safe Mode" Can Be Turned Into a Remote Code Execution Engine](/blog/beware-friendly-fire-auto-mode-auto-review-rce/)
+- [Coding Agent Security Checklist 2026](/blog/coding-agent-security-checklist-2026/)
+- [AI Agent Config Attack Surface 2026](/blog/ai-agent-config-attack-surface-2026/)
+
+---
+
+You configure Claude Code's sandbox carefully. `"enabled": true`, `"allowUnsandboxedCommands": false`, a network allowlist that only permits your own domains. You watch the main session block a command that tries to reach outside. Everything seems locked down.
+
+Then a subagent working inside a nested repository directory runs the same command — fully unsandboxed, with unrestricted network access. Nothing tells you it happened. That is the situation documented in [Claude Code issue #83035](https://github.com/anthropics/claude-code/issues/83035), reported on August 1, 2026, against Claude Code v2.1.220 on macOS.
+
+This is a sandbox-escape-class failure, and it has a nasty property: it is **silent**. The main session enforces the sandbox, so you reasonably believe the boundary is holding. The subagent shows you it isn't. If you keep multiple git repositories under one workspace root — which is the common case for anyone working in several projects at once — you need to read this and check your own setup.
+
+## What happened
+
+Claude Code reads sandbox settings from `.claude/settings.local.json` (or `settings.json`) at the **project root** where the session starts. That file can contain a `sandbox` block like this:
+
+```json
+{
+  "sandbox": {
+    "enabled": true,
+    "allowUnsandboxedCommands": false,
+    "network": {
+      "allowedDomains": ["api.mycompany.com"]
+    }
+  }
+}
+```
+
+That configuration is supposed to mean: run everything inside the sandbox, never let commands escape it, block outbound network to anywhere but my own domains.
+
+The bug report describes what happens when your workspace contains a **nested project directory** — for example a `workspace/repo/` subfolder that is itself a Claude Code project — and a session or subagent roots itself there. The key chain:
+
+1. Your workspace root has a `.claude/settings.local.json` with the sandbox block above.
+2. The nested project — `workspace/repo/` — has its own `.claude/settings.local.json`, which contains **only permissions, no `sandbox` key**.
+3. You ask Claude Code to work on a task in the nested project, or spawn a subagent that routes there.
+4. Instead of merging the parent's sandbox policy with the child's settings, Claude Code treats the child file as a complete replacement. **The sandbox block disappears.**
+
+The reporter verified this with `ssh <host> hostname` against a host in the parent's `allowedDomains` blocklist. On the main workspace session it was declined. Inside the nested project it ran, silently, unsandboxed — full network access.
+
+## Who is affected
+
+This is not a rare corner case. You are exactly in the affected situation if:
+
+- You keep multiple repositories under one parent workspace folder (monorepo workspaces, `~/code/*` with several repos, nested `git worktree`s).
+- You let subagents or child tasks work in a specific repository inside that workspace.
+- Any of those nested repos has its own `.claude/settings.local.json` or `settings.json` **without a `sandbox` block**.
+- You relied on the parent workspace's sandbox to protect work that actually runs in the nested repo.
+
+The report notes two aggravating realities:
+
+1. **Subagents are the common case, not the edge case.** Delegated agents naturally root themselves in the nested repo they are asked to work on. So the least-supervised work — the exact place you want the sandbox strongest — runs with the weakest restrictions.
+2. **The failure is silent.** The operator sees the main session blocked, reasonably concludes commands cannot escape the sandbox, and has no idea the delegated work ran with full network access.
+
+An attacker who can place a malicious file in a repo, or who controls content the agent reads while working on the nested project, can make the agent run unsandboxed commands, exfiltrate data, or reach internal hosts — all without anything behaving in a way you'd notice at the parent level. And the trigger is mundane: answering "Yes, and don't ask again" to a permission prompt on a nested subtree creates exactly the settings file that makes the sandbox disappear.
+
+## How to check if you are affected
+
+Run this from your workspace root to list every Claude Code settings file under it:
+
+```bash
+find . -name "settings.json" -o -name "settings.local.json"
+```
+
+For each file, check whether it contains a `sandbox` block:
+
+```bash
+jq '.sandbox' <path-to-settings-file>
+```
+
+If the output is `null` for any nested project file, and your workspace root (or ancestor directory) has a non-null `sandbox` block, you are exposed.
+
+You can also check what Claude Code sees with:
+
+```bash
+claude config list --local sandbox
+# or verbose
+claude --debug --version
+```
+
+Then, if you want to verify the escape deterministically, follow the reporter's exact reproduction on a test host you control:
+
+1. Put a domain (e.g. `blockme.test`) in your parent workspace's sandbox `allowedDomains` list. (`allowedDomains` is a list of *allowed* domains — anything not in the list should be blocked.)
+2. In a session rooted at the parent, ask Claude Code (or run a command) to `ssh blockme.test` — it should be **blocked**.
+3. Start a session or subagent rooted in a nested repo under that workspace, and run the same command. If it **succeeds**, your nested project silently discarded the parent's sandbox.
+
+Do this against a test host; never against a production system.
+
+## How to protect yourself
+
+Until Anthropic ships a fix, the sandbox is only as strong as the `settings.local.json` files at each project root. So:
+
+**1. Add an explicit `sandbox` block to every nested project's settings file.**
+
+```json
+{
+  "sandbox": {
+    "enabled": true,
+    "allowUnsandboxedCommands": false,
+    "network": {
+      "allowedDomains": ["api.mycompany.com"]
+    }
+  }
+}
+```
+
+That makes the configured sandbox the source of truth again — the nested file can't silently drop it.
+
+2. **Don't rely on parent-workspace sandbox to protect nested repos.** As long as this issue is open, assume a nested project with a settings file of its own has whatever sandbox *its* file says — and if it says nothing, assume it has none.
+
+3. **Harden subagent delegation.** When you spawn a subagent or ask for work on a path under a nested repo, check what settings that repo carries first. Better: keep the shared sandbox settings in a user-level or enterprise policy location, and keep nested project files minimal.
+
+4. **Prefer `settings.json` over scattering permissions.** The classic default of "Yes, and don't ask again" creates permissions-only `.claude/settings.local.json` files in nested subtrees — exactly the vector that makes the sandbox vanish. Since the bug report (#83035) reproduces the pattern, treat any such file as a sandbox killer.
+
+5. **Watch the issue.** Follow [claude-code/#83035](https://github.com/anthropics/claude-code/issues/83035) to find out when Anthropic resolves it, and re-run the checks above after upgrading.
+
+## Is there a fix?
+
+As of this writing (August 8, 2026), **no**: claude-code #83035 is open with no fix published and no maintainer response noted in the thread. The related prior issue #20218 closed with a fix for the permissions side of the same shadowing mechanism, but the sandbox side remained unfixed. The upstream fix direction suggested by the reporter: **nested sandbox configs should inherit-and-merge with the parent, never replace it**, or alternatively at minimum a loud warning when an ancestor sandbox config is discarded for a sub-session.
+
+Doing the workaround above (explicit sandbox per nested project) is the practical mitigation today.
+
+## Bottom line
+
+Claude Code's sandbox is a strong default, but its per-project configuration model assumes your projects are flat. If you use nested projects in one workspace, a permissions-only `settings.local.json` in a subdirectory quietly turns off the boundary you thought you'd configured. The failure is silent — the main session looks correct while subagent work runs with the weakest restrictions.
+
+At minimum: `jq '.sandbox'` each project's settings file, put an explicit sandbox block in every nested project, and re-test after each Claude Code upgrade. Default-deny beats best-effort — but only when the tool's effective policy is what it looks like. Check what your nested repos actually inherit before you trust a parent-level sandbox.
+
+---
+
+*Sources: Claude Code issue #83035 (reported 2026-08-01), #20218, #40831, #70711, Claude Code v2.1.220 notes. Terminalblog verified sandbox block merging/replacement behavior as described in the public reports at time of writing.*
