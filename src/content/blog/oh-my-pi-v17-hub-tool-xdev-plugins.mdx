@@ -1,15 +1,15 @@
 ---
 title: "Oh My Pi v17 Is Here: The Hub Tool, xd:// Virtual Files, and a Plugins Standard — What Changes for Beginners"
-description: "Oh My Pi's v17 series — from v17.0.0 on July 15 to v17.2.11 on August 7 — merges its messaging and job tools into one hub, replaces hidden tools with xd:// virtual files, and adds an Agent Plugins 1.0.0 standard. A plain-English guide to what changed and whether your setup is affected."
+description: "Oh My Pi's v17 series — from v17.0.0 on July 15 through v17.2.12 on August 9 — merges its messaging and job tools into one hub, replaces hidden tools with xd:// virtual files, adds an Agent Plugins 1.0.0 standard, and fixes a memory leak that made long sessions balloon. A plain-English guide to what changed and whether your setup is affected."
 pubDate: "2026-08-09T10:00:00Z"
-updatedDate: "2026-08-09T10:00:00Z"
+updatedDate: "2026-08-10T06:00:00Z"
 tags: ["oh-my-pi", "v17", "release", "agent-plugins", "terminal-agent", "coding-agent", "beginner"]
 tool: "oh-my-pi"
 author: "sage"
 image: "/api/og?title=Oh+My+Pi+v17+Hub+xd%2F%2F+Plugins&tool=oh-my-pi"
 ---
 
-Oh My Pi — the open-source terminal coding agent that has been quietly shipping daily releases while bigger names take weeks — just crossed into version **17**. The v17 series started with v17.0.0 on July 15, 2026, and the latest release, **v17.2.11**, landed August 7. If you last looked at Oh My Pi during the v16 era, this is the update to care about: v17 is not a pile of small fixes. It reorganizes how the agent's tools work under the hood, and two of its headline changes — the unified `hub` tool and the new `xd://` virtual-file system — will change how you approve, watch, and share agent work.
+Oh My Pi — the open-source terminal coding agent that has been quietly shipping daily releases while bigger names take weeks — just crossed into version **17**. The v17 series started with v17.0.0 on July 15, 2026, and the latest release, **v17.2.12**, landed August 9. If you last looked at Oh My Pi during the v16 era, this is the update to care about: v17 is not a pile of small fixes. It reorganizes how the agent's tools work under the hood, and two of its headline changes — the unified `hub` tool and the new `xd://` virtual-file system — will change how you approve, watch, and share agent work. The August 9 hotfix batch, meanwhile, is the kind of release that keeps long sessions from slowly eating your RAM.
 
 This guide explains what actually changed, what breaks when you upgrade, and what beginners should do next. No assumed knowledge: if you have never opened a terminal agent, the first section tells you what Oh My Pi even is.
 
@@ -43,6 +43,14 @@ The v17 line has shipped steadily since mid-July (v17.1.0 landed July 24, v17.2.
 
 **Better quota and provider handling (v17.2.x).** v17.2.11 added reporting of Cursor's personal monthly USD quota and remaining balance, honored `ANTHROPIC_BASE_URL` for custom gateways again (fixing broken agent proxies), raised the idle-timeout floor on Amazon Bedrock to 900 seconds for slow reasoning models like Claude, and improved error handling for Simplified Chinese quota messages and Copilot's `model_not_available_for_integrator` error. Translation: fewer mysterious timeouts and credential rotation failures if you use Copilot, Cursor, Bedrock, or a custom gateway.
 
+**The v17.2.12 hotfix batch (August 9).** The most recent patch in the series is aimed squarely at reliability, and three fixes matter to beginners:
+
+- **Long sessions no longer leak memory.** Previously, every background "scout"/`task` subagent that finished and got parked kept its whole session object — message list, provider transcript, debug buffers — pinned in memory until the process exited. Leave an agent running long enough and RAM slowly climbs no matter what the agent is doing. v17.2.12 releases that memory when the subagent is disposed.
+- **No more idle CPU spin on WSL / Windows.** The terminal-title spinner wrote updates in a way that consumed CPU while waiting on WSL, ConPTY, and slow Loader paints. On Windows/WSL dev machines, an idle agent now actually idles.
+- **Web search results keep their sources.** The Z.AI search integration was double-encoding some responses, which dropped source links and occasionally dumped raw JSON into the session. Fixed in this release.
+
+The same batch fixed two correctness bugs you might have hit: shell "minimization" was rewriting short command outputs — including replacing meaningful `rustc --print` output with the single word `OK` — so outputs under 1,000 characters now pass through unchanged; and a `/handoff` with empty content was being shown as "cancelled" instead of a failed generation, which made debugging handoffs confusing. On the provider side, Codex sessions now try every configured account before surfacing a credential error, and Qwen3.8-Max's discovered metadata was corrected so thinking controls and image input actually work through it.
+
 ## What breaks when you upgrade
 
 Breaking changes in v17.0.0 are the real upgrade hazard:
@@ -55,11 +63,11 @@ For a typical beginner workflow — `omp` in a repo, describe a change, approve 
 
 ## How to update
 
-Oh My Pi generally self-updates, but the official upgrade paths are: macOS/Linux via `curl -fsSL https://omp.sh/install | sh`, Windows via `irm https://omp.sh/install.ps1 | iex`, Homebrew users via `brew upgrade can1357/tap/omp`, and npm users via `bun update -g @oh-my-pi/pi-coding-agent`. Run the version check after updating to confirm you are on v17.2.x. If you are automating agents, watch for config settings referencing the old discovery or resolve paths and replace them per the v17.0.0 release notes.
+Oh My Pi generally self-updates, but the official upgrade paths are: macOS/Linux via `curl -fsSL https://omp.sh/install | sh`, Windows via `irm https://omp.sh/install.ps1 | iex`, Homebrew users via `brew upgrade can1357/tap/omp`, and npm users via `bun update -g @oh-my-pi/pi-coding-agent`. Run the version check after updating to confirm you are on v17.2.12. If you are automating agents, watch for config settings referencing the old discovery or resolve paths and replace them per the v17.0.0 release notes.
 
 ## The bottom line
 
-v17 is the biggest internal change to the Oh My Pi agent in months: one tool to rule messaging, background jobs, and long-running processes; transparent `xd://` approvals instead of hidden ones; and a serious plugins standard that makes extension safer. For beginners the practical wins are the stability fixes in the v17.2 series — fewer timeouts, cleaner quota handling, and instant plugin reloads. If you skipped the v16 series updates, the jump to v17.2.11 is worth it.
+v17 is the biggest internal change to the Oh My Pi agent in months: one tool to rule messaging, background jobs, and long-running processes; transparent `xd://` approvals instead of hidden ones; and a serious plugins standard that makes extension safer. For beginners the practical wins are the stability fixes in the v17.2 series — fewer timeouts, cleaner quota handling, instant plugin reloads, and no more memory creep on long sessions. If you skipped the v16 series updates, the jump to v17.2.12 is worth it.
 
 ## Related articles
 
