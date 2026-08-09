@@ -6,7 +6,7 @@ const blog = defineCollection({
   loader: glob({
     base: './src/content/blog',
     // _archive holds retired thin posts (historical debt cleanup)
-    pattern: '**/[^_]*.{md,mdx}',
+    pattern: '*.{md,mdx}',
   }),
   schema: ({ image }) =>
     z.object({

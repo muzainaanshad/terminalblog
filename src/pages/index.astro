@@ -198,17 +198,58 @@ function tagClass(tag) {
       </a>
     </section>
 
-    <!-- Affiliate: ShipKit -->
-    <section class="section-group">
-      <div class="affiliate-banner-inline">
-        <a href="https://betterauth.app?via=TerminalBlog" target="_blank" rel="noopener nofollow" class="aff-home-link">
-          <span class="aff-home-label">Recommended</span>
-          <span class="aff-home-name">ShipKit — Better Auth Starter</span>
-          <span class="aff-home-desc">Production-ready auth for SaaS. Orgs, billing, admin — shipped in an afternoon.</span>
-          <span class="aff-home-cta">Learn more →</span>
-        </a>
+    <!-- Inline newsletter signup -->
+    <section class="home-inline-newsletter">
+      <div class="hin-text">
+        <span class="hin-label">📬</span>
+        <span>Security Bewares, leaderboard moves, and the few posts that matter. Weekly.</span>
       </div>
+      <form class="hin-form" id="hin-form">
+        <input type="email" id="hin-email" name="email" required placeholder="you@company.com" autocomplete="email" />
+        <button type="submit" id="hin-btn">Subscribe</button>
+      </form>
+      <p class="hin-status" id="hin-status" role="status" aria-live="polite"></p>
     </section>
+
+    <script is:inline>
+    (function() {
+      const form = document.getElementById('hin-form');
+      const statusEl = document.getElementById('hin-status');
+      const btn = document.getElementById('hin-btn');
+      if (!form) return;
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('hin-email')?.value?.trim();
+        if (!email) return;
+        btn.disabled = true;
+        btn.textContent = '...';
+        try {
+          const res = await fetch('/api/newsletter', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, source: 'homepage-inline' }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data.ok) {
+            statusEl.textContent = '✓ Subscribed';
+            statusEl.className = 'hin-status ok';
+            form.reset();
+            btn.textContent = '✓';
+          } else {
+            statusEl.textContent = data.error || 'Try again.';
+            statusEl.className = 'hin-status err';
+            btn.textContent = 'Subscribe';
+          }
+        } catch {
+          statusEl.textContent = 'Network error.';
+          statusEl.className = 'hin-status err';
+          btn.textContent = 'Subscribe';
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    })();
+    </script>
 
     <!-- Pillars (SEO money pages) -->
     {pillars.length > 0 && (
@@ -290,18 +331,6 @@ function tagClass(tag) {
         </div>
       </section>
     )}
-
-    <!-- Affiliate: RankPill -->
-    <section class="section-group">
-      <div class="affiliate-banner-inline">
-        <a href="https://rankpill.com?via=TerminalBlog" target="_blank" rel="noopener nofollow" class="aff-home-link">
-          <span class="aff-home-label">Recommended</span>
-          <span class="aff-home-name">RankPill — SEO on Autopilot</span>
-          <span class="aff-home-desc">AI writes daily articles, builds backlinks, and publishes to your site. Grow traffic while you sleep.</span>
-          <span class="aff-home-cta">Learn more →</span>
-        </a>
-      </div>
-    </section>
 
     <!-- Comparisons -->
     <section class="section-group">
@@ -517,24 +546,18 @@ function tagClass(tag) {
     .star-stat { color: var(--amber); }
     .top-agent-score { font-family: var(--font-mono); font-size: 0.65rem; color: var(--fg-dim); }
     
-    /* Affiliate banners */
-    .affiliate-banner-inline { margin: 0.5rem 0; }
-    .aff-home-link {
-      display: flex;
-      flex-direction: column;
-      gap: 0.3rem;
-      padding: 1rem 1.25rem;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      border: 1px solid #333;
-      border-radius: 8px;
-      text-decoration: none;
-      color: inherit;
-      transition: border-color 0.2s, transform 0.2s;
-    }
-    .aff-home-link:hover { border-color: var(--green); transform: translateY(-1px); }
-    .aff-home-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--green); font-weight: 600; }
-    .aff-home-name { font-size: 1rem; font-weight: 700; color: var(--fg-bright); }
-    .aff-home-desc { font-size: 0.85rem; color: var(--fg-dim); line-height: 1.4; }
-    .aff-home-cta { font-size: 0.8rem; color: var(--green); font-weight: 500; margin-top: 0.25rem; }
+    /* Inline newsletter — compact single-line bar */
+    .home-inline-newsletter { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin: 0.5rem 0; padding: 0.55rem 0.8rem; background: var(--bg-alt); border: 1px solid var(--border); border-radius: 6px; font-size: 0.78rem; color: var(--fg-dim); }
+    .hin-label { font-size: 0.9rem; flex-shrink: 0; }
+    .hin-text { white-space: nowrap; flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .hin-form { display: flex; gap: 0.35rem; flex: 1 1 auto; min-width: 0; }
+    .hin-form input { flex: 1 1 120px; min-width: 0; padding: 0.35rem 0.6rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--fg); font-family: var(--font-mono); font-size: 0.78rem; }
+    .hin-form input:focus { outline: none; border-color: var(--green); }
+    .hin-form button { padding: 0.35rem 0.7rem; border: none; border-radius: 4px; background: var(--green); color: #000; font-family: var(--font-mono); font-weight: 600; font-size: 0.78rem; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+    .hin-form button:disabled { opacity: 0.5; cursor: wait; }
+    .hin-status { font-family: var(--font-mono); font-size: 0.7rem; margin: 0; flex-shrink: 0; white-space: nowrap; }
+    .hin-status.ok { color: var(--green); }
+    .hin-status.err { color: #f87171; }
+    @media (max-width: 600px) { .home-inline-newsletter { flex-direction: column; align-items: stretch; gap: 0.4rem; padding: 0.6rem; } .hin-text { white-space: normal; font-size: 0.72rem; } .hin-form input { min-width: 0; } }
   </style>
 </Layout>

@@ -8,7 +8,7 @@ pubDate: "2026-07-10T18:05:00Z"
 updatedDate: "2026-07-10T18:05:00Z"
 ---
 
-Something shifted in the last few hours, and it wasn't a flashy new feature. It was a quiet, coordinated-looking harden across the coding-agent ecosystem.
+Something shifted in the last few hours, and it wasn't a flashy new feature. It was a quiet, coordinated-looking harden across the coding-agent ecosystem. For operators who actually read changelogs, it read like an overdue security sprint — and a signal about where the next generation of exploits is going to land.
 
 OpenClaw shipped a cluster of fixes: OAuth error bodies are now redacted so a provider can't leak secrets in a stack trace, a UTF-16 token-mask boundary is preserved so redaction actually covers multibyte characters, internal tool-trace banners are stripped from text before it leaves the agent, and plugin provenance from the official ClawHub is hardened against tampering. Goose tightened function-call name sanitization. Hermes opened up a "deterministic tool output risk" — naming the problem instead of hiding it. Codex started validating memory-consolidation artifacts before letting them succeed.
 
@@ -19,6 +19,22 @@ For a year, the security conversation around these tools was stuck on "don't let
 The fixes landed this week are exactly the defenses that threat model demands. Sanitizing function-call names blocks an injected tool from masquerading as a trusted one. Token-mask boundaries matter because a half-corrected redaction leaks the second half of the secret. Provenance checks on plugins close the supply-chain door. Validating persisted memory stops a poisoned artifact from surviving a reboot and quietly steering every future session.
 
 What this means for developers: stop thinking of your agent as a helpful autocomplete and start treating it like a process that handles untrusted input — because it does. Audit what text you feed it. Prefer tools that redact, sanitize, and verify by default. And when you pick between agents, the presence of this work in the commit log is now a feature worth more than the next model bump.
+
+## A practical audit checklist
+
+If you're running one of these agents today, you don't need to wait for a vendor to fix your threat model. You can close most of the surface yourself:
+
+- **Redact anything sensitive before it enters context.** Secrets, tokens, API keys, and formatted stack traces should never round-trip through a conversation log or a persisted session file. Treat every paste as potentially forwarded.
+- **Verify plugin provenance.** Agents install plugins and MCP servers from registries. Only install what you can trace to a maintainer you trust, and pin versions so a re-published manifest you didn't review can't silently replace what you validated.
+- **Sanitize untrusted files before the agent reads them.** A README, a patch comment, a dependency manifest, or a support thread can carry injection payloads. When you let an agent open a file from outside the repo, it should be read as data, not as instructions.
+- **Validate persisted memory and outputs.** Codex's move to validate memory-consolidation artifacts points at a real long-term risk: a poisoned checkpoint survives reboots and steers every later session. If your agent persists state, treat that store as an asset worth verifying.
+- **Watch for the redaction edge cases.** Half-corrected redaction leaks the *second half* of a secret. Token-mask boundaries and UTF-16 multibyte characters are exactly where naive scrubbing fails — check that fixes cover the full character range, not just ASCII.
+
+You can start with the two things that cost nothing: stop pasting secrets into chats, and stop letting the agent auto-invoke anything from an external manifest.
+
+## What to watch for next
+
+The fixes in the log are the obvious first layer. The harder problems are the ones no changelog mentions: tool supersession, where an agent swaps in a tool it wasn't asked for; and indirect injection through files the agent reads on its own. Software that scrubs, redacts, and verifies on day one is ahead of the curve — but it still runs on the same untrusted-text model to prove itself the next session.
 
 The arms race isn't model vs. model anymore. It's harness vs. injection. And this week, the harnesses showed up.
 

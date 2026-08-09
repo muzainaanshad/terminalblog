@@ -1,0 +1,93 @@
+---
+title: "Hermes Agent v0.20.0 (Herald): Voice That Interrupts, A2A Agent Chat, and Webhooks — Beginner's Guide"
+description: "Hermes Agent v0.20.0, the Herald release, adds streaming hands-free voice with barge-in, Agent-to-Agent (A2A v1.0) interop, signed outbound webhooks, grounded citations, and a desktop plugin SDK. Plain-English breakdown for beginners."
+pubDate: "2026-08-08T09:45:00Z"
+updatedDate: "2026-08-08T09:45:00Z"
+tags: ["hermes-agent", "open-source", "release", "voice", "a2a", "webhooks", "ai-agent", "coding-agent", "beginner"]
+tool: "hermes"
+author: "sage"
+image: "/api/og?title=Hermes+v0.20.0+Herald+Release&tool=hermes-agent"
+---
+
+Hermes Agent v0.20.0, codenamed **Herald**, landed on August 3, 2026 — the biggest jump since Quicksilver. If you have never used a terminal coding agent before, here is the short version: Hermes is a free, open-source AI assistant that runs in your terminal (or desktop app), reads your codebase, and does tasks you describe in plain English. The v0.19.1 update made it start up 80% faster. This one makes it **talk out loud, talk to other agents, and phone home to your other tools**.
+
+The release is enormous on paper — about 3,650 commits, 1,400 merged pull requests, and roughly 1,200 issues closed since v0.19.0 — but the user-facing changes collapse into five ideas you can grasp in one sitting.
+
+## 1. Voice mode finally feels like a conversation
+
+Before Herald, Hermes voice mode worked like a walkie-talkie: you speak, it waits, it records one long reply, you listen to the whole file. Annoying. Now the agent:
+
+- **Streams its reply out loud as it generates** — clause by clause, instead of one giant audio file.
+- **Lets you interrupt mid-sentence** ("barge-in"): start talking and it stops itself, listens, and the model knows you cut in.
+- **Detects when you are busy** and does not talk over you.
+
+You can switch to voice in the CLI, the desktop app, or the gateway. For a beginner, the mental model is finally "talk to your computer like a teammate," not "exchange voicemails with a machine."
+
+## 2. Wake words — hands-free from across the room
+
+The release adds **on-device wake words**. You pick a phrase — "Hey Hermes" or anything - and it starts listening when it hears it. Two details matter for privacy and practicality:
+
+- Detection runs **on your machine**, so no audio leaves your computer while it waits for the wake word.
+- Different wake phrases can route to **different profiles**, and a spoken "stop" ends voice chat anywhere without touching the keyboard.
+
+If that sounds like "smart speaker for your codebase" — that is exactly the direction. Perfect for beginners with accessibility needs or anyone who just wants terminal control without typing every step.
+
+## 3. Hermes can now ring your other systems (webhooks)
+
+Webhooks are the invisible duct tape of the modern internet. A webhook is just: *when X happens, my server sends a message to a URL you give it.* Before v0.20.0, integrating Hermes with other tools meant polling — checking again and again "did anything change?"
+
+Now Hermes **pushes signed lifecycle events** to any HTTP endpoint you register: session activity, turn completions, tool events. "Signed" means each event carries an HMAC signature, so the receiving server can verify the message really came from your agent and was not forged on the way.
+
+If you are new to this: it is what lets Hermes notify your CI, a dashboard, your home automation, or a Slack-style webhook URL the moment a task finishes — with no polling loop in the middle.
+
+## 4. It can finally talk to other agents (A2A v1.0)
+
+A2A stands for Agent-to-Agent. Google (with Rust et al) proposed an open protocol named that in 2025, and Hermes now ships a bundled plugin implementing **A2A v1.0**. What does a beginner get out of it?
+
+- Hermes can **discover** other A2A-compatible agents.
+- It can **talk to** them and be driven by them.
+- It works across heterogeneous stacks — not just Hermes-to-Hermes. One agent running in Python, one in Rust, one in TypeScript — the wire protocol is now standard.
+
+This closes Hermes issue #514 at the needs: it was one of the oldest open feature requests in the repo. If you are building a multi-agent setup, this is the "JSON-over-HTTP for agents" moment: one standard way for agents to find each other and exchange work.
+
+## 5. Research that names its sources
+
+A `grounded-citations` skill makes Hermes produce research where claims carry verifiable sources:
+
+- Quotes are matched against **actual page text** — it cannot slip in a "citation" that doesn't exist (a classic hallucination failure).
+- Citations link to the exact evidence.
+- A **fact-check mode** takes any document (or claim) and tells you what checks out, what does not, and what could not be verified.
+
+If you use Hermes for research or docs, this is the difference between "sounds right" and "provably sourced."
+
+## Also in this release
+
+Packed underneath the four headline features you likely missed:
+
+- **Desktop became a platform**: rendered artifacts with sandboxed live preview (generated HTML/apps run in a safe viewer), a real **plugin SDK** with a provisional Kanban plugin, `ctx.download()` to hand users files, floating panes, and multiple windows.
+- **CLI power commands**: `!command` runs a shell command with zero model turns, `/init` generates (or updates) an AGENTS.md, `/diff` shows staged/all changes, `/context` shows exactly what is filling your context window, and `/focus` gives you a reduced-output view that can unhide lines later.
+- **Redirects while the agent works**: type a correction mid-turn and Hermes changes course without discarding in-flight work — no more restarting out of scratch when it heads the wrong way.
+- **Self-healing tools**: `patch` detects already-applied edits, `write_file` verifies content on disk, and truncated outputs spill to a file the agent itself can read. Tool-calling iteration limit lifted 90 → 500, so long autonomous runs no longer hit an artificial wall.
+- **Smarter background compression**: long conversations stay coherent and stop stalling — per-turn micro-compaction instead of one giant pause, and recent user messages are always preserved.
+
+## How to try it (beginner steps)
+
+1. Get the CLI: check the [Hermes Agent repo](https://github.com/NousResearch/hermes-agent) for your platform's installer (npm, homebrew, or binary).
+2. Run `hermes` in your terminal; ask it to initialize a project with `/init` — it scans your codebase and writes an AGENTS.md context file.
+3. Try voice: enable voice mode, pick "hey Hermes" (or your own) as the wake phrase, and ask it to plan a task out loud.
+4. Let it build a small HTML artifact in desktop mode and open the preview in the right rail.
+5. Point a webhook at a CI endpoint (or a `curl` listener) and run a finished task — you'll see the signed event arrive.
+
+The upgrade path: if you're on an older version, `hermes upgrade` picks up Herald automatically. The full changelog lives at [NousResearch/hermes-agent releases](https://github.com/NousResearch/hermes-agent/releases).
+
+## Should you upgrade?
+
+If you use voices, automation, or multi-agent setups: **yes, this is the release you were waiting for**. If your use case is "only type, only one project, no external tools," most of the value is in the CLI wave and better tool reliability — still worth the update, less dramatic.
+
+New to Hermes entirely? Read our [deep-dive on Hermes Agent](</blog/deep-dive-hermes-agent-autonomous-coding-assistant>) for what it can do, then come back to the Herald specifics above.
+
+## Related articles
+
+- [Qwen3.8-Max Ships With 2.4T Parameters, 16-Day Autonomous Coding Demo, and Open Weights Coming Next Week](/blog/qwen3-8-max-2-4t-autonomous-coding-open-weights/)
+- [What Developers Think About Oracle Banning AI Code — From 470 HN Comments](/blog/hn-oracle-openjdk-ai-code-ban-hn-opinions/)
+- [Oh My Pi v17 Is Here: The Hub Tool, xd:// Virtual Files, and a Plugins Standard — What Changes for Beginners](/blog/oh-my-pi-v17-hub-tool-xdev-plugins/)

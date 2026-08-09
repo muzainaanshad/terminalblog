@@ -1,0 +1,218 @@
+---
+/**
+ * StickyBar.astro — Fixed bottom newsletter bar
+ *
+ * Shows after 3s delay. Dismissed via X (localStorage).
+ * Reappears after 24h. Submits directly to Kit v3 from browser.
+ */
+---
+
+<div class="sticky-bar" id="sticky-bar" role="complementary" aria-label="Newsletter signup">
+  <div class="sb-inner">
+    <span class="sb-text">
+      <span class="sb-pulse"></span>
+      Join <strong>2,500+ devs</strong> — weekly agent digest · No spam
+    </span>
+    <form class="sb-form" id="sb-form">
+      <label class="sr-only" for="sb-email">Email</label>
+      <input
+        id="sb-email"
+        type="email"
+        name="email"
+        required
+        placeholder="you@company.com"
+        autocomplete="email"
+      />
+      <button type="submit" id="sb-btn">Subscribe</button>
+    </form>
+    <span class="sb-status" id="sb-status" role="status" aria-live="polite"></span>
+    <button class="sb-close" id="sb-close" aria-label="Close">&times;</button>
+  </div>
+</div>
+
+<script is:inline>
+(function() {
+  const KEY = 'tb_sb_dismissed';
+  const HIDE_MS = 86400000; // 24h
+  const bar = document.getElementById('sticky-bar');
+  if (!bar) return;
+
+  const dismissed = parseInt(localStorage.getItem(KEY) || '0', 10);
+  if (dismissed && Date.now() - dismissed < HIDE_MS) {
+    bar.style.display = 'none';
+    return;
+  }
+
+  setTimeout(() => { bar.classList.add('sb-visible'); }, 3000);
+
+  document.getElementById('sb-close')?.addEventListener('click', () => {
+    bar.classList.remove('sb-visible');
+    localStorage.setItem(KEY, String(Date.now()));
+  });
+
+  const form = document.getElementById('sb-form');
+  const statusEl = document.getElementById('sb-status');
+  const btn = document.getElementById('sb-btn');
+  if (form && statusEl && btn) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('sb-email')?.value?.trim();
+      if (!email) return;
+      btn.disabled = true;
+      statusEl.textContent = 'Subscribing…';
+      statusEl.className = 'sb-status pending';
+      try {
+        const res = await fetch('/api/newsletter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, source: 'sticky-bar' }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.ok) {
+          statusEl.textContent = data.message || "You're subscribed!";
+          statusEl.className = 'sb-status ok';
+          form.reset();
+          setTimeout(() => {
+            bar.classList.remove('sb-visible');
+            localStorage.setItem(KEY, String(Date.now()));
+          }, 4000);
+        } else {
+          statusEl.textContent = data.error || 'Try again.';
+          statusEl.className = 'sb-status err';
+        }
+      } catch {
+        statusEl.textContent = 'Network error.';
+        statusEl.className = 'sb-status err';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+})();
+</script>
+
+<style>
+  .sticky-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 9000;
+    background: linear-gradient(180deg, rgba(10,10,15,0.95) 0%, rgba(10,10,15,0.99) 100%);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--green);
+    transform: translateY(100%);
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+  }
+  .sticky-bar.sb-visible {
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+  .sb-inner {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    position: relative;
+  }
+  .sb-text {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--fg-dim);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .sb-text strong { color: var(--green); }
+  .sb-pulse {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: sb-pulse 2s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+  @keyframes sb-pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
+    50% { opacity: 0.7; box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+  }
+  .sb-form {
+    display: flex;
+    gap: 0.4rem;
+    flex: 1;
+    min-width: 0;
+  }
+  .sb-form input {
+    flex: 1 1 160px;
+    min-width: 0;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+  }
+  .sb-form input:focus {
+    outline: none;
+    border-color: var(--green);
+  }
+  .sb-form button {
+    padding: 0.4rem 0.8rem;
+    border: none;
+    border-radius: 4px;
+    background: var(--green);
+    color: #000;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 0.78rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+  }
+  .sb-form button:disabled { opacity: 0.5; cursor: wait; }
+  .sb-status {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    white-space: nowrap;
+  }
+  .sb-status.ok { color: var(--green); }
+  .sb-status.err { color: #f87171; }
+  .sb-status.pending { color: var(--fg-dim); }
+  .sb-close {
+    background: none;
+    border: none;
+    color: var(--fg-dim);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0 0.25rem;
+    line-height: 1;
+    transition: color 0.15s;
+    flex-shrink: 0;
+  }
+  .sb-close:hover { color: var(--fg); }
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    border: 0;
+  }
+
+  @media (max-width: 600px) {
+    .sb-inner {
+      flex-direction: column;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+    }
+    .sb-text { white-space: normal; text-align: center; justify-content: center; }
+    .sb-form { width: 100%; }
+    .sb-close { position: absolute; top: 0.5rem; right: 0.75rem; }
+  }
+</style>

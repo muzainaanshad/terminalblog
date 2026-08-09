@@ -1,0 +1,83 @@
+---
+title: "OpenClaw v2026.6.34: Your Coding Agent's Browser and Network Access Just Got Safer"
+description: "OpenClaw's August 8 stable release sandboxes its browser, locks down DNS targets, patched the ip-address library behind CVE-2026-69192, and stops silent mid-task crashes. A plain-English walkthrough of what changed and how to update."
+pubDate: "2026-08-08T09:00:00Z"
+updatedDate: "2026-08-08T09:00:00Z"
+tags: ["release", "openclaw", "security", "browser", "beginner"]
+tool: "openclaw"
+author: "sage"
+image: "/api/og?title=OpenClaw+v2026.6.34+Safer+Browser+Network&tool=openclaw"
+---
+
+If you run an AI coding agent, the scariest moment is when it quietly does something you did not approve — fetching a URL, opening a browser, talking to a server — and you only find out later. OpenClaw's new stable release, **v2026.6.34** (published August 8, 2026), is built almost entirely around making that class of surprise harder. It is a maintenance release with no flashy new features, but it hardens the boundaries where agents interact with the internet, patches a dependency at the center of a real CVE, and fixes a bunch of "my agent died mid-task" bugs.
+
+Here is what changed, in plain language.
+
+## First, what OpenClaw is
+
+OpenClaw is a free, open-source agent platform (over 380,000 GitHub stars) that runs your coding-agent sessions and connects them to the channels you already use: **terminal, browser, WhatsApp, Discord, Slack, Telegram**. It is popular precisely because it is a bridge — one agent, many surfaces. And as any bridge, its weakest points are the ramps: every channel and every URL-fetch is an entry point an attacker can aim at.
+
+## The headline: browser and network access is now sandboxed
+
+The official changelog calls it "safer browser and network boundaries." Concretely, four guardrails got stricter:
+
+1. **Sandboxed browser routes** — when the agent's built-in browser navigates to a site, it no longer honors every path the page demands. Suspicious routes get rejected before a request ever leaves the machine.
+2. **Trusted DNS targets** — the agent keeps a list of DNS targets it is allowed to resolve and talk to. Addresses outside that list are refused.
+3. **Custom browser origins** — you can define extra "origins" (the domain + protocol part of a URL) the agent is allowed to use, but everything else stays blocked.
+4. **Loopback provider endpoints** — the agent refuses to make requests to loopback addresses (`127.0.0.1`, `localhost`, `::1`) from untrusted contexts, unless the endpoint is explicitly allowed.
+
+Why does this matter? Because of a bug class called **SSRF (Server-Side Request Forgery)**: an attacker tricks the agent into fetching a URL that looks public but secretly points at *your* machine or your cloud's internal metadata service. If the agent is doing **browser automation** or fetching links inside a user message, a single insecurely parsed address can leak credentials. This release closes a whole family of those paths.
+
+## The dependency fix: a CVE you may recognize
+
+OpenClaw's release notes list a "dependency security" pass: updated production dependencies with patched versions of `brace-expansion`, PostCSS, `fast-uri`, **`ip-address`**, and Undici.
+
+`ip-address` is the JavaScript library central to the recently disclosed **[CVE-2026-69192](/blog/cve-2026-69192-leading-zero-ssrf-ip-address/)** — the "leading zero" bug where `012.0.0.1` is parsed as decimal 12 instead of octal 10, letting attackers sneak internal addresses past SSRF filters. And against precisely the judgment calls agents make before fetching. If you run an agent stack built on OpenClaw or anything Node-based, this CVE is likely in your tree somewhere; the fix here removes one prominent copy of it.
+
+## "My agent quietly stopped" — the resilience wave
+
+The second half of the release targets a frustration every beginner hits: the agent stops responding, and you never know why.
+
+- **Retained session writes** — progress and state are written even when the session hiccups.
+- **Provider fallbacks** — if the primary model/API provider stream breaks, the run recovers instead of silently ending.
+- **Stream progress handling** — mid-stream failures are now recoverable errors, not kill switches.
+- **stdio failures** — the system recovers when the underlying channel chokes.
+
+**Channel recovery** got the same treatment: pending channel work resumes after restarts, outbound acknowledgements are idempotent (no double-sends), and sustained **Discord gateway bursts** no longer pile up into runaway queues.
+
+There is also a **credentials hygiene** fix: "operator diagnostics" surfaces (status summaries, account listings) no longer leak credentials into account URLs, and owner-only actions stay owner-only.
+
+## What did NOT change
+
+This is an **extended-stable maintenance release** — deliberately content-free of new features. The 2026.7 line (with its control-plane work, see our **[OpenClaw 2026.7.2 deep dive](/blog/openclaw-2026-7-2-control-plane/)**) keeps going in parallel. Do not confuse this release with a strategy change; think of it as the boring, valuable update you do on the reliable rail while the beta line drives forward.
+
+One caveat for plugin authors: the notes re-flag the long-running **plugin SDK migration** — legacy imports like `before_agent_start`, root `openclaw/plugin-sdk` imports, `providerAuthEnvVars`, and `channelEnvVars` are scheduled for removal. If you maintain an OpenClaw plugin, migrate it to the manifest + focused subpath imports before the old paths disappear.
+
+## How to update (two minutes)
+
+If you installed via npm:
+
+```bash
+npm install -g openclaw@2026.6.34
+openclaw --version   # expect 2026.6.34
+```
+
+Homebrew users: `brew upgrade openclaw`.
+
+Docker users: pull the new tag (`2026.6.34`, or still-slim `/browser` flavor if you use browser automation):
+
+```bash
+docker pull ghcr.io/openclaw/openclaw:2026.6.34
+```
+
+The extended-stable npm/container aliases now point at this version, so a plain `openclaw update` or `npm update -g openclaw` gets you there too.
+
+## Bottom line
+
+OpenClaw v2026.6.34 is a quiet release with an outsized security payload: sandboxed browser access, locked DNS targets, the `ip-address` CVE patched, and a pile of "don't die mid-task" resilience fixes. If you run OpenClaw in any channel, updating is a two-minute, zero-risk move. For beginners, the takeaway is bigger than this one agent: **every surface your agent can reach is a surface attackers can reach too**, and releases like this are where that arms race is fought. Our [coding-agent security checklist](/blog/coding-agent-security-checklist-2026/) walks through the rest of the hygiene you should have in place.
+
+## Related articles
+
+- [Deep Agents Code (dcode) Approval Modes: Manual, Auto, YOLO — The Practical Guide](/blog/deepagents-code-approval-modes-guide/)
+- [What Developers Think About Approving Every AI Agent Command — From 177 HN Comments](/blog/hn-agent-approval-fatigue-humans-in-the-loop-debate/)
+- [Beware: Claude Code Silently Drops Its Sandbox in Nested Project Folders](/blog/beware-claude-code-nested-project-sandbox-drop/)

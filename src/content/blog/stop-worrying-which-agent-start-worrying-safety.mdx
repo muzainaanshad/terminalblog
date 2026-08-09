@@ -2,7 +2,7 @@
 title: "Stop Worrying About Which Agent Is Best — Start Worrying About Safety"
 description: "Everyone compares benchmark scores. Nobody's asking the important question: can your coding agent delete your database?"
 pubDate: "2026-07-10T10:00:00Z"
-updatedDate: "2026-07-10T10:00:00Z"
+updatedDate: "2026-08-04T10:00:00Z"
 tags: ['opinion', 'safety', 'security', 'production', 'best-practices']
 image: "/api/og?title=Stop+Worrying+About+Which+Agent+Is+Best+—+Start+Worrying+About+Safety"
 ---
@@ -31,17 +31,56 @@ Stories are piling up. An agent that almost deleted a production table. An agent
 
 In every case, the agent did exactly what it was asked to do. The problem wasn't the agent — it was that nobody had set boundaries.
 
+## Threat Model by Permission Level
+
+Not all coding agents have the same blast radius. Your risk posture should match the access you grant:
+
+- **Local-only editors** (Cursor, Copilot inline): limited risk. They edit files and run language servers. The damage ceiling is a bad diff, which version control catches.
+- **Terminal-integrated agents** (Claude Code, Codex CLI): medium risk. They run arbitrary shell commands. A single `rm -rf` or `git push --force` can cascade. Most teams need approval gates here.
+- **Orchestrated agents** (Hermes, multi-agent pipelines): high risk. These combine file access, shell execution, API calls, and cross-service coordination. A misconfigured cron can repeat a destructive action hundreds of times before anyone notices.
+- **Cloud-deployed agents** (GitHub Actions, CI-integrated): highest risk. They hold deployment keys, database credentials, and infrastructure tokens. A compromised or misprompted agent in this tier can take down production.
+
+Most incidents happen at tier 2-3, where agents have enough access to cause damage but teams haven't added guardrails because the agent "seems trustworthy." Trust is not a security boundary.
+
+## Tool-Specific Guardrails That Actually Work
+
+Every major agent exposes configuration for restricting access. Here's what to actually set up:
+
+1. **Claude Code**: Use `--allowedTools` to whitelist only the tools each task needs. Block `Bash` for code-review sessions. Set `CLAUDE_CODE_MAX_TURNS` to cap how many actions an agent takes before requiring approval.
+2. **Codex CLI**: Configure `full-auto` vs `suggest` mode. For anything touching production, use `suggest` so the agent proposes changes and a human commits.
+3. **Hermes Agent**: Use scoped profiles with different permissions. A content-editing profile shouldn't have cloud API access. Cron jobs should inherit the narrowest toolset required.
+4. **GitHub Copilot Coding Agent**: Review every PR it opens before merge. Disable auto-merge on any repository where the agent operates. Treat its PRs with the same scrutiny as a junior developer's first week.
+
+The pattern: never let an agent be more powerful than it needs to be for the task at hand.
+
 ## What Safety-Conscious Teams Do
 
 The teams that use coding agents without incidents share common practices:
 
 1. **Read-only database users for development** — agents query production dashboards with read-only credentials. They can't write even if they try.
-
 2. **Approval gates on destructive operations** — any command that modifies infrastructure, deletes data, or changes permissions requires human confirmation. This is configurable in every major agent.
-
 3. **Separate environments** — agents working on staging access staging credentials. Production agents are explicitly authorized, not assumed.
-
 4. **Session isolation** — when an agent finishes a task, its credentials expire. No long-lived agent tokens.
+
+## Your 30-Minute Safety Audit
+
+If you're running a coding agent today, here's how to spend 30 minutes making it significantly safer:
+
+**Step 1: Audit credentials (5 min)**
+Check what the agent has access to. Run `env | grep -iE "token|key|secret|password"` in your agent's terminal. If production database credentials or cloud API keys show up, remove them. Use a dedicated `.env.agent` file with only what the agent needs — nothing more.
+
+**Step 2: Enable approval gates (10 min)**
+Every major agent — Claude Code, Codex, Cursor — has a setting for requiring human approval on file writes, shell commands, or git operations. Turn it on. Yes, it's slower. No, you won't regret it the first time an agent tries to `git push --force` on main.
+
+**Step 3: Test in a sandbox (10 min)**
+Spin up a disposable container or a fresh branch. Give the agent a destructive-sounding task ("delete all test files and rewrite the CI pipeline") and watch what it does. If it attempts anything you wouldn't do manually, the guardrails aren't tight enough. Tools like [Rust-based guardrails](/blog/rust-guardrail-tool-ai-agent-code/) can automate this layer.
+
+**Step 4: Set up monitoring (5 min)**
+Use [pre-commit hooks](/blog/coding-agents-security-hardening-wave/) or [audit trails](/blog/confessor-audit-what-ai-coding-agent-touched/) to log every file change and shell command. Even if you trust the agent, you want a record of what it touched. This is the difference between "I think the agent was fine" and "I know the agent was fine."
+
+## The Cost of Skipping This
+
+A single `rm -rf` on the wrong directory costs hours of recovery. A force-push to main costs the whole team's afternoon. A leaked API key costs... well, you've seen the breach notification bills. Guardrails aren't about distrusting your agent — they're about making sure a single mistake doesn't become a team-wide incident.
 
 ## The Bottom Line
 
@@ -51,3 +90,10 @@ The best agent isn't the one with the highest score. It's the one you trust enou
 
 ---
 *Stop paying for AI subscriptions you barely use. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** is $12/mo for access to GPT, Claude, Gemini, Grok, DeepSeek, Perplexity, and more. One sub, every top model.*
+
+
+## Related articles
+
+- [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
+- [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)
+- [Your AI Agents Config Directory Is Now the Most Dangerous Place on Your Machine](/blog/ai-agent-config-directory-attack-surface-2026/)

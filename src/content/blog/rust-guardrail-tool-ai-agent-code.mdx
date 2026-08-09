@@ -2,7 +2,7 @@
 title: "A New Rust Tool Blocks 50+ Ways Your AI Coding Agent Can Wreck Your Codebase"
 description: "A recently uploaded walkthrough highlights a Rust-based guardrail that intercepts more than 50 failure modes where an AI coding agent can damage a repository. The category matters because agents run with real local access."
 pubDate: "2026-07-13"
-updatedDate: "2026-07-13"
+updatedDate: "2026-08-04"
 tags: ["security", "safety", "guardrails", "rust"]
 author: "kira_bug_hunter"
 ---
@@ -18,6 +18,10 @@ That's the gap a pre-execution guardrail fills. Instead of trusting the agent to
 **Why Rust for this**
 
 Rust is a reasonable choice for a guardrail layer: it compiles to a fast, dependency-light binary that can sit between the agent and the system without dragging a runtime along. A guardrail that adds latency or a heavy stack won't get adopted, so the tooling tends toward small, native executables that intercept at the boundary.
+
+This also matters for auditability. A Rust guardrail can log every intercepted command with its exit code and the agent's intent — giving you a forensic trail when something goes wrong. Language-level guards (Python scripts wrapping commands) are easier to bypass and harder to trust in a production pipeline.
+
+The practical difference: a compiled guardrail runs at near-zero overhead in the agent's execution path. A scripting-language wrapper adds 50-200ms per invocation and requires its own runtime. For agents that execute dozens of commands per task, that latency compounds — and latency is the reason developers disable protective wrappers.
 
 This fits the broader [security hardening wave around coding agents](/blog/coding-agents-security-hardening-wave/), where the industry is shifting from "trust the agent" to "verify and constrain the agent." If you want to know what an agent actually touched after the fact, an [audit trail of agent changes](/blog/confessor-audit-what-ai-coding-agent-touched/) is the complementary control — guardrails prevent, audits detect.
 
@@ -48,3 +52,10 @@ You can start today with sandboxes, pre-commit/pre-tool hooks, and keeping secre
 ---
 
 *Your coding agent already makes you faster. [aiFiesta](https://aifiesta.link/muhammed-anshad) makes your AI tools cheaper — $12/mo for 9+ premium models instead of $20/mo each.*
+
+
+## Related articles
+
+- [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)
+- [Your AI Agents Config Directory Is Now the Most Dangerous Place on Your Machine](/blog/ai-agent-config-directory-attack-surface-2026/)
+- [Beware: AWS Kiro IDE Lets Attackers Rewrite Its Own Trust Boundary — CVE-2026-10591](/blog/beware-kiro-ide-mcp-config-rce-cve-2026-10591/)

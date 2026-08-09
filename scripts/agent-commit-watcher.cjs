@@ -39,6 +39,7 @@ const AGENTS = {
   'gemini-cli': { repo: 'google/gemini-cli', name: 'Gemini CLI' },
   'microsoft-copilot-cli': { repo: 'microsoft/copilot-cli', name: 'Copilot CLI' },
   'hermes-agent': { repo: 'NousResearch/hermes-agent', name: 'Hermes Agent' },
+  'qwen-code': { repo: 'QwenLM/qwen-code', name: 'Qwen Code' },
 };
 
 function hasFlag(f) { return process.argv.includes(f); }

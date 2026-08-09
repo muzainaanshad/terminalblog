@@ -1,0 +1,202 @@
+---
+/**
+ * ContentUpgrade.astro — Mid-article email capture card
+ *
+ * Placed inside BlogPost.astro after the article content.
+ * Appears with a slide-in animation when visible.
+ * Offers a "cheat sheet" or "PDF summary" lead magnet.
+ */
+
+import agents from '../data/agents.json';
+---
+
+<div class="content-upgrade" id="content-upgrade">
+  <div class="cu-card">
+    <div class="cu-accent"></div>
+    <div class="cu-body">
+      <div class="cu-badge">FREE RESOURCE</div>
+      <h3 class="cu-title">Get the AI Agent Cheat Sheet</h3>
+      <p class="cu-desc">
+        All {agents.length} coding agents in one comparison table — pricing, features, benchmarks.
+        Updated weekly. Delivered to your inbox.
+      </p>
+      <form class="cu-form" id="cu-form">
+        <label class="sr-only" for="cu-email">Email</label>
+        <input
+          id="cu-email"
+          type="email"
+          name="email"
+          required
+          placeholder="you@company.com"
+          autocomplete="email"
+        />
+        <button type="submit" id="cu-btn">Send me the cheat sheet →</button>
+      </form>
+      <p class="cu-status" id="cu-status" role="status" aria-live="polite"></p>
+    </div>
+  </div>
+</div>
+
+<script is:inline>
+(function() {
+  const el = document.getElementById('content-upgrade');
+  if (!el) return;
+
+  // Observe visibility — animate in when 50% visible
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        el.classList.add('cu-visible');
+        observer.disconnect();
+      }
+    });
+  }, { threshold: 0.3 });
+  observer.observe(el);
+
+  // Form submit
+  const form = document.getElementById('cu-form');
+  const statusEl = document.getElementById('cu-status');
+  const btn = document.getElementById('cu-btn');
+  if (form && statusEl && btn) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('cu-email')?.value?.trim();
+      if (!email) return;
+      btn.disabled = true;
+      btn.textContent = 'Subscribing…';
+      try {
+        const res = await fetch('/api/newsletter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, source: 'content-upgrade' }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.ok) {
+          statusEl.textContent = data.message || "Check your inbox!";
+          statusEl.className = 'cu-status ok';
+          form.reset();
+          btn.textContent = '✓ Sent!';
+        } else {
+          statusEl.textContent = data.error || 'Try again.';
+          statusEl.className = 'cu-status err';
+          btn.textContent = 'Send me the cheat sheet →';
+        }
+      } catch {
+        statusEl.textContent = 'Network error.';
+        statusEl.className = 'cu-status err';
+        btn.textContent = 'Send me the cheat sheet →';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+})();
+</script>
+
+<style>
+  .content-upgrade {
+    margin: 2.5rem 0;
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .content-upgrade.cu-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .cu-card {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--bg-card);
+  }
+  .cu-accent {
+    width: 4px;
+    background: linear-gradient(180deg, var(--green) 0%, #166534 100%);
+    flex-shrink: 0;
+  }
+  .cu-body {
+    flex: 1;
+    padding: 0.8rem 1rem;
+  }
+  .cu-badge {
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--green);
+    font-weight: 700;
+    margin-bottom: 0.2rem;
+  }
+  .cu-title {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--fg-bright);
+    margin: 0 0 0.15rem;
+  }
+  .cu-desc {
+    font-size: 0.72rem;
+    color: var(--fg-dim);
+    line-height: 1.4;
+    margin: 0 0 0.6rem;
+  }
+  .cu-form {
+    display: flex;
+    gap: 0.35rem;
+    align-items: center;
+  }
+  .cu-form input {
+    flex: 1 1 100px;
+    min-width: 0;
+    padding: 0.3rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+  .cu-form input:focus {
+    outline: none;
+    border-color: var(--green);
+  }
+  .cu-form button {
+    padding: 0.3rem 0.7rem;
+    border: none;
+    border-radius: 4px;
+    background: var(--green);
+    color: #000;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 0.75rem;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: opacity 0.15s;
+  }
+  .cu-form button:disabled { opacity: 0.5; cursor: wait; }
+  .cu-status {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    min-height: 1em;
+    margin: 0.3rem 0 0;
+  }
+  .cu-status.ok { color: var(--green); }
+  .cu-status.err { color: #f87171; }
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    border: 0;
+  }
+
+  @media (max-width: 600px) {
+    .cu-body { padding: 0.6rem 0.8rem; }
+    .cu-form { flex-wrap: wrap; }
+    .cu-form input { flex: 1 1 100%; min-width: 0; }
+    .cu-form button { width: 100%; }
+  }
+</style>

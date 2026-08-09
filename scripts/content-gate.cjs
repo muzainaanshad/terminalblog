@@ -28,9 +28,9 @@ const TODAY = new Date().toISOString().slice(0, 10);
 const CODING_AGENT_TOOLS = new Set([
   'claude-code', 'hermes', 'cursor', 'opencode', 'mimo', 'kilo',
   'pi-dot-dev', 'oh-my-pi', 'gitlawb-zero', 'codex', 'goose',
-  'openclaw', 'codebuff', 'ampcode', 'copilot-cli', 'cline', 'industry',
-  'deepagents',
-]);
+  'openclaw', 'codebuff', 'ampcode', 'copilot-cli', 'industry',
+    'aider', 'cline', 'qwen-code',
+  ]);
 
 const OFF_NICHE_HINTS = [
   /trading bot/i, /crypto exchange/i, /kraken/i, /seedream/i,

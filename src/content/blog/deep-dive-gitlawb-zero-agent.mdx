@@ -1,8 +1,8 @@
 ---
 title: "Gitlawb Zero Deep Dive: The Decentralized Coding Agent You Own"
-description: "Gitlawb Zero is an MIT-licensed terminal coding agent with durable local sessions, multi-provider model support, and a decentralized git network for AI agents."
+description: "Gitlawb Zero is an MIT-licensed terminal coding agent with durable local sessions, multi-provider model support, and a decentralized git network for AI agents. v0.6.0 adds persistent session goals and stronger sandbox privacy."
 pubDate: "2026-07-03T16:00:00Z"
-updatedDate: "2026-07-21T11:30:00Z"
+updatedDate: "2026-08-10T08:00:00Z"
 tags: ["deep-dive", "pillar", "gitlawb-zero-architecture", "decentralized", "agent-network"]
 tool: "gitlawb-zero"
 author: "jax"
@@ -58,6 +58,24 @@ The [Hermes Agent vs Gitlawb Zero comparison](/blog/hermes-vs-gitlawb-zero/) dra
 
 ## Recent improvements
 
-The development cadence has been aggressive. Recent releases shipped auto-commit messages (so the agent proposes commit messages based on the diff it just created), context preservation across exec prompts (the agent remembers what it did when you interrupt and redirect), and a provider-picker terminal UX that makes switching models mid-session a single keystroke instead of an environment variable edit. The [--auto commit messages feature](/blog/gitlawb-zero-auto-commit-messages/) and the [runner-hang fix](/blog/gitlawb-zero-askUser-runner-hang-fix/) round out the picture of a project optimizing for trustworthy, owned-by-you daily use.
+The development cadence has been aggressive. Recent releases shipped auto-commit messages (so the agent proposes commit messages based on the diff it just created), context preservation across exec prompts (the agent remembers what it did when you interrupt and redirect), and a provider-picker terminal UX that makes switching models mid-session a single keystroke instead of an environment variable edit. The [--auto commit messages feature](/blog/gitlawb-zero-auto-commit-messages/) and the [runner-hang fix](/blog/gitlawb-zero-askUser-runner-hang-fix/) round out the picture of a project optimizing for trustworthy, owned-by-you daily use. On the horizon, [cross-session messaging](/blog/gitlawb-zero-cross-session-messaging/) — merged to main in August — lets live Zero sessions discover each other and exchange messages under an explicit accept/hold/refuse inbound policy.
+
+## What's new in v0.6.0 (July 29, 2026)
+
+Zero v0.6.0 is a release where privacy and reliability lead. If you are new to Zero, the sections below are the ones worth reading — each one is a small thing that makes a terminal agent feel safer to run.
+
+**Persistent session goals.** You can now tell Zero something you want to keep in mind — for example, "always keep dependencies pinned" or "never touch the database folder" — and it stays active across sessions instead of vanishing when you close the terminal. For beginners this is the closest thing to writing your own `.gitignore` for agent behavior: set it once, and every future session inherits the rule. It's implemented as a goal stored with the session, so the agent checks in when a task might conflict.
+
+**Credential privacy.** The sandbox now blocks reads of git's credential stores. That means files storing saved Git tokens (like `~/.git-credentials` or platform equivalents) are off-limits unless you explicitly approve a read. Terminal agents often need `git push`, but they do not need to exfiltrate the tokens behind it — this closes exactly that class of "agent leaks my GitHub token" accidents.
+
+**Sandbox writes are serialized.** A platform-specific write lock now guards the grant-state file. In plain terms: if two agent processes both try to update the permission list at the same moment, they can no longer corrupt the file and lose the rules you approved. For beginners running Zero as a daemon or inside CI, this removes a whole family of "my approvals disappeared" bugs.
+
+**Windows cleanup.** On Windows, killing a provider command now kills the full process tree via a job object, so canceling a model call no longer leaves orphaned helper processes burning CPU in the background. Small, but it is the kind of thing you only notice when your task manager shows three leftover node processes.
+
+**Tighter provider plumbing.** Providers that fail before a request is even sent are now retried instead of surfacing an error. Fireworks AI gets an official provider preset, joining the existing presets. Provider-command timeouts are treated as an upper bound (a fixture can bill beyond the 5-second default), and the process-management fixes apply on all platforms.
+
+**Atomic cron jobs.** Zero's built-in cron reserves job IDs atomically, so scheduled tasks cannot accidentally claim the same ID and overwrite each other's state.
+
+The v0.6.0 release continues the hardening arc that started v0.4.0 — sandbox bypasses, permission payload validation, and stale-lock prevention. The theme is consistent: an agent you own should also be an agent that withholds your data.
 
 Unlike agents tied to a specific platform or CI/CD system, Zero works everywhere and answers to no one but you. For developers who want an agent that behaves like a local tool rather than a cloud service, Zero is the strongest option in the terminal agent category today.

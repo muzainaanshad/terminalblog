@@ -1,8 +1,13 @@
 ---
 import Layout from './Layout.astro';
 import FormattedDate from '../components/FormattedDate.astro';
+import ContentUpgrade from '../components/ContentUpgrade.astro';
 import type { CollectionEntry } from 'astro:content';
 import { authors } from '../data/authors';
+import agents from '../data/agents.json';
+
+/** Only tools with a real /tool/<slug>/ hub get a clickable badge. */
+const HUB_IDS = new Set((agents as { id: string }[]).map((a) => a.id));
 
 type Props = CollectionEntry<'blog'>['data'] & {
   slug?: string;
@@ -33,7 +38,11 @@ const shareUrl = encodeURIComponent(articleUrl);
       </p>
       <h1 style="font-size:1.8rem;margin:0;line-height:1.3;">{title}</h1>
       <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:1rem;">
-        {tool && <a href={`/tool/${tool}/`} class="tool-badge">{toolNames[tool] || tool}</a>}
+        {tool && (HUB_IDS.has(tool) ? (
+          <a href={`/tool/${tool}/`} class="tool-badge">{toolNames[tool] || tool}</a>
+        ) : (
+          <span class="tool-badge">{toolNames[tool] || tool}</span>
+        ))}
         {(tags || []).map(tag => (
           <a href={`/blog/tag/${tag}/`} class="tag-badge">#{tag}</a>
         ))}
@@ -43,6 +52,9 @@ const shareUrl = encodeURIComponent(articleUrl);
     <div class="post-body">
       <slot />
     </div>
+
+    <!-- Content upgrade: email capture after reading -->
+    <ContentUpgrade />
 
     <!-- Inline affiliate CTA (randomly selected per article) -->
     <div class="inline-affiliate" style="margin:2rem 0;padding:1rem 1.2rem;border:1px solid var(--border);border-left:3px solid var(--amber);border-radius:6px;background:var(--bg-alt);">

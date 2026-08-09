@@ -1,0 +1,58 @@
+---
+title: "What Developers Think About Approving Every AI Agent Command — From 177 HN Comments"
+description: "A browser game collected 409,000 real approval decisions from developers watching AI agents run commands. Humans missed 1 in 3 dangerous ones. The Hacker News debate that followed explains why 'just review the prompts' never worked."
+pubDate: "2026-08-08T15:00:00Z"
+updatedDate: "2026-08-08T15:00:00Z"
+tags: ["opinion", "hacker-news", "coding-agents", "security", "developer-experience", "permissions"]
+tool: "industry"
+author: "kira"
+image: "/api/og?title=AI+Agent+Approval+Fatigue+HN+Debate&tool=industry"
+---
+
+Your coding agent wants to run a command. A dialog pops up: approve or deny? You glance at it, hit approve, and the agent moves on. Now multiply that by a hundred prompts a day, and ask yourself how carefully you actually read the hundredth one.
+
+This week a small experiment put hard numbers on that question, and the result set Hacker News arguing about the future of AI agent safety. The game collected 40,000 playthroughs and more than 400,000 approval decisions. Humans approved about one in every three dangerous commands. The debate is not really about the game — it is about whether "human in the loop" can ever carry the security load for agents.
+
+## What happened
+
+Scalex.dev, the tooling company behind the data, first published an "AI agent permission game" on Hacker News months ago. You play the part of a developer whose agent is mid-task and needs approvals: a quick `npm install` here, a shell one-liner there, occasionally something genuinely malicious hidden inside a plausible command. After growing to over 40,000 plays and roughly 409,000 decisions, the author shared the statistics.
+
+Key results: about one in three dangerous commands was approved, and that number held even though players were warned up-front that threats were hidden in the game. A classic trick worked almost too well: the `npm run setup` trap, where the agent first edits package.json, then asks permission to run the script it just wrote — the approval prompt arrives after the dangerous edit was already greenlit, and players routinely approve the final run.
+
+## Why "just ask the user" keeps failing
+
+The strongest current in the thread is historical: software has tried the "constantly ask the user, hope they never make a mistake" security model many times before, and it has never worked. Commenters dragged out the classics: Windows UAC — described by one as the worst dialog in history — mobile app permission prompts, and Java applet warnings from the pre-agent era. A former pen-tester noted that the best way to get someone to click Accept on a hostile Java prompt was to annoy them first: wear the target down with frequent junk dialogs, and they become an approval machine. The fatigue measured in the game is the same fatigue, now pointed at agents.
+
+Several comments also sharpened a suspicion many carry: the approval prompt exists less for security than for liability. When the human clicks yes, the human owns the damage. As one commenter put it, the goal of human-in-the-loop is to have someone to blame, not to prevent disasters. Others connected it to the older idea of a "moral crumple zone" — the human component designed to absorb legal and moral impact when the automated system fails.
+
+## Is one-in-three actually terrible?
+
+The thread split cleanly on how to read the number. One camp called one-in-three "end-of-the-line awful," and argued that any system whose safety depends on a tired human catching a fast-moving agent is not a safety system at all. The other camp said the metric is fine: the game forced people to answer under time pressure, out of their own stack (Java and C developers being asked to judge npm commands), with zero real stakes — and being asked whether a command is hostile is itself a task most developers have never trained for. Several who played reported doing much better than the average precisely because they knew it was a test; the author pushed back, noting the miss rate held steady across later runs that came from outside Hacker News.
+
+The test's own author agreed the threshold question is real: threats of this shape are rare in day-to-day work, which is exactly why attention fades. The sharpest reply to one critic made the point this way: supervision is only as good as your understanding — if you can only review commands within your own narrow specialty, you are the bottleneck, and you cannot oversee more automation than you can explain.
+
+## If approvals fail, what replaces them?
+
+The most constructive part of the discussion is what developers actually do instead of babysitting every prompt. Three answers dominated.
+
+**Sandboxes.** The repeated first choice: run the agent with restricted powers — a container, a VM, or an unprivileged user — so an approved mistake has a blast radius instead of access to everything. One commenter explained a comfortable setup: the agent runs as an unprivileged user with no access to anything not explicitly given, can pull code and submit PRs but never push, and the real firewall is the OS. Another described giving agents their own box after watching one chain together tools like "a gorilla escaping the zoo." The catch everyone acknowledged: sandboxes are not a permission model, they are a damage model — exfiltration of data the agent can read is nearly impossible to stop, and sandbox escapes exist. But nobody needs to argue the perfect is the enemy of the contained.
+
+**Automatic policy, not manual clicks.** A growing middle tier: an allow/deny classifier or rule-set approves routine commands automatically, and escalation happens only for genuinely ambiguous ones. The game's author framed this as the honest answer to his own data: exhausted humans should not be the security layer; better tooling should hash out the permission rules, with humans seeing only the decisions that need judgment. Most commenters agreed the current pop-up-everything design is a UX anti-pattern borrowed from an OS era that taught us the same lesson.
+
+**Another agent as the reviewer.** Some are already running a second, separate model or harness that audits the first agent's actions before they execute. One harness vendor in the thread said the failure mode of context-less self-approval is false positives — safe commands rejected — not the other way around, and runs its agents in a yolo-style mode with monitoring built in. Skeptics were loud about this too: one called the whole category circular — "we don't trust the LLM, so we built a tool that uses the LLM to check if the LLM can be trusted" — and another joked it was just a way to bill you for a second token stream. But even the skeptics agreed it is strictly better than asking a tired human to read a hundred dialogs.
+
+## What it means for you
+
+**If you run agents daily:** treat the approve button as the last line, not the only line. The pattern that keeps coming up across the thread: let the agent run in an environment where a mistake cannot touch your secrets or your production data (container, VM, separate user), use allowlists and auto-approval for the boring 95% of commands, and keep your manual attention for the decisions you can actually judge — file writes you care about, deploys, credential access. Copy the trick from the game's most dangerous trap: never approve a script without reading what it does first, especially when the agent is the one who wrote the script.
+
+**If you are evaluating agent tools:** the thread is a useful checklist. Does the harness support sensible permission tiers? Does it have an auto-approval/classifier mode? Can it run inside a sandbox or remote environment? Permission dialogs are not a differentiator — that is the thing the whole thread agrees failed decades ago; it is the controls around the dialogs that matter.
+
+**If you're new to coding agents:** this research doubles as a warning. Yes, agents are amazing — but the moment you grant "approve everything" because the prompts are annoying, you are replicating the 1-in-3 miss rate on real code. There is a good reason the game's author ended on a note most of the thread agreed with: the fix is not to be more careful, it is to design the environment so being careless is not catastrophic.
+
+The thread's prevailing conclusion, in one line: human-in-the-loop as a permission prompt is a liability model, not a security model — and the products that treat it as the whole answer are asking the wrong person to be the fire department.
+
+## Related articles
+
+- [Qwen3.8-Max Ships With 2.4T Parameters, 16-Day Autonomous Coding Demo, and Open Weights Coming Next Week](/blog/qwen3-8-max-2-4t-autonomous-coding-open-weights/)
+- [Deep Agents Code (dcode) Approval Modes: Manual, Auto, YOLO — The Practical Guide](/blog/deepagents-code-approval-modes-guide/)
+- [Beware: Claude Code Silently Drops Its Sandbox in Nested Project Folders](/blog/beware-claude-code-nested-project-sandbox-drop/)

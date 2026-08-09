@@ -1,0 +1,119 @@
+---
+title: "Cline v3.25 Ships Deep Planning, Focus Chain, and Auto Compact — Three Features That Fix Long-Task Drift"
+description: "Cline v3.25 adds three interlocking systems — Deep Planning, Focus Chain, and Auto Compact — that keep AI coding agents on track through complex, multi-file tasks. Here's what each does and why it matters."
+pubDate: "2026-08-02T10:00:00Z"
+tags: ["cline", "release", "deep-planning", "focus-chain", "auto-compact", "coding-agent", "context-engineering"]
+tool: "cline"
+author: "sage"
+image: "/api/og?title=Cline+v3.25+Deep+Planning+Focus+Chain+Auto+Compact&tool=cline"
+---
+
+Cline v3.25 shipped on August 15, 2025, and it tackles the biggest unsolved problem in AI coding agents: **performance collapse on long tasks**. Every agent degrades as conversations grow. Cline v3.25 adds three interlocking features — Deep Planning, Focus Chain, and Auto Compact — designed to keep the agent sharp at turn 50, not just turn 1.
+
+If you have ever watched an AI coding agent start strong, then slowly lose the thread of what it was doing halfway through a complex refactor, this release is the fix.
+
+## The Problem: Why Agents Lose the Plot
+
+Every AI coding agent faces the same physics. LLMs degrade in performance as context size increases. Researchers call it the "lost in the middle" effect — information buried in the middle of a long conversation gets ignored or forgotten. The degradation compounds across turns: 95% accuracy on turn 1, 92% on turn 2, 70% by turn 10, and by turn 20 the agent is hallucinating.
+
+The problem is not just that the context window fills up. The signal-to-noise ratio gets worse with every interaction. The agent's own explanations, error corrections, tool outputs, failed attempts, and file contents all pile up. The original task gets buried under layers of accumulated noise.
+
+Bigger context windows do not fix this. A million tokens of polluted context is still polluted context. The degradation curve just stretches out instead of disappearing.
+
+Cline v3.25 takes a different approach: instead of waiting for bigger windows, it curates, compresses, and resets context deliberately.
+
+## Deep Planning: Start With a Perfect Blueprint
+
+The `/deep-planning` slash command is the first piece. When you run it with your task description, Cline enters a four-step planning phase before writing any code:
+
+1. **Silent Investigation** — Cline reads through your entire codebase. It greps files, analyzes patterns, understands dependencies, and builds a mental model of your project. This happens quietly, with no output noise filling the context.
+
+2. **Targeted Discussion** — After investigating, Cline asks you specific questions about requirements, edge cases, and approach. These are not generic prompts. They are informed by the actual codebase structure.
+
+3. **Plan Creation** — Cline writes a detailed `implementation_plan.md` to your project root. This document captures the architecture, file-by-file changes, dependencies, and implementation order.
+
+4. **Fresh Task Handoff** — Cline starts a new task with a clean context window. The new task includes the implementation plan, the key files it needs, and nothing else. No exploration debris. No accumulated assumptions.
+
+Why this matters: research shows that instructions delivered in a single consolidated plan achieve 95% optimal performance. Instructions fragmented across multiple conversation turns degrade by 39%. Deep Planning front-loads the exploration into a separate phase, then hands the distilled result to a fresh agent that starts with maximum signal and zero noise.
+
+For beginners: think of it like cooking. You would not start preheating the oven before reading the recipe. Deep Planning reads the recipe first, asks you about dietary restrictions, writes out the steps, and only then starts cooking with a clean workspace.
+
+## Focus Chain: A Persistent North Star
+
+Even with a perfect plan, agents drift. The Focus Chain is the second piece. It is enabled by default in v3.25.
+
+When you start a task, Cline automatically generates a todo list from your instructions. The critical part: Cline **reinjects this list into context every six messages** (configurable in settings). Each time, it reads the list, updates what is done, and refocuses on what comes next.
+
+This is not just a UI checkbox tracker. The Focus Chain is a context injection mechanism. When the model's attention wanders due to accumulated noise, the todo list cuts through and says: "Here is what you were doing. Here is what is left." It is a recurring anchor point that prevents the slow drift that kills long sessions.
+
+The Focus Chain also adapts. As work progresses, items get checked off, new tasks emerge, and priorities shift. But the core mission stays visible. You can edit the markdown todo list directly to reorder steps, add constraints, or correct course — and Cline adapts accordingly.
+
+For beginners: the Focus Chain works like a project manager tapping your shoulder every few minutes to say "remember, we are building X." Without it, the agent might get sidetracked fixing a minor bug and forget the main feature it was supposed to implement.
+
+## Auto Compact: Compress and Continue
+
+The third piece is Auto Compact. When the context window approaches its limit, Cline automatically:
+
+1. Creates a comprehensive summary of everything that has happened — every technical decision, code change, and progress milestone.
+2. Replaces the bloated conversation history with this compressed summary.
+3. Continues working from the summary without losing state.
+
+With Auto Compact, a task that needs 5 million tokens of interaction can complete using a 200K context window. Claude Sonnet 4's 1-million-token window becomes even more powerful — not because you can fit more pollution, but because you go longer between compressions, maintaining higher fidelity throughout.
+
+The key innovation: the Focus Chain persists through compaction. When Auto Compact summarizes the conversation, the todo list survives. The agent does not lose its place even after the context gets compressed.
+
+For beginners: Auto Compact is like taking notes during a long meeting, then replacing the 3-hour recording with a one-page summary. You keep all the important decisions without wading through every tangent. And your todo list stays pinned to the top of the summary.
+
+## The Trio Together
+
+These three features are designed as a system, not isolated additions:
+
+- **Deep Planning** eliminates context pollution before implementation starts.
+- **Focus Chain** keeps the agent on track during implementation.
+- **Auto Compact** extends how long the agent can work before hitting limits.
+
+Use `/deep-planning` for anything beyond a trivial one-file change. Let Focus Chain run in the background (it is on by default). And let Auto Compact handle rollover automatically. When you need manual control mid-flow, `/smol` compresses on demand, and `/newtask` creates a clean handoff.
+
+## Other Changes in v3.25
+
+- Added 200K context window support for Claude Sonnet 4 via OpenRouter and Cline providers
+- Added custom base URL option for Requesty provider
+- Added GPT-OSS models to AWS Bedrock
+- Fixed duplicate `attempt_completion` command in progress checklist updates
+- Fixed bug preventing announcement banner dismissal
+
+## How to Get Started
+
+**VS Code extension:**
+```
+code --install-extension saoudrizwan.claude-dev
+```
+The extension ID is still `saoudrizwan.claude-dev` from the original "Claude Dev" name. After installing, Focus Chain and Auto Compact are enabled by default.
+
+**To use Deep Planning:**
+Type `/deep-planning` in the Cline chat input, followed by your task description. Cline will investigate your codebase, ask questions, write a plan, and hand off to a fresh task.
+
+**To adjust Focus Chain settings:**
+Open Cline settings (gear icon) and look for Focus Chain configuration. The default reminder interval is every 6 messages. You can make it more or less frequent depending on your task complexity.
+
+## Why This Matters for the Coding Agent Landscape
+
+Cline v3.25 directly addresses the research gap between "powerful model" and "reliable long-running agent." Bigger models and longer context windows are not enough — you need active context management. Deep Planning, Focus Chain, and Auto Compact are Cline's answer to the "lost in the middle" problem that affects every agent in the market.
+
+The approach also creates a template other agents will likely follow. Focus-style injection, plan-then-execute workflows, and automatic compaction are patterns that solve real reliability problems. Cline shipped them first as a unified system, with documentation and defaults that make them accessible to beginners.
+
+For developers evaluating coding agents, v3.25 makes Cline the most compelling option for long, complex tasks that require sustained accuracy across many turns. Pair it with a frontier model like Claude Sonnet 4, and the combination handles multi-file refactors, cross-module features, and architectural changes that previously required manual supervision throughout.
+
+## Related Reading
+
+- [Cline v4.0.12 Goes Free: Zero-Cost Models, Opus 5, and Desktop App](/blog/cline-free-models-opus-5-desktop-app)
+- [Cline Desktop Launches with Free Coding Models](/blog/cline-desktop-free-coding-models-zero-api-keys)
+- [What Developers Say About Claude Code vs Cursor](/blog/what-devs-say-claude-code-vs-cursor)
+- [Context Engineering for Coding Agents](/blog/context-engineering-for-coding-agents-2026)
+
+
+## Related articles
+
+- [Your AI Agents Config Directory Is Now the Most Dangerous Place on Your Machine](/blog/ai-agent-config-directory-attack-surface-2026/)
+- [Context Engineering for Coding Agents: How to Make Every Token Count](/blog/context-engineering-for-coding-agents-2026/)
+- [Qwen3.8-Max Ships With 2.4T Parameters, 16-Day Autonomous Coding Demo, and Open Weights Coming Next Week](/blog/qwen3-8-max-2-4t-autonomous-coding-open-weights/)

@@ -9,6 +9,21 @@ const require = createRequire(import.meta.url);
 const { scoreAgents, metric: getMetric } = require(
   join(process.cwd(), 'scripts/lib/adoption-score.cjs')
 );
+import agentHub from '../data/agents.json';
+
+/** Only real coding agents have /tool/<slug>/ hubs (see tool/[tool].astro). */
+const HUB_IDS = new Set((agentHub as { id: string }[]).map((a) => a.id));
+/** Map leaderboard snapshot ids -> canonical hub slug where the live tool page differs. */
+const HUB_ALIAS: Record<string, string> = {
+  'pi-dev': 'pi-dot-dev',
+  'mimo-code': 'mimo',
+  'kilo-code': 'kilo',
+};
+/** Return a valid /tool/<slug>/ href for an agent id, or null if no hub page exists. */
+function hubOf(id: string): string | null {
+  const slug = HUB_IDS.has(id) ? id : HUB_ALIAS[id];
+  return slug && HUB_IDS.has(slug) ? `/tool/${slug}/` : null;
+}
 
 const snapshotsDir = path.join(process.cwd(), 'src', 'data', 'adoption', 'snapshots');
 const snapshots = fs.existsSync(snapshotsDir)
@@ -127,17 +142,23 @@ function tierColor(t: string) {
       value = adoption_score ÷ price_index (1=free/BYO low cost … 4=expensive). High value = more signal per dollar friction.
     </p>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.75rem;">
-      {byValue.slice(0, 6).map((agent, i) => (
-        <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.75rem;">
-          <div style="display:flex;justify-content:space-between;margin-bottom:0.35rem;">
-            <span style="font-family:var(--font-mono);font-size:0.65rem;color:var(--fg-dim);">#{i + 1} value</span>
-            <span style="font-family:var(--font-mono);font-size:0.6rem;color:var(--fg-dim);">
-              {agent.pricing_label || '—'}
-            </span>
-          </div>
-          <a href={`/tool/${agent.id}`} style="font-family:var(--font-mono);font-size:0.85rem;color:var(--green);text-decoration:none;font-weight:600;">
-            {agent.name}
-          </a>
+      {byValue.slice(0, 6).map((agent, i) => {
+              const href = hubOf(agent.id);
+              return (
+              <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.75rem;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:0.35rem;">
+                  <span style="font-family:var(--font-mono);font-size:0.65rem;color:var(--fg-dim);">#{i + 1} value</span>
+                  <span style="font-family:var(--font-mono);font-size:0.6rem;color:var(--fg-dim);">
+                    {agent.pricing_label || '—'}
+                  </span>
+                </div>
+                {href ? (
+                  <a href={href} style="font-family:var(--font-mono);font-size:0.85rem;color:var(--green);text-decoration:none;font-weight:600;">
+                    {agent.name}
+                  </a>
+                ) : (
+                  <span style="font-family:var(--font-mono);font-size:0.85rem;color:var(--green);font-weight:600;">{agent.name}</span>
+                )}
           <div style="font-family:var(--font-mono);font-size:0.7rem;margin-top:0.35rem;">
             <span style="color:var(--fg);font-weight:600;">{agent.value_score ?? '—'}</span>
             <span style="color:var(--fg-dim);"> value · adopt </span>
@@ -147,7 +168,8 @@ function tierColor(t: string) {
             {agent.pricing_label || '—'}
           </div>
         </div>
-      ))}
+      );
+      })}
     </div>
   </div>
 
@@ -184,9 +206,13 @@ function tierColor(t: string) {
             <tr style="border-bottom:1px solid var(--border);">
               <td style="padding:0.55rem 0.4rem;color:var(--fg-dim);">{agent.rank}</td>
               <td style="padding:0.55rem 0.4rem;">
-                <a href={`/tool/${agent.id}`} style="color:var(--fg);text-decoration:none;font-weight:600;">
-                  {agent.name}
-                </a>
+                              {hubOf(agent.id) ? (
+                              <a href={hubOf(agent.id)} style="color:var(--fg);text-decoration:none;font-weight:600;">
+                                {agent.name}
+                              </a>
+                              ) : (
+                              <span style="color:var(--fg);font-weight:600;">{agent.name}</span>
+                              )}
                 {agent.github && (
                   <div style="font-size:0.55rem;color:var(--fg-dim);margin-top:0.15rem;">
                     {agent.github}

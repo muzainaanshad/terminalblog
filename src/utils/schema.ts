@@ -65,7 +65,7 @@ export function buildPostGraph(opts: {
       headline: title,
       description,
       datePublished: publishDate,
-      dateModified: updateDate || undefined,
+      dateModified: updateDate || publishDate,
       keywords: tags?.join(', '),
       image: articleImage,
     },

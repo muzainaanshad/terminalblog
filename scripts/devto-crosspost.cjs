@@ -78,6 +78,9 @@ async function main() {
   const state = loadState();
   const posted = new Set(state.posted || []);
 
+  const MAX_CROSSPOSTS = 3;
+  const MIN_WORDS = 800;
+
   // Find articles to cross-post
   let slugs = [];
   if (specificSlug) {
@@ -91,6 +94,34 @@ async function main() {
         slugs.push(slug);
       }
     }
+  }
+
+  // Filter out Beware/security articles (keep exclusive per content policy)
+  const BEWARE_RE = /^beware[-_]/i;
+  const before = slugs.length;
+  slugs = slugs.filter(s => !BEWARE_RE.test(s));
+  if (slugs.length < before) {
+    console.log(`Excluded ${before - slugs.length} Beware/security article(s)`);
+  }
+
+  // Filter by word count (min 800 words)
+  slugs = slugs.filter(s => {
+    const fp = path.join(BLOG, s + '.mdx');
+    if (!fs.existsSync(fp)) return true; // will be skipped later
+    const content = fs.readFileSync(fp, 'utf-8');
+    const { body } = parseFront(content);
+    const words = body.split(/\s+/).filter(Boolean).length;
+    if (words < MIN_WORDS) {
+      console.log(`  SKIP: ${s} (${words} words < ${MIN_WORDS} minimum)`);
+      return false;
+    }
+    return true;
+  });
+
+  // Cap at MAX_CROSSPOSTS per run (Dev.to rate limit)
+  if (slugs.length > MAX_CROSSPOSTS && !specificSlug) {
+    console.log(`Capping from ${slugs.length} to ${MAX_CROSSPOSTS} crossposts per run`);
+    slugs = slugs.slice(0, MAX_CROSSPOSTS);
   }
 
   if (!slugs.length) {

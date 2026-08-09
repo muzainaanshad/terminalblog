@@ -1,0 +1,260 @@
+---
+/**
+ * ExitPopup.astro — Exit-intent overlay with lead magnet CTA
+ *
+ * Triggers when mouse leaves viewport (desktop) or after 45s (mobile).
+ * Shown once per session via localStorage.
+ * Lead magnet: "AI Coding Agent Security Checklist 2026"
+ */
+---
+
+<div class="exit-popup" id="exit-popup" role="dialog" aria-label="Newsletter signup" aria-hidden="true">
+  <div class="ep-backdrop" id="ep-backdrop"></div>
+  <div class="ep-card">
+    <button class="ep-close" id="ep-close" aria-label="Close">&times;</button>
+    <div class="ep-icon">🛡️</div>
+    <h2 class="ep-title">Before you go</h2>
+    <p class="ep-sub">
+      Get the <strong>AI Coding Agent Security Checklist 2026</strong> —
+      the hardening guide operators actually use. Covers sandbox escapes,
+      permission holes, and the 12 things to audit before trusting any agent.
+    </p>
+    <form class="ep-form" id="ep-form">
+      <label class="sr-only" for="ep-email">Email</label>
+      <input
+        id="ep-email"
+        type="email"
+        name="email"
+        required
+        placeholder="you@company.com"
+        autocomplete="email"
+      />
+      <button type="submit" id="ep-btn">Get the Checklist →</button>
+    </form>
+    <p class="ep-status" id="ep-status" role="status" aria-live="polite"></p>
+    <p class="ep-note">Free · No spam · Unsubscribe anytime</p>
+  </div>
+</div>
+
+<script is:inline>
+(function() {
+  const KEY = 'tb_ep_shown';
+  const popup = document.getElementById('exit-popup');
+  if (!popup) return;
+
+  // Already shown this session
+  if (sessionStorage.getItem(KEY)) return;
+
+  let shown = false;
+  function showPopup() {
+    if (shown) return;
+    shown = true;
+    popup.setAttribute('aria-hidden', 'false');
+    popup.classList.add('ep-visible');
+    sessionStorage.setItem(KEY, '1');
+  }
+
+  // Desktop: exit-intent (mouse leaves top of viewport)
+  document.addEventListener('mouseout', (e) => {
+    if (e.clientY <= 0 && e.relatedTarget === null) {
+      setTimeout(showPopup, 200);
+    }
+  });
+
+  // Mobile / fallback: show after 45s
+  setTimeout(() => { if (!shown) showPopup(); }, 45000);
+
+  // Close
+  document.getElementById('ep-close')?.addEventListener('click', () => {
+    popup.classList.remove('ep-visible');
+    popup.setAttribute('aria-hidden', 'true');
+  });
+  document.getElementById('ep-backdrop')?.addEventListener('click', () => {
+    popup.classList.remove('ep-visible');
+    popup.setAttribute('aria-hidden', 'true');
+  });
+
+  // Form submit
+  const form = document.getElementById('ep-form');
+  const statusEl = document.getElementById('ep-status');
+  const btn = document.getElementById('ep-btn');
+  if (form && statusEl && btn) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('ep-email')?.value?.trim();
+      if (!email) return;
+      btn.disabled = true;
+      btn.textContent = 'Subscribing…';
+      try {
+        const res = await fetch('/api/newsletter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, source: 'exit-popup' }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.ok) {
+          statusEl.textContent = data.message || "Check your inbox for the checklist!";
+          statusEl.className = 'ep-status ok';
+          form.reset();
+          btn.textContent = '✓ Subscribed';
+          setTimeout(() => {
+            popup.classList.remove('ep-visible');
+            popup.setAttribute('aria-hidden', 'true');
+          }, 3500);
+        } else {
+          statusEl.textContent = data.error || 'Try again.';
+          statusEl.className = 'ep-status err';
+          btn.textContent = 'Get the Checklist →';
+        }
+      } catch {
+        statusEl.textContent = 'Network error.';
+        statusEl.className = 'ep-status err';
+        btn.textContent = 'Get the Checklist →';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+
+  // ESC to close
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && popup.classList.contains('ep-visible')) {
+      popup.classList.remove('ep-visible');
+      popup.setAttribute('aria-hidden', 'true');
+    }
+  });
+})();
+</script>
+
+<style>
+  .exit-popup {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+  }
+  .exit-popup.ep-visible {
+    opacity: 1;
+    visibility: visible;
+  }
+  .ep-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(4px);
+  }
+  .ep-card {
+    position: relative;
+    max-width: 440px;
+    width: calc(100% - 2rem);
+    background: var(--bg-card);
+    border: 1px solid var(--green);
+    border-radius: 12px;
+    padding: 2rem 1.75rem;
+    text-align: center;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.5), 0 0 30px rgba(34,197,94,0.1);
+    transform: scale(0.95) translateY(10px);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .exit-popup.ep-visible .ep-card {
+    transform: scale(1) translateY(0);
+  }
+  .ep-close {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    background: none;
+    border: none;
+    color: var(--fg-dim);
+    font-size: 1.5rem;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.15s;
+  }
+  .ep-close:hover { color: var(--fg); background: var(--bg-hover); }
+  .ep-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+  }
+  .ep-title {
+    font-family: var(--font-mono);
+    font-size: 1.2rem;
+    margin: 0 0 0.5rem;
+    color: var(--fg-bright);
+  }
+  .ep-sub {
+    font-size: 0.85rem;
+    color: var(--fg-dim);
+    line-height: 1.5;
+    margin: 0 0 1.25rem;
+  }
+  .ep-sub strong { color: var(--green); }
+  .ep-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .ep-form input {
+    padding: 0.65rem 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+  }
+  .ep-form input:focus {
+    outline: none;
+    border-color: var(--green);
+  }
+  .ep-form button {
+    padding: 0.65rem 1.25rem;
+    border: none;
+    border-radius: 6px;
+    background: var(--green);
+    color: #000;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .ep-form button:disabled { opacity: 0.5; cursor: wait; }
+  .ep-status {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    min-height: 1.2em;
+    margin: 0.5rem 0 0;
+  }
+  .ep-status.ok { color: var(--green); }
+  .ep-status.err { color: #f87171; }
+  .ep-note {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--fg-dim);
+    margin: 0.75rem 0 0;
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    border: 0;
+  }
+
+  @media (max-width: 600px) {
+    .ep-card { padding: 1.5rem 1.25rem; }
+    .ep-title { font-size: 1.05rem; }
+  }
+</style>

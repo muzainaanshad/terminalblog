@@ -1,0 +1,246 @@
+---
+/**
+ * WelcomeOverlay.astro — First-visit welcome mat
+ *
+ * Full-screen overlay shown on first visit only.
+ * Value prop + email signup. localStorage to track state.
+ */
+---
+
+<div class="welcome-overlay" id="welcome-overlay" role="dialog" aria-label="Welcome" aria-hidden="true">
+  <div class="wo-backdrop" id="wo-backdrop"></div>
+  <div class="wo-card">
+    <button class="wo-close" id="wo-close" aria-label="Close">&times;</button>
+    <div class="wo-logo">~/terminalblog</div>
+    <h1 class="wo-title">We track every coding agent<br/>so you don't have to</h1>
+    <p class="wo-desc">
+      Security alerts · Benchmark updates · Leaderboard moves<br/>
+      Delivered weekly. No just-shipped spam.
+    </p>
+    <form class="wo-form" id="wo-form">
+      <label class="sr-only" for="wo-email">Email</label>
+      <input
+        id="wo-email"
+        type="email"
+        name="email"
+        required
+        placeholder="you@company.com"
+        autocomplete="email"
+      />
+      <button type="submit" id="wo-btn">Join the digest →</button>
+    </form>
+    <p class="wo-status" id="wo-status" role="status" aria-live="polite"></p>
+    <div class="wo-links">
+      <a href="/blog">Browse articles</a>
+      <span class="wo-dot">·</span>
+      <a href="/leaderboard">Leaderboard</a>
+      <span class="wo-dot">·</span>
+      <a href="/rss.xml">RSS</a>
+    </div>
+  </div>
+</div>
+
+<script is:inline>
+(function() {
+  const KEY = 'tb_wm_shown';
+  const overlay = document.getElementById('welcome-overlay');
+  if (!overlay) return;
+
+  // Already shown — ever
+  if (localStorage.getItem(KEY)) return;
+
+  // Show after 1.5s (let page render first)
+  setTimeout(() => {
+    overlay.setAttribute('aria-hidden', 'false');
+    overlay.classList.add('wo-visible');
+    localStorage.setItem(KEY, '1');
+  }, 1500);
+
+  function close() {
+    overlay.classList.remove('wo-visible');
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+
+  document.getElementById('wo-close')?.addEventListener('click', close);
+  document.getElementById('wo-backdrop')?.addEventListener('click', close);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('wo-visible')) close();
+  });
+
+  // Form submit
+  const form = document.getElementById('wo-form');
+  const statusEl = document.getElementById('wo-status');
+  const btn = document.getElementById('wo-btn');
+  if (form && statusEl && btn) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('wo-email')?.value?.trim();
+      if (!email) return;
+      btn.disabled = true;
+      btn.textContent = 'Subscribing…';
+      try {
+        const res = await fetch('/api/newsletter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, source: 'welcome-mat' }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.ok) {
+          statusEl.textContent = data.message || "You're in! Check your inbox.";
+          statusEl.className = 'wo-status ok';
+          form.reset();
+          btn.textContent = '✓ Subscribed';
+          setTimeout(close, 3000);
+        } else {
+          statusEl.textContent = data.error || 'Try again.';
+          statusEl.className = 'wo-status err';
+          btn.textContent = 'Join the digest →';
+        }
+      } catch {
+        statusEl.textContent = 'Network error.';
+        statusEl.className = 'wo-status err';
+        btn.textContent = 'Join the digest →';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+})();
+</script>
+
+<style>
+  .welcome-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 11000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+  }
+  .welcome-overlay.wo-visible {
+    opacity: 1;
+    visibility: visible;
+  }
+  .wo-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.8);
+    backdrop-filter: blur(6px);
+  }
+  .wo-card {
+    position: relative;
+    max-width: 500px;
+    width: calc(100% - 2rem);
+    background: var(--bg-card);
+    border: 1px solid var(--green);
+    border-radius: 14px;
+    padding: 2.5rem 2rem;
+    text-align: center;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 40px rgba(34,197,94,0.08);
+    transform: scale(0.95) translateY(10px);
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .welcome-overlay.wo-visible .wo-card {
+    transform: scale(1) translateY(0);
+  }
+  .wo-close {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    background: none;
+    border: none;
+    color: var(--fg-dim);
+    font-size: 1.5rem;
+    cursor: pointer;
+    width: 32px; height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.15s;
+  }
+  .wo-close:hover { color: var(--fg); background: var(--bg-hover); }
+  .wo-logo {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--fg-dim);
+    margin-bottom: 1rem;
+  }
+  .wo-logo span { color: var(--green); }
+  .wo-title {
+    font-family: var(--font-mono);
+    font-size: 1.3rem;
+    color: var(--fg-bright);
+    margin: 0 0 0.75rem;
+    line-height: 1.4;
+  }
+  .wo-desc {
+    font-size: 0.85rem;
+    color: var(--fg-dim);
+    line-height: 1.6;
+    margin: 0 0 1.5rem;
+  }
+  .wo-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .wo-form input {
+    padding: 0.65rem 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+  }
+  .wo-form input:focus {
+    outline: none;
+    border-color: var(--green);
+  }
+  .wo-form button {
+    padding: 0.65rem 1.25rem;
+    border: none;
+    border-radius: 6px;
+    background: var(--green);
+    color: #000;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .wo-form button:disabled { opacity: 0.5; cursor: wait; }
+  .wo-status {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    min-height: 1.2em;
+    margin: 0.5rem 0 0;
+  }
+  .wo-status.ok { color: var(--green); }
+  .wo-status.err { color: #f87171; }
+  .wo-links {
+    margin-top: 1.25rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+  .wo-links a { color: var(--fg-dim); }
+  .wo-links a:hover { color: var(--green); }
+  .wo-dot { color: var(--border); margin: 0 0.4rem; }
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    border: 0;
+  }
+
+  @media (max-width: 600px) {
+    .wo-card { padding: 2rem 1.25rem; }
+    .wo-title { font-size: 1.1rem; }
+  }
+</style>

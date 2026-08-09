@@ -1,0 +1,68 @@
+---
+title: "Oh My Pi v17 Is Here: The Hub Tool, xd:// Virtual Files, and a Plugins Standard — What Changes for Beginners"
+description: "Oh My Pi's v17 series — from v17.0.0 on July 15 to v17.2.11 on August 7 — merges its messaging and job tools into one hub, replaces hidden tools with xd:// virtual files, and adds an Agent Plugins 1.0.0 standard. A plain-English guide to what changed and whether your setup is affected."
+pubDate: "2026-08-09T10:00:00Z"
+updatedDate: "2026-08-09T10:00:00Z"
+tags: ["oh-my-pi", "v17", "release", "agent-plugins", "terminal-agent", "coding-agent", "beginner"]
+tool: "oh-my-pi"
+author: "sage"
+image: "/api/og?title=Oh+My+Pi+v17+Hub+xd%2F%2F+Plugins&tool=oh-my-pi"
+---
+
+Oh My Pi — the open-source terminal coding agent that has been quietly shipping daily releases while bigger names take weeks — just crossed into version **17**. The v17 series started with v17.0.0 on July 15, 2026, and the latest release, **v17.2.11**, landed August 7. If you last looked at Oh My Pi during the v16 era, this is the update to care about: v17 is not a pile of small fixes. It reorganizes how the agent's tools work under the hood, and two of its headline changes — the unified `hub` tool and the new `xd://` virtual-file system — will change how you approve, watch, and share agent work.
+
+This guide explains what actually changed, what breaks when you upgrade, and what beginners should do next. No assumed knowledge: if you have never opened a terminal agent, the first section tells you what Oh My Pi even is.
+
+## What is Oh My Pi?
+
+Oh My Pi is a free, open-source AI coding agent that lives in your terminal. You describe what you want in plain English — "refactor this function and add tests" — and it reads your code, plans edits, and applies them to your files with hash-anchored edits, so it can tell you exactly which lines changed and revert them cleanly. The project describes itself as an "AI coding agent for the terminal — hash-anchored edits, optimized tool harness, LSP, Python, browser, subagents, and more." It sits at roughly **23,000 GitHub stars** and supports macOS, Linux, and Windows.
+
+Its defining trait is the "tool harness": instead of assuming one workflow, Oh My Pi comes with a large catalog of tools (providers, browsers, subagents, file ops) and can be extended with plugins. That catalog is exactly what v17 reorganized.
+
+## Why v17 matters: the same agent, cleaner plumbing
+
+Most of what a coding agent does happens through tools. Oh My Pi previously had several overlapping tools: `irc` for agent-to-agent messaging, `job` for background jobs, and `launch` for supervised long-running processes — plus a `resolve` tool that finalized plan approvals, and a "tool discovery" system that used full-text search to find tools on demand.
+
+**v17.0.0's breaking changes:**
+
+- The `irc`, `job`, and `launch` tools were **merged into one `hub` tool** (loaded as "essential"). Messaging, job control, and process supervision now route through a single interface.
+- The **tool discovery system was removed**, along with its settings (`tools.discoveryMode`, `tools.essentialOverride`, `mcp.discoveryMode`, `mcp.discoveryDefaultServers`).
+- The **`resolve` tool was removed**. Plan approvals now use three plain-text "virtual device" paths: `xd://resolve` (apply preview), `xd://reject` (discard preview), and `xd://propose` (submit a plan for approval).
+
+**The new `xd://` protocol** is the architectural centerpiece. v17 introduces the concept of mounting tools as **virtual devices readable and writable through the normal read/write tools**. Instead of hidden internal functions, approvals and previews become simple files: the agent writes to `xd://propose`, you approve via `xd://resolve`. This is much easier to reason about — you can see what the agent is doing because it is using the same read/write tools you see in the session.
+
+## What you get in the v17 series
+
+The v17 line has shipped steadily since mid-July (v17.1.0 landed July 24, v17.2.0 on July 30, and patch releases almost daily since). Beyond the restructure, the series added several features beginners will actually feel:
+
+**Agent Plugins 1.0.0 standard (v17.2.x).** Plugins are how you extend Oh My Pi. The new 1.0.0 standard brings automatic discovery, validation, and secure execution of compliant plugin packages — so plugins announce their capabilities and run in a validated way instead of relying on config inheritance. v17.2.11 fixed `/reload-plugins` and the Agent Control Center so agent definitions update without a full session restart.
+
+**`omp share` command.** You can now share a saved session by ID or file path without launching the agent: `omp share <session>`. Useful if you want to hand a colleague (or another machine) a session.
+
+**`AGENT=1` environment variable.** Child processes spawned by the coding agent now see `AGENT=1`, so downstream tools can detect agent-driven execution. A small thing, but it helps hook watchers and safety tooling distinguish agent runs.
+
+**Better quota and provider handling (v17.2.x).** v17.2.11 added reporting of Cursor's personal monthly USD quota and remaining balance, honored `ANTHROPIC_BASE_URL` for custom gateways again (fixing broken agent proxies), raised the idle-timeout floor on Amazon Bedrock to 900 seconds for slow reasoning models like Claude, and improved error handling for Simplified Chinese quota messages and Copilot's `model_not_available_for_integrator` error. Translation: fewer mysterious timeouts and credential rotation failures if you use Copilot, Cursor, Bedrock, or a custom gateway.
+
+## What breaks when you upgrade
+
+Breaking changes in v17.0.0 are the real upgrade hazard:
+
+- Anything that scripted the old `irc`, `job`, or `launch` tools needs to target the `hub` tool.
+- Config settings for the removed discovery system, and the old `resolve` tool, are gone. If your config references them, clean them up.
+- `edit.enforceSeenLines` (defaults to `false`) is a new opt-in safety flag: when enabled, the agent refuses to edit lines that have not been fully displayed in the session. If self-review quality matters to you, enable it in settings.
+
+For a typical beginner workflow — `omp` in a repo, describe a change, approve the diff — nothing about the daily flow changes. The same commands, the same approvals; the reshuffle is mostly invisible unless you used the advanced messaging or job tools.
+
+## How to update
+
+Oh My Pi generally self-updates, but the official upgrade paths are: macOS/Linux via `curl -fsSL https://omp.sh/install | sh`, Windows via `irm https://omp.sh/install.ps1 | iex`, Homebrew users via `brew upgrade can1357/tap/omp`, and npm users via `bun update -g @oh-my-pi/pi-coding-agent`. Run the version check after updating to confirm you are on v17.2.x. If you are automating agents, watch for config settings referencing the old discovery or resolve paths and replace them per the v17.0.0 release notes.
+
+## The bottom line
+
+v17 is the biggest internal change to the Oh My Pi agent in months: one tool to rule messaging, background jobs, and long-running processes; transparent `xd://` approvals instead of hidden ones; and a serious plugins standard that makes extension safer. For beginners the practical wins are the stability fixes in the v17.2 series — fewer timeouts, cleaner quota handling, and instant plugin reloads. If you skipped the v16 series updates, the jump to v17.2.11 is worth it.
+
+## Related articles
+
+- [Qwen3.8-Max Ships With 2.4T Parameters, 16-Day Autonomous Coding Demo, and Open Weights Coming Next Week](/blog/qwen3-8-max-2-4t-autonomous-coding-open-weights/)
+- [Hermes Agent v0.20.0 (Herald): Voice That Interrupts, A2A Agent Chat, and Webhooks — Beginners Guide](/blog/hermes-agent-v020-herald-voice-a2a-webhooks/)
+- [Codex 0.147.0: Portable Plugins, Automatically Approved Reviews, and Safer Defaults](/blog/codex-0-147-portable-plugins-auto-approval/)

@@ -2,7 +2,7 @@
 title: "Beware: Claude Code Silently Drops Your Work After an Interrupt — Then Denies It Happened"
 description: "A fresh Claude Code bug shows the agent losing already-completed planning context after a mid-turn interrupt, then confidently insisting the work never happened. Here's how to protect yourself."
 pubDate: "2026-07-12T20:00:00Z"
-updatedDate: "2026-07-12T20:00:00Z"
+updatedDate: "2026-08-01T08:00:00Z"
 tags: ["security", "beware", "claude-code", "reliability", "context", "interrupt"]
 tool: "claude-code"
 author: "kira_bug_hunter"
@@ -19,6 +19,10 @@ From that point on, the assistant's active context no longer contained any trace
 
 The danger isn't the data loss — it's the **confident denial**. The agent sent the user on a wrong-track investigation of sibling projects instead of checking its own current transcript first.
 
+### Why Confident Denial Is Worse Than Silence
+
+A normal error message ("context unavailable") would prompt you to investigate. But the agent's confident assertion that nothing happened actively misleads you. It is not guessing — it is generating a plausible-sounding narrative from truncated context, and it has no internal mechanism to flag that its memory is incomplete. This is fundamentally different from a cache miss or a null pointer. The agent is filling a gap with fiction and defending it as fact.
+
 ## Are You Affected?
 
 Check whether your live context matches your on-disk transcript after any interrupt:
@@ -34,17 +38,73 @@ grep -c "AskUserQuestion" ~/.claude/projects/*/$(ls -t ~/.claude/projects/*/*.js
 ls -lt ~/.claude/plans/ | head
 ```
 
-If the `.jsonl` shows tool calls or a plan your agent says don't exist, you've hit the bug.
+If the `.jsonl` shows tool calls or a plan your agent says do not exist, you've hit the bug.
+
+### Quick Self-Test
+
+Run this diagnostic sequence after your next interrupt to catch the bug before it wastes your time:
+
+1. Before interrupting: ask the agent "list every `AskUserQuestion` call in this session and its answer."
+2. Interrupt with `Esc`, ask an unrelated question, then resume.
+3. Ask again: "list every `AskUserQuestion` call and its answer."
+4. If the second answer is shorter than the first — or denies calls the first listed — you have a confirmed context gap.
+
+If you spot it early, you can re-state the decisions before the agent goes off-track.
 
 ## The Fix
 
-- **Don't trust amnesia.** After any mid-turn interrupt, re-state the key decisions and ask the agent to confirm against its session file before moving on.
-- **Keep plans on disk.** Always have the agent write scoping decisions to a plan file — it survives the context gap even when live memory doesn't.
+### Immediate Steps
+
+- **Do not trust amnesia.** After any mid-turn interrupt, re-state the key decisions and ask the agent to confirm against its session file before moving on.
+- **Keep plans on disk.** Always have the agent write scoping decisions to a plan file — it survives the context gap even when live memory does not.
 - **Recover via the transcript.** If the agent denies prior work, point it at `~/.claude/projects/*/*.jsonl` directly rather than accepting the denial.
+
+### Defensive Workflow Patterns
+
+**Pattern 1: Checkpoint before interrupt.** Before hitting `Esc`, ask the agent to write a one-line summary of current state to a plan file:
+
+```
+Before I interrupt, write a one-line status summary to plans/session-status.md
+```
+
+After resuming, ask the agent to read that file back. This costs five seconds and prevents ten minutes of confused rework.
+
+**Pattern 2: The transcript audit.** If you suspect context loss, do not argue with the agent. Instead:
+
+```bash
+# Dump the full session transcript
+cat ~/.claude/projects/*/$(ls -t ~/.claude/projects/*/*.jsonl | head -1 | xargs basename) | \
+  python3 -c "import sys,json; [print(json.loads(l).get('content','')[:200]) for l in sys.stdin if 'AskUserQuestion' in l or 'plan' in l.lower()]"
+```
+
+Then paste the relevant lines back into the conversation. The agent can process raw transcript content even if it lost the live context version.
+
+**Pattern 3: Two-session separation.** If your workflow involves heavy planning followed by unrelated questions, run them in separate Claude sessions. Keep one session focused on the planning task; start a fresh session for unrelated questions. This sidesteps the interrupt-trigger entirely.
+
+### Recovering From Context Loss
+
+If you are already in the "denial loop" — the agent insists work never happened and you are wasting cycles arguing — use this escape hatch:
+
+```bash
+# Find the session file
+SESSION=$(ls -t ~/.claude/projects/*/*.jsonl | head -1)
+
+# Extract the plan or decisions the agent wrote
+grep -o '"plan_file":"[^"]*"' "$SESSION" | tail -1
+
+# If a plan file exists, read it directly
+cat ~/.claude/plans/$(grep -o '"plan_file":"[^"]*"' "$SESSION" | tail -1 | cut -d'"' -f4)
+```
+
+Feed the plan file contents back into the conversation. The agent will process the document and continue from where it left off — no more arguing required.
 
 ## Why It Happened
 
 The trigger is interrupting right as a tool call or plan write finishes. Context compaction (or post-interrupt context reconstruction) appears to diverge from the full session transcript, silently resetting the active window to an earlier point. Because nothing errors, the agent continues as if pre-interrupt work never occurred — and will defend that false state until forced to read its own log.
+
+The likely mechanism: when an interrupt fires during or immediately after a tool call, the context reconstruction code snapshots the transcript at a point *before* the tool result was appended. The plan file write itself completed — that is a filesystem side-effect — but the in-memory context never incorporated the tool result that confirmed the write succeeded. The agent then has no representation of the planning work in its active window.
+
+This is structurally similar to a race condition in event-sourced systems: the event (tool call result) was persisted, but the read model (active context) missed it due to a timing-dependent replay.
 
 ## FAQ
 
@@ -52,9 +112,22 @@ The trigger is interrupting right as a tool call or plan write finishes. Context
 No. The data is intact in `~/.claude/projects/*/*.jsonl` and any plan file. Only the agent's live, in-memory context lost it. Recover by referencing the transcript.
 
 **Q2: Is this a security vulnerability?**
-Not a remote exploit, but it's a trust-safety problem: a confident, false denial can send you chasing phantom bugs or re-doing decided work. Treat agent "this never happened" claims as unverified after an interrupt.
+Not a remote exploit, but it is a trust-safety problem: a confident, false denial can send you chasing phantom bugs or re-doing decided work. Treat agent "this never happened" claims as unverified after an interrupt.
 
 **Q3: Does this affect other agents?**
 Any agent that compacts or reconstructs context after an interrupt can exhibit amnesia. Verify continuity by re-stating prior decisions before relying on them.
 
+**Q4: Is there a way to disable context compaction entirely?**
+Not in the current Claude Code release. Context compaction is tied to the token window and cannot be toggled off. Your best defense is the checkpoint pattern: persist critical decisions to disk before any interrupt.
+
+**Q5: Does this happen with `/compact` manually, or only on interrupt?**
+The reported trigger is interrupt-based, but manual `/compact` could theoretically produce the same gap if it snapshots before a tool result is fully incorporated. If you use `/compact` during active tool work, verify afterward by asking the agent to list recent tool calls.
+
 *Your AI tools should work for you, not your budget. Find savings at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
+
+
+## Related articles
+
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+- [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
+- [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)

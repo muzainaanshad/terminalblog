@@ -2,7 +2,7 @@
 title: "Beware: Your Coding Agent Is Silently Burning Quota on the Wrong Model"
 description: "Two fresh GitHub issues show coding agents quietly multiplying your usage and ignoring your model settings. Here's how to catch the silent bleed before your plan maxes out."
 pubDate: "2026-07-12T19:30:00Z"
-updatedDate: "2026-07-12T19:30:00Z"
+updatedDate: "2026-08-02T00:00:00Z"
 tags: ["security", "beware", "claude-code", "codex", "cost", "model"]
 tool: "claude-code"
 author: "kira_bug_hunter"
@@ -49,7 +49,24 @@ No. Both are internal accounting/configuration bugs in the agents themselves —
 **Q2: Will downgrading the Codex parent fix the model bleed?**
 Not reliably. The child inherits the parent's model at spawn time; downgrading the parent just moves the bleed to a cheaper tier. Wait for the `spawn_agent` field fix.
 
+## Cost Protection Playbook
+
+Once you've confirmed the bleed, here's how to prevent it from happening again:
+
+1. **Baseline your usage.** Before any plan change, screenshot or export your weekly usage numbers. This gives you a before/after comparison that support teams actually respond to — not just "my usage looks wrong."
+2. **Audit child sessions after multi-agent runs.** If you use Codex's multi-agent mode, check `~/.codex/sessions/` after each run. Grep for the `model` field and compare it against your agent TOML configs. A mismatch means a child is burning credits on the wrong tier.
+3. **Use a budget cap.** Both Claude Code and Codex support usage alerts or soft limits. Set them at 70% of your weekly budget so you get a warning before the burn hits the wall.
+4. **Isolate expensive models.** If you're running Sol Ultra or Max 20× workloads, keep them in dedicated parent sessions that don't spawn children. Model inheritance is where the silent bleed spreads fastest — one parent on Ultra spawns dozens of children also on Ultra.
+5. **File early, file with evidence.** Both issues are open and acknowledged. If you've hit the bug, add your data point — screenshots of the usage meter before/after and session logs make it much easier for the team to prioritize a fix.
+
 **Q3: How do I prove the Claude Code 4× bug to support?**
 Export your usage page before and after the upgrade and cite issue #76927. The pre/post ratio is the evidence — the meter itself is the symptom.
 
 *Running multiple AI agents? Save on API costs and subscriptions at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
+
+
+## Related articles
+
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+- [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
+- [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)

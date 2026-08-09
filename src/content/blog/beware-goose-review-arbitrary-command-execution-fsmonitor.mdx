@@ -1,0 +1,134 @@
+---
+title: "Beware: Goose `goose review` Executes Arbitrary Commands via Malicious Git Config"
+description: "GHSA-r5pp-p5r8-466r is a high-severity flaw in Goose versions before 1.44.0 that lets a malicious repository run arbitrary code on your machine when you run `goose review`. No prompt, no model call, no approval needed. Fixed in v1.44.0."
+pubDate: "2026-08-01T10:00:00Z"
+updatedDate: "2026-08-01T10:00:00Z"
+tags: ["security", "beware", "goose", "git", "command-injection", "fsmonitor", "coding-agent"]
+tool: "goose"
+author: "kira_bug_hunter"
+image: "/api/og?title=Beware:%20Goose%20Review%20Command%20Injection&tool=Goose"
+---
+
+On July 24, 2026, GitHub published [GHSA-r5pp-p5r8-466r](https://github.com/aaif-goose/goose/security/advisories/GHSA-r5pp-p5r8-466r) — a high-severity (CVSS 7.0) arbitrary command execution vulnerability in the Goose coding agent's `goose review` subcommand. The flaw lets an attacker craft a malicious repository that executes arbitrary code on the host machine the instant a developer runs `goose review` inside it. No prompt submission. No model call. No tool approval dialog. No trust prompt. The code executes before Goose ever contacts the AI model.
+
+If you are running any version of Goose before 1.44.0, you are affected. Update immediately.
+
+## The short version
+
+Goose's `review` command runs system `git` commands to collect a diff before summarizing changes. The problem is that Goose builds those git invocations without stripping attacker-controlled git configuration entries — specifically `core.fsmonitor`. A malicious repository whose `.git/config` contains a single line under `[core] fsmonitor = <attacker command>` causes git to execute that command during its index refresh. Goose's `review` command triggers this index refresh. The attacker's code runs with the full privileges of the user who invoked `goose review`.
+
+This is not a theoretical edge case. The proof-of-concept takes 30 seconds to reproduce. Download the PoC repo, run `goose review`, and a calculator launches. The only malicious payload is one line in `.git/config`.
+
+## Who is affected
+
+**Affected versions:** All Goose releases before 1.44.0. The vulnerability was reported by @0xmagic0 and credited to Francisco Rosales of Manifold Security. Goose patched it in v1.44.0, released July 23, 2026.
+
+**What you need to exploit it:** The attacker must place a malicious `.git/config` on the victim's filesystem before the victim runs `goose review` against that directory. Common delivery paths include:
+
+- Cloning a malicious repository (the most obvious)
+- Downloading and extracting a project archive
+- Working inside a shared directory or nested auto-discovered repository
+- Running Goose against a CI checkout that pulled from an untrusted source
+
+**CVSS v4.0 scoring:**
+
+| Metric | Value |
+|--------|-------|
+| Attack Vector | Local |
+| Attack Complexity | Low |
+| Attack Requirements | None |
+| Privileges Required | Low |
+| User Interaction | Active |
+| Confidentiality | High |
+| Integrity | High |
+| Availability | High |
+
+**Overall CVSS score: 7.0 (High)**
+
+**CWE:** CWE-94 — Improper Control of Generation of Code ("Code Injection")
+
+## How the exploit works
+
+The root cause is in `crates/goose-cli/src/commands/review/handler.rs`. Here is what happens step by step:
+
+**Step 1: Goose invokes git.** When you run `goose review`, the handler function `git_command()` builds git invocations with a single config override: `-c core.quotePath=off`. It does not strip `core.fsmonitor` or any other potentially dangerous configuration entries.
+
+**Step 2: Git refreshes the index.** The review handler calls `git diff --name-only HEAD` and `git diff HEAD` to collect the diff. These commands trigger an index refresh.
+
+**Step 3: `core.fsmonitor` fires.** Git's `core.fsmonitor` feature lets a repository specify an external command that git calls whenever it needs to enumerate changed files. Git trusts this configuration. When the index refresh hits the malicious entry, git executes the attacker's command.
+
+**Step 4: Code runs outside the sandbox.** The command executes with the invoking user's full privileges. It inherits the user's environment variables, which typically include provider API keys (Anthropic, OpenAI, etc.), SSH keys, cloud credentials, and anything else exported in the shell session.
+
+The critical detail: this execution happens **before** Goose contacts the AI model. There is no opportunity for Goose's permission system to intercept it. There is no tool approval prompt. There is no trust boundary being crossed because Goose never gets to the point of applying one.
+
+## Why this matters for coding agent users
+
+This vulnerability exposes a structural problem that affects more than just Goose. Coding agents routinely shell out to git to gather context. Every agent that runs `git diff`, `git log`, or `git status` on untrusted repositories faces the same class of risk unless it explicitly sanitizes git configuration before invocation.
+
+Consider what happens in a typical developer workflow:
+
+1. You clone a repository someone recommended on Twitter or Hacker News
+2. You run your coding agent's review or analysis command
+3. The agent calls git internally
+4. Git reads the repository's `.git/config`
+5. If that config contains `core.fsmonitor`, `core.hooksPath`, or `core.gitProxy`, git executes attacker-controlled commands
+
+The developer did nothing wrong. They reviewed a repository. The agent did nothing wrong — it ran git, which is its job. The failure is in the trust boundary between "git configuration from an untrusted repository" and "commands executed on the host."
+
+This is the same class of vulnerability that affected Claude Code in CVE-2026-55607, where a malicious repository chained `core.fsmonitor` with worktree naming and symlink tricks to escape the sandbox. The Goose vulnerability is simpler — it requires fewer steps — but the underlying lesson is identical: **git configuration from untrusted repositories must be treated as untrusted input.**
+
+## What to do
+
+### If you are running Goose < 1.44.0
+
+Update to v1.44.0 or later immediately:
+
+```bash
+# If installed via Homebrew
+brew upgrade goose
+
+# If installed via Cargo
+cargo install goose-cli --force
+
+# Check your version
+goose --version
+```
+
+### If you cannot update right now
+
+Avoid running `goose review` on repositories you did not create yourself. If you must review an untrusted repository, inspect its `.git/config` first:
+
+```bash
+cat /path/to/repo/.git/config
+```
+
+Look for any `core.fsmonitor`, `core.hooksPath`, or `core.gitProxy` entries. If you see them and you did not set them yourself, do not run `goose review` in that directory.
+
+### What the fix does
+
+Goose v1.44.0 patches the vulnerability by hardening the git command builder. The `git_command()` function now strips dangerous configuration entries before passing them to git. The v1.44.0 release also includes additional security hardening — "Chunk command-classifier input with overlapping windows for security" — suggesting the team is paying closer attention to the trust boundary between git and the agent.
+
+## The broader pattern
+
+This is the third high-severity coding agent vulnerability in two months that chains git configuration with agent execution:
+
+| Date | Tool | Vulnerability | CVSS |
+|------|------|---------------|------|
+| Jun 29 | Claude Code | CVE-2026-55607 — sandbox escape via worktree + fsmonitor | 8.8 |
+| Jul 20 | Cline | Clinejection — supply chain attack via CI prompt injection | High |
+| Jul 24 | Goose | GHSA-r5pp-p5r8-466r — arbitrary execution via fsmonitor | 7.0 |
+
+The pattern is clear: coding agents that invoke git on untrusted repositories are exposed to the full attack surface of git configuration. `core.fsmonitor` is not the only dangerous entry. `core.hooksPath` can redirect git hooks to attacker-controlled scripts. `core.gitProxy` can route git network operations through an attacker-controlled proxy. Any agent that runs git without sanitizing configuration is vulnerable to variants of this attack.
+
+If you maintain or operate a coding agent, audit every place your code invokes git. Strip or ignore configuration entries from untrusted repositories. Treat `.git/config` the same way you would treat a `Dockerfile` from a stranger — it describes operations that will run on your machine.
+
+## Credit
+
+Thanks to Francisco Rosales of Manifold Security for discovering and responsibly disclosing this vulnerability, and to the Goose team for patching it within a reasonable window. The advisory is published at [GHSA-r5pp-p5r8-466r](https://github.com/aaif-goose/goose/security/advisories/GHSA-r5pp-p5r8-466r).
+
+
+## Related articles
+
+- [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)
+- [Your AI Agents Config Directory Is Now the Most Dangerous Place on Your Machine](/blog/ai-agent-config-directory-attack-surface-2026/)
+- [Beware: AWS Kiro IDE Lets Attackers Rewrite Its Own Trust Boundary — CVE-2026-10591](/blog/beware-kiro-ide-mcp-config-rce-cve-2026-10591/)

@@ -1,0 +1,83 @@
+---
+title: "Meta's Muse Code: A Battery of Persistent Subagents, Replay-Safe Runtime"
+description: "Meta released Muse Code, a terminal coding agent powered by Spark 1.2 — with persistent async background agents, a replay-exact event-log runtime, and co-trained model plus harness. Here's what it does differently."
+pubDate: "2026-08-07T11:00:00Z"
+updatedDate: "2026-08-07T11:00:00Z"
+tags: ["meta", "muse-code", "spark", "coding-agents", "release", "terminal", "subagents"]
+tool: "industry"
+author: "sage"
+image: "/api/og?title=Meta+Muse+Code+Replay+Safe+Subagents&tool=meta"
+---
+
+Meta released **Muse Code** (beta) on August 6, 2026: a terminal coding agent powered by the new **Muse Spark 1.2** model. It is Meta's real entry into the terminal-agent race, and it does not just clone Claude Code. Two design decisions stand out — a battery of **persistent async background agents** and a **replay-exact, restart-safe event log** — and they quietly address the two things operators actually complain about with current agents: redundant context gathering and sessions that die on a crash.
+
+Here is what changed and why it matters if you evaluate or run terminal coding agents.
+
+## The One-Line Summary
+
+Muse Code runs in the terminal (macOS and Linux), plans changes across large repos, writes code, and validates results — the standard harness job. The differentiator is its runtime architecture rather than any single feature. It coordinates **multiple persistent subagents that stay alive for the whole session** instead of spawning short-lived ones per task, and it records every model call, tool run, approval, and edit to a **local event log** that makes the whole run replay-exact and restart-safe.
+
+Neither idea is brand new in isolation — persistent background agents appeared in OpenCode and Claude Code's recent releases — but Meta's framing treats them as the core design rather than an add-on, and co-trains the model specifically so it behaves best inside this harness.
+
+## Persistent Background Agents, Not Spawned-On-Demand
+
+Most agents today use a simple "spawn a subagent for this task, get the result, throw it away" cycle. Muse Code inverts that: a set of **async background agents remain active throughout the session**, rather than being created for individual tasks.
+
+Why this matters in practice:
+
+- **Less redundant information gathering.** A fresh subagent re-reads the codebase to build context from scratch every time. A persistent agent already holds that context, so multi-step tasks spend fewer tokens and less wall-clock time locating what they need.
+- **Less steering.** The background agents decide when to communicate back to the main agent instead of dumping every intermediate step on you. On a long refactor, that keeps your terminal quiet until there is a decision that actually needs a human.
+- **Mixed latency.** Because the subagents are already warm, follow-up steps on multi-step work start immediately rather than after a full context-reload.
+
+The default skills ship with the pattern baked in. `/plan` turns a task into an approval-gated plan, `/grill` stress-tests that plan until it holds up, and `/goal` drives work toward a completed objective. Translated: plan, pressure-test the plan, then execute toward the finish line — a workflow that benefits exactly from having a record that the same agents can act on.
+
+For a quick primer: if you have used Claude Code's `--background-subagents` or OpenCode's orchestration, you already have the mental model. Muse Code just makes persistent agents the default locomotion instead of an opt-in performance feature.
+
+## Replay-Exact, Restart-Safe Runtime
+
+The second big change is quieter but maybe more important for long-running work. Muse Code keeps a **local event log** to which every model call, tool run, approval, and edit is appended. One file becomes the single source of truth for the session.
+
+The consequence is that the runtime is **replay-exact and restart-safe**: if the process crashes, the agent can resume precisely where it stopped instead of losing the thread and silently derailing. For anyone who has lost hours to a 2-hour session that corrupted on a network blip or a closed lid, this is the feature set you actually wanted — checkpointing without manual orchestration.
+
+This pairs naturally with the company's marketing of the *same* model + harness. Contrast with a generic agent that has no durable event log: a crash means the next run re-reads context and re-builds everything, burning tokens and losing decisions. With a restart-safe log, long-horizon tasks survive interruptions without you babysitting retries.
+
+## Spark 1.2 Was Co-Trained With Muse Code
+
+Muse Spark 1.2 is a coding-focused update to the mid-2026 Spark 1.1 line, with gains in code generation, complex debugging, codebase understanding, and end-to-end workflows. The pricing framing readers saw in Meta's earlier Spark 1.1 API story (aggressively cheap inference) still applies to the model family story, but the model alone is only half the release here.
+
+The important coordination: **Muse Spark 1.2 was co-trained with Muse Code** using rejection-sampled harness trajectories and recipe optimizations for goal conditioning, compaction, and subagent use, plus integration of the Muse Code toolset to maximize harness compatibility. In plain terms, the training objective bakes in behavior designed for the *specific* persistent-subagent, event-log harness — not just "give good code," but "give good code that works well through Muse Code's long-horizon loop." If you evaluate the model on a raw browser bench, you will miss the point of the co-training.
+
+Two training directions worth noting:
+
+- **Long-horizon training.** Spark 1.2 was trained on whole-repository generation, large end-to-end projects, and auto-research, using planning to sequence work, goal conditioning to hold direction, and context compaction to retain knowledge across long runs.
+- **A self-improvement loop.** The team used Spark 1.1 to generate challenge environments and templates, then had it grade candidate solutions, producing a scalable training set for 1.2. That loop is why the model handles concrete long-horizon follow-through.
+
+The case study in the release is a GPU-KDA kernel optimization run of 1,000+ tool calls (up to 24 hours), writing, compiling, profiling, and improving over baseline. The agent held a multi-hour, multi-thousand-call loop and kept improving — emblematic of what the persistent, replay-safe runtime is for.
+
+## What It Means for the Terminal Coder
+
+Three practical takeaways for operators and evaluators:
+
+1. **Context costs less.** If your pain is agents re-reading your repo every few minutes, the persistent subagent pattern directly targets that. It is worth benchmarking Muse Code against your current default specifically on a task that requires the second and third follow-up edits to a large file, where context is the bottleneck.
+2. **Sessions are safer.** The replay-exact log means a crash does not nuke the work. Since long multi-hour runs are the organic habitat for this class of task, that is a real advantage even if nothing else sways you.
+3. **The frontier is now model-plus-harness.** Whereas 2025 treated "the best model" as almost the whole story, 2026 is increasingly co-training the model to live inside a specific harness — Muse does this with Spark 1.2. Evaluation now has to benchmark the coupling, not the model on the bench or the harness in a vacuum. That is the deeper takeaway this release anchors.
+
+Watch the builder: make the model and harness a matched flagship pair, and the lock-in argument shifts from "my model is smart" to "my harness understands my model." Muse Code is a round stake in that camp.
+
+## The Watch List
+
+Three things to verify before the beta earns a slot in a serious stack:
+
+- **Platform.** Muse Code's installer targets macOS and Linux on day one. Windows users are out until there is a native path — same gap several terminal agents spent 2026 closing.
+- **Model access and cost.** Spark 1.2 is available in Muse Code and in the Meta Model API. If the earlier Spark 1.1 API pricing story holds as a pattern, expect the cheap-inference position to carry over — but confirm the Muse Code access tier yourself rather than assuming it.
+- **It is a co-trained beta, not a dashboard.** The interesting parts of this release are architectural (persistent agents, replay-exact logs) and hold up on a disposable repo you are happy to churn. Test it with approval-gated plan mode first, in a throwaway clone, before pointing it at a repo your livelihood depends on. Early betas earning trust is how a terminal agent gets adopted; Muse is still in the earning phase.
+
+The signal worth taking away is directional. Terminal agents are converging on two things: warm persistent context instead of per-task context reloads, and durable run state instead of sessions that die. Muse Code ships both as defaults, not add-ons — that is a genuine step, even at beta quality, in the direction the whole category is already marching.
+
+---
+
+## Related articles
+
+- [Model Musical Chairs: What 500 Hacker News Comments Reveal About the Death of AI Model Loyalty](/blog/model-musical-chairs-hn-developers-death-of-ai-loyalty/)
+- [Qwen3.8-Max Ships With 2.4T Parameters, 16-Day Autonomous Coding Demo, and Open Weights Coming Next Week](/blog/qwen3-8-max-2-4t-autonomous-coding-open-weights/)
+- [What Developers Think About the Vibe-Coded Tool Flood — From 40 HN Comments](/blog/hn-vibe-coded-tool-flood-backlash/)

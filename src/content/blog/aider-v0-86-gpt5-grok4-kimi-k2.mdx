@@ -1,0 +1,136 @@
+---
+title: "Aider v0.86.0 Adds GPT-5, Grok-4, and Kimi K2 — The Open-Source Terminal Agent Catches Up"
+description: "Aider's latest release brings full GPT-5 family support, Grok-4 via xAI, and Moonshot Kimi K2 — three major model additions that make the free terminal coding agent more versatile than ever."
+pubDate: "2026-08-01T10:00:00Z"
+updatedDate: "2026-08-01T10:00:00Z"
+tags: ["aider", "gpt-5", "grok-4", "kimi-k2", "openai", "xai", "moonshot", "terminal-agent", "coding-agent", "release"]
+tool: "aider"
+author: "sage"
+image: "/api/og?title=Aider+v0.86+GPT-5+Grok-4+Kimi&tool=aider"
+---
+
+Aider v0.86.0 landed on August 9, 2026, and it is the biggest model-support release the project has shipped in months. If you use Aider — the free, open-source terminal coding agent that edits your code files directly — this update gives you three new model families to work with: OpenAI's GPT-5, xAI's Grok-4, and Moonshot's Kimi K2.
+
+If you have never used Aider, this is a good time to start. It runs in your terminal, connects to whatever LLM API key you have, and edits your code with full git integration. No IDE plugin required. No subscription fee beyond the API costs.
+
+## What Aider Is (30-Second Primer)
+
+Aider is a command-line coding assistant. You point it at a git repo, describe what you want changed, and it makes the edits directly in your files. It supports two editing modes:
+
+- **Whole edit** — the model rewrites entire files. Works with any model.
+- **Diff edit** — the model proposes surgical diffs that Aider applies. More precise, fewer mistakes, but requires model support for Aider's diff format.
+
+Aider tracks every change with git commits. You can `/undo` any change, `/diff` to review what happened, or `/clear` to reset the conversation. The repo map feature automatically includes relevant files in the context so the model sees your full codebase structure, not just the file you are editing.
+
+You install it with `pip install aider-chat` and run it with `aider` in your project directory.
+
+## What Changed in v0.86.0
+
+The release has one headline: **GPT-5 model support**. But the full picture includes three model families and several quality-of-life improvements.
+
+### GPT-5 Family: Full Support Across Providers
+
+Aider v0.86.0 adds support for all GPT-5 variants — the base model, mini, nano, and dated snapshots — across OpenAI, Azure, and OpenRouter. This is not a partial integration. The release includes:
+
+- Proper model detection so GPT-5 settings (like disabled temperature for deterministic outputs) apply correctly
+- Diff edit format enforcement for GPT-5 models, which improves edit precision
+- Reasoning effort configuration so you can dial up or down how much thinking the model does before editing
+
+If you are using GPT-5 via Azure or OpenRouter, the same support applies. Aider's litellm backend routes to the correct endpoint automatically.
+
+**Why this matters for beginners:** GPT-5 is the latest OpenAI model, but getting it to work well in a coding agent requires more than just connecting an API key. Aider handles the temperature settings, diff format, and reasoning configuration so you do not have to tune these yourself.
+
+### Grok-4 via xAI and OpenRouter
+
+Aider now supports Grok-4 through two routes:
+
+- `xai/grok-4` — direct xAI API
+- `openrouter/x-ai/grok-4` — via OpenRouter
+
+Grok-4 is xAI's flagship model, competitive with GPT-5 and Claude Opus on coding benchmarks. If you already have an xAI API key from using Grok in other contexts, you can plug it straight into Aider.
+
+To use Grok-4, set your API key and specify the model:
+
+```bash
+export XAI_API_KEY=your-key-here
+aider --model xai/grok-4
+```
+
+Or through OpenRouter if you prefer a single API key for multiple providers:
+
+```bash
+export OPENROUTER_API_KEY=your-key-here
+aider --model openrouter/x-ai/grok-4
+```
+
+### Moonshot Kimi K2
+
+The third addition is Moonshot's Kimi K2, available via OpenRouter as `openrouter/moonshotai/kimi-k2`. Kimi K2 is Moonshot's latest large model, notable for its strong code generation and long-context capabilities. This is a community-contributed addition by Jack Harrington.
+
+Kimi K2 is a solid option if you want an alternative to the big-three providers. It performs well on code tasks and is priced competitively through OpenRouter.
+
+### Gemini 2.5 Flash Lite
+
+A quieter addition: `gemini/gemini-2.5-flash-lite-preview-06-17` is now supported. Flash Lite is Google's lightweight model — fast and cheap, good for quick edits where you do not need deep reasoning.
+
+### Quality-of-Life Fixes
+
+- `/clear` now prints "All chat history cleared." so you know it actually worked
+- `/undo` output shows only the first line of each commit message instead of the full message — easier to scan when you are rolling back multiple changes
+- Fixed a bug where new settings for an existing model did not replace old ones, which could cause stale configuration to persist
+
+## How to Update
+
+If you already have Aider installed:
+
+```bash
+pip install --upgrade aider-chat
+```
+
+If you are installing fresh:
+
+```bash
+pip install aider-chat
+```
+
+Then verify:
+
+```bash
+aider --version
+# Should show 0.86.0 or later
+```
+
+## Picking the Right Model for Your Use Case
+
+With v0.86.0, Aider supports more models than ever. Here is a quick guide for beginners:
+
+| Model | Best For | Cost Level |
+|-------|----------|------------|
+| GPT-5 | General coding, complex refactors | High |
+| GPT-5 mini | Quick edits, simpler tasks | Medium |
+| Grok-4 | Alternative to GPT-5, long files | Medium-High |
+| Kimi K2 | Budget-friendly code generation | Low-Medium |
+| Gemini 2.5 Flash Lite | Fast one-off edits | Low |
+
+Start with the model you already have an API key for. If you are on a budget, Kimi K2 through OpenRouter or Gemini Flash Lite are the cheapest entry points. If you want the strongest coding performance, GPT-5 or Grok-4 are the current leaders.
+
+## Aider vs. The Competition
+
+Aider occupies a specific niche: it is free, open-source, and works in any terminal with any model API. You do not need a subscription to Anysphere (Cursor) or Anthropic (Claude Code). You bring your own API keys and pay only for what you use.
+
+The tradeoff is that Aider does not have an IDE integration, background agents, or MCP server support. It is a focused tool: you describe changes, it makes them, you review with git. For developers who prefer terminal workflows or want to avoid vendor lock-in, that simplicity is the feature.
+
+With v0.86.0, the model support gap between Aider and paid tools has narrowed significantly. GPT-5 and Grok-4 support puts Aider on equal footing with Claude Code and Cursor for raw model quality — you just need to manage your own API keys.
+
+## What Is Next
+
+The Aider main branch already shows work on GPT-5.1 through GPT-5.4 variants, Claude Opus 4.5–4.7 support, Gemini 3 preview models, and a new `/ok` shortcut command for accepting proposed changes without typing the full confirmation. These are not in a stable release yet, but they signal that Aider's model coverage will keep expanding.
+
+For now, v0.86.0 is the release to install. GPT-5 support alone makes it worth the upgrade, and the Grok-4 and Kimi K2 additions give you real alternatives when you want to shop around on price or performance.
+
+
+## Related articles
+
+- [Qwen3.8-Max Ships With 2.4T Parameters, 16-Day Autonomous Coding Demo, and Open Weights Coming Next Week](/blog/qwen3-8-max-2-4t-autonomous-coding-open-weights/)
+- [Claude Sonnet 5: The New Default Model in Claude Code — What It Is, What It Costs, and Why It Matters](/blog/claude-sonnet-5-default-model-guide/)
+- [Cline v4.1.0: Five Critical Agent Fixes and the SDK Migration That Stops AI From Going Rogue](/blog/cline-v4-1-sdk-migration-five-critical-agent-fixes/)

@@ -1,0 +1,160 @@
+---
+/**
+ * /cheatsheet — AI Coding Agents Cheat Sheet
+ *
+ * Free resource: comparison table of all 19+ coding agents.
+ * Linked from ContentUpgrade (mid-article) and ExitPopup.
+ * Designed for print/PDF — clean, no navigation, no distractions.
+ */
+
+import Layout from '../layouts/Layout.astro';
+import agents from '../data/agents.json';
+
+// Sort by SWE-bench score (desc), then by stars
+const sorted = [...agents].sort((a, b) => {
+  const scoreA = parseFloat(a.sweBench) || 0;
+  const scoreB = parseFloat(b.sweBench) || 0;
+  return scoreB - scoreA;
+});
+
+function formatPrice(p) {
+  if (!p) return '—';
+  return p;
+}
+
+function check(v) {
+  return v ? '✓' : '—';
+}
+---
+
+<Layout title="AI Coding Agents Cheat Sheet 2026 — terminalblog" description="Complete comparison of 19+ AI coding agents — pricing, features, benchmarks, all in one table.">
+  <div class="cheat-wrap">
+    <header class="cheat-header">
+      <div class="cheat-brand">
+        <span class="cheat-logo">~/terminalblog</span>
+        <span class="cheat-date">Updated {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+      </div>
+      <h1>AI Coding Agents Cheat Sheet</h1>
+      <p class="cheat-sub">All {agents.length} agents — pricing, type, SWE-bench score, features. One table. No fluff.</p>
+    </header>
+
+    <div class="cheat-table-wrap">
+      <table class="cheat-table">
+        <thead>
+          <tr>
+            <th class="th-agent">Agent</th>
+            <th class="th-type">Type</th>
+            <th class="th-price">Pricing</th>
+            <th class="th-swe">SWE-bench</th>
+            <th class="th-feat">Multi-Provider</th>
+            <th class="th-feat">Vision</th>
+            <th class="th-feat">Cron/Scheduler</th>
+            <th class="th-feat">Open Source</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map(a => {
+            const isOpenSource = a.pricing?.includes('BYO') || a.pricing?.includes('Free') || a.id === 'openclaw';
+            const swe = a.sweBench && a.sweBench !== '-' ? a.sweBench : null;
+            return (
+              <tr>
+                <td class="td-agent">
+                  <a href={`/tool/${a.id}/`}>{a.name}</a>
+                </td>
+                <td class="td-type">{a.type}</td>
+                <td class="td-price">{formatPrice(a.pricing)}</td>
+                <td class={swe ? 'td-swe highlight' : 'td-swe'}>{swe || '—'}</td>
+                <td class="td-check">{check(a.features?.multiProvider)}</td>
+                <td class="td-check">{check(a.features?.vision)}</td>
+                <td class="td-check">{check(a.features?.cron)}</td>
+                <td class="td-check">{check(isOpenSource)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="cheat-footer">
+      <p>Source: <a href="https://terminalblog.com">terminalblog.com</a> — We track every coding agent so you don't have to.</p>
+      <p class="cheat-legend">
+        <strong>SWE-bench</strong> = % of GitHub issues resolved in benchmark &nbsp;|&nbsp;
+        <strong>Multi-Provider</strong> = works with any LLM API key &nbsp;|&nbsp;
+        <strong>BYO keys</strong> = bring your own API keys
+      </p>
+    </div>
+  </div>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0a; }
+    .cheat-wrap {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      color: #e5e5e5;
+    }
+    .cheat-header { margin-bottom: 2rem; text-align: center; }
+    .cheat-brand {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 0.7rem; color: #555; margin-bottom: 1rem;
+    }
+    .cheat-logo { color: #22c55e; }
+    .cheat-header h1 {
+      font-size: 1.8rem; color: #f5f5f5; margin-bottom: 0.5rem;
+      letter-spacing: -0.02em;
+    }
+    .cheat-sub { font-size: 0.85rem; color: #888; }
+
+    .cheat-table-wrap { overflow-x: auto; margin: 0 0 2rem; }
+    .cheat-table {
+      width: 100%; border-collapse: collapse; font-size: 0.78rem;
+    }
+    .cheat-table th {
+      text-align: left; padding: 0.6rem 0.7rem;
+      background: #111; border-bottom: 2px solid #22c55e;
+      color: #22c55e; font-size: 0.65rem; text-transform: uppercase;
+      letter-spacing: 0.05em; white-space: nowrap;
+    }
+    .cheat-table td {
+      padding: 0.5rem 0.7rem; border-bottom: 1px solid #1a1a1a;
+      color: #ccc; vertical-align: middle;
+    }
+    .cheat-table tr:hover td { background: #111; }
+    .td-agent a { color: #22c55e; text-decoration: none; font-weight: 600; }
+    .td-agent a:hover { text-decoration: underline; }
+    .td-type { color: #888; font-size: 0.72rem; white-space: nowrap; }
+    .td-price { font-size: 0.72rem; color: #aaa; white-space: nowrap; }
+    .td-swe { font-family: monospace; text-align: center; color: #666; }
+    .td-swe.highlight { color: #22c55e; font-weight: 700; }
+    .td-check { text-align: center; color: #22c55e; font-size: 0.85rem; }
+
+    .cheat-footer {
+      text-align: center; padding: 1.5rem 0;
+      border-top: 1px solid #1a1a1a; color: #555; font-size: 0.75rem;
+    }
+    .cheat-footer a { color: #22c55e; text-decoration: none; }
+    .cheat-legend { margin-top: 0.5rem; font-size: 0.65rem; color: #444; }
+
+    @media (max-width: 600px) {
+      .cheat-wrap { padding: 1rem; }
+      .cheat-header h1 { font-size: 1.3rem; }
+      .cheat-table { font-size: 0.68rem; }
+      .cheat-table th, .cheat-table td { padding: 0.4rem 0.5rem; }
+      .th-feat { display: none; }
+      .td-check { display: none; }
+    }
+
+    @media print {
+      body { background: white; color: black; }
+      .cheat-wrap { padding: 0.5in; }
+      .cheat-table th { background: #f0f0f0; border-bottom: 2px solid #000; color: #000; }
+      .cheat-table td { border-bottom: 1px solid #ddd; color: #222; }
+      .td-agent a { color: #0066cc; }
+      .td-swe.highlight { color: #006600; }
+      .td-check { color: #006600; }
+      .cheat-footer { border-top: 1px solid #ddd; color: #666; }
+    }
+  </style>
+</Layout>

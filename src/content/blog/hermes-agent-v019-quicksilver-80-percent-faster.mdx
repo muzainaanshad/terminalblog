@@ -1,0 +1,130 @@
+---
+title: "Hermes Agent v0.19.1 Quicksilver: 80% Faster Starts, Smart Approvals, and Secrets That Survive"
+description: "Hermes Agent's Quicksilver release cuts first-token latency by 80%, adds LLM-reviewed command approvals, Bitwarden secrets, and a delivery ledger that survives crashes — all beginner-friendly."
+pubDate: "2026-08-02T10:00:00Z"
+updatedDate: "2026-08-02T10:00:00Z"
+tags: ["hermes-agent", "open-source", "release", "ai-agent", "coding-agent", "speed", "security"]
+tool: "hermes"
+author: "sage"
+image: "/api/og?title=Hermes+Quicksilver+Release&tool=hermes-agent"
+---
+
+Hermes Agent v0.19.0, codenamed **Quicksilver**, landed on July 20, 2026. A week later, the v0.19.1 patch tag rolled up over a thousand merged pull requests into a stable release for fresh installs and Docker images. If you use Hermes — the open-source, self-hosted AI coding agent from Nous Research — this is the update that makes it feel like a different product.
+
+The release is big. Over 2,200 commits, 450+ community contributors, and changes touching nearly 2,500 files. But the parts that matter to you as a user boil down to five things: it is dramatically faster, it stops asking you to approve every command, it can pull secrets from your password manager, it will not lose your messages if it crashes, and one gateway can now run multiple independent agents.
+
+Let's break each one down in plain language.
+
+## 80% Faster Cold Starts
+
+If you have used Hermes before, you know the feeling: you fire up the CLI or desktop app, and there is a pause before the first token appears. That cold-start delay used to be about 4.3 seconds — the time between hitting Enter and seeing the model's first response.
+
+Quicksilver cuts that to roughly **0.9 seconds**. That is an 80% reduction, and it applies everywhere: the terminal interface (TUI), the desktop app, the messaging gateway, and even cron-scheduled background jobs.
+
+How did they pull it off? Three things changed:
+
+1. **Discord capability detection moved off the critical path.** Previously, Hermes checked what Discord features were available before doing anything else. Now it caches that check for 24 hours and refreshes it in the background.
+2. **Unnecessary provider probes got skipped.** If you are using an API provider like OpenAI or Anthropic, Hermes no longer wastes time checking whether you have Ollama running locally.
+3. **Blocking startup work was removed.** Some initialization that used to block the first turn now happens after your first message instead.
+
+The result: reasoning models stream their thinking live by default (no more staring at a spinner), and the response box paints token by token instead of line by line. If Hermes ever felt like it took a deep breath before answering, that breath is gone.
+
+For beginners: **TTFT** (time to first token) is the delay between sending a message and getting the first word back. Lower TTFT means the agent feels more responsive, like talking to someone who listens instead of zoning out.
+
+## Smart Approvals: Let the AI Judge Its Own Commands
+
+This is the change that makes Hermes practical for unattended work.
+
+When Hermes wants to run a shell command (like `npm install`, `git commit`, or `rm -rf node_modules`), it used to pause and ask you to approve it. Every. Single. Time. That is safe, but it is exhausting.
+
+Quicksilver introduces **smart approvals**, and they are on by default. Here is how it works:
+
+- When Hermes wants to run a flagged command, an **independent LLM** (a separate AI model call) assesses that exact command.
+- The reviewer is not the same model that suggested the command — it is a different AI looking over the first one's shoulder.
+- Each approval covers only that specific command. A later command that looks similar gets its own fresh review — no blanket permissions.
+
+You can still switch to fully manual approval if you prefer, or go full-auto ("yolo mode"). But the new default strikes a middle ground: the speed of autonomy with brakes you control.
+
+Two safety features back this up:
+
+- **User-defined deny rules** — commands you never want Hermes to run, even in full-auto mode.
+- **The `/deny` command** — when you refuse a command, you can tell Hermes *why* so it learns the boundary and does not repeat the request.
+
+For beginners: think of smart approvals as a spell-checker for shell commands. Instead of reading every command yourself, a second AI reads them and flags only the ones that look risky. You still get the final say.
+
+## Bitwarden and 1Password: No More Plaintext API Keys
+
+Most AI coding agents need API keys — long secret strings like `sk-abc123...` that prove you paid for access to a model. Traditionally, you store these in a `.env` file on disk. The problem: that file is plaintext. Anyone who reads it has your keys.
+
+Quicksilver adds a new **SecretSource** interface that pulls credentials directly from **Bitwarden** and **1Password** at startup. Here is what that means in practice:
+
+- **No more `.env` files** — Hermes reads your API keys from your password manager when it starts.
+- **Multiple vaults at once** — you can pull secrets from both Bitwarden and 1Password simultaneously.
+- **Conflict warnings** — if the same key exists in multiple places, Hermes tells you which one wins.
+- **Per-variable provenance** — you can see exactly which vault each secret came from.
+
+This is not a one-off Bitwarden integration. The SecretSource interface is pluggable — future password manager integrations can drop in as plugins without touching Hermes core.
+
+For beginners: a **vault** is just a collection of secrets stored in your password manager. Hermes can read from one or more vaults automatically, so your API keys stay encrypted until the moment Hermes needs them.
+
+## The Delivery Ledger: Your Messages Survive Crashes
+
+This one is subtle but important if you run Hermes on a server or in the background.
+
+Before Quicksilver, a race condition existed: Hermes could generate a response, then crash before the messaging platform (Telegram, Discord, Slack, WhatsApp) confirmed delivery. The response was gone. You paid for the turn, but never saw the answer.
+
+Quicksilver fixes this with a **durable delivery ledger** — a log of final responses written to the database (`state.db`) around the send operation. If the gateway dies mid-delivery, Hermes automatically redelivers the response on the next boot.
+
+This applies to every channel Hermes supports. It also applies to **subagent delegation** — when Hermes spawns a background worker, that worker's results are now restored through an ownership-checked ledger if the process restarts. A task that was 90% done no longer starts over from scratch.
+
+For beginners: a **subagent** is a smaller AI that Hermes delegates a task to. The subagent works independently (like an assistant), and now its work is saved even if the main agent crashes.
+
+## Profile Routing: One Gateway, Many Agents
+
+If you run a Discord bot or Telegram bot powered by Hermes, you used to need separate bot tokens for different purposes. One for your work server, one for your personal server, one for a client.
+
+Quicksilver adds **profile-based message routing**: a single gateway sharing one bot token can now route specific channels, threads, or guilds to different profiles. Each profile is a fully separate agent with its own config, skills, memory, and secrets.
+
+Point your work Discord server at the `work` profile and your hobby server at `personal` — from one bot process.
+
+A second hardening pass ensures one misconfigured profile cannot take down the entire gateway.
+
+## What Else Changed
+
+The Quicksilver release includes several more improvements worth noting:
+
+- **New providers** — Fireworks AI and DeepInfra join as first-class providers with cost estimation. Upstage Solar also added.
+- **New models** — GPT-5.6 (all variants), Grok 4.5 (GA), Kimi K3, Claude Fable 5 / Sonnet 5, and Tencent HY3 are all wired in.
+- **Reasoning effort tiers** — new `max` and `ultra` levels let you control how deeply the model thinks, per model and per task.
+- **Session export** — `hermes sessions export` now writes Markdown, HTML, Quarto, or Hugging Face trace formats, with an opt-in `--redact` flag that scrubs secrets before the file leaves your machine.
+- **Desktop speed** — 20+ performance PRs cut Markdown splitter CPU by 14×, virtualized diff review, and made session switching snappy on large transcripts.
+- **TUI improvements** — incremental Markdown rendering, session search, and a capabilities page.
+
+## How to Update
+
+If you already have Hermes installed:
+
+```bash
+hermes update
+```
+
+For a fresh install:
+
+```bash
+curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
+```
+
+The v0.19.1 tag (released July 30) is the current stable release. It rolls up all fixes from v0.19.0 plus the infrastructure patches from v0.18.1 and v0.18.2.
+
+## Should You Care?
+
+If you are evaluating coding agents — Claude Code, Codex, Cline, Goose, or Hermes — Quicksilver changes the calculus on Hermes. The 0.9-second cold start puts it in the same responsiveness tier as hosted services like Claude Code. The smart approvals make unattended operation practical. The Bitwarden integration means you can run it on a server without leaving secrets on disk. And the delivery ledger means your background jobs will not silently lose their results.
+
+For existing Hermes users, this is a no-brainer update. For everyone else, it is the release that makes self-hosted AI agents feel as instant as hosted chatbots — without giving up your model choice or your data.
+
+
+## Related articles
+
+- [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)
+- [Your AI Agents Config Directory Is Now the Most Dangerous Place on Your Machine](/blog/ai-agent-config-directory-attack-surface-2026/)
+- [Beware: AWS Kiro IDE Lets Attackers Rewrite Its Own Trust Boundary — CVE-2026-10591](/blog/beware-kiro-ide-mcp-config-rce-cve-2026-10591/)

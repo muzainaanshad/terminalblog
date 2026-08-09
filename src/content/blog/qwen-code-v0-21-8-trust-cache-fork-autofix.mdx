@@ -1,0 +1,69 @@
+---
+title: "Qwen Code v0.21.8 Fixes a Trust Bug, Shares Prompt Cache, and Brings Back Fork Autofix"
+description: "Qwen Code's August 8 release fixes a security issue where folders you marked untrusted could inherit trust from a parent directory, enables cache sharing for OpenAI/Gemini/Vertex to cut costs, and restores autofix for pull requests from forks. Plain-English breakdown for beginners."
+pubDate: "2026-08-09T12:00:00Z"
+updatedDate: "2026-08-09T12:00:00Z"
+tags: ["release", "qwen-code", "security", "beginner", "coding-agents"]
+tool: "qwen-code"
+author: "sage"
+image: "/api/og?title=Qwen+Code+v0.21.8+Trust+Fix+Cache+Sharing&tool=qwen-code"
+---
+
+Here is a scenario every coding-agent user should fear: you tell your agent "this folder is not trusted, do not go wild in here," and it quietly ignores you because the folder happens to live inside a directory you *did* trust. That is exactly the kind of bug the new **Qwen Code v0.21.8** (published August 8, 2026) fixes — and it is the most important item in a release that also makes long sessions cheaper and restores automated fixes for contributors' pull requests.
+
+Qwen Code is Alibaba's open-source coding agent (26,900+ GitHub stars, Apache-2.0) that lives in your terminal. You start it with `qwen` in a project folder, describe what you want in plain language, and it plans, edits files, runs commands, and creates commits. It is one of the few open agents with a paid subscription option (the Alibaba Cloud Coding Plan) — and it has never been covered on this blog, so here is a beginner tour plus everything new in v0.21.8.
+
+## The headline: "I said don't trust this folder" now means it
+
+Every modern coding agent (Qwen Code included) checks with you before touching anything. Instead of asking about every single file, it uses a **trust model**: when you first open a project folder, you grant it a level of trust, and everything under that folder inherits that permission. That inheritance is exactly where v0.21.8's security fix lives.
+
+Before this release, if you explicitly marked a workspace as **distrusted** — "no autonomous edits here" — Qwen Code could still follow the parent directory's trust level and treat those files as fair game. In practical terms: you said *no*, but the agent acted like you said *yes* (PR [#8628](https://github.com/QwenLM/qwen-code/pull/8628)). The boundary between "your home directory, which you trust" and "a subfolder you explicitly flagged untrusted" was porous.
+
+The fix makes **explicit distrust always win**: your "no" is no longer overridable by a parent's "yes". For anyone who stores secrets, a `.env`, or an untrusted third-party checkout inside a trusted workspace, this closes a real hole. It is also a good moment to remember the rule from our [coding-agent security checklist](/blog/coding-agent-security-checklist-2026/): separate sensitive folders from everything else and never trust code you did not write.
+
+## The other headline: sessions now cost less across more providers
+
+If you have ever watched your token bill climb on a long session, you already know *prompt caching matters*. Agents resend your whole conversation history with every step; some providers cache that prefix so repeated sends are cheap, but Qwen Code only reused those caches for certain providers. **v0.21.8 enables compression-cache sharing for OpenAI-compatible providers, Gemini, and Vertex AI** ([#8418](https://github.com/QwenLM/qwen-code/pull/8418), [#8425](https://github.com/QwenLM/qwen-code/pull/8425)) — conversation prefixes are now reused instead of reprocessed, so long sessions get faster and cheaper on those providers.
+
+The `/review` command got the same treatment: its remote matching moved to a deterministic CLI subcommand, reaching **up to 93.3% prompt-cache hit rates** ([#8658](https://github.com/QwenLM/qwen-code/pull/8658)). Plain English: when you ask Qwen Code to review code, most of the repeated context no longer gets billed as new.
+
+## Fork pull requests get autofix again
+
+One concrete CI pain for open-source maintainers: someone opens a PR from their fork, and the automated fix agent refuses to touch it because fork workflows don't have the repo's secrets. v0.21.8 **restores real-time autofix for pull requests opened from forks** by bridging review events to credentialed workflows ([#8676](https://github.com/QwenLM/qwen-code/pull/8676)), with a fail-safe: jobs backed by personal access tokens are skipped for fork PRs that lack repository secrets ([#8671](https://github.com/QwenLM/qwen-code/pull/8671)). If you are on the receiving end of "open-source contributions never get fixed automatically," this release is the change you were waiting for.
+
+## Reviews get context manifests (and stop lying about their version)
+
+- **Repository context manifests** ([#8654](https://github.com/QwenLM/qwen-code/pull/8654)) let you describe your repo's bounded domains, related paths, and recommended tests so `/review` knows what "the auth module" means *for your codebase* instead of guessing.
+- Reviews now **know when they are stale**: if the executing bundle is older than the current code, they warn you, and a new `--test-delta` flag documents severity adjustments ([#8390](https://github.com/QwenLM/qwen-code/pull/8390)). An honest reviewer is more important than a fast one.
+
+## Smaller fixes worth knowing
+
+- **Fail closed on zero inodes** ([#8290](https://github.com/QwenLM/qwen-code/pull/8290)): file caching and session leases now refuse to treat unrelated files as identical when inode numbers are zero — a common misidentification path.
+- **MCP hangs fixed** ([#8555](https://github.com/QwenLM/qwen-code/pull/8555)): `qwen mcp list` no longer hangs forever on unresponsive MCP servers; it now times out the silent attempts.
+- **Windows path issue fixed** ([#8619](https://github.com/QwenLM/qwen-code/pull/8619)): workspace paths with verbatim prefixes no longer crash runtime startup.
+- **Signal kills are honest** ([#8501](https://github.com/QwenLM/qwen-code/pull/8501)): when a shell command is killed by a signal (Ctrl+C), it is now reported as an error — not silently treated as a success.
+- **Parallel ACP calls** ([#8631](https://github.com/QwenLM/qwen-code/pull/8631)): agent tool calls coming through ACP (other agents delegating to Qwen Code) run concurrently at the configured limit instead of serially.
+
+## Nothing is breaking — here's how you update
+
+The release ships no known breaking changes. To get the fixes:
+
+```bash
+curl -fsSL https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen-standalone.sh | bash
+```
+
+Windows:
+
+```powershell
+irm https://qwen-code-assets.oss-cn-hangzhou.aliyuncs.com/installation/install-qwen-standalone.ps1 | iex
+```
+
+If you installed via npm, `npm install -g @qwen-code/qwen-code@latest` will move you to v0.21.8. Restart your terminal (the `qwen` command may need a fresh shell to pick up the new path), then verify with `qwen --version`.
+
+The short version: if you use Qwen Code, update it this week — the trust-inheritance fix is worth it alone. And if you are new to open agents and want to see this one in action next to [Qwen's model news](/blog/qwen3-8-max-2-4t-autonomous-coding-open-weights/), our [beginner setup guide](/blog/how-to-setup-ai-coding-agents/) walks through a first config.
+
+## Related articles
+
+- [Deep Agents Code (dcode) Approval Modes: Manual, Auto, YOLO — The Practical Guide](/blog/deepagents-code-approval-modes-guide/)
+- [What Developers Think About Approving Every AI Agent Command — From 177 HN Comments](/blog/hn-agent-approval-fatigue-humans-in-the-loop-debate/)
+- [Beware: Claude Code Silently Drops Its Sandbox in Nested Project Folders](/blog/beware-claude-code-nested-project-sandbox-drop/)

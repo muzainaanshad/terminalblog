@@ -234,12 +234,12 @@ async function submitToSeznam(urls) {
 function getChangedUrls() {
   // Read sitemap to get all URLs (dist after build)
   let sitemapPath = path.join(ROOT, 'dist', 'client', 'sitemap-0.xml');
-  if (!fs.existsSync(sitemapPath)) {
-    sitemapPath = path.join(ROOT, 'dist', 'sitemap-0.xml');
-  }
-  if (!fs.existsSync(sitemapPath)) {
-    sitemapPath = path.join(ROOT, 'public', 'sitemap-0.xml');
-  }
+    if (!fs.existsSync(sitemapPath)) {
+      sitemapPath = path.join(ROOT, 'dist', 'sitemap-0.xml');
+    }
+    if (!fs.existsSync(sitemapPath)) {
+      sitemapPath = path.join(ROOT, 'public', 'sitemap-0.xml');
+    }
   if (!fs.existsSync(sitemapPath)) {
     console.log('No sitemap found — run build first');
     return [];
@@ -252,7 +252,8 @@ function getChangedUrls() {
   while ((match = regex.exec(content)) !== null) {
     urls.push(match[1]);
   }
-  return urls;
+  // Filter out _archive URLs (they 404 — no route exists)
+  return urls.filter(url => !url.includes('/_archive/'));
 }
 
 function getNewUrls(allUrls, state) {

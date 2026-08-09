@@ -13,13 +13,13 @@ Oh My Pi (omp) is one of the most capable open-source coding agents available, w
 
 ## What Makes Oh My Pi Distinct
 
-**Hash-Anchored Edits** — Instead of traditional file patching, Oh My Pi uses hash-anchored edits that verify file integrity before applying changes. This means edits are atomic and verifiable — no partial writes, no corruption.
+**Hash-Anchored Edits** — Instead of traditional file patching, Oh My Pi uses hash-anchored edits that verify file integrity before applying changes. This means edits are atomic and verifiable — no partial writes, no corruption. If a file changed out from under the agent (by a formatter, a git operation, or another tool), the edit fails cleanly instead of clobbering the newer content.
 
-**LSP Integration** — Language Server Protocol is wired directly into the agent. Oh My Pi can query your editor's language server for completions, definitions, references, and diagnostics, giving it IDE-level awareness of your code.
+**LSP Integration** — Language Server Protocol is wired directly into the agent. Oh My Pi can query your editor's language server for completions, definitions, references, and diagnostics, giving it IDE-level awareness of your code. This is a meaningful advantage over agents that work purely from text: the agent can find every reference to a symbol, see the actual type errors a language server reports, and jump to definitions with the same accuracy as a human in an editor.
 
-**Browser Automation** — Built-in Puppeteer integration for headless Chromium. The agent can navigate pages, take screenshots, extract data, and interact with web UIs — all autonomously.
+**Browser Automation** — Built-in Puppeteer integration for headless Chromium. The agent can navigate pages, take screenshots, extract data, and interact with web UIs — all autonomously. It's useful for verifying a UI change end-to-end, scraping docs, or checking that a deployed page renders as expected.
 
-**Subagents** — Oh My Pi spawns sub-agents for parallel work, similar to Hermes's delegate_task. Each sub-agent gets its own context and tool scope.
+**Subagents** — Oh My Pi spawns sub-agents for parallel work, similar to Hermes's delegate_task. Each sub-agent gets its own context and tool scope, so a large task can be split into independent investigations that run concurrently instead of serially chewing through one context window.
 
 ## Key Capabilities
 
@@ -31,7 +31,15 @@ Oh My Pi (omp) is one of the most capable open-source coding agents available, w
 
 ## Architecture
 
-Oh My Pi is written in TypeScript and follows a modular tool harness pattern. Each tool is a self-contained module with its own schema, execution logic, and error handling. The agent core orchestrates tool calls based on the task plan, similar to a planner-executor architecture.
+Oh My Pi is written in TypeScript and follows a modular tool harness pattern. Each tool is a self-contained module with its own schema, execution logic, and error handling. The agent core orchestrates tool calls based on the task plan, similar to a planner-executor architecture. Because tools are isolated modules with explicit schemas, the agent can validate arguments before execution and fail fast on a bad call, which keeps long autonomous runs stable.
+
+The hash-anchored edit mechanic deserves a closer look because it's the single most distinctive part of the design. Every edit targets a file by a content hash of the expected state. Before applying a change, the agent recomputes the hash and compares it. If it matches, the edit applies cleanly. If it doesn't, the agent knows the file changed and can re-read it rather than overwriting a concurrent change. For agent-driven workflows where multiple tools touch the same tree, this turns silent corruption into a detectable, recoverable condition.
+
+## Where it shines — typical workflows
+
+- **Refactor with confidence** — Ask for a rename across a module; the LSP integration finds every reference, and hash-anchored edits make each write atomic so a long refactor either lands or fails loudly.
+- **Docs-to-code** — Have the agent read a spec page in the browser, extract the requirements, then scaffold the implementation against a language server that validates it.
+- **Parallel investigation** — Hand a task to the sub-agent cluster, where each child digs into a different file or service, and then have the orchestrator merge results.
 
 ## Community and Ecosystem
 

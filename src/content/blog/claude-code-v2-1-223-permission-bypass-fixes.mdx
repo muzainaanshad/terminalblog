@@ -1,0 +1,62 @@
+---
+title: "Claude Code v2.1.223 Fixes Permission Bypasses: What the Security Patches Actually Did"
+description: "Claude Code versions 2.1.221-223 (Aug 4-6, 2026) fixed hidden-command permission bypasses, sandbox escapes, and worktree isolation gaps. Here's what attackers could do and why you should update."
+pubDate: "2026-08-07T10:00:00Z"
+updatedDate: "2026-08-07T10:00:00Z"
+tags: ["claude-code", "anthropic", "security", "permission-bypass", "sandbox", "coding-agent", "release"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+v2.1.223+Security+Fixes&tool=claude-code"
+---
+
+Between **August 4 and 6, 2026**, Anthropic pushed three fast-follow updates to Claude Code — **v2.1.221, v2.1.222, and v2.1.223** — and while the release notes look like ordinary patch noise, they quietly close a real class of security holes that matter for anyone running a coding agent. A handful of the fixes stop malicious commands from sneaking past the permission prompt you are supposed to see and approve.
+
+If you use Claude Code for daily work, this is the article that explains what those fixes actually prevented, why the same flaws affect nearly every coding agent, and what to do now. The short version is: **update to v2.1.223 before you run your next heavy agent session.**
+
+## What "permission bypass" means, in plain English
+
+Coding agents edit files and run commands on your machine. To keep that safe, they are supposed to ask you before doing anything destructive — running a command, editing a file, deleting things. Claude Code shows you a **permission prompt** for the risky action.
+
+A **permission bypass** is a trick that lets the agent (or a malicious repo, or a prompt, or poisoned tool output) perform an action **without that prompt ever appearing**. The user thinks they approved a safe command, but something else — or more of the same command than they realized — actually ran.
+
+## The specific bypasses Claude Code just fixed
+
+Across the three releases, three stood out as the most serious:
+
+**1. Commands hiding parts of themselves (v2.1.223).** Anthropic fixed a "Bash permission bypass where a crafted command could hide parts of itself from permission checks," and separately that "commands padded with tabs or invisible Unicode can no longer hide part of the command from the approval dialog." The concern: the approval dialog showed you only part of a command. If you saw a harmless prefix like `cat file.txt` but the real command actually ran something else appended in invisible characters, you would approve something you never actually read. That is the most dangerous fix in this batch, because it targets the prompt you trust with your yes-click.
+
+**2. Shell-condition trickery in Bash and zsh (v2.1.221).** Another fix closed a bypass "where zsh could execute hidden commands in `[[ ]]` regex conditionals" — code hidden inside a regex check would run but was treated as not worth prompting for. Affected commands now prompt normally.
+
+**3. Sandbox escapes (v2.1.221 / v2.1.222).** Two more fixes matter for people who run Claude Code sandboxed: "workflow scripts [could] use dynamic `import()` to run code outside the workflow sandbox," and worktree-isolated sessions could still run destructive git commands against the main checkout. The sandbox is supposed to be a cell you cannot escape; these fixes close two ways out of it.
+
+## Why this affects you even if you "trust" your model
+
+It is tempting to think "my prompts are safe, I wrote them." But prompt-injection is the real threat model. When you paste in code you found, a README from a repo, or content from a webpage, that content can contain hidden instructions. A well-crafted piece of untrusted text can nudge the agent toward running a command — and then use the bypass to hide it from your approval dialog. You are not approving the prompt; you are approving the action the agent shows you. If it hides the action, you have no chance to say no.
+
+The "hide part of the command" fixes directly shrink that window.
+
+## Other headline changes worth knowing
+
+Not everything in these releases was security. A few user-facing changes stand out:
+
+- **New "Focus view" in VS Code (v2.1.221)** — hides tool activity behind an expandable per-turn summary with a live running-tool indicator, toggled with `Ctrl+Alt+F`. Good if the tool output scroll behind file edits.
+- **Credential file masking (`mode: "mask"`) for sandboxed Linux/WSL** — sandboxed commands only see a sentinel copy of files like API keys, with the real value substituted only when it exits. Your secrets don't leak into the sandbox.
+- **`/review` is now an alias for `/code-review`** (v2.1.223), which reviews your current diff or a PR.
+- **`/teleport` hints** in cloud sessions show how to continue locally with `claude --teleport`.
+- **Marketplace org wildcards** — `strictKnownMarketplaces` and `blockedMarketplaces` now accept `"owner/*"` to allow or block an entire GitHub org's marketplace repos.
+
+## What to do right now
+
+1. **Update.** Check your version with `claude --version`. If you're below v2.1.223, update your install (the normal `@latest` route for npm users, or rebuild your binary). The fixes from August 4-6 are in there.
+2. **Keep sandboxing on for reviews/automations.** If you review foreign repos, extracted code, or pasted web content, treat those as untrusted. The worktree/sandbox fixes only protect you if you actually use them.
+3. **Read the full command before clicking allow.** For anyone who uses `--dangerously-skip-permissions` to skip the prompt entirely, these fixes do not protect you — you turned the gate off voluntarily. Prefer approval prompts over skipping them.
+
+None of this is a reason to stop using Claude Code — it's the opposite. Rapidly fixing permission and sandbox bypasses in back-to-back patches is exactly what a mature agent should do. But it is a good reminder: keep the tool updated, keep approval prompts on, and treat anything pasted from the internet as a potentially hostile instruction.
+
+*Want the latest across the whole field each week? Catch the [Coding Agent Weekly digest](/blog/coding-agent-weekly-2026-08-03/).*
+
+## Related articles
+
+- [Model Musical Chairs: What 500 Hacker News Comments Reveal About the Death of AI Model Loyalty](/blog/model-musical-chairs-hn-developers-death-of-ai-loyalty/)
+- [Qwen3.8-Max Ships With 2.4T Parameters, 16-Day Autonomous Coding Demo, and Open Weights Coming Next Week](/blog/qwen3-8-max-2-4t-autonomous-coding-open-weights/)
+- [Metas Muse Code: A Battery of Persistent Subagents, Replay-Safe Runtime](/blog/meta-muse-code-spark-1-2-persistent-subagents/)

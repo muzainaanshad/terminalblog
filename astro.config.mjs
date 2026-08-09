@@ -11,6 +11,11 @@ import tailwindcss from '@tailwindcss/vite';
 
 /** Near-duplicate posts redirected in vercel.json — omit from sitemap. */
 const SITEMAP_EXCLUDE = new Set([
+  'https://terminalblog.com/admin/',
+  'https://terminalblog.com/admin/affiliates/',
+  'https://terminalblog.com/admin/flow/',
+  'https://terminalblog.com/admin/login/',
+  'https://terminalblog.com/admin/stats/',
   'https://terminalblog.com/blog/genlayer-internet-court-ai-agents-2026-07-12/',
   'https://terminalblog.com/blog/genlayer-internet-court-ai-agents-27-firms-2026-07-13/',
   'https://terminalblog.com/blog/cursor-sand-ai-office-agent-anthropic-2026-07-13/',

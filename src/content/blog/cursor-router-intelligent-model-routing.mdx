@@ -1,64 +1,76 @@
 ---
 title: "Cursor Router Automatically Picks the Best Model for Every Coding Task"
 slug: cursor-router-intelligent-model-routing
-description: "Cursor Router analyzes each coding request and sends it to the best model for the job. Teams report 30-50% cost savings with frontier-quality output."
+description: "Cursor Router analyzes each coding request and sends it to the best model for the job. How Compass scores complexity, the model taxonomy, and what teams save."
 tags: ["cursor", "release", "coding-agents", "model-routing", "teams"]
 tool: "cursor"
 author: "kira"
 pubDate: "2026-07-30"
+updatedDate: "2026-08-09"
 image: "/api/og?title=Cursor+Router+Model+Routing&tool=cursor"
 ---
 
 ## Related articles
 
 - [Cursor Now Runs on iPad — Build, Review, and Merge Code From Your Couch](/blog/cursor-ipad-app-build-review-merge-code/)
-- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-complete-guide/)
-- [Copilot CLI Now Manages Multiple Sessions and Lets You Queue Messages](/blog/copilot-cli-sessions-sidebar-queue-manager-grok-4-5/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Claude Code Model Routing: When the Default Model Is Wrong](/blog/claude-code-model-routing-trust-crisis/)
 
 ---
 
-Cursor, the AI-powered code editor from Anysphere, launched Cursor Router on July 22, 2026. It is an intelligent model router that automatically decides which AI model handles each coding request. Instead of every prompt going to the same expensive model, Cursor Router classifies the task first and sends it to the model best suited for the job — saving teams 30 to 50 percent on their AI coding costs without losing output quality.
+Cursor, the AI-powered code editor from Anysphere, launched Cursor Router on July 22, 2026. It is an intelligent model router that automatically decides which AI model handles each coding request. Instead of every prompt going to the same expensive model, Cursor Router classifies the task first and sends it to the model best suited for the job — saving teams money on AI coding costs without losing output quality.
 
 If you have ever stared at a model picker wondering which model to pick for a quick variable rename versus a complex architecture refactor, Cursor Router is the feature that removes that decision from your workflow entirely.
 
-## How Cursor Router works
+## Why model routing matters
 
-The core problem Cursor Router solves is simple: most developers pick one model and stick with it. According to Cursor, roughly 60 percent of developers using Cursor choose a single model as their daily driver. That means routine tasks — renaming a variable, updating a comment, fixing a typo in documentation — get processed by the same expensive frontier model used for hard problems. AI spend grows fast while output quality does not.
+The core problem Cursor Router solves is simple: most developers pick one model and stick with it. According to Cursor, roughly 60 percent of developers using Cursor choose a single model as their daily driver. That means routine tasks — renaming a variable, updating a comment, fixing a typo in documentation — get processed by the same expensive frontier model used for hard problems. AI spend grows while output quality does not.
 
-Cursor Router fixes this by analyzing each request before a model runs. It looks at four things:
+Two weeks after launch, on August 6, Cursor published a follow-up deep-dive explaining how the router actually works: a complexity predictor called Compass, a task taxonomy, and a budget-based model picker. The measured results at that point: **Auto Intelligence now delivers above Fable-level user satisfaction at 68 percent lower cost** — a further 18 percent reduction since launch — while **Auto Balance outperforms Opus 4.8 at 41 percent lower cost** (an 8 percent further reduction) and adds another 3 percent of user satisfaction.
 
-1. **The query itself.** What you typed and what you are asking for.
-2. **The context.** The codebase, file types, and project structure around the request.
-3. **Task complexity.** Whether this is a simple edit or a multi-step reasoning problem.
-4. **Domain.** Whether the work involves frontend, backend, infrastructure, or something else.
+## The routing pipeline: Compass + taxonomy
 
-Cursor trained the routing classifier on over 600,000 live coding requests and evaluated it in online A/B tests across millions of real requests. The system optimizes for user satisfaction — measured by whether the developer moves on to the next task (a positive signal) or corrects the agent (a negative one).
+Cursor trained the routing system on hundreds of thousands of live coding turns. Each turn carries two labels used for training: performance (did the developer move to the next task — positive — or correct the agent — negative) and cost (API pricing plus token usage, including the cache misses that switching models causes). The router never sees raw conversation content; it works from structured features like task category, recent tool calls, and conversation state.
 
-The practical result: simple edits go to cheaper, faster models. Complex reasoning tasks go to frontier models like Grok 4.5 or Opus 4.8. UI-focused work goes to models Cursor has identified as strong at that specific task. You do not pick the model. The router does.
+### Compass: the complexity predictor
+
+Routing happens in two stages. First, **Compass** — Cursor's complexity predictor — estimates whether the user will be satisfied with a price-efficient model's response. Compass assigns each turn a continuous complexity score between 0 and 1. Turns above a threshold go to a price-efficient model; turns below it are upgraded to frontier models. Lower thresholds keep more traffic cheap; higher thresholds upgrade more often.
+
+Cursor validated Compass online, and its scores predict real outcomes: turns rated most likely to succeed got a positive signal 96 percent of the time; turns rated least likely only 71 percent. Mid-complexity turns sat at 90.1 percent. The gap matters: it is exactly the signal the router needs to know when the frontier model is worth paying for.
+
+### The task taxonomy
+
+When Compass decides a turn deserves a frontier model, a second stage classifies the work across three dimensions learned from real developer traffic:
+
+- **Domains** — where the work happens (backend, database schemas, frontend)
+- **Tasks** — what the developer wants done (fixing bugs, running commands, writing tests)
+- **Modifiers** — characteristics that cut across domains and change which model wins (bounded edits, product questions, visual-heavy work)
+
+Model selection uses two rules. A candidate model only becomes eligible when its observed performance on that task label clears a 75% one-sided uplift threshold against the price-efficient baseline — meaning the router needs real confidence the upgrade is worth it. Second, from the eligible candidates, an optimizer picks the traffic-weighted mix expected to maximize performance gain while the average cost per turn stays within the mode's budget.
 
 ## Three optimization modes
 
 Cursor Router offers three modes that let you control where you sit on the cost-versus-quality tradeoff:
 
-**Intelligence mode** aims for frontier quality. It routes to the most capable models available, matching the performance you would get from manually selecting the most expensive option. Cursor reports this mode achieves comparable satisfaction to Fable 5 at roughly 60 percent lower cost, and about 15 percent higher satisfaction than Opus 4.8 at nearly the same cost.
+**Intelligence mode** aims for frontier quality. It routes to the most capable models available, matching performance you would get from manually selecting the most expensive option. As of the August 6 update, Auto Intelligence delivers *above* Fable-level satisfaction at 68 percent lower cost — a further 18 percent improvement over launch numbers.
 
-**Balance mode** targets strong quality at a lower price. It routes to models that most developers would happily use as their daily driver. Cursor says this mode delivers comparable satisfaction to GPT-5.6 Sol at lower cost, and beats Opus 4.8 on satisfaction while costing about 36 percent less.
+**Balance mode** targets strong quality at a lower price. It routes to models most developers would happily use daily. As of the August 6 update, Auto Balance outperforms Opus 4.8 on satisfaction while costing 41 percent less — a further 8 percent reduction since launch, plus 3 percent more user satisfaction.
 
-**Cost mode** prioritizes token efficiency. It reaches for the best available intelligence but optimizes for lowest spend. This is the mode for teams watching their budget closely.
+**Cost mode** optimizes for the lowest spend per turn. It reaches for the best available intelligence while keeping the bill small.
 
 All three modes bill at the routed model's actual rate — you pay for what was used, not a flat fee.
 
 ## What the cost data looks like
 
-Cursor shared per-commit cost data from early access testing with enterprise customers:
+Cursor published per-commit cost data from early access with enterprise customers:
 
 | Metric | Cursor Router (Intelligence) | Cursor Router (Balance) | Opus 4.8 | Fable 5 | GPT-5.6 Sol |
-|--------|-----------------------------|------------------------|----------|---------|-------------|
+|--------|------------------------------|------------------------|----------|---------|-------------|
 | Cost per commit | $6.76 | $4.63 | $7.34 | $12.69 | Similar to Intelligence |
 
-Three high-volume enterprise accounts with thousands of users saved 30 to 50 percent on routed requests compared to sending everything to Opus 4.8, with no decrease in output quality. The savings come from routine tasks landing on cheaper models while hard tasks still get frontier treatment.
+Early enterprise pilots measured 30 to 50 percent savings on routed requests compared to sending everything to a single frontier model.
 
-These are not offline benchmark numbers. Cursor measured them using online A/B tests across millions of real coding requests in production, including cache misses from model switching.
+These are not offline benchmark numbers. Cursor measured them using online A/B tests across millions of real coding requests in production.
 
 ## Admin controls for teams
 
@@ -76,16 +88,20 @@ The router is on by default for Teams plans. Enterprise admins can enable it fro
 
 Model routing is becoming a theme across coding agents. Here is how Cursor's approach differs:
 
-**Claude Code** lets you switch models mid-session with `/model` and supports fallback models configured in settings, but the routing is manual — you pick, the system does not decide for you.
+**Claude Code** lets you switch models mid-session with `/model` and supports fallback models configured in settings, but the routing is manual — the developer picks.
 
 **GitHub Copilot CLI** supports multiple models including Grok 4.5 and Claude Opus 5, but again relies on the developer choosing which one to use.
 
 **OpenAI Codex** defaults to its own model family and does not offer cross-provider routing.
 
-Cursor Router is the first coding agent to offer automatic, per-request model routing across multiple providers with configurable optimization modes. The closest analogy is what cloud load balancers do for web traffic — but applied to AI model selection.
+**Claude Code's model routing** has also drawn trust scrutiny: terminalblog covered the trust crisis when the announced routing behavior did not match what shipped. In that context, Cursor's router set explicit, testable constraints (per-mode budgets, uplift thresholds, admin control) rather than opaque "best model" claims.
+
+Cursor Router is one of the only coding agents to offer automatic, per-request model routing across multiple providers with configurable optimization modes. The heuristic is a learned model of user satisfaction — measured from real traffic — applied at request time.
 
 ## What is next
 
-Cursor says it plans to improve the router as new models launch. The classifier is designed so that adding a new model to the routing pool does not require retraining from scratch. Dynamic tool calling — where tool descriptions are loaded on demand instead of in every prompt — is another efficiency improvement running alongside the router.
+The system keeps improving as the frontier moves. Cursor's August follow-up reports the router is being tuned continuously: new frontier models get added to the routing pool (notably Opus 5), Compass's complexity predictions get retrained on fresh production data, and optimizers adjust the cost budgets. Over time the router is expected to predict quality and cost per model continuously, updating policy from outcomes.
 
-For teams spending real money on AI coding tools, Cursor Router is worth evaluating. Turn it on in Balance mode for a week, check your usage dashboard, and compare the cost and output quality against your current manual model selection. The data Cursor has published suggests the savings are real and the quality tradeoff is minimal for most daily coding work.
+For teams spending real money on AI coding tools, Cursor Router is worth evaluating. Turn it on in Balance mode for two weeks, compare your usage dashboard and the quality of shipped PRs against manual model selection, and let the data decide which configuration stays.
+
+Give the routing policy the real thing: it only learns if developers correct the edits it sends back — so use the approving and rejecting signals deliberately, and the price/quality curve shifts in your favor.

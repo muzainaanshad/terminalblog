@@ -1,0 +1,149 @@
+---
+title: "Beware: Claude for Chrome Extension OAuth Grant Survives Global Logout — You Cannot Kill It"
+description: "A Claude for Chrome extension OAuth grant persists after 'Log out of all devices,' password changes, and every visible token revocation — leaving your account wide open to unauthorized quota theft. Here's what happens, who's affected, and what you can do."
+pubDate: "2026-08-01T12:00:00Z"
+updatedDate: "2026-08-01T12:00:00Z"
+tags: ["security", "beware", "claude-code", "claude", "anthropic", "oauth", "chrome", "credential-leak", "authentication"]
+tool: "claude-code"
+author: "kira_bug_hunter"
+image: "/api/og?title=Beware:%20Claude%20Chrome%20OAuth%20Survives%20Logout&tool=Claude%20Code"
+---
+
+## Related articles
+
+- [Beware: Claude Code's Approval Previews Could Be Spoofed With Invisible Unicode](/blog/beware-claude-code-approval-preview-unicode-spoof/)
+- [Beware: Your Coding Agent's Sandbox Was Leaking Its Own Credentials to Spawned Commands](/blog/beware-coding-agent-sandbox-leaks-own-credentials/)
+- [Coding Agent Security Checklist 2026](/blog/coding-agent-security-checklist-2026/)
+
+---
+
+You change your password. You click "Log out of all devices." You revoke every Claude Code OAuth token you can find. You delete the Chrome extension, clear browser data, and check every visible session. You breathe a sigh of relief — your account is locked down.
+
+It is not. The **Claude for Chrome** browser extension holds an OAuth grant that survives all of those actions. It does not appear in your Claude Code token list. It does not show up in the active-session inventory. It refreshes silently in the background, consuming your plan's quota at full speed, and there is no visible way to revoke it.
+
+This is not a theoretical concern. Two independent GitHub users ([uningeniero](https://github.com/anthropics/claude-code/issues/82074) and [lankhaar](https://github.com/anthropics/claude-code/issues/82074#issuecomment-5117704222)) have confirmed it with forensic evidence. One user watched their Max-plan quota go from 0% to 100% in 34 minutes — without touching anything — after applying every revocation measure Anthropic provides. The other had to **cancel their plan and create an entirely new account** because their original account remained compromised with no path to recovery.
+
+Anthropic has not responded to the issue as of this writing (filed July 28, 2026). There is no fix. There is not even an acknowledgment.
+
+## What actually happened
+
+The Claude for Chrome extension (official extension ID `fcoeoabgfenejglbffodgkkbkcdhcgfn`) requests OAuth scopes `user:profile`, `user:inference`, and `user:chat` during authorization. It stores `accessToken`, `refreshToken`, and `tokenExpiry` in persistent `chrome.storage.local` — the browser's local extension storage, not tied to any server-side session.
+
+When the user logs out of all devices, changes their password, or revokes tokens through Anthropic's dashboard, here is what happens to each Claude client:
+
+| Client | Logs out? | Notes |
+|--------|-----------|-------|
+| Claude web (claude.ai) | ✅ Yes | Normal session invalidation |
+| Claude Code (CLI/desktop) | ✅ Yes | Requires re-authentication |
+| Claude Windows app | ✅ Yes | Logged out on credential change |
+| Claude Android app | ✅ Yes | Logged out on credential change |
+| **Claude for Chrome extension** | ❌ **No** | **Persists, invisible, continues consuming quota** |
+
+The extension does not make an observable OAuth revocation request during its logout path. When a user "logs out" of the extension, it only removes local and session storage — it does not revoke the server-side refresh token. That refresh token keeps working. The extension's background process silently obtains new access tokens and continues making API calls using the user's plan.
+
+Looking at the extension's packaged code (versions 1.0.81 and 1.0.84), the authorization flow requests a token duration of **31,536,000 seconds** — one full year. Even if the server caps the effective lifetime, the refresh token family itself is never revoked by any user-facing action.
+
+## Who is affected
+
+**Every Claude for Chrome user who has ever authorized the extension.** If you installed the extension at any point and granted it OAuth access, that grant is still active unless you have taken one of the specific remediation steps listed below. The issue does not require any special exploit — the extension's own design creates a persistence path that survives all normal revocation mechanisms.
+
+The blast radius extends to your **entire Anthropic billing relationship**:
+
+- **Max plan users**: Unauthorized consumption can exhaust your plan window quota, effectively locking you out of your own paid service. One reporter watched their 5-hour Max window drain to 100% in 34 minutes while they were away from the keyboard.
+- **API users with spending limits**: If your Claude account is linked to API billing, the unauthorized session consumes credits against your limit.
+- **Team and enterprise users**: A compromised individual account's unauthorized sessions count against the team's shared quota.
+
+The attack does not require the attacker to be on your machine. If someone obtained your OAuth tokens through a separate credential-theft incident (malware, phishing, leaked tokens), the Chrome extension's refresh token gives them persistent, invisible access that survives every remediation step you can take through Anthropic's interface.
+
+## How to check if you are affected
+
+The Claude for Chrome extension does not report its OAuth status to any dashboard. You need to check manually.
+
+### Step 1: Check if the extension is installed
+
+Open Chrome and navigate to `chrome://extensions/`. Look for **Claude** with ID `fcoeoabgfenejglbffodgkkbkcdhcgfn`. If it is present, the OAuth grant may be active.
+
+### Step 2: Check Chrome storage directly
+
+For a more technical verification, you can inspect the extension's stored tokens:
+
+1. Open Chrome DevTools (`F12` or `Ctrl+Shift+I`)
+2. Go to the **Application** tab
+3. In the left sidebar, expand **Extensions**
+4. Find `fcoeoabgfenejglbffodgkkbkcdhcgfn`
+5. Look under **Local Storage** for keys containing `accessToken`, `refreshToken`, or `tokenExpiry`
+
+If any of these values exist and are non-empty, the extension holds an active OAuth grant.
+
+### Step 3: Check for unauthorized consumption
+
+If you suspect your account has been compromised:
+
+1. Log in to [claude.ai](https://claude.ai)
+2. Check your **Usage** page for any activity you did not initiate
+3. Compare the timestamps against when you were actually using Claude
+4. Look for activity during periods when you were not at your computer or when all devices should have been logged out
+
+### Step 4: Monitor your quota in real time
+
+Open your Claude usage page in a browser tab, note the current quota percentage, and do not touch any Claude client for 15 minutes. If the percentage increases without your action, something is consuming your quota in the background.
+
+## How to protect yourself
+
+Since Anthropic has not provided a fix, you need to take manual action.
+
+### Immediate: Remove the Chrome extension
+
+This is the most important step. In Chrome, go to `chrome://extensions/`, find the Claude extension, and click **Remove**. This deletes the locally stored tokens, which prevents the extension from obtaining new access tokens through its refresh cycle.
+
+However, note that removing the extension does **not** revoke the server-side refresh token. If an attacker has extracted that token through other means, removing the extension from your browser only removes your copy.
+
+### Comprehensive: Reset everything and monitor
+
+1. **Remove the Claude for Chrome extension** from all browsers on all machines
+2. **Change your Anthropic account password** (this invalidates web sessions)
+3. **Log out of all devices** through the Anthropic dashboard
+4. **Revoke all Claude Code OAuth tokens** visible in your account settings
+5. **Monitor your usage page daily** for at least a week for any unauthorized activity
+6. If unauthorized activity continues, **contact Anthropic support directly** and reference [GitHub issue #82074](https://github.com/anthropics/claude-code/issues/82074)
+
+### Nuclear option: Create a new account
+
+If you cannot confirm that the unauthorized access has stopped — and Anthropic has not responded — the only guaranteed path is to create a new Anthropic account with a new email address and a new subscription. This is what one affected user ([lankhaar](https://github.com/anthropics/claude-code/issues/82074#issuecomment-5117859449)) ultimately had to do.
+
+### For organizations
+
+If you manage a team or enterprise Anthropic deployment:
+
+- Audit all member accounts for the Claude for Chrome extension
+- Consider blocking the extension ID `fcoeoabgfenejglbffodgkkbkcdhcgfn` through your Chrome Enterprise policy until Anthropic addresses the issue
+- Monitor shared quota for unexpected consumption patterns
+- Notify your team members to check and remove the extension individually
+
+## Why this has not been fixed
+
+The issue was filed on **July 28, 2026** by user uningeniero, with screenshot evidence, extension code analysis, and a detailed timeline of unauthorized quota consumption. A second user independently confirmed the behavior the following day. As of August 1, 2026 — four days later — there has been no response from Anthropic on the issue.
+
+The root cause appears to be architectural: the Claude for Chrome extension's OAuth flow is not integrated with Anthropic's server-side session revocation system. When Anthropic's "Log out of all devices" invalidates tokens, it appears to target the Claude Code and web-session token families but not the Chrome extension's token family. The extension's logout path (confirmed by static code analysis) only clears local storage — it never makes a server-side revocation call.
+
+This is a design gap, not a missing patch. Fixing it likely requires Anthropic to either:
+
+1. Add the Chrome extension's OAuth token family to the server-side revocation scope of "Log out of all devices"
+2. Implement sender-constrained tokens (DPoP) so stolen refresh tokens cannot be used from a different client
+3. Add an OAuth token management UI that lists all granted clients (including the Chrome extension) with per-client revocation
+
+None of these are trivial changes, which may explain the silence. But the absence of a response or workaround guidance is concerning given the real financial impact on affected users.
+
+## The broader lesson for coding-agent operators
+
+This vulnerability exposes a pattern that goes beyond the Claude for Chrome extension: **OAuth grants in coding-agent ecosystems are not first-class revocable credentials**. When you authorize a browser extension, a CLI tool, a desktop app, and a mobile app, each one holds its own refresh token. But the revocation mechanisms you are offered (password change, "log out of all devices") may not cover every token family equally.
+
+The practical takeaway:
+
+- **Treat every OAuth grant as a separate credential** that may need separate revocation
+- **Audit your authorized applications regularly**, not just your active sessions
+- **Do not assume "log out of all devices" means what it says** — verify by monitoring quota consumption for a period after revocation
+- **Consider using dedicated accounts** for different tools (one Anthropic account for Claude Code, another for the web UI) to limit blast radius
+- **Monitor billing dashboards proactively** — unauthorized consumption is silent and fast
+
+The coding-agent security model assumes that revocable access is actually revocable. When it is not, every credential-theft incident becomes a permanent compromise. Until Anthropic fixes this, the Claude for Chrome extension is the exception to every security promise their platform makes.

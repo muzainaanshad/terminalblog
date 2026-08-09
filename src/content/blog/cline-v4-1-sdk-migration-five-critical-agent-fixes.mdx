@@ -1,0 +1,144 @@
+---
+title: "Cline v4.1.0: Five Critical Agent Fixes and the SDK Migration That Stops AI From Going Rogue"
+description: "Cline fixed a runaway agent that fired 2,100+ API calls, broken compaction, and wrong-directory file reads — then shipped a major SDK migration. Here's what went wrong and why it matters for every coding agent user."
+pubDate: "2026-08-02T10:00:00Z"
+updatedDate: "2026-08-08T07:00:00Z"
+tags: ["cline", "agent-reliability", "sdk", "vscode", "coding-agent", "release"]
+tool: "cline"
+author: "sage"
+image: "/api/og?title=Cline+v4.1+Agent+Fixes+SDK&tool=cline"
+---
+
+Cline, the open-source coding agent with over 65,000 GitHub stars, shipped its most important release in months. Between July 27 and August 1, 2026, the project landed five critical reliability fixes, a complete SDK migration, and a staged rollout of a new extension architecture. The headline bug was the scariest kind of AI agent failure: a runaway loop that fired over 2,100 consecutive API calls while appearing to wait for user input.
+
+If you use Cline — in VS Code, in the terminal, or through the new desktop app — this release cycle fixes real bugs that could have burned your API budget, corrupted your working directory, or left your agent stuck in an infinite loop.
+
+## What Cline Is (If You Are New)
+
+Cline is a coding agent that lives inside your code editor (VS Code, JetBrains) or runs as a CLI tool. You describe what you want changed, and Cline edits your files, runs terminal commands, and manages context automatically. It supports dozens of LLM providers — OpenAI, Anthropic, Google, local models through Ollama, and more.
+
+Unlike some agents that run in a sandboxed environment, Cline works directly on your filesystem. That makes it powerful but also means bugs in path handling or session management can have real consequences on your project.
+
+## The Five Critical Fixes (July 27)
+
+Cline's maintainer, Saoud Rizwan, landed a cascade of five targeted fixes after methodical end-to-end testing in clean environments. Here is what each one means in plain language.
+
+### 1. The Runaway Agent Loop
+
+This was the most serious bug. Cline has a "mistake limit" — a safety feature that should stop the agent when it detects it is going in circles. But the mistake-limit decision logic blocked on a user prompt while the underlying SDK kept firing API requests in the background.
+
+The result: the agent appeared frozen, waiting for input, while silently burning through 2,100+ consecutive API calls. If you were on a metered API plan, this could rack up significant costs without any visible activity on screen.
+
+**The fix:** The agent loop now halts immediately at the mistake limit without waiting for user input. This matches the behavior the CLI already had correct. If you were running Cline with weaker models or frequently hitting mistake limits, update immediately.
+
+### 2. Compaction Silently Fell Back to Basic Mode
+
+Cline compresses long conversations to stay within context windows. The "agentic compaction" mode sends the conversation to an LLM for intelligent summarization. But the agentic summarizer was building its HTTP handler without including your configured base URL — so it silently hit `api.openai.com` instead of your actual provider.
+
+If you were using OpenAI Compatible providers (a self-hosted model, Azure, or any non-OpenAI endpoint), compaction was silently degrading to basic mode. You would not see an error message — the summarization would just be worse.
+
+**The fix:** The agentic summarizer now correctly uses your configured base URL.
+
+### 3. Manual /compact Never Reached the Model
+
+When you type `/compact` in Cline to manually compress the conversation, the command was never actually reaching the language model. It was budgeting against a 64K fallback context window instead of your model's real context window, and the compaction request was not being sent correctly.
+
+**The fix:** Manual compaction now works as expected, using the model's actual context window size.
+
+### 4. File Reads Resolved to the Wrong Directory
+
+The `read_files` tool was resolving relative paths against the VS Code extension host's `process.cwd` — which is usually `/` on Linux and macOS — instead of your actual workspace directory.
+
+In practice, this meant Cline could not read files in your project. It would try to read `/src/index.ts` instead of `/your-project/src/index.ts`, fail, fall back to running shell commands to read files, and get stuck in a loop.
+
+**The fix:** Relative paths now resolve against the workspace root, not the system root.
+
+### 5. Desktop MCP Server Card Cleanup
+
+The desktop app standardized its MCP (Model Context Protocol) server display. Server cards now show consistently, and there is a single uninstall button instead of multiple conflicting ones. This was a polish fix, but it eliminated confusion when managing connected MCP servers.
+
+## The SDK Migration: Cline v4.1.0 (July 31)
+
+Beyond the five critical fixes, Cline v4.1.0 introduced a major architectural change. The stable VS Code extension is now a **combined A/B package** — one VSIX file that contains both the current (legacy) extension and a new SDK-based extension, with a small loader that activates exactly one per window.
+
+Here is what that means for you:
+
+- **For most users, nothing changes.** The loader activates the same extension you were running before. A small percentage of users (starting at 1%) are gradually opted into the new SDK-based extension.
+- **Automatic fallback.** If the new extension fails to activate for any reason, the loader falls back to the current extension in the same window. No user action needed.
+- **Shared settings.** Credentials, preferences, and settings are shared between both extensions. Nothing is lost when switching.
+- **Staged rollout.** The new extension activates on window reload, never mid-session. You will not lose work.
+
+Why does this matter? The SDK-based architecture separates the agent logic from the VS Code UI. This means Cline's core can power the VS Code extension, the CLI, the desktop app, and potentially other editors — all from the same codebase. It is the foundation for the desktop beta and the JetBrains plugin.
+
+## More Fixes in SDK v0.0.66–0.0.68 (July 28–August 1)
+
+The SDK releases between v0.0.66 and v0.0.68 added a batch of improvements alongside the critical fixes:
+
+**Agentic compaction became the default.** Cline now uses LLM-powered summarization for context compression by default, instead of the basic truncation method. The compaction pipeline was also fixed to find cut points in tool-heavy transcripts — previously, assistant messages with many tool calls would cause endless "auto-compaction skipped" messages while context kept growing.
+
+**MCP timeouts are now configurable.** The per-server `timeout` setting in `cline_mcp_settings.json` is now actually respected. Previously, MCP tool calls used hardcoded 1.5-second and 5-second limits regardless of your configuration. The default is now 60 seconds, clamped to 1–3,600 seconds.
+
+**Free Cline models.** Cline now supports `cline-free` models with zero cost. When you hit the free tier limit, you get a dedicated error message with the reset time instead of a generic failure.
+
+**Reasoning controls from the model catalog.** Reasoning effort, budget, and on/off settings are now driven by the models.dev catalog. Anthropic's mandatory and impossible thinking modes are handled explicitly, and out-of-range budgets are clamped automatically.
+
+**Session forking.** You can now fork a session at any point, edit an earlier prompt, and restore from there. This is useful when the agent goes down a wrong path and you want to branch without losing the original conversation.
+
+**Windows PowerShell UTF-8.** On Windows, Cline now sends commands over UTF-8 stdin instead of the command line. This fixes issues where non-ASCII characters were corrupted by the active code page, and long commands that exceeded the Windows command-line character limit would silently fail.
+
+**Root filesystem sessions fixed.** Sessions rooted at `/` (the filesystem root) would fail to run any command because `basename("/")` returned an empty string that schema validation rejected. This is now fixed.
+
+## What Shipped After v4.1.0 (August 4–7)
+
+The v4.1.0 launch landed as a commit cycle. The first follow-up wave, **v4.1.4 → v4.1.6**, was released from August 4–6, and the **desktop app hit v0.0.10** on August 7. None of this is as dramatic as the runaway-loop fix, but three changes matter in daily use:
+
+### 1. Cline Desktop now logs into MCP servers with OAuth (v0.0.10)
+
+The desktop app's biggest new feature is **OAuth authentication for remote MCP servers, managed from Settings → MCP**. Previously, connecting a remote MCP server to the desktop app usually meant hand-copying an API key or token into a config file — exactly the kind of step that trips up beginners. Now you can authorize a server, watch its auth status, and cancel or retry a pending authorization. It also supports servers that need a pre-registered OAuth client (client ID/secret) rather than dynamic registration, and stored tokens are invalidated when a server's client configuration changes — so revoking a leaked credential actually sticks.
+
+The same release fixed a silent-failure class of bugs: MCP errors now show on the individual server card instead of as a page-level error, and a server with invalid configuration is surfaced with its error instead of disappearing from the list. Failed turns no longer fail silently either — a message sent with no model credentials shows the real error in the transcript with a pointer to Settings → Models.
+
+### 2. The stop button is finally obvious (v0.0.10)
+
+Desktop 0.0.10 made **Esc stop the current turn** and added `Cmd/Ctrl+N` for a new session and `Cmd/Ctrl+,` for settings. The stop button is now actually visible and clickable, and the composer no longer gets stuck on "Agent is working…" after a turn already finished. It also fixed the first message of a chat rendering twice.
+
+For a beginner, this is the "trust" release: when you can reliably interrupt an agent, letting it work on your files stops feeling like watching a runaway and starts feeling like delegating. There's also a new "Connect a model" notice on the welcome screen when no provider has credentials, with one-click onboarding and "Get an API key" links for popular providers.
+
+### 3. Reason controls honored everywhere, including Ollama (v0.0.10)
+
+Reasoning effort and thinking on/off now resolve consistently across AI SDK providers — including **Ollama** — instead of being silently ignored. Vertex AI credential refreshes also respect your configured fetch, fixing authentication through proxies. On the agent side, v4.1.6 (August 6) refreshed the model catalog with the **Meta Muse Spark 1.2 contributor model on the Cline provider**, and fixed telemetry so failures are attributed to the model actually in use rather than the wrong one.
+
+## What To Do Now
+
+1. **Update Cline** in VS Code or run `npm update -g cline` for the CLI. The five critical fixes shipped in v4.0.13+ / SDK v0.0.66+.
+2. **If you were hitting the runaway agent bug**, check your recent API usage. The 2,100+ call loop could have consumed significant tokens.
+3. **Test your compaction.** Run `/compact` in a long conversation and verify it actually compresses instead of silently doing nothing.
+4. **Try agentic compaction** if you had it disabled. The bugs that made it unreliable have been fixed, and it produces better summaries than basic truncation.
+5. **Check your MCP timeout settings.** If you had custom timeouts in `cline_mcp_settings.json`, they are now actually being used.
+
+## The Bigger Picture
+
+Cline's July fix sprint highlights a real tension in AI coding agents: the more autonomous the agent, the more costly a bug becomes. A runaway loop in a simple chatbot wastes compute. A runaway loop in a coding agent that has file system access and can run shell commands wastes compute *and* potentially damages your project.
+
+The five fixes Saoud shipped are not exotic security vulnerabilities — they are the kind of bugs that surface when fast-moving AI tooling meets production use. Path resolution, error handling in the compaction pipeline, a race condition between the mistake-limit decision and the SDK's request loop. These are the bugs that separate a promising demo from a tool you can trust with your codebase.
+
+The v4.1.0 SDK migration is the forward-looking story. By decoupling the agent core from VS Code, Cline is building toward a world where the same agent runs in your editor, your terminal, your desktop app, and potentially CI pipelines. For users, the staged rollout with automatic fallback means you get to benefit from the new architecture without risking your current workflow.
+
+## Cline v4.1.0 at a Glance
+
+| Feature | Details |
+|---------|---------|
+| Release date | July 27 – August 1, 2026; follow-ups August 4–7 |
+| Key versions | v4.1.0, v4.1.4–v4.1.6, SDK v0.0.66–0.0.71, Desktop v0.0.10 |
+| Critical fixes | Runaway agent loop, compaction fallback, /compact broken, wrong-directory file reads, MCP UI |
+| Architecture | Combined A/B VSIX with staged remote rollout |
+| New features | Free models, session forking, configurable MCP timeouts, reasoning controls, MCP OAuth login (Desktop 0.0.10) |
+| Windows fixes | PowerShell UTF-8 stdin, root filesystem sessions |
+| Update | `npm update -g cline` or VS Code extension update |
+
+
+## Related articles
+
+- [Your AI Agents Config Directory Is Now the Most Dangerous Place on Your Machine](/blog/ai-agent-config-directory-attack-surface-2026/)
+- [Qwen3.8-Max Ships With 2.4T Parameters, 16-Day Autonomous Coding Demo, and Open Weights Coming Next Week](/blog/qwen3-8-max-2-4t-autonomous-coding-open-weights/)
+- [Beware: Clinejection — How a GitHub Issue Title Became a Supply Chain Attack on Millions of Developers](/blog/beware-clinejection-supply-chain-attack-github-actions/)

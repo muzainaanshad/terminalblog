@@ -1,12 +1,14 @@
 ---
 title: "Extending Hermes Agent with Custom Skills: A Practical Guide"
-description: "How to build and install reusable skill packages for Hermes Agent — turning complex workflows into shareable, one-command automations."
+description: "How to build, install, and manage reusable skill packages for Hermes Agent — from SKILL.md anatomy to registry installs, snapshots, and team sync."
 pubDate: "2026-07-03T13:10:00Z"
-updatedDate: "2026-07-03T13:10:00Z"
+updatedDate: "2026-08-09T04:00:00Z"
+updated: true
 author: "Hermes Blog Team"
-keywords: "AI agent plugins, extensible AI assistant, custom AI tools, Hermes Agent skills, autonomous life assistants, workflow orchestration, SKILL.md, reusable workflows"
+keywords: "AI agent plugins, extensible AI assistant, custom AI tools, Hermes Agent skills, SKILL.md, skills.sh, workflow orchestration, reusable workflows, agent registry"
 ---
-Hermes Agent ships with a set of built-in capabilities, but its real power comes from **skills** — reusable packages that encapsulate specialized workflows.
+
+Hermes Agent ships with a set of built-in capabilities, but its real power comes from **skills** — reusable packages that encapsulate specialized workflows. A skill turns a procedure you would otherwise describe in every prompt into something the agent loads on its own when the task matches.
 
 ## What a Skill Contains
 
@@ -24,7 +26,7 @@ skills/
       patterns.md     # Reference material
 ```
 
-The `SKILL.md` is the heart of the system. It tells the agent exactly when to use the skill, what steps to follow, and what pitfalls to avoid:
+The `SKILL.md` is the heart of the system. It tells the agent when to use the skill, what steps to follow, and what pitfalls to avoid:
 
 ```markdown
 ---
@@ -39,33 +41,99 @@ description: "Audit a codebase for security vulnerabilities"
 4. Generate report using templates/report.md
 ```
 
-## Why Skills Matter
+The `name` and `description` frontmatter fields do the routing: only the description stays in the agent's active context, and the full skill body loads when a task matches. That keeps expertise available on demand without paying for it on every turn.
 
-Without skills, every complex task requires the agent to figure out the approach from scratch. With skills, the agent **loads proven workflows** — battle-tested sequences that produce consistent results. This is especially powerful for onboarding (new team members get instant access to established workflows), compliance (audit steps are documented and repeatable), and sharing (skills can be published across projects).
+## Finding Skills
 
-## Installing and Using Skills
-
-Skills can come from local directories, git repos, or community registries:
+Hermes pulls skills from **skills.sh**, well-known agent skill endpoints, GitHub, ClawHub, and other registries. Browse what's out there before writing your own:
 
 ```bash
-hermes skill install ./skills/code-review
-hermes skill install code-review --from registry
-hermes skills list
-hermes skill view security-audit
+hermes skills search code-review
+hermes skills browse
 ```
 
-When a matching task comes in, Hermes **automatically detects** which skill to use based on the skill's description and the task context. No manual activation needed.
+Both commands return skills with their descriptions, so you can judge relevance before touching anything.
+
+## Installing Skills
+
+Install by registry identifier or by a direct URL to a `SKILL.md`:
+
+```bash
+# from a registry identifier
+hermes skills install openai/skills/skill-creator
+
+# from a direct URL to a SKILL.md file
+hermes skills install https://example.com/skills/deploy/SKILL.md --name deploy
+
+# install without the confirmation prompt (needed in TUI mode)
+hermes skills install code-review --yes
+
+# override which category folder the skill lands in
+hermes skills install deploy --category release
+```
+
+The installer scans what it downloads before committing; `--force` installs despite a blocked scan verdict — only use it when you trust the source. The `--name` override helps when you install from a URL whose `SKILL.md` has no `name:` frontmatter.
+
+## Managing Installed Skills
+
+The day-to-day commands:
+
+```bash
+hermes skills list          # show installed skills
+hermes skills inspect        # preview a skill without installing it
+hermes skills check          # check installed skills for updates
+hermes skills update         # update installed skills
+hermes skills audit          # re-scan installed skills against registries
+hermes skills uninstall x    # remove an installed skill
+```
+
+That `check`/`update` cycle matters. Skills aren't static — the good ones get fixed and extended upstream. A weekly `hermes skills check` keeps your whole toolkit current instead of running stale instructions.
+
+## Bundled Skill Management
+
+Some skills ship with Hermes itself. Editing one is allowed — Hermes tracks that you modified it and keeps your changes across updates:
+
+```bash
+hermes skills list-modified    # which bundled skills have you edited
+hermes skills diff             # how your copy differs from the stock version
+hermes skills reset <skill>    # clear 'user-modified' so updates apply again
+```
+
+`reset` is the escape hatch: if your edits go stale against a newer stock version, reset clears the modified flag and `hermes skills update` takes over again. You can also opt out entirely of bundled-skill seeding with `hermes skills opt-out` (opt back in with `opt-in`), or backfill missing official optional skills with `repair-official`.
+
+## Configuring Skills
+
+`hermes skills config` opens an interactive view to enable or disable individual skills. If a skill keeps matching tasks you don't want it in, disable it there — that's the designed control surface, cleaner than deleting it.
+
+## Snapshots: Move Skills Between Machines
+
+If you manage more than one profile or machine, snapshots export the whole installed set to a file:
+
+```bash
+hermes skills snapshot export   # export installed skills to a file
+hermes skills snapshot import   # import and install skills from a file
+```
+
+That's the reproducible path: export once, import on the next machine, done. It beats re-installing every skill by hand.
+
+## Syncing Skills Across a Team
+
+For teams, the dedicated command is `hermes sync` — Skill Sync, which syncs your skills across devices and with teammates. The snapshot flow is fine for one-off migrations; `hermes sync` is the ongoing channel for a shared skill set, so a runbook or style skill can be maintained once and picked up everywhere.
+
+## Publishing Your Own Skill
+
+When a skill proves itself, you can publish it to a registry with `hermes skills publish`. Publishing a skill means writing good frontmatter quality so other agents beyond Hermes can adopt it — the same `SKILL.md` convention is becoming a cross-tool standard, so one well-written skill can serve multiple agents.
 
 ## Writing Your First Skill
 
-1. Create `skills/my-skill/SKILL.md` with frontmatter (name, description, trigger phrases)
-2. Add scripts, templates, and references as needed
-3. Package with `zip -r my-skill.zip my-skill/`
-4. Install with `hermes skill install my-skill.zip`
+1. Create `skills/my-skill/SKILL.md` with frontmatter (`name`, `description` — the description is what routing matches against, so be specific)
+2. Add `scripts/`, `templates/`, and `references/` as needed
+3. Test it locally until the flow is repeatable
+4. Install it: `hermes skills install ./skills/my-skill --name my-skill`
+5. For the team: `hermes skills snapshot export` or `hermes sync`
 
-Skills bridge the gap between a general-purpose assistant and a specialized tool that knows your team's exact workflows.
+Skills bridge the gap between a general-purpose assistant and a specialized tool that knows your exact workflows — and because they live in plain Markdown, they're version-controllable, reviewable in pull requests, and shareable across your team.
 
 ---
 
----
-*Stop paying for AI subscriptions you barely use. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** is $12/mo for access to GPT, Claude, Gemini, Grok, DeepSeek, Perplexity, and more. One sub, every top model.*
+*Related: the [Hermes console dashboard guide](/blog/hermes-console-dashboard-changes-how-you-monitor-ai-agents/) covers the monitoring side of running agents, and the [2026 coding agent security checklist](/blog/coding-agent-security-checklist-2026/) has the hardening steps to pair with any skill install.*
