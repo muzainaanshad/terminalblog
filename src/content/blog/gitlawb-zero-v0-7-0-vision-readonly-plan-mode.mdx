@@ -1,0 +1,74 @@
+---
+title: "Gitlawb Zero Just Gave Its Agents Eyes — Screenshots Are No Longer a Lie"
+description: "Gitlawb Zero v0.7.0 (August 10, 2026) finally lets agents see the screenshots they capture — tool results now carry images and a view_image tool exists. Plus a read-only planning mode, sandbox hardening against credential theft, and live model lists. Beginner-friendly breakdown."
+pubDate: "2026-08-10T12:00:00Z"
+updatedDate: "2026-08-10T12:00:00Z"
+tags: ["gitlawb-zero", "release", "vision", "security", "beginner", "coding-agents"]
+tool: "gitlawb-zero"
+author: "sage"
+image: "/api/og?title=Gitlawb+Zero+v0.7.0+Gave+Agents+Eyes&tool=gitlawb-zero"
+---
+
+Here is an absurd situation that was true until this week: a coding agent could take a screenshot of your app, save it to disk, tell you "Artifact captured!" — and then be completely unable to look at the image it just created. The picture existed. The agent just had no eyes.
+
+**Gitlawb Zero v0.7.0** (released August 10, 2026) fixes exactly that. The open-source terminal agent now gives tool results an **image channel** and ships a `view_image` tool, so agents can finally see the screenshots, PDFs, and desktop captures they produce. That is the headline of a release that also adds a read-only "planning mode," slams shut two sandbox holes, and makes model lists refresh themselves.
+
+## What Zero is, in one paragraph
+
+Gitlawb Zero (about 1,200 GitHub stars, MIT-licensed, npm package `@gitlawb/zero`) is a terminal coding agent for people who want to own their tooling. You start it in a project folder, ask for something in plain English, and it plans, edits files, runs commands, and commits — but every permission stays on your machine, and you can point it at any model provider you like (OpenAI, Anthropic, Ollama, OpenRouter, local models via LM Studio, and more). If you are new to it, our [Gitlawb Zero deep dive](/blog/deep-dive-gitlawb-zero-agent/) covers the architecture. This article is about what v0.7.0 changes.
+
+## The headline: agents can finally look at what they capture
+
+Zero's `browser_screenshot`, `desktop_screenshot`, and `browser_pdf` tools have been around for a while. They capture a PNG or PDF, stash it as an artifact with a path, and report back "Artifact captured: `<path>`." That is where the story broke: tool results could only carry *text*, so nothing ever read that image back to the model ([PR #843](https://github.com/Gitlawb/zero/pull/843)).
+
+Translation: you asked the agent to screenshot your landing page so it could tell you whether the button is misaligned, and the honest answer was "I saved a file I am incapable of inspecting."
+
+v0.7.0 adds an **image channel to tool results** plus a **`view_image` tool**. Now a screenshot or PDF flows back into the conversation as an actual image the model can interpret. "Is the hero section overflowing?" becomes a question the agent can genuinely answer instead of guessing from DOM dumps. For beginners, the practical upshot is simple: **the agent's eyes and its hands are finally connected.** It is a small change conceptually and a large one in day-to-day usefulness — debugging visual layout, reading chart screenshots, and checking "does this UI look broken?" all become real agent tasks instead of party tricks.
+
+## A read-only planning mode: think first, touch nothing
+
+The second headline feature is `PermissionModePlan` ([PR #853](https://github.com/Gitlawb/zero/pull/853)): a **read-only agent mode for interactive planning**. While it is active, Zero refuses to run mutating tools, local commands, executable hooks, or `request_permissions` — including the deferred `tool_search` path, so a spoofed or gated tool cannot sneak mutations through a back door.
+
+You get it three ways:
+
+- **TUI**: switch into plan mode in the interface
+- **CLI**: `zero --plan` (deliberately rejected when combined with `--worktree`, so you cannot plan in one worktree and accidentally mutate another)
+- **ACP**: serialized through agent-to-agent entry points
+
+Why this matters for beginners: read-only planning is how you let an agent *study* a codebase before you let it *touch* a codebase. Think of it as the difference between someone reading your kitchen and someone cooking in it. If you want to try an agent on a repo you do not fully trust yet, plan mode is the safe first date — explore, get a proposal, review it, and only then drop the guard.
+
+## Sandbox hardening: two ways your credentials get safer
+
+Security is the quiet theme of v0.7.0, and two fixes belong in every user's mental model:
+
+1. **Zero can no longer read its own credential stores** ([PR #681](https://github.com/Gitlawb/zero/pull/681)). The sandbox now denies reads of Zero's stored credentials. A coding agent needs to *use* your keys, but it never needs to *exfiltrate* the file that holds them. This closes exactly the class of "my agent leaked my API token" accidents — the same reasoning behind the credential-blocking in [our security checklist](/blog/coding-agent-security-checklist-2026/).
+2. **The Windows write jail stops honoring "Everyone"-granted paths** ([PR #865](https://github.com/Gitlawb/zero/pull/865)). On Windows, a path that the OS marks accessible to "Everyone" could bypass Zero's write-protection jail. That loophole is closed: the jail now checks real per-user access instead of trusting broad inherited grants.
+
+The same batch fixed a **secret-redaction leakage** bug where redaction could fail to scrub secrets from certain outputs, and prunes stale worktrees to avoid state rot ([PR #855](https://github.com/Gitlawb/zero/pull/855)).
+
+## Smaller things that make daily use better
+
+- **Live model lists for OpenRouter and OpenGateway** ([PR #860](https://github.com/Gitlawb/zero/pull/860)): the provider picker now pulls the *live* model catalog instead of a stale static list, with context length and modality info parsed in. New model released? It shows up without waiting for a Zero update. (Related reading: our [provider-picker UX deep dive](/blog/gitlawb-zero-provider-picker-terminal-ux/).)
+- **`/rename` replaces `/retitle`** ([PR #826](https://github.com/Gitlawb/zero/pull/826)): renaming a session is now a local operation by default.
+- **Broken MCP servers get reported** ([PR #822/#827](https://github.com/Gitlawb/zero/pull/822)): if an MCP server fails to start, `zero mcp check` tells you instead of silently reporting success. A follow-up fix names the non-text blocks a tool result drops ([PR #874](https://github.com/Gitlawb/zero/pull/874)).
+- **No more NUL-byte TUI panic on Windows** ([PR #876](https://github.com/Gitlawb/zero/pull/876)): copying a NUL byte used to crash the interface; it is now handled.
+- **Provider health checks use OAuth credentials** ([PR #828](https://github.com/Gitlawb/zero/pull/828)) so status checks stop failing for OAuth-based providers.
+- **Performance**: common test output is now compacted and harness context is leaner ([PR #846](https://github.com/Gitlawb/zero/pull/846), [PR #838](https://github.com/Gitlawb/zero/pull/838)) — long sessions stay cheaper.
+
+## What about the agents talking to each other?
+
+If you saw our [cross-session messaging article](/blog/gitlawb-zero-cross-session-messaging/), one clarification: that feature (sessions discovering and messaging each other) was merged to `main` on August 9 but is **not** part of the v0.7.0 tag. It is still main-only and will land in a future release — v0.7.0 is the vision, planning, and sandbox release.
+
+## How to update
+
+Zero is a fast-moving project (v0.7.0 came 12 days after v0.6.0). To get it:
+
+```bash
+npm install -g @gitlawb/zero
+```
+
+Then confirm with `zero --version` and run a quick plan-mode session — it is the best way to feel the new read-only safety rail.
+
+## The bottom line
+
+v0.7.0 is the release where Zero's agents stop being half-blind: screenshots finally become something the model can actually look at, planning gets a genuinely read-only mode, and two sandbox holes that could have leaked credentials are closed. If you have been curious about an agent you fully own — your keys, your model choice, your session data — this is a good version to start on, and plan mode is the safest possible on-ramp.
