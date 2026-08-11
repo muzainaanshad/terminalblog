@@ -1,0 +1,93 @@
+---
+title: "Meta Just Gave Away a Free Coding Agent Model — And It Runs on Your Laptop"
+description: "Meta released Muse Glimmer, a 30B open-weight model under Apache 2.0 that runs locally on consumer hardware, codes, uses tools, and sees screenshots. Here's what it means for developers."
+pubDate: "2026-08-11T12:00:00Z"
+updatedDate: "2026-08-11T12:00:00Z"
+tags: ["meta", "muse-glimmer", "open-source", "local-llm", "coding-agents", "release", "beginner"]
+tool: "industry"
+author: "sage"
+image: "/api/og?title=Meta+Muse+Glimmer+Free+Local+Coding+Agent&tool=meta"
+---
+
+Meta dropped a 30-billion-parameter model on Hugging Face under the **Apache 2.0 license** — no API key, no subscription, no cloud. It is called **Muse Glimmer**, it was released on August 10, 2026, and it is designed from the ground up to run a coding agent on your own laptop. If you have been waiting for a local model that can actually do agentic work — not just autocomplete but plan, call tools, recover from errors, and read your screenshots — this is the moment that waiting paid off.
+
+Here is what Muse Glimmer is, what it can do, how to run it, and whether it actually competes with the cloud agents you already use.
+
+## What is Muse Glimmer?
+
+Muse Glimmer is an open-weights multimodal model from Meta Superintelligence Labs. It has **29.6 billion parameters** split across a 2B vision encoder and a 28B text decoder, a 131K+ token context window, and it was distilled from Meta's larger **Muse Spark** model using a training recipe that includes supervised fine-tuning, on-policy distillation, and reinforcement learning across coding, reasoning, and agentic tasks.
+
+The important thing is not the parameter count — it is where the model was trained to sit. Muse Glimmer is not a general-purpose chatbot with tool calling bolted on. It was **trained around the agent loop**: it plans, calls functions, reads what those functions return, decides what to try next, and keeps going until the task is done. When something fails, it retries and diagnoses instead of stopping.
+
+Meta also released it under Apache 2.0 — the most permissive open-source license available. That means you can run it, modify it, fine-tune it, and deploy it commercially with no restrictions.
+
+## What can it actually do?
+
+Muse Glimmer handles four things that matter for a local coding agent:
+
+**1. Agentic coding.** It reads your codebase, plans changes, writes code, runs tests, and validates results. On SWE-Bench Pro — one of the hardest coding benchmarks — Glimmer scores **51.2**, which beats Qwen3.6-27B (50.2) and crushes Gemma4-31B (36.9). On SWE-Bench Verified it scores 76.0, competitive with the best in its weight class.
+
+**2. Tool use and function calling.** The model is trained to invoke tools with precise schemas across multi-step workflows. It handles retries when a tool call fails, which means longer tasks actually complete instead of dying on the first error.
+
+**3. Multimodal input.** Because it has a built-in vision encoder, you can show Glimmer screenshots, charts, documents, or UI mockups and it understands them. For a coding agent, this means it can look at a bug report screenshot and figure out what to fix.
+
+**4. Long-horizon reasoning.** With a 131K+ token context window, Glimmer can sustain coherent plans across complex, multi-file refactors without losing the thread.
+
+## How does it compare to other local models?
+
+Here are the head-to-head numbers on agentic coding benchmarks:
+
+| Benchmark | Muse Glimmer 30B | Qwen3.6-27B | Gemma4-31B |
+|-----------|:----------------:|:-----------:|:----------:|
+| SWE-Bench Pro | **51.2** | 50.2 | 36.9 |
+| SWE-Bench Verified | 76.0 | **77.2** | 66.6 |
+| TerminalBench 2.1 | 51.7 | **60.7** | 43.4 |
+| SciCode | **43.6** | 39.8 | 43.4 |
+| MCP Atlas (tool use) | **75.5** | 62.5 | 54.2 |
+| DeepSearch QA | **74.6** | 71.1 | 61.7 |
+
+Glimmer wins on SWE-Bench Pro, SciCode, MCP Atlas, and DeepSearch QA. Qwen3.6 leads on SWE-Bench Verified and TerminalBench. The takeaway: Glimmer is the strongest local model for tool-calling and multi-step agentic workflows, while Qwen3.6 still edges it out on raw terminal-level coding tasks.
+
+For most developers, the deciding factor is not the benchmark spread — it is the fact that Glimmer can read screenshots and documents, which Qwen3.6 and Gemma4 cannot.
+
+## How do you run it?
+
+Muse Glimmer runs on a machine with a single consumer GPU or Apple Silicon with 24–32GB of memory. Meta worked with partners to make day-zero support available across the ecosystem:
+
+- **Ollama** — pull and run with a single command
+- **LM Studio** — GUI-based local inference
+- **llama.cpp** — optimized C++ backend for CPU and GPU
+- **MLX** — Apple Silicon native
+- **ExecuTorch** — mobile and edge deployment
+- **vLLM / SGLang** — high-throughput serving
+
+Meta also released a **DFlash speculative decoding drafter** that speeds up generation by up to **3.1x on an RTX 5090**, **1.8x on an M5 Max**, and **1.5x on an M4 Max**. The drafter is optional but recommended — it is especially effective for structured output like code.
+
+If you want to use it with a coding agent framework like OpenClaw, Hermes, or a custom scaffold, the model exposes standard OpenAI-compatible API endpoints, so integration is straightforward.
+
+## What makes this different from previous Meta releases?
+
+Meta has released open-weight models before — Llama, Code Llama, the original Muse Spark. But Glimmer is different in three ways:
+
+**1. It is trained as an agent, not a chatbot.** Previous open models were general-purpose text generators with optional tool support. Glimmer is trained end-to-end for the agent loop: plan, execute, observe, retry. The training data includes long-horizon agentic traces, failure recovery scenarios, and multi-tool workflows.
+
+**2. It is small enough to run locally.** At 30B parameters, it fits on hardware developers actually own. This is not a 70B model that requires a cloud instance — it is designed for the laptop on your desk.
+
+**3. The license is genuinely open.** Apache 2.0 means no usage restrictions, no attribution requirements for inference, and full commercial freedom. For teams that need to keep code and data on-premise, this removes the last barrier.
+
+## What beginners should do next
+
+If you want to try Muse Glimmer today:
+
+1. **Install Ollama** (ollama.com) — it is the easiest way to run local models
+2. **Pull the model** — search for Muse Glimmer in Ollama's library or follow the Hugging Face page instructions
+3. **Ask it to write or fix code** — try something simple like "write a Python function that validates email addresses" and see how it plans and executes
+4. **Show it a screenshot** — if you have a bug report image or a UI design, paste it in and see if the model understands what it is looking at
+
+The model is available now on [Hugging Face](https://huggingface.co/meta-models/Muse-Glimmer-30B) with full documentation at [Meta's Developer Center](https://developer.meta.com/ai/models/muse-glimmer/).
+
+## The bottom line
+
+Meta just made it possible to run a serious coding agent on your own hardware, for free, under the most permissive license available. Muse Glimmer is not a toy — it beats or matches the best 27-31B models on agentic coding benchmarks, it can see and understand images, and it is built to persist through failures instead of giving up.
+
+If you have been spending money on API tokens for coding agents, or if your team needs to keep code local for compliance reasons, this is the model to evaluate. It will not replace Claude Code or Codex for cloud-scale workloads, but for local, private, always-on agent workflows, it is the strongest option that exists today.
