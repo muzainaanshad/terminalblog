@@ -10,7 +10,7 @@ const path = require('path');
 const BLOG_DIR = path.join(__dirname, '..', 'src', 'content', 'blog');
 
 function parseMdx(filePath) {
-  const raw = fs.readFileSync(filePath, 'utf8');
+  const raw = fs.readFileSync(filePath, 'utf8').replace(/\r\n/g, '\n');
   const fmMatch = raw.match(/^---\n([\s\S]*?)\n---/);
   if (!fmMatch) return null;
 
@@ -50,7 +50,6 @@ function addRelatedSection(article, relatedArticles) {
   ).join('\n')}`;
 
   // Insert before the last separator or affiliate CTA
-  // Find the last --- separator (but skip frontmatter closing)
   const lines = article.raw.split('\n');
   let lastSepIdx = -1;
   let inFrontmatter = false;
@@ -66,8 +65,6 @@ function addRelatedSection(article, relatedArticles) {
   
   let insertPoint;
   if (lastSepIdx > 0) {
-    // Find byte position of that line
-    insertPoint = article.raw.indexOf('\n---\n', article.raw.indexOf('---') + 3);
     // Find the LAST --- after frontmatter
     const allSeps = [];
     let pos = 0;
