@@ -1,0 +1,274 @@
+---
+title: "Beware: Hermes Agent Security Audit Uncovers Credential Bypass, Sandbox Escape, and Session Hijacking in 5 HIGH-Severity Findings"
+description: "A coordinated security audit of NousResearch/hermes-agent (EPIC #82591) revealed 5 HIGH-severity vulnerabilities including credential-file mount bypass, empty execute_code capability escalation, URL credential leakage, cross-profile session hijacking, and callback adapter confusion. Here is what each finding means, who is affected, and how to protect yourself until patches land."
+pubDate: "2026-08-12T16:00:00Z"
+updatedDate: "2026-08-12T16:00:00Z"
+tags: ["security", "beware", "hermes-agent", "sandbox", "credential-leak", "session-hijack", "audit"]
+tool: "hermes"
+author: "kira_bug_hunter"
+image: "/api/og?title=Beware:%20Hermes%20Agent%20Security%20Audit%205%20HIGH%20Findings&tool=Hermes%20Agent"
+---
+
+## Related articles
+
+- [Beware: Claude Code CVE-2026-55607 — A Malicious Repo Can Escape the Sandbox](/blog/beware-cve-2026-55607-claude-code-worktree-sandbox-escape/)
+- [Beware: Cline Supply Chain Attack via GitHub Actions](/blog/beware-clinejection-supply-chain-attack-github-actions/)
+- [Beware: Hermes Coding Agents Trip EDR Rules Like Attackers](/blog/beware-coding-agents-trip-edr-rules-like-attackers/)
+
+---
+
+On August 12, 2026, the NousResearch/hermes-agent repository opened five new security issues — all rated HIGH severity — as part of a coordinated security audit tracked under [EPIC #82591](https://github.com/NousResearch/hermes-agent/issues/82591). These are not theoretical speculations. Each finding comes with pinned source blobs, affected file ranges, an acceptance contract specifying exactly what a fix must prove, and an interlock requirement tying every patch back to the EPIC for traceability.
+
+If you run Hermes Agent — whether as a personal assistant, a team tool, or embedded in a production automation pipeline — these findings affect your security posture right now. Two of the five findings involve credential exposure and sandbox capability escalation, both of which can lead to unauthorized access to sensitive files or unrestricted code execution. The other three involve session hijacking, credential leakage in logs, and cross-profile callback confusion.
+
+This article explains each finding in plain language, tells you who is affected, shows you how to check your exposure, and lists what you can do until the fixes land.
+
+## What happened
+
+The Hermes Agent codebase underwent a systematic security audit — not a random bug hunt, but a structured campaign with numbered contracts, consensus classes, and interlocked implementation plans. The audit team opened five issues on August 12, each tagged `type/security` and classified as HIGH severity. All five are part of [EPIC #82591](https://github.com/NousResearch/hermes-agent/issues/82591), which itself is a massive plan to harden Hermes's Kanban worker architecture, credential handling, and session isolation.
+
+The five findings are:
+
+| Issue | Title | Severity | Core Risk |
+|-------|-------|----------|-----------|
+| [#84270](https://github.com/NousResearch/hermes-agent/issues/84270) | Config credential-file mounts bypass the master-store read denylist | HIGH | Credential leak |
+| [#84271](https://github.com/NousResearch/hermes-agent/issues/84271) | Explicit empty execute_code capability set broadens to all sandbox tools | HIGH | Sandbox escape |
+| [#84267](https://github.com/NousResearch/hermes-agent/issues/84267) | Default URL redaction preserves userinfo and query credentials | HIGH | Credential leakage in logs |
+| [#84269](https://github.com/NousResearch/hermes-agent/issues/84269) | Run, approval, event, and stop registries authorize by raw run ID only | HIGH | Session hijacking |
+| [#84266](https://github.com/NousResearch/hermes-agent/issues/84266) | Profile-prefixed platform callbacks can resolve through the default adapter | HIGH | Cross-profile callback injection |
+
+No public exploit code has been released. The audit team explicitly states that each issue "contains the independently adjudicated hardening contract, not a public exploit recipe." However, the attack surfaces described are real, the affected code paths are documented, and the acceptance contracts tell an attacker exactly where to look.
+
+## Finding #1: Credential-file mount bypass (Issue #84270)
+
+### What it means
+
+Hermes has a "master-store" denylist that is supposed to prevent certain sensitive files from being mounted into agent tool contexts. Think of it like a safety deposit box policy: certain files (authentication tokens, environment variables, OAuth credentials, pairing keys) should never be accessible to agent tools or plugins.
+
+The problem is that there are two separate code paths that handle file mounting: one for user configuration and one for skill registration. The denylist is enforced on the skill registration path but not on the config path. This means an attacker (or a misconfigured plugin) can mount `auth.json`, `.env`, OAuth tokens, and master-store credential files through the config path, completely bypassing the denylist.
+
+### Who is affected
+
+Everyone running Hermes Agent with credential file mounts enabled. The affected code is in `tools/credential_files.py` at lines 62-148 and 176-239. If you use Docker, SSH, or remote backends with credential mounting, you are in scope.
+
+### How to check
+
+Look for credential mount configurations in your Hermes config:
+
+```bash
+# Check your Hermes config for credential file mounts
+find ~/.config/hermes -name "*.yaml" -o -name "*.json" -o -name "*.toml" 2>/dev/null | \
+  xargs grep -l "credential_files\|credentialMount\|mount" 2>/dev/null
+
+# Check if any mount entries reference sensitive files
+find ~/.config/hermes -name "*.yaml" -o -name "*.json" -o -name "*.toml" 2>/dev/null | \
+  xargs grep -i "auth.json\|\.env\|oauth\|pairing\|master" 2>/dev/null
+```
+
+If you find mount configurations that reference sensitive credential files, those files may be accessible to agent tools despite the denylist.
+
+## Finding #2: Empty capability set broadens to all sandbox tools (Issue #84271)
+
+### What it means
+
+This is the most alarming finding. Hermes has a code execution tool that accepts an `enabled_tools` parameter to restrict which tools are available inside the sandbox. If you set `enabled_tools=["terminal", "write_file"]`, only those tools should be usable.
+
+The problem: when `enabled_tools` is set to an empty list `[]` (meaning "nothing allowed"), the system treats it the same as if the parameter was never provided at all. An unset parameter means "use the default," which typically means "allow everything." An empty list should mean "allow nothing." But the code uses Python truthiness checks — an empty list is falsy, so it falls through to the default branch.
+
+The result: a configuration that says "allow zero tools" actually allows "all tools." If you configured Hermes with an explicit empty capability set expecting maximum restriction, you got maximum permissiveness instead.
+
+### Who is affected
+
+Anyone running Hermes with an explicit `enabled_tools=[]` configuration, which is a reasonable security hardening choice. The affected code is in `tools/code_execution_tool.py` (lines 1080-1083 and 1333-1338) and `model_tools.py` (lines 1458-1468). This affects both local and remote execution paths.
+
+### How to check
+
+```bash
+# Check your Hermes config for explicit empty tool sets
+find ~/.config/hermes -name "*.yaml" -o -name "*.json" -o -name "*.toml" 2>/dev/null | \
+  xargs grep -A5 "enabled_tools" 2>/dev/null
+
+# Check for empty arrays in code execution config
+find ~/.config/hermes -name "*.yaml" -o -name "*.json" -o -name "*.toml" 2>/dev/null | \
+  xargs grep "enabled_tools:\s*\[\]" 2>/dev/null
+```
+
+If your config has `enabled_tools: []` or `"enabled_tools": []`, you believed you were restricting the sandbox to zero tools. In reality, all tools are available.
+
+### Why this matters
+
+This is a sandbox escape by configuration inversion. A security-conscious administrator who explicitly restricts capabilities gets the opposite of what they configured. An attacker who can influence the configuration (through prompt injection, supply chain compromise, or config file tampering) can set an empty tool list knowing it will be treated as "allow everything."
+
+## Finding #3: URL redaction leaks credentials in logs (Issue #84267)
+
+### What it means
+
+Hermes has a URL redaction system designed to strip sensitive information (API keys, tokens, passwords) from URLs before they appear in logs, error messages, and provider metadata. The problem is that the "strict" redaction mode — which properly strips userinfo (like `username:password@host`) and query parameters (like `?api_key=abc123`) — is only enforced at navigation-capable boundaries.
+
+At log boundaries, error messages, provider metadata, and base URL cache identity, the system falls back to a lenient mode that preserves these credentials. If an API URL looks like `https://api.example.com/v1/chat?key=sk-abc123`, the `sk-abc123` will appear in your logs, error output, and provider metadata.
+
+### Who is affected
+
+Everyone using Hermes with custom API endpoints that embed credentials in the URL. This includes self-hosted LLM providers, custom API gateways, and any setup where the API key is part of the URL rather than a separate header.
+
+### How to check
+
+```bash
+# Check if your Hermes config has URLs with embedded credentials
+find ~/.config/hermes -name "*.yaml" -o -name "*.json" -o -name "*.toml" 2>/dev/null | \
+  xargs grep -E "https?://[^@]*@" 2>/dev/null
+
+# Check for API keys in query parameters
+find ~/.config/hermes -name "*.yaml" -o -name "*.json" -o -name "*.toml" 2>/dev/null | \
+  xargs grep -iE "(key|token|secret|password)=" 2>/dev/null
+
+# Check Hermes logs for exposed credentials (if you have logs enabled)
+grep -r "api_key\|token\|secret\|password" ~/.local/share/hermes/logs/ 2>/dev/null | head -20
+```
+
+## Finding #4: Run registries authorize by raw run ID (Issue #84269)
+
+### What it means
+
+Hermes manages running agent sessions through registries that track approval state, events, and stop commands. These registries are keyed by "run ID" — a unique identifier for each agent run. The problem: the registries only check whether the caller provides a valid run ID, not whether the caller is authorized to interact with that specific run.
+
+In a multi-profile setup (where different users or configurations have separate profiles), Run A's ID can be used to approve, stop, or receive events from Run B, as long as the attacker knows or guesses Run B's ID. The affected code is in `gateway/platforms/api_server.py` across four different ranges (lines 1421-1437, 6354-6367, 6870-6901, 6937-6950).
+
+### Who is affected
+
+Anyone running Hermes in a multi-profile configuration, particularly shared installations where multiple users or teams access the same Hermes instance. Single-user setups are less exposed but still affected if the API server is network-accessible.
+
+### How to check
+
+```bash
+# Check if you have multiple Hermes profiles configured
+ls -la ~/.config/hermes/profiles/ 2>/dev/null
+
+# Check if the API server is bound to a network-accessible address
+grep -r "host\|bind\|listen" ~/.config/hermes/gateway* 2>/dev/null
+
+# Check if your API server requires authentication beyond run IDs
+grep -r "api_key\|bearer\|auth" ~/.config/hermes/gateway* 2>/dev/null
+```
+
+If you have multiple profiles and the API server is accessible, an attacker who can send HTTP requests to the API could potentially approve, stop, or monitor runs belonging to other profiles.
+
+## Finding #5: Profile callbacks resolve through default adapter (Issue #84266)
+
+### What it means
+
+When Hermes processes platform callbacks (webhook responses, OAuth callbacks, platform-specific events), it looks up the appropriate "adapter" to handle the callback. In a multi-profile setup, each profile should have its own adapter registry. The problem: if a callback arrives for Profile B but the system cannot find Profile B's adapter, it silently falls back to the default (Profile A's) adapter.
+
+This means a callback intended for one profile can be processed by another profile's adapter, potentially exposing one profile's data to another or allowing an attacker to trigger actions in the wrong profile context.
+
+### Who is affected
+
+Same as Finding #4: multi-profile Hermes installations. The affected code is in `gateway/platforms/api_server.py` (lines 1840-1998, 2032-2045, 2081).
+
+## The broader picture: why this audit matters
+
+These five findings are not isolated bugs. They are symptoms of a systemic issue: Hermes Agent's security model was built incrementally as features were added, and the interactions between features were not fully analyzed until now. The credential mount bypass exists because config loading and skill registration were implemented separately. The capability broadening exists because empty-list semantics were not distinguished from unset semantics. The run ID authorization exists because single-profile assumptions leaked into multi-profile code.
+
+The EPIC #82591 plan addresses all of this systematically. It calls for:
+
+1. **Centralized credential policy**: A single containment function that validates all config entries against the denylist, regardless of whether they come from config files or skill registration.
+
+2. **Tri-state capability semantics**: Distinguishing between `None` (unset, use defaults), `[]` (explicit deny-all), and `[specific tools]` (explicit allow-list). The system must fail closed when an unattended child process has no capability context.
+
+3. **Mandatory strict URL redaction**: Making credential stripping mandatory outside typed navigation paths, rather than optional.
+
+4. **Profile-scoped run authorization**: Recording the authenticated principal and profile scope on every run entry, and requiring scope equality for all control operations.
+
+5. **Strict adapter resolution**: Requiring that callback adapters resolve from the selected profile's registry, with no fallback to the default adapter. Missing adapters must return 503 instead of silently falling back.
+
+## How to protect yourself right now
+
+The fixes have not been merged yet. Here is what you can do today:
+
+### 1. Restrict network access to your Hermes API server
+
+If you run Hermes with a gateway/API server, make sure it is bound to `127.0.0.1` or behind authentication. The run-ID authorization issue (#84269) is only exploitable if an attacker can reach the API.
+
+```bash
+# Check what address your API server listens on
+grep -r "host\|bind\|listen\|0\.0\.0\.0" ~/.config/hermes/ 2>/dev/null
+
+# If you see 0.0.0.0, change it to 127.0.0.1
+```
+
+### 2. Avoid embedding credentials in URLs
+
+Move any API keys out of URLs and into request headers or environment variables. This protects you from the URL redaction issue (#84267).
+
+```bash
+# Instead of this:
+#   base_url: https://api.example.com/v1?key=sk-abc123
+# Use this:
+#   base_url: https://api.example.com/v1
+#   api_key: sk-abc123
+```
+
+### 3. Audit your credential file mounts
+
+Check whether any sensitive files (auth tokens, environment variables, OAuth credentials) are being mounted into agent tool contexts. If they are, remove them from mount configurations until the denylist fix lands.
+
+```bash
+# List all files in your Hermes config directory
+find ~/.config/hermes -type f 2>/dev/null | head -50
+```
+
+### 4. Run the latest version
+
+Track the implementation of EPIC #82591. When the fixes land, update immediately. The interlock requirement means the implementation PR must reference both the individual issue and the EPIC, so you can search for merged PRs tagged with these issue numbers.
+
+```bash
+# Check your current Hermes version
+hermes --version 2>/dev/null || cat ~/.config/hermes/version 2>/dev/null
+
+# Update when fixes are available
+pip install --upgrade hermes-agent 2>/dev/null
+# or
+hermes update 2>/dev/null
+```
+
+### 5. Enable logging to detect credential leakage
+
+Paradoxically, the URL redaction issue means you should check your logs for credentials that should not be there. If you find API keys or tokens in Hermes logs, rotate those credentials immediately.
+
+```bash
+# Search recent Hermes logs for potential credential leaks
+find ~/.local/share/hermes/logs/ -name "*.log" -mtime -7 2>/dev/null | \
+  xargs grep -iE "(key=|token=|secret=|password=|bearer )" 2>/dev/null
+```
+
+## Is there a fix?
+
+Not yet. All five issues were opened on August 12, 2026, and are currently in the audit phase. The EPIC #82591 implementation plan requires:
+
+- **Two interlocked trains**: One for godfile eradication (breaking up large monolithic files into properly scoped modules) and one for adding the security controls themselves.
+- **5x2x3 verification**: Five independent mapping lanes, two reviewers who did not produce the slice, and three verification waves for each change.
+- **Interlock tracking**: Every implementation PR must close its specific issue and link back to the EPIC.
+
+This is a thorough, well-planned response. The audit team clearly takes security seriously and is not rushing to ship incomplete fixes. However, until the patches land and are deployed, the vulnerabilities remain open.
+
+The timeline for fixes is not publicly specified, but given the complexity of the godfile eradication work and the multi-verification requirement, expect several weeks before all five findings are addressed.
+
+## Should you stop using Hermes?
+
+No. These are hardening improvements discovered through proactive security auditing, not evidence of active exploitation. The Hermes team discovered these issues themselves through systematic review. The attack surfaces are real but require specific conditions to exploit:
+
+- Findings #1 and #2 require influence over configuration (either direct access or a supply chain attack).
+- Finding #3 requires custom API endpoints with embedded credentials.
+- Findings #4 and #5 require network access to the API server in a multi-profile setup.
+
+If you run Hermes as a single-user tool behind localhost, your exposure is limited. If you run it as a shared service with network access and multiple profiles, your exposure is significant and you should implement the mitigations above immediately.
+
+The right response is to apply temporary mitigations, watch for the fix PRs, update as soon as they land, and rotate any credentials that may have been exposed through logging. This is what good security hygiene looks like — not panic, but systematic risk reduction.
+
+## What this means for the coding agent ecosystem
+
+Hermes is not alone in these kinds of issues. Claude Code had [CVE-2026-55607](/blog/beware-cve-2026-55607-claude-code-worktree-sandbox-escape/) — a sandbox escape with CVSS 8.8. Cline had [a supply chain attack via GitHub Actions](/blog/beware-clinejection-supply-chain-attack-github-actions/). The pattern is clear: coding agents are complex systems with large attack surfaces, and the security community is actively probing them.
+
+The difference with Hermes is the transparency. Opening a public EPIC with 5 detailed security findings, complete with acceptance contracts and interlock requirements, is unusual. Most projects quietly patch these issues and disclose them later (or never). Hermes is showing its work, which means users can track the fixes in real time and verify the remediation themselves.
+
+That transparency is valuable — but it also means attackers can read the same issues. The clock is ticking. Apply the mitigations, rotate your credentials, and watch for the fixes.
