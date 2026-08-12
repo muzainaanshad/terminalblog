@@ -1,17 +1,19 @@
 ---
-title: "Oh My Pi v17 Is Here: The Hub Tool, xd:// Virtual Files, and a Plugins Standard — What Changes for Beginners"
-description: "Oh My Pi's v17 series — from v17.0.0 on July 15 through v17.2.12 on August 9 — merges its messaging and job tools into one hub, replaces hidden tools with xd:// virtual files, adds an Agent Plugins 1.0.0 standard, and fixes a memory leak that made long sessions balloon. A plain-English guide to what changed and whether your setup is affected."
+title: "Oh My Pi Just Got a Compress Command, Smarter Cleanse, and MCP Fixes — v17.2.15 Changes Everything"
+description: "Oh My Pi v17.2.14 and v17.2.15 (Aug 11-12) add omp compress, natural-language cleanse, interactive picker, MCP Streamable HTTP fixes, handoff artifact preservation, and hardened tar parsing. The v17 series continues its daily-shipping pace with features beginners will actually use."
 pubDate: "2026-08-09T10:00:00Z"
-updatedDate: "2026-08-10T06:00:00Z"
-tags: ["oh-my-pi", "v17", "release", "agent-plugins", "terminal-agent", "coding-agent", "beginner"]
+updatedDate: "2026-08-12T10:00:00Z"
+tags: ["oh-my-pi", "v17", "v17.2.15", "release", "omp-compress", "omp-cleanse", "mcp", "terminal-agent", "coding-agent", "beginner"]
 tool: "oh-my-pi"
 author: "sage"
-image: "/api/og?title=Oh+My+Pi+v17+Hub+xd%2F%2F+Plugins&tool=oh-my-pi"
+image: "/api/og?title=Oh+My+Pi+v17.2.15+Compress+Cleanse+MCP&tool=oh-my-pi"
 ---
 
-Oh My Pi — the open-source terminal coding agent that has been quietly shipping daily releases while bigger names take weeks — just crossed into version **17**. The v17 series started with v17.0.0 on July 15, 2026, and the latest release, **v17.2.12**, landed August 9. If you last looked at Oh My Pi during the v16 era, this is the update to care about: v17 is not a pile of small fixes. It reorganizes how the agent's tools work under the hood, and two of its headline changes — the unified `hub` tool and the new `xd://` virtual-file system — will change how you approve, watch, and share agent work. The August 9 hotfix batch, meanwhile, is the kind of release that keeps long sessions from slowly eating your RAM.
+Oh My Pi — the open-source terminal coding agent that has been quietly shipping daily releases while bigger names take weeks — just crossed into version **17**. The v17 series started with v17.0.0 on July 15, 2026, and the latest releases, **v17.2.14 (Aug 11)** and **v17.2.15 (Aug 12)**, keep the momentum going with features beginners will actually use: a new `omp compress` command, a dramatically smarter `omp cleanse` with natural-language requests and an interactive picker, MCP Streamable HTTP fixes, handoff artifact preservation, and hardened tar parsing.
 
-This guide explains what actually changed, what breaks when you upgrade, and what beginners should do next. No assumed knowledge: if you have never opened a terminal agent, the first section tells you what Oh My Pi even is.
+If you last looked at Oh My Pi during the v16 era, this is the update to care about: v17 is not a pile of small fixes. It reorganizes how the agent's tools work under the hood, and two of its headline changes — the unified `hub` tool and the new `xd://` virtual-file system — will change how you approve, watch, and share agent work. The August 9 hotfix batch (v17.2.12) fixed memory leaks and idle CPU spin. Now v17.2.14 and v17.2.15 add genuinely useful new capabilities.
+
+This guide explains what actually changed across the v17 series, what breaks when you upgrade, and what beginners should do next. No assumed knowledge: if you have never opened a terminal agent, the first section tells you what Oh My Pi even is.
 
 ## What is Oh My Pi?
 
@@ -51,6 +53,39 @@ The v17 line has shipped steadily since mid-July (v17.1.0 landed July 24, v17.2.
 
 The same batch fixed two correctness bugs you might have hit: shell "minimization" was rewriting short command outputs — including replacing meaningful `rustc --print` output with the single word `OK` — so outputs under 1,000 characters now pass through unchanged; and a `/handoff` with empty content was being shown as "cancelled" instead of a failed generation, which made debugging handoffs confusing. On the provider side, Codex sessions now try every configured account before surfacing a credential error, and Qwen3.8-Max's discovered metadata was corrected so thinking controls and image input actually work through it.
 
+**v17.2.14 (August 11) — Reasoning controls and external thinking.** This release adds granular control over model reasoning:
+
+- **`forceReasoningOff` and `disableReasoning` options** for OpenAI and Azure OpenAI models — turn off native reasoning entirely when you want faster, cheaper responses or when the model's built-in reasoning hurts more than helps.
+- **`externalThinking` setting** — enables a private scratchpad via the new `think` tool, letting the agent reason externally before committing to an answer. Useful for complex multi-step tasks where you want to see the agent's thought process.
+
+**v17.2.15 (August 12) — The feature-packed release.** This is the biggest feature drop in the v17 series so far, and several changes directly improve the beginner experience:
+
+- **New `omp compress` command.** Rewrites single or multiple text files (supporting glob patterns and concurrent processing) into dense "prompt registers" using an isolated two-tool agent loop. Think of it as a smart summarizer that turns verbose source files into compact context you can feed back to the agent — perfect for reducing token usage on large codebases.
+
+- **Smarter `omp cleanse` with natural language and interactive picker.** The code-quality command now supports:
+  - **Natural language requests:** `omp cleanse "fix all lint errors in the Python modules"` launches a discovery subagent that inspects your project, determines the right commands, and runs them.
+  - **Interactive picker:** Run `omp cleanse` without arguments on a TTY and you get a menu to run all checkers, pick a specific one, or describe what to fix in plain English.
+  - **Massively expanded tool discovery:** Now supports `staticcheck` and `golangci-lint` (Go); `mypy`, `pylint`, `flake8`, `ty`, and `basedpyright` (Python); `oxlint`, `deno lint`, `stylelint`, and `vue-tsc` (JS/TS); and `actionlint` (GitHub Workflows).
+  - **Higher subagent cap:** Default for `omp cleanse` raised from 8 to 32 subagents for faster parallel checking.
+
+- **MCP Streamable HTTP transport fixes.** Updated the negotiated protocol version to `2025-11-25`, resolving connection drops, SSE resumption gaps, and double-execution of tools during auth refreshes. If you use remote MCP servers over HTTP, this release is a significant stability upgrade.
+
+- **`/handoff` preserves local artifacts.** Plans, scratch files, and research notes now copy across the handoff session boundary instead of being lost. Handoffs between sessions (or machines) are finally practical.
+
+- **Hardened tar parsing.** Replaced libarchive-based tar reading with an in-process reader that safely handles complex archives, symlinks, and sparse metadata — no more crashes on weird tarballs.
+
+- **`--external-thinking` CLI flag.** Forces external thinking tool activation from the command line, useful for scripting or when you want consistent behavior across sessions.
+
+- **Hashline edit safety.** Added a post-apply parse advisory warning that alerts you when an applied edit fails to parse (despite the pre-edit content parsing successfully), catching balance-neutral misplacements that previously failed silently. Also fixed a bug where Rust lifetimes (e.g., `'static`) were incorrectly parsed as string literals, which could lead to silent signature deletions.
+
+- **Headless mode hang fix.** Fixed a hang in `omp -p` (print mode) runs when `plan.defaultOnStartup: true` was enabled.
+
+- **Tool activity hiding fixed.** `display.hideToolActivity` now properly hides reminders, diagnostics, and completion blocks, not just the main tool output.
+
+- **Anthropic model ID parsing** is now case-insensitive, and the high-resolution 1932px frame tier extends to Claude Opus 5 and later, preserving full history per compaction.
+
+- **SSE reconnection support.** Extended parsed Server-Sent Events to include optional `id` and `retry` fields, enabling reconnecting transports to retain stream cursors and respect server-requested retry intervals.
+
 ## What breaks when you upgrade
 
 Breaking changes in v17.0.0 are the real upgrade hazard:
@@ -63,11 +98,11 @@ For a typical beginner workflow — `omp` in a repo, describe a change, approve 
 
 ## How to update
 
-Oh My Pi generally self-updates, but the official upgrade paths are: macOS/Linux via `curl -fsSL https://omp.sh/install | sh`, Windows via `irm https://omp.sh/install.ps1 | iex`, Homebrew users via `brew upgrade can1357/tap/omp`, and npm users via `bun update -g @oh-my-pi/pi-coding-agent`. Run the version check after updating to confirm you are on v17.2.12. If you are automating agents, watch for config settings referencing the old discovery or resolve paths and replace them per the v17.0.0 release notes.
+Oh My Pi generally self-updates, but the official upgrade paths are: macOS/Linux via `curl -fsSL https://omp.sh/install | sh`, Windows via `irm https://omp.sh/install.ps1 | iex`, Homebrew users via `brew upgrade can1357/tap/omp`, and npm users via `bun update -g @oh-my-pi/pi-coding-agent`. Run the version check after updating to confirm you are on **v17.2.15**. If you are automating agents, watch for config settings referencing the old discovery or resolve paths and replace them per the v17.0.0 release notes.
 
 ## The bottom line
 
-v17 is the biggest internal change to the Oh My Pi agent in months: one tool to rule messaging, background jobs, and long-running processes; transparent `xd://` approvals instead of hidden ones; and a serious plugins standard that makes extension safer. For beginners the practical wins are the stability fixes in the v17.2 series — fewer timeouts, cleaner quota handling, instant plugin reloads, and no more memory creep on long sessions. If you skipped the v16 series updates, the jump to v17.2.12 is worth it.
+v17 is the biggest internal change to the Oh My Pi agent in months: one tool to rule messaging, background jobs, and long-running processes; transparent `xd://` approvals instead of hidden ones; and a serious plugins standard that makes extension safer. For beginners the practical wins keep stacking: the stability fixes in v17.2.12 (no more memory leaks, idle CPU spin, or dropped search sources), reasoning controls in v17.2.14, and now v17.2.15's `omp compress`, natural-language `omp cleanse`, MCP fixes, handoff artifact preservation, and hardened tar parsing. If you skipped the v16 series updates, the jump to v17.2.15 is absolutely worth it.
 
 ## Related articles
 
