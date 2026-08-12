@@ -1,0 +1,79 @@
+---
+title: "Claude Code Just Fixed That Windows Git Bug That Drove Everyone Crazy"
+description: "v2.1.228 drops with fixes for interactive session crashes, Windows Git detection, cross-session messaging leaks, and more. Here's what actually matters."
+pubDate: 2026-08-12
+updatedDate: 2026-08-12
+heroImage: "/blog-placeholder.jpg"
+tags: ["claude-code", "releases", "beginner-friendly"]
+tool: "claude-code"
+---
+
+Claude Code v2.1.228 landed 13 hours ago. If you've been fighting Windows Git detection, interactive sessions that freeze, or cross-session message leaks — this one's for you.
+
+## The Headline Fixes
+
+### Interactive Sessions Stopping Mid-Work (Fixed)
+**The bug:** You're in the middle of a coding session, everything's flowing, then — the UI stops redrawing. The process is still running, but you're staring at a frozen screen. This was a rare internal layout error that could strike any time.
+
+**The fix:** v2.1.228 patches the redraw loop. Your sessions should now stay responsive even when internal hiccups occur.
+
+### Windows: "Git Not Found" When It's Right There (Fixed)
+**The bug:** You launch Claude Code from a parent folder of your Git installation (common on Windows), and it insists Git isn't installed. Even though `git --version` works fine in your terminal.
+
+**The fix:** The Git detection logic now properly searches parent directories. No more fake "Git not found" errors on Windows.
+
+### Cross-Session Messaging Leaking Conversation History (Fixed)
+**The bug:** When using Remote Control to `/resume` a session on another machine, the resumed conversation's title or history would leak into your connected session. Privacy issue. Confusing UX.
+
+**The fix:** Resume operations are now properly isolated. What happens in the resumed session stays in the resumed session.
+
+### Self-Hosted Runners Failing on Checkout Hook Errors (Fixed)
+**The bug:** `claude self-hosted-runner` sessions would fail completely on fresh runners when a `checkout` hook failed — even for repos the session doesn't push to.
+
+**The fix:** Problematic repos are now skipped with a warning instead of killing the whole session.
+
+## Quality-of-Life Improvements
+
+| Improvement | Why It Matters |
+|-------------|----------------|
+| Cross-session messages show inline | No more collapsed lines — sender + body visible immediately |
+| Vertex AI credentials fail fast | Expired/missing GCP creds fail in seconds, not minutes of retries |
+| Compaction progress shows retry countdown | You actually see what's happening during compaction |
+| Terminal busy-spinner glyphs updated | Less tab-bar jitter on popular terminals |
+| Write tool matches Edit tool rules | Newer models can overwrite unread files (older models still require read-first) |
+| Skills from claude.ai hardened | No more shadowing local commands, no `!` command execution, `@` files don't expand remotely |
+| Outdated pricing note removed | First-use notice no longer mentions "auto mode costs slightly more" for Pro/Max/Team |
+
+## What This Means for You
+
+**If you're on Windows:** Update immediately. The Git detection fix alone saves daily frustration.
+
+**If you use Remote Control / cross-session messaging:** The privacy leak is patched. Update before your next multi-machine session.
+
+**If you run self-hosted runners:** The checkout hook resilience means fewer "why did my runner die?" investigations.
+
+**Everyone else:** The interactive session stability fix is invisible until it saves you. It's the kind of fix you only notice when it *doesn't* happen.
+
+## How to Update
+
+```bash
+# npm
+npm update -g @anthropic-ai/claude-code
+
+# or if you installed via homebrew
+brew upgrade claude-code
+
+# verify
+claude --version
+# should show 2.1.228
+```
+
+## The Bigger Picture
+
+Anthropic's been shipping fixes at a relentless pace — v2.1.223, 224, now 228 in quick succession. Each release targets real pain points reported by developers actually using the tool daily. No marketing fluff, just "this broke, here's the fix."
+
+That's the release cadence you want from a coding agent you depend on.
+
+---
+
+*Found this useful? Share it with a teammate who's been cursing at Windows Git detection. Questions about a specific fix? Drop a comment.*
