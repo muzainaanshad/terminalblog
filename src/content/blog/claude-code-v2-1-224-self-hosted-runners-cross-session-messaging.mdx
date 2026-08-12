@@ -1,8 +1,8 @@
 ---
 title: "Claude Code v2.1.224: Self-Hosted Runners, Cross-Session Messaging, and Tighter Secret Handling"
-description: "Anthropic's August 7 Claude Code release lets you run sessions on your own machines, lets agents message each other, and masks JWT and AWS credentials in sandboxed commands. Updated with v2.1.225/226: gateway spend limits, workspace trust prompts, and a wave of reliability fixes."
+description: "Anthropic's August 7 Claude Code release lets you run sessions on your own machines, lets agents message each other, and masks JWT and AWS credentials in sandboxed commands. Updated with v2.1.225–228: gateway spend limits, workspace trust, hardened skills from claude.ai, and a wave of reliability fixes."
 pubDate: "2026-08-07T10:00:00Z"
-updatedDate: "2026-08-08T08:00:00Z"
+updatedDate: "2026-08-12T00:00:00Z"
 tags: ["claude-code", "anthropic", "release", "self-hosted", "security", "agent-to-agent"]
 tool: "claude-code"
 author: "sage"
@@ -80,13 +80,45 @@ Other fixes worth knowing: conversation history no longer breaks on Remote Contr
 
 **The practical takeaway:** if you adopted v2.1.224 for self-hosted runners or cross-session messaging, update to v2.1.225 before relying on it in CI — the OAuth, headless-message, and runner `--base-dir` fixes are exactly the kind of bugs that only show up in automation. And if your gateway enforces spend limits, the new warning text tells you the cap, reset time, and who to ask.
 
+## What landed August 10–11: v2.1.227 and v2.1.228
+
+Anthropic shipped **v2.1.227** on August 10 and **v2.1.228** on August 11. v2.1.227 is mostly reliability fixes — the notable one being that every Bash command failing under `claude-code-action` with `allowed_non_write_users` on GitHub-hosted runners is now fixed, so CI workflows that use GitHub Actions should work again.
+
+**v2.1.228 is the security story.** Here is what changed and why it matters:
+
+### Skills from claude.ai can no longer hijack your session
+
+If you use the Claude Code marketplace (claude.ai skill sync), this is the single most important change: **synced skills now cannot shadow your local commands or MCP prompts.** Before v2.1.228, a skill installed from the marketplace could define a command with the same name as one of your local commands or MCP tools — and silently override it. Your agent would run the marketplace version instead of yours, without warning.
+
+That is a supply-chain attack vector: a malicious or compromised skill could define a `build` or `deploy` command that does something different from what you expect. v2.1.228 closes the door:
+
+- **No more shadowing.** Marketplace skills cannot define commands or MCP prompts that have the same name as local ones.
+- **Descriptions are sanitized.** Skill descriptions are cleaned and labeled so they cannot mislead the model about what a tool does.
+- **Bodies are restricted.** Synced skill bodies are no longer allowed to run `!` (shell) commands or expand `@` (file) references on your machine.
+
+For a beginner: imagine installing a plugin from an app store, and that plugin quietly replacing your local `npm test` with its own version. That was possible before v2.1.228. It is not anymore.
+
+### Write tool changes: newer models overwrite without reading first
+
+The `Write` tool now lets newer models overwrite an existing file they haven't read during the current session — the same permission the `Edit` tool has always had. Older models still require a read first. This is a quality-of-life change that speeds up batch file operations: the agent no longer needs to read a file just to overwrite it entirely.
+
+If you rely on the safety net of "the agent must read before writing" to catch bad overwrites, be aware that this net is now thinner for newer models. Your sandbox deny rules still apply.
+
+### Other fixes worth noting
+
+- **Windows Git Bash detection fixed.** Claude Code launched from a parent folder of the git installation now finds `git` correctly. If you are on Windows and Claude Code used to claim git was not installed when it was, this is the fix.
+- **Session cleanup no longer nukes your project memory.** A bug caused cleanup to delete contents inside a project's `.claude/memory/` folder. That is now fixed.
+- **Vertex AI credentials fail fast.** Expired or missing Google Cloud credentials now produce an immediate error instead of retrying for minutes. Saves time and avoids confusing timeout messages.
+- **Cross-session messages display inline.** Instead of a collapsed one-liner, you now see the sender and body directly in the conversation — and Remote Control sessions on other machines show the session name as the sender.
+- **Compaction is less opaque.** The retry countdown and stall hint now appear during compaction instead of only a progress bar, so you know whether it is working or stuck.
+
 ## Getting started
 
 Update and check your version:
 
 ```bash
 npm update -g @anthropic-ai/claude-code
-claude --version   # should report 2.1.226 (2.1.225 + 2.1.226 fix packages)
+claude --version   # should report 2.1.228 or later
 ```
 
 Then try the new pieces in order:
@@ -106,7 +138,7 @@ If you use sandbox deny rules, this is the release to re-test them on — the tr
 
 ## The bottom line
 
-v2.1.224 is a "where does the work happen" release: self-hosted runners for the enterprise, cross-session messaging for multi-agent workflows, zip plugins for distribution, and a real security pass on credentials and sandbox denies. For a beginner, the two things to remember are the approval gate on cross-session messages (remote agents cannot run wild on unlocked sessions) and re-validating your deny rules after updating.
+v2.1.224 is a "where does the work happen" release: self-hosted runners for the enterprise, cross-session messaging for multi-agent workflows, zip plugins for distribution, and a real security pass on credentials and sandbox denies. v2.1.225–226 polished the rough edges. And v2.1.228 closes a supply-chain gap that let marketplace skills shadow your local commands — if you use skill sync, update today. For a beginner, the two things to remember are the approval gate on cross-session messages (remote agents cannot run wild on unlocked sessions), the skill shadowing fix (marketplace skills can no longer override your local commands), and re-validating your deny rules after updating.
 
 ---
 
