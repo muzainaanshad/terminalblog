@@ -22,6 +22,10 @@ const {
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 const ogImage = image || `/api/og?title=${encodeURIComponent(title)}&description=${encodeURIComponent(description || '')}`;
+// Truncate meta description to ≤155 chars for SEO
+const metaDescription = (description || '').length > 155
+  ? (description || '').slice(0, 152).replace(/\s+\S*$/, '') + '...'
+  : description || '';
 const isArticle = Astro.url.pathname.startsWith('/blog/');
 const isHome = Astro.url.pathname === '/' || Astro.url.pathname === '';
 const pubDate = (Astro.props as any).pubDate;
@@ -31,7 +35,13 @@ const tags = (Astro.props as any).tags || [];
 const pageTitle =
   title === SITE_TITLE || isHome
     ? SITE_TITLE_HOME
-    : `${title} — ${SITE_TITLE}`;
+    : (() => {
+        const full = `${title} — ${SITE_TITLE}`;
+        if (full.length <= 60) return full;
+        // Truncate title to fit within 60 chars with suffix
+        const maxTitle = 60 - ` — ${SITE_TITLE}`.length;
+        return `${title.slice(0, maxTitle)} — ${SITE_TITLE}`;
+      })();
 
 // Build JSON-LD graph
 const graph = isArticle && pubDate
@@ -55,7 +65,7 @@ const graph = isArticle && pubDate
     <Seo
       title={pageTitle}
       titleTemplate={isHome ? '%s' : '%s — terminalblog'}
-      description={description}
+      description={metaDescription}
       canonical={canonicalURL.href}
       ogType={isArticle ? 'article' : 'website'}
       ogImage={new URL(ogImage, Astro.site).href}
