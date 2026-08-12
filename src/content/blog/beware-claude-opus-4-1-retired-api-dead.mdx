@@ -1,0 +1,164 @@
+---
+title: "Anthropic Just Killed Opus 4.1 — Your Agents Are Broken and Nobody Told You"
+description: "Claude Opus 4.1 was retired from the Anthropic API on August 5, 2026. Any hardcoded model ID now returns errors. Plus a hidden gotcha: passing temperature or top_p to Opus 4.7/4.8 returns HTTP 400. Here is how to diagnose what broke, what to migrate to, and how to avoid the silent failures hitting production agents right now."
+pubDate: "2026-08-12T09:00:00Z"
+tags: ["beware", "anthropic", "claude-code", "api", "migration", "breaking-change"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Opus+4.1+Is+Dead&tool=claude-code"
+---
+
+## Related articles
+
+- [Claude Sonnet 5: The New Default Model in Claude Code](/blog/claude-sonnet-5-default-model-guide/)
+- [Claude Opus 5 Arrives: Near-Fable Intelligence at Half the Price](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Beware: Claude Code v2.1.214 Quietly Closed Six Permission Holes](/blog/beware-claude-code-v2-1-214-permission-fail-closed/)
+
+---
+
+On August 5, 2026, Anthropic retired `claude-opus-4-1-20250805` from the Claude API. Every request to that model ID now returns an error. If your coding agents, CI pipelines, or background scripts reference Opus 4.1 anywhere — in a model string, a config file, a hardcoded environment variable — they broke that day. They are still broken. And unless you specifically check, you might not know it.
+
+This is the kind of silent failure that does not ring alarms. Your agent runs, hits the API, gets back a 404 or a redirect, and either crashes silently or — worse — continues with a fallback model that behaves differently than expected. If you are seeing sudden quality regressions, unexpected refusals, or agents that "work but feel wrong," this is the first thing to check.
+
+## What happened
+
+Anthropic announced the deprecation of Opus 4.1 on June 5, 2026 — exactly 60 days before retirement. The recommended replacement was `claude-opus-4-8`. After August 5, requests to the old model ID fail with an immediate error.
+
+The timeline was clear if you were reading release notes:
+
+| Date | Event |
+|------|-------|
+| June 5, 2026 | Deprecation notice published; `claude-opus-4-1-20250805` marked deprecated |
+| June 5 – August 5 | 60-day migration window; model still functional |
+| August 5, 2026 | Model retired; all requests to old model ID now fail |
+
+That is a generous window by AI-industry standards. Most model providers give 30 days or less. The problem is not the warning — it is that nobody reads deprecation emails until things break.
+
+## Who is affected
+
+You are affected if **any** of the following reference `claude-opus-4-1-20250805`:
+
+- **Claude Code model override** — if you pinned the Opus model to 4.1 via `--model` flag or config
+- **API scripts** — any `curl` call, Python script, or Node integration that sends `"model": "claude-opus-4-1-20250805"` in the request body
+- **CI/CD pipelines** — GitHub Actions, GitLab CI, or any automated workflow that calls the Anthropic API with the old model string
+- **Agent harnesses** — Codex, Hermes, Goose, or any framework that lets you configure the model endpoint
+- **Bedrock / Vertex deployments** — if you provisioned Amazon Bedrock or Google Vertex with the Opus 4.1 model ID, those integrations break too
+- **Third-party tools** — any SaaS product that internally routes to the Anthropic API and cached the old model identifier
+
+The failure mode depends on your setup. Direct API calls return an HTTP error immediately. Framework-level integrations may silently fall back to a different model, which changes behavior without obvious failure signals. A Bedrock deployment that was routing to Opus 4.1 may show up as "model not available" in CloudTrail.
+
+## How to diagnose
+
+The fastest check is a direct API call with the old model ID:
+
+```bash
+curl -s https://api.anthropic.com/v1/messages \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "claude-opus-4-1-20250805",
+    "max_tokens": 64,
+    "messages": [{"role": "user", "content": "Reply with OK"}]
+  }'
+```
+
+If this returns an error — model not found, invalid model ID, or similar — your integration is broken.
+
+For code-level checks, search your entire workspace:
+
+```bash
+# Find any reference to the old model ID
+grep -r "opus-4-1" . --include="*.json" --include="*.yaml" --include="*.yml" --include="*.env" --include="*.toml" --include="*.cjs" --include="*.mjs" --include="*.py"
+
+# Also check for the older identifier patterns
+grep -r "claude-opus-4-1-20250805" . --include="*.json" --include="*.yaml" --include="*.env" --include="*.py" --include="*.js"
+```
+
+If your agent harness has a model configuration file (often `.claude/settings.json`, `agent.config.json`, or an environment variable like `ANTHROPIC_MODEL`), check it directly.
+
+## What to migrate to
+
+Anthropic recommends `claude-opus-4-8` as the drop-in replacement. In practice, there are three viable options depending on your use case and budget:
+
+| Model | When to use | API model ID | Approximate cost |
+|-------|-------------|-------------|------------------|
+| **Claude Opus 4.8** | Direct replacement; closest capability match | `claude-opus-4-8` | Higher (flagship tier) |
+| **Claude Opus 5** | If you want state-of-the-art coding + agentic performance | `claude-opus-5` | Mid-tier Opus pricing |
+| **Claude Sonnet 5** | If Opus 4.1 was overkill for your tasks; near-Opus quality at 1/3 cost | `claude-sonnet-5` | $3/$15 per MTok (standard) |
+
+For most coding agent workflows, **Opus 5 or Sonnet 5** are better choices than Opus 4.8. Opus 5 launched July 24 and is the current state-of-the-art for agentic coding. Sonnet 5 delivers close-to-Opus quality at roughly one-third the cost. Only reach for Opus 4.8 if you have a specific reason — like needing the Priority Tier service level, which Sonnet 5 does not support.
+
+**If you were using Opus 4.1 through Claude Code** (not the API directly), Claude Code already auto-upgrades to Opus 5 as the default Opus model. You likely do not need to change anything — unless you had explicitly pinned the model version in a config override.
+
+## The hidden gotcha: temperature and top_p now return 400
+
+Even if you have already migrated to Opus 4.8 or 5, there is a breaking behavioral change that catches experienced developers off guard.
+
+**In Opus 4.7 and 4.8 (and Opus 5), passing non-default values for `temperature`, `top_p`, or `top_k` returns HTTP 400.** These parameters are no longer user-configurable on the flagship Opus models. The only way to steer model behavior is through prompting.
+
+This matters because a common pattern in agent pipelines is:
+
+```python
+# This worked on Opus 4.1 — it BREAKS on 4.8 / Opus 5
+response = client.messages.create(
+    model="claude-opus-4-8",
+    max_tokens=4096,
+    temperature=0.3,  # ← HTTP 400
+    top_p=0.9,        # ← HTTP 400
+    messages=[...]
+)
+```
+
+If your agent code sets these parameters, update your code to remove them. Use prompting strategies instead — system prompt instructions like "be precise and conservative" or "explore multiple approaches" achieve similar effects without the API-level parameter.
+
+Sonnet 5 does not have this restriction. If you need user-configurable temperature, Sonnet 5 still supports it.
+
+## The broader lesson: model lifecycle is an operational dependency
+
+The Opus 4.1 retirement is not an isolated event. Anthropic retired Opus 4 and Opus 4.1 simultaneously. They gave 60 days. That is fair. But the pattern of model retirements breaking production is becoming predictable.
+
+Every coding agent operator should have:
+
+1. **Model ID as an explicit config variable**, not hardcoded in source. Set it in an environment variable or config file that is easy to update in one place.
+2. **A deprecation monitoring practice.** Subscribe to the Anthropic changelog, OpenAI release notes, and the model deprecation pages. Check monthly.
+3. **Error-rate alerts.** If your agent pipeline starts returning 400s or model-not-found errors at a rate above your baseline, you need to know immediately — not when a developer notices the agent "feels slower."
+4. **Fallback model strategy.** If your primary model goes down, what does the agent fall back to? If the fallback is "silent quality regression," you have a monitoring gap.
+
+The AI model market is moving fast. Models ship, deprecate, and get replaced in weeks. Treating the model layer as a stable API is a mistake. Treat it like a dependency that needs its own lifecycle management.
+
+## Quick migration checklist
+
+```bash
+# 1. Find old model references
+grep -r "opus-4-1" . --include="*.json" --include="*.yaml" --include="*.env" --include="*.py" --include="*.js"
+
+# 2. Replace with your chosen model
+#    Option A: Opus 4.8 (direct replacement)
+#    Option B: Opus 5 (latest, best for coding)
+#    Option C: Sonnet 5 (cheapest, near-Opus quality)
+
+# 3. Remove temperature/top_p/top_k from Opus 4.7+ calls
+grep -r "temperature" . --include="*.py" --include="*.js" --include="*.ts" | grep -i opus
+grep -r "top_p" . --include="*.py" --include="*.js" --include="*.ts" | grep -i opus
+grep -r "top_k" . --include="*.py" --include="*.js" --include="*.ts" | grep -i opus
+
+# 4. Test with a direct API call
+curl -s https://api.anthropic.com/v1/messages \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "claude-opus-5",
+    "max_tokens": 64,
+    "messages": [{"role": "user", "content": "Reply with OK"}]
+  }'
+
+# 5. Verify your agent runs end-to-end
+```
+
+## Bottom line
+
+Claude Opus 4.1 is gone. The 60-day grace period is over. If your agents were pinned to the old model ID, they are returning errors right now — or worse, silently falling back to a different model with different behavior. Check your configs, update the model string, and while you are at it, remove any `temperature` or `top_p` parameters from Opus-family API calls before they become your next 400 error.
+
+The model layer is not infrastructure you set and forget. It is a living dependency that needs active lifecycle management. Treat it accordingly.
