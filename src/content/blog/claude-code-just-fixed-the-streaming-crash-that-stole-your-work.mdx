@@ -1,0 +1,144 @@
+---
+title: "Claude Code Just Fixed the Streaming Crash That Stole Your Work"
+description: "v2.1.229 stops long responses from vanishing mid-stream, fixes Windows path crashes, and adds SSE keepalive so Vertex/Bedrock sessions don't die during thinking pauses."
+pubDate: 2026-08-13
+updatedDate: 2026-08-13
+heroImage: "/blog-placeholder.jpg"
+tags: ["claude-code", "releases", "anthropic", "bug-fixes"]
+tools: ["claude-code"]
+---
+
+You're in the middle of a complex refactor. Claude Code is streaming a 500-line response. Then — *poof* — half of it vanishes. Or it prints twice. Or the terminal crashes entirely.
+
+That was v2.1.228. **v2.1.229 fixes it.**
+
+Released 6 hours ago, this patch tackles the streaming reliability issues that have been driving developers crazy, plus a stack of Windows crashes, Vertex/Bedrock disconnects, and Remote Control bugs. If you've ever lost work to a mid-stream glitch, update now.
+
+---
+
+## The Headline Fix: Streaming Finally Works
+
+**Long responses partly disappearing while streaming and being printed twice in the terminal** — fixed.
+
+This was the most reported regression. You'd watch the response build, then chunks would vanish or duplicate. The root cause was a race condition in the terminal renderer when handling high-volume streaming output. v2.1.229 rewrites the stream buffer flush logic so every chunk arrives exactly once, in order.
+
+**RangeError crash when a progress bar or markdown table rendered in a very narrow terminal** — fixed.
+
+If you split your terminal pane too thin, the whole process crashed. Could also crash `claude --continue`/`--resume` at startup. Now it gracefully handles narrow viewports.
+
+---
+
+## Windows Users: Your Crashes Are Gone
+
+**Crash on Windows when a tool call referenced an extended-length (`\\?\`) or UNC path** — fixed.
+
+Windows paths longer than 260 chars use the `\\?\` prefix. UNC paths (`\\server\share`) are common on corporate networks. Both triggered unhandled exceptions. Now they resolve correctly.
+
+**File-watcher handle leak after atomic file replacements** — fixed.
+
+**Uncaught error on Windows when scheduled-tasks watcher failed on network/virtual filesystems** — fixed.
+
+If you work on network drives or WSL-mounted volumes, the file watcher would silently leak handles until the OS killed the process. That's resolved.
+
+---
+
+## Vertex AI & Bedrock: No More Mid-Thinking Disconnects
+
+**SSE keepalive pings to gateway streaming responses during long thinking pauses** — added.
+
+This is huge for enterprise users. When Claude thinks for 2+ minutes (complex reasoning, large context), Vertex AI and Bedrock gateways would idle-timeout the connection. The session dies, you lose context, you start over.
+
+Now the gateway sends keepalive pings during thinking. Your 10-minute reasoning session stays alive.
+
+**Vertex AI credential handling: expired/missing Google Cloud credentials now fail within seconds instead of retrying for minutes** — improved.
+
+No more staring at a spinner wondering if it's working.
+
+---
+
+## Remote Control Gets Reliable
+
+| Issue | Fixed? |
+|-------|--------|
+| Stuck working spinner after slash command on laptop | ✅ |
+| `/resume` while connected leaking conversation title/history | ✅ |
+| Cross-session messaging starting without inbox on first session | ✅ |
+| `ListAgents` now marks disconnected sessions `offline`, labels cloud sessions `cloud` | ✅ |
+| `claude remote-control --continue` documented for resuming most recent session | ✅ |
+
+Remote Control is finally usable for daily cross-machine workflows.
+
+---
+
+## Self-Hosted Runners: Production-Ready
+
+- **Server-supplied hook support** now matches managed-environment behavior
+- **Repository preparation no longer hangs on Git Credential Manager prompts** — fails fast with clear error
+- **Managed MCP servers deployed via `managed-mcp.json` no longer crash startup** — skipped with warning
+- **Windows startup requires explicit `--base-dir`** — no default checkout directory (prevents accidental writes)
+- **Workflow fan-out staggering** — sibling agents read cached prompt prefix instead of re-paying (`CLAUDE_CODE_WORKFLOW_PREFIX_STAGGER_MS=0` disables)
+
+If you run self-hosted runners for CI/CD, this release moves them from "experimental" to "production viable."
+
+---
+
+## Plugin Marketplace: Dynamic Without Restarts
+
+**Plugin marketplace `command` sources** — a local command (e.g. an IDE) prints the plugin directory, re-resolved each session, applied without restart. `mode: "link"` uses it in place.
+
+This means your IDE can dynamically inject plugins per-project, per-session, with zero config reloads.
+
+---
+
+## VS Code Extension: Quality of Life
+
+- **Session groups in sidebar** — right-click to create, rename, delete; Cmd/Ctrl- or Shift-click to move multiple sessions
+- **Resizable `/btw` side-question panel** — drag boundary in both layouts
+- **"Report a problem" and `/bug` open built-in feedback dialog** — no more retired survey links
+
+---
+
+## The "Thank God" Fixes
+
+| Bug | Impact |
+|-----|--------|
+| Auto mode failing every tool call when `CLAUDE_CODE_ATTRIBUTION_HEADER` disabled | ✅ Fixed |
+| `/model` rejecting Sonnet/Opus 1M for claude.ai subscribers with custom `ANTHROPIC_BASE_URL` | ✅ Fixed |
+| MCP OAuth with strict auth servers (uses `127.0.0.1` not `localhost`) | ✅ Fixed |
+| One-shot `claude plugin` commands leaving stray liveness files | ✅ Fixed |
+| Dynamic workflows in CPU-limited containers using host core count | ✅ Fixed |
+| SDK/`stream-json` 400 error on whitespace-only messages | ✅ Fixed |
+| Conversations exceeding 32MB request limit retrying compaction endlessly | ✅ Fixed — now fails once with clear message |
+| OpenTelemetry export from Claude Desktop rejected by gateway | ✅ Fixed |
+| `/commit-push-pr` no longer auto-approves dangerous git flags (`--force`, `--amend`, `--no-verify`) | ✅ Fixed |
+| Sandbox IPv6 literals now bracketed (`[::1]:443`), ambiguous spellings fail-closed | ✅ Fixed |
+
+---
+
+## How to Update
+
+```bash
+# If installed via npm
+npm update -g @anthropic-ai/claude-code
+
+# If installed via Homebrew
+brew upgrade claude-code
+
+# Verify
+claude --version
+# Should show 2.1.229
+```
+
+---
+
+## Bottom Line
+
+v2.1.229 isn't a feature release — it's a **reliability release**. The kind that matters when you're debugging at 2 AM and the tool just works.
+
+If you've been burned by streaming glitches, Windows path crashes, or Vertex timeouts, this is the update you've been waiting for.
+
+**Full changelog:** [github.com/anthropics/claude-code/releases/tag/v2.1.229](https://github.com/anthropics/claude-code/releases/tag/v2.1.229)
+
+---
+
+*Updated August 13, 2026 — covers v2.1.229 released August 12, 2026*
