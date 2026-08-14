@@ -1,0 +1,165 @@
+---
+title: "Claude Code Just Made Subagents Free — And They Remember Everything"
+description: "v2.1.232 drops subagent forking by default, @ mentions to ping other sessions, GitLab support, and Fable 5 advisor access. Your agents can now inherit full context, talk to each other, and actually work together."
+pubDate: "2026-08-14T14:00:00Z"
+tags: ["claude-code", "release", "subagents", "cross-session", "gitlab", "beginner", "guide"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+v2.1.232+Subagent+Forking+Cross+Session&tool=claude-code"
+---
+
+Claude Code v2.1.232 landed **6 hours ago** (August 13, 23:29 UTC) and it's the kind of release that changes how you *work* — not just what the tool can do in theory.
+
+The headline: **subagent forking is now on by default**. When you spawn a subagent with `subagent_type: "fork"`, it inherits the **full conversation history and prompt cache**. Non-teammate agents in interactive sessions now run in the background automatically. Your agents don't just delegate — they *remember*.
+
+Add **@ mentions to reach other sessions directly**, **GitLab support** (finally), and **Fable 5 advisor access** for orgs that have it, and this is the most collaborative Claude Code has ever been.
+
+---
+
+## The Feature That Changes Everything: Subagent Forking by Default
+
+Until now, subagents started fresh. They knew the task you gave them, but not the context you built — the files you read, the decisions you made, the bugs you already found. That changes in v2.1.232.
+
+**`subagent_type: "fork"` now means:** the subagent gets the *entire* parent conversation and prompt cache. It picks up exactly where you left off.
+
+```json
+// In your agent config or skill
+{
+  "subagent_type": "fork"
+}
+```
+
+What this means in practice:
+- **Debugging session → handoff to fixer subagent**: The fixer sees every stack trace, every log, every hypothesis you already tested
+- **Research → implementation handoff**: The implementer inherits all the API docs, code patterns, and architectural decisions you gathered
+- **Code review → refactor subagent**: The refactorer knows the exact style violations, the test expectations, the "why" behind every comment
+
+**Background by default for non-teammate agents** means you spawn a subagent and keep working. It runs in parallel, reports back when done. No more blocking your main session.
+
+---
+
+## @ Mentions: Your Sessions Can Finally Talk to Each Other
+
+Type `@` in the prompt and you'll see a list of your other live Claude sessions — by name. Pick one, and Claude uses `SendMessage` to reach it directly.
+
+```
+@backend-session "The API contract changed: /users now returns {id, email, created_at}. Update your tests."
+```
+
+**What's new in v2.1.232:**
+- `SendMessage` delivers to a bare name that exactly matches a live session — no more "confirm with a ref" prompt
+- Sessions on one machine keep unique names automatically: if you start/renames to a name another live session uses, you get `name-word-word` and a notice
+- New `/config` rows: **"Dialog expiry"** and **"Messages from your other sessions"** (accept/hold/refuse inbound cross-session messages)
+
+This isn't "agents talking" in the abstract. It's **you orchestrating multiple parallel sessions** — frontend, backend, infra, docs — each with full context, able to sync when interfaces change.
+
+---
+
+## GitLab Support: No More "It Only Works with GitHub"
+
+Bare `gitlab.com` URLs (including nested subgroups like `gitlab.com/group/subgroup/project`) now clone like GitHub URLs. Clone auth-failure hints name your actual git host.
+
+**Plugin marketplace support for GitLab:**
+- `additionalMarketplaces` / `allowedMarketplaces` — friendlier aliases for `extraKnownMarketplaces` / `strictKnownMarketplaces`
+- Enterprise policy: `blockedMarketplaces` with bare repo URLs keeps blocking even when CLI classifies it as a git clone
+
+If your company uses GitLab, Claude Code just became a first-class citizen in your workflow.
+
+---
+
+## Fable 5 Advisor Access (For Orgs With Fable Access)
+
+Fable 5 (Anthropic's Mythos-family model with extra safeguards) is back in `/advisor` for organizations with Fable access. Consent flows through `/model fable`.
+
+This matters if you're in a regulated environment or need the strongest guardrails — Fable 5 is built for **high-stakes coding where hallucination risk must be near zero**.
+
+---
+
+## The Fixes You'll Actually Notice
+
+### Windows & PowerShell (Finally Taken Seriously)
+- **PowerShell permission bypass fixed**: Variable-writing parameters could silently overwrite `$PSDefaultParameterValues` and redirect later commands' file access
+- **Windows Git Bash symlink bypass fixed**: Cygwin-style symlinks that path validation saw as regular files now require permission approval
+- **Nested git repos no longer inherit parent trust**: Each repo requires its own trust confirmation
+
+### Remote Control (Actually Reliable Now)
+- Sessions hosted by a bridge inside a cloud session no longer inherit that session's transcript or credentials
+- Resuming a conversation whose session was deleted from claude.ai now starts a replacement instead of failing with a login error
+- Remote Control keeps reconnecting for ~30 minutes after network blips (was: drops after a few blips across an hour)
+- Terminal now tells you *why* a session ended: taken over by another device, ended from another app, or deleted
+
+### MCP & Gateway
+- MCP connections no longer hang for the full 30-second timeout when a server fails to answer or sends a malformed protocol-version probe
+- Stream idle timeout errors now recover on Bedrock, Vertex, and gateway deployments instead of failing the request
+- Gateway: empty `managed.policies[].match.groups` and malformed `email_domain` values now fail at boot instead of silently granting admin access
+- mTLS client certificate rotation no longer requires a restart — Claude Code reloads rotated cert/key automatically on connection errors
+
+### Secret Redaction (Expanded)
+- GitLab token families now redacted: `glrt-`, `gloas-`, `glptt-`, `glagent-`, `glimt-`, `glsoat-`, `glcbt-`, `glft-`, `glffct-`
+- Full redaction of routable `glpat-`/`gldt-` tokens
+- `glab` CLI config store gets same sandbox and credential-path protection as `gh`
+
+### Agent Panel & UX
+- Completed subagents hide immediately with a `/tasks` footer hint
+- "��� N more" overflow indicator moved left for visibility
+- `/feedback` and `/bug` now open immediately while Claude is responding (no waiting for turn to finish)
+- `/plugin install plugin@marketplace` refreshes marketplace first — newly published plugins install without manual update
+- `/code-review` at high/xhigh/max effort now runs in a background agent like other levels
+
+---
+
+## What Breaks (Almost Nothing)
+
+This is a patch release (2.1.228 → 2.1.232), so breaking changes are minimal:
+
+- `sandbox.ripgrep` now honored only from user, managed, and `--settings` — **project settings can no longer override** the sandbox's ripgrep binary (security hardening)
+- Startup tip suggesting custom subagents removed (the feature is now mainstream)
+- Hardened auto-generated cross-session socket directory on shared `/tmp` — pre-planted symlinks or another user's directory now refused
+- Hardened Linux filesystem sandbox against protected-path bypass
+
+If you had project-level `sandbox.ripgrep` config, move it to user or managed settings.
+
+---
+
+## How to Update
+
+```bash
+npm update -g @anthropic-ai/claude-code
+# or
+claude /update
+```
+
+Verify:
+```bash
+claude --version
+# Should show 2.1.232
+```
+
+**Test the new features:**
+1. Spawn a subagent with `subagent_type: "fork"` — watch it inherit your full context
+2. Type `@` in any prompt — see your other live sessions listed
+3. Clone a GitLab repo with a bare `gitlab.com/...` URL — it just works
+4. Check `/config` for the new "Dialog expiry" and cross-session message rows
+
+---
+
+## The Bottom Line
+
+**v2.1.228 fixed Windows crashes.** **v2.1.232 makes Claude Code collaborative.**
+
+Subagent forking by default means delegation doesn't mean amnesia. @ mentions mean your parallel sessions can sync without you playing telephone. GitLab support means your tool fits your infra, not the other way around.
+
+If you've been running multiple Claude sessions and manually copying context between them — **stop**. Update to 2.1.232 and let the agents talk.
+
+---
+
+## Related Reading
+
+- [Claude Code v2.1.228: Windows Git Fix, Interactive Session Crash, Cross-Session Messaging Leaks](/blog/claude-code-v2-1-228-windows-git-fix-interactive-session-crash/)
+- [Claude Code v2.1.224: Self-Hosted Runners, Cross-Session Messaging, and Tighter Secret Handling](/blog/claude-code-v2-1-224-self-hosted-runners-cross-session-messaging/)
+- [Beware: Claude Code Cross-Session Content Bleed — GitHub Issue #77147](/blog/beware-claude-code-cross-session-content-bleed/)
+- [Claude Code Skills vs Subagents vs MCP: Which One Actually Does What?](/blog/claude-code-skills-vs-subagents-vs-mcp/)
+
+---
+
+*Updated August 14, 2026 — covers v2.1.232 released August 13, 2026 23:29 UTC. Full changelog: [github.com/anthropics/claude-code/releases/tag/v2.1.232](https://github.com/anthropics/claude-code/releases/tag/v2.1.232)*
