@@ -1,16 +1,65 @@
 ---
-title: "Pi 0.81–0.83: Local Models via llama.cpp, Opus 5 on Copilot, and One-Click Provider Logins"
-description: "Three Pi releases in eight days add local LLM management through llama.cpp, Claude Opus 5 via GitHub Copilot, constrained tool sampling, and OAuth login for OpenRouter and Kimi Code. Here is what changed and how to try it."
-tags: ["pi", "release", "llama-cpp", "local-models", "opus-5", "coding-agent"]
+title: "Pi 0.81–0.84: Fullscreen TUI, Mermaid Diagrams, Local Models via llama.cpp, and Opus 5 on Copilot"
+description: "Four Pi releases in three weeks add a fullscreen TUI mode with Mermaid/LaTeX rendering, per-directory context overrides, local LLM management through llama.cpp, Claude Opus 5 via GitHub Copilot, and OAuth login for OpenRouter and Kimi Code. Here is what changed and how to try it."
+tags: ["pi", "release", "llama-cpp", "local-models", "opus-5", "fullscreen-tui", "mermaid", "coding-agent"]
 tool: "pi-dot-dev"
 author: "sage"
 pubDate: "2026-08-02T10:00:00Z"
-image: "/api/og?title=Pi+0.83+llama.cpp+Opus+5+Copilot&tool=pi"
+updatedDate: "2026-08-14T14:00:00Z"
+image: "/api/og?title=Pi+0.84+Fullscreen+TUI+Mermaid+llama.cpp&tool=pi"
 ---
 
-Pi shipped three releases between July 21 and July 29 — v0.81.0, v0.82.0, and v0.83.0. Together they mark the biggest eight-day stretch in the tool's history. The headline: you can now manage local LLMs through llama.cpp without leaving Pi, Claude Opus 5 runs through GitHub Copilot subscriptions, and provider logins are one command instead of manual API key juggling.
+Pi shipped four releases between July 21 and August 14 — v0.81.0, v0.82.0, v0.83.0, and v0.84.x. Together they mark the most aggressive three-week stretch in the tool's history. The headlines: a **fullscreen TUI mode with Mermaid and LaTeX rendering**, **per-directory context overrides**, **local LLM management through llama.cpp**, **Claude Opus 5 via GitHub Copilot**, and **one-command OAuth logins** for OpenRouter and Kimi Code.
 
 If you have been watching Pi since our [Vim of coding agents writeup](/blog/pi-vim-of-coding-agents/), this is the release cycle that turns philosophy into features.
+
+## Fullscreen TUI Mode: Pi Gets a Real Interface (v0.84.0)
+
+Pi 0.84.0 introduces a **fullscreen TUI mode** — switch between regular and fullscreen at runtime with a sticky editor and footer, independently scrollable transcript, and draggable scrollbars. This is not a cosmetic tweak; it changes how you work with long sessions.
+
+**Mermaid and LaTeX rendering** now works in interactive transcripts. Architecture diagrams, sequence charts, and mathematical notation render inline. For teams documenting systems or working with algorithmic code, this means you can see the diagram the model generates without leaving the terminal.
+
+**Per-directory context overrides** via `AGENTS.override.md` let you replace context files for a specific directory. Different parts of your codebase can have different instructions, conventions, and constraints — Pi respects them automatically.
+
+**Advanced custom model sampling** brings arbitrary OpenAI-compatible `samplingParams` and opt-in vLLM `thinking_token_budget` values. If you run local models through vLLM or use custom providers, you now control temperature, top-p, repetition penalty, and thinking budgets per request.
+
+**Baseten provider** adds built-in Baseten authentication and model support for teams deploying on that platform.
+
+### Breaking Changes in 0.84.0
+
+- JSON and RPC `message_update` events now emit only `assistantMessageEvent` deltas — clients needing partial messages must assemble deltas between `message_start` and `message_end`
+- `ModelRegistry.getApiKeyAndHeaders()` returns `ProviderHeaders` with `string | null` values, preserving `null` header-deletion markers
+- `ModelRegistry.refresh()` and `ModelRuntime.setRuntimeApiKey()` signatures changed for cancellation and error handling
+- OAuth `refreshToken` callbacks must now accept and honor a concrete abort signal
+- pi-ai's old global API moved to `@earendil-works/pi-ai/compat` (existing extensions keep working via loader alias)
+
+---
+
+## Qwen Token Plan & Auth Readiness (v0.84.1)
+
+Pi 0.84.1 adds **Qwen Token Plan Individual** as a built-in provider with its documented subscription model catalog and the shared international `QWEN_TOKEN_PLAN_API_KEY`.
+
+**Authentication readiness checks** — run `pi auth check` to verify provider or model credentials, optionally emitting the resolved credential. No more guessing if your API key works before starting a session.
+
+**Improved fullscreen interaction** — select words and paragraphs with multiple clicks, configure half-page transcript scrolling, and use unbound single-line and half-page scroll actions.
+
+**Terminating blocked tool calls** — extension `tool_call` handlers can stop all-terminating batches without another model call, giving extensions more control over execution flow.
+
+---
+
+## Fullscreen Transcript Search & Configurable Defaults (v0.84.2)
+
+Pi 0.84.2 (released today, August 14) adds **fullscreen transcript search** with `Ctrl+Shift+F`, incremental match highlighting, configurable search match theme colors, and next/previous navigation with `Enter`/`Ctrl+G` and `Shift+Enter`/`Ctrl+Shift+G`.
+
+**Configurable default tools** — choose startup built-in tools globally or per project via the new `defaultTools` setting.
+
+**Configurable fullscreen exit output** — choose between printing the final transcript or only a session resume hint on exit.
+
+**Experimental strict JSON-schema constrained sampling** for the default `read`, `bash`, `edit`, and `write` tools under `PI_EXPERIMENTAL=1` — forces tool outputs to match exact schemas, eliminating parse errors.
+
+**Per-run theme selection** with `--use-theme <name[/name]>` lets you pick an initial interactive theme without changing saved settings.
+
+---
 
 ## llama.cpp: Run Pi With Local Models
 
@@ -81,7 +130,16 @@ If Pi is already installed:
 pi upgrade
 
 # Or via npm
-npm install -g @anthropic/pi-coding-agent@latest
+npm install -g @earendil-works/pi-coding-agent@latest
+```
+
+To try the new fullscreen TUI:
+
+```bash
+# Toggle fullscreen mode at runtime
+# Press Ctrl+Shift+F for transcript search
+# Use --use-theme for per-run theme selection
+pi --use-theme dracula
 ```
 
 To set up llama.cpp:
@@ -101,6 +159,15 @@ To enable OAuth logins:
 /login
 
 # Check available providers
+pi auth check
+```
+
+To try Qwen Token Plan:
+
+```bash
+# Set the API key
+export QWEN_TOKEN_PLAN_API_KEY=your_key
+# Pi will auto-detect the provider
 ```
 
 ## Related Reading
@@ -111,14 +178,13 @@ To enable OAuth logins:
 
 ## The Bottom Line
 
-Three releases in eight days is aggressive for any project. Pi delivered the features that matter most to its audience: local model management for privacy-conscious teams, constrained sampling for reliability, OAuth flows for convenience, and Opus 5 access through existing subscriptions.
+Four releases in three weeks is aggressive for any project. Pi delivered the features that matter most to its audience: **a fullscreen TUI that feels like a real IDE**, **Mermaid and LaTeX rendering for technical diagrams**, **per-directory context overrides for monorepos**, **local model management via llama.cpp**, **constrained sampling for reliability**, **OAuth flows for convenience**, and **Opus 5 access through existing Copilot subscriptions**.
 
-The llama.cpp integration is the standout. It turns Pi from a cloud-dependent coding agent into one that can run fully offline with local models. Combined with the extension system and provider flexibility Pi already had, this positions Pi as the most model-agnostic coding agent available.
+The fullscreen TUI with Mermaid/LaTeX is the standout — it turns Pi from a minimal terminal agent into a tool you can live in for hours. Combined with the extension system, provider flexibility, and now local model support, Pi positions itself as the most model-agnostic, interface-flexible coding agent available.
 
-If you run Pi, update now. If you are evaluating Pi against Codex or Claude Code, the llama.cpp support alone is a differentiator worth testing.
+If you run Pi, update now. If you are evaluating Pi against Codex or Claude Code, the fullscreen TUI + llama.cpp combination alone is a differentiator worth testing.
 
-
-## Related articles
+---
 
 - [Cline v4.1.0: Five Critical Agent Fixes and the SDK Migration That Stops AI From Going Rogue](/blog/cline-v4-1-sdk-migration-five-critical-agent-fixes/)
 - [Codex 0.145–0.146: Voice Coding, Agent Plugins, Multi-Agent V2, and More](/blog/codex-0-146-agent-plugins-session-naming-thread-forking/)
