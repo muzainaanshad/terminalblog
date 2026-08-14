@@ -1,12 +1,12 @@
 ---
-title: "Cline Just Made Your Coding Sessions Bulletproof — Here's What v4.1.8 Fixed"
-description: "Cline v4.1.7 and v4.1.8 shipped in the same week with fixes that finally stop lost prompts, broken sessions, and confusing model pickers. If you've ever had Cline forget your queued messages or fail silently, this update changes everything."
+title: "Cline Just Made Your Coding Sessions Bulletproof — Here's What v4.1.9 Fixed"
+description: "Cline v4.1.7, v4.1.8, and v4.1.9 shipped in one week with fixes that finally stop lost prompts, broken sessions, token refresh failures, and a broken Claude Code provider. If you've ever had Cline forget your queued messages or fail silently, this update changes everything."
 pubDate: 2026-08-13
-updatedDate: 2026-08-13
+updatedDate: 2026-08-14
 author: "Anshad"
 tags: ["cline", "release", "coding-agent", "reliability", "beginner", "guide"]
 tool: "cline"
-image: "/api/og?title=Cline+v4.1.8+Bulletproof+Sessions&tool=cline"
+image: "/api/og?title=Cline+v4.1.9+Bulletproof+Sessions&tool=cline"
 ---
 
 Cline v4.1.7 dropped August 9. v4.1.8 followed two days later. Together they're the most important reliability update this free coding agent has shipped in months — and if you've ever lost work to a silent failure, you need to know what changed.
@@ -83,7 +83,71 @@ Pre-registered OAuth clients for remote MCP servers are now supported, for setup
 
 ---
 
-## What v4.1.8 Fixed (August 11)
+## What v4.1.9 Fixed (August 13)
+
+### Token Refresh Finally Works After Long Idle Periods
+
+This is a quiet but critical fix. Previously, if your Cline token expired while you were away (lunch, overnight, weekend), the refresh would succeed **but then get discarded** because the old token was already past expiry. The first request after returning would fail despite valid credentials.
+
+**Now:** A successfully refreshed token is kept even if the previous one was expired. You come back, send a prompt, and it just works.
+
+### Legacy Migration Stops Spamming Telemetry
+
+The v4.x migration of legacy tasks was reporting success before the seeded session actually persisted. If the migration failed, it was still logged as a success — corrupting your telemetry and hiding real problems.
+
+**Now:** Migration outcome is recorded only once the session actually persists. Failed migrations show as failures.
+
+### Involuntary Logouts Are Now Visible
+
+If your refresh token was rejected (revoked, rotated, expired), Cline used to silently clear credentials. You'd open the extension and wonder why you were logged out.
+
+**Now:** You get a clear \"involuntary logout\" notice instead of silent credential clearing.
+
+### Diff Colors Fixed for All Themes
+
+Diff block text used a hardcoded color that washed out in many VS Code themes (especially high-contrast and custom themes).
+
+**Now:** Diffs use the editor's foreground color — they stay legible everywhere.
+
+### Interface Font Switched to Inter + Geist Mono
+
+The entire Cline UI now uses **Inter** for prose and **Geist Mono** for code. Cleaner, more readable, and consistent with modern VS Code design.
+
+---
+
+## What v4.1.9 Fixed (SDK Bundle Only)
+
+These fixes land through **SDK v0.0.75** and apply to windows running the SDK bundle (not the legacy VS Code extension).
+
+### Claude Code Provider Finally Works for Agentic Work
+
+This is the biggest SDK fix. The Claude Code provider was **unusable for agentic workflows** — it received tool definitions it couldn't bridge, didn't anchor sessions to your workspace, and ignored your `~/.claude` permission rules.
+
+**Now:** It runs its own native tools, anchors sessions on your workspace directory, and loads `~/.claude` plus project settings. Your permission rules actually apply.
+
+### Truncated Tool-Call JSON Rejected Instead of \"Repaired\"
+
+Previously, malformed/truncated tool-call JSON was silently \"repaired\" into wrong arguments — causing mysterious wrong-tool executions.
+
+**Now:** Truncated tool-call JSON is rejected with an error. You see the failure instead of the agent doing the wrong thing silently.
+
+### Empty Text Parts No Longer Crash Strict Providers
+
+A message with only empty text parts (no actual content) caused strict providers to reject the turn with \"user message must have content.\"
+
+**Now:** Empty text parts are handled gracefully.
+
+### Mid-Turn Crash on Streamed Tool Calls Fixed
+
+Streamed tool calls with non-zero or non-contiguous indexes crashed mid-turn, especially through LiteLLM's Anthropic passthrough.
+
+**Now:** Index handling is robust — no more mid-stream crashes.
+
+### Token Accounting Fixed: 5x Inflation Gone
+
+On cache-heavy sessions, Cline was re-counting the **whole cached conversation** on every request instead of using per-request buckets. This inflated per-task token totals roughly **5x**.
+
+**Now:** Disjoint per-request token buckets are reported. Your usage numbers are finally accurate.
 
 ### Vertex AI: Full Model Catalog Per Region
 
@@ -167,9 +231,9 @@ Bundled catalog updated.
 
 ## What This Means for Beginners
 
-If you're new to Cline, v4.1.8 is the first version where the basics *just work*:
+If you're new to Cline, v4.1.9 is the first version where the basics *just work*:
 
-| Before v4.1.7 | After v4.1.8 |
+| Before v4.1.7 | After v4.1.9 |
 |---------------|--------------|
 | Queue prompts → lose them on hiccup | Queue prompts → they survive |
 | Hub restarts → lose session | Hub restarts → session intact |
@@ -179,6 +243,9 @@ If you're new to Cline, v4.1.8 is the first version where the basics *just work*
 | Compaction skipped on reasoning models | Compaction works, logs diagnostics |
 | Failed turn → ghost success | Failed turn → error with cause + fix link |
 | No model connected → confusing empty state | Welcome screen → one-click connect |
+| **Long idle → token refresh fails silently** | **Long idle → token refresh just works** |
+| **Claude Code provider broken for agents** | **Claude Code provider runs native tools** |
+| **Token usage inflated 5x on cached sessions** | **Token usage accurate per-request** |
 
 ---
 
@@ -214,4 +281,4 @@ Cline just pushed through.
 
 ---
 
-*Updated August 13, 2026 — covers Cline v4.1.7 (Aug 9) and v4.1.8 (Aug 11) changelogs. Full diffs: [v4.1.6→v4.1.7](https://github.com/cline/cline/compare/v4.1.6...v4.1.7) · [v4.1.7→v4.1.8](https://github.com/cline/cline/compare/v4.1.7...v4.1.8)*
+*Updated August 14, 2026 — covers Cline v4.1.7 (Aug 9), v4.1.8 (Aug 11), and v4.1.9 (Aug 13) changelogs. Full diffs: [v4.1.6→v4.1.7](https://github.com/cline/cline/compare/v4.1.6...v4.1.7) · [v4.1.7→v4.1.8](https://github.com/cline/cline/compare/v4.1.7...v4.1.8) · [v4.1.8→v4.1.9](https://github.com/cline/cline/compare/v4.1.8...v4.1.9)*
