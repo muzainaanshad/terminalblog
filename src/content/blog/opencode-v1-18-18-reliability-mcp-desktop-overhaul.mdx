@@ -1,0 +1,226 @@
+---
+title: "Opencode Just Became the Open-Source Coding Agent You Can Actually Trust"
+description: "v1.18.18 fixes the MCP reconnect loops, provider model routing, desktop freezes, and session chaos that made you hesitate. The 160K-star agent is finally reliable enough for daily work."
+pubDate: "2026-08-15T14:00:00Z"
+tags: ["opencode", "release", "open-source", "mcp", "desktop", "beginner", "guide"]
+tool: "opencode"
+author: "sage"
+image: "/api/og?title=Opencode+v1.18.18+Reliability+Overhaul&tool=opencode"
+---
+
+Opencode v1.18.18 dropped **two days ago** (August 13, 2026) and it's the kind of release that turns a "cool project" into a daily driver. The 160,000-star open-source coding agent spent the last month quietly fixing the paper cuts that made you keep a commercial backup: MCP servers getting stuck in reconnect loops, provider model configs breaking mid-session, desktop app freezes, and session ordering chaos.
+
+If you tried Opencode a few months ago and walked away frustrated — **this is the version to come back for**.
+
+---
+
+## The Headline: MCP Finally Works Reliably
+
+The biggest win in v1.18.18 isn't a flashy feature. It's that **MCP SSE connections no longer get stuck in reconnect loops after server error responses**.
+
+If you've used MCP with any agent, you know the pain: the server hiccups, the client spins forever trying to reconnect, and your workflow dies. Opencode now:
+- Reconnects MCP servers after expired SDK sessions (including concurrent requests)
+- Honors configured MCP OAuth callback ports in `mcp debug`
+- Restored compatibility with legacy MCP SDK clients
+- Improved compatibility with newer MCP servers and OAuth flows
+
+This alone makes Opencode viable for teams running custom MCP tooling — the kind of reliability that used to be a commercial-agent moat.
+
+---
+
+## Provider Model Routing: No More Surprise Failures
+
+OpenCode now **respects provider-defined reasoning options instead of falling back to the wrong reasoning controls**. This fixes a whole class of "why is my model acting dumb?" issues:
+
+- **GitHub Copilot model routing** now honors each model's advertised chat or responses endpoint
+- **Azure Cognitive Services endpoint support** restored for Azure-hosted models
+- **OpenAI Responses phase handling** fixed so it doesn't break conversations
+- **Cerebras reasoning replay** fixed — earlier assistant reasoning now sent back in provider-supported field
+- **Mistral prompt caching stabilized** with correct prompt cache keys per SDK
+- **MiniMax M3 thinking variant selection** fixed
+- **xAI prompt cache routing** improved with PDF file support in Responses models
+- **Meta model handling** improved for reasoning variants and provider requests
+
+The practical impact: you pick a model, it works the way the provider intended. No more debugging why reasoning effort seems ignored or why a model that *should* support PDFs keeps erroring.
+
+---
+
+## Desktop App: The Freezes Are Gone
+
+The desktop app got a **massive stability pass**. If you've ever had the app hang on a large pasted image, freeze when closing a project, or show blank session titles — those are fixed:
+
+- **Composer lag reduced** when drafts include large pasted images or attachments
+- **Right-to-left layout issues fixed** across tabs, drawers, resizing, titlebar interactions
+- **Session tabs no longer clip** when resized smaller
+- **Stale session tab state in title bar fixed**
+- **File tree tab clipping prevented** when resized
+- **Debug gutter labels and values aligned**
+- **Home page scrolling fixed** — sticky headers and session list behave correctly
+- **Startup readiness fixed** — WSL server loading included before app reports ready
+- **Custom agent selector visibility fixed** when custom agents are available
+- **Home page command palette search** can now find and open sessions
+- **Tab keyboard navigation** follows visible tab order
+- **External links open in system browser** instead of inside the app
+- **Markdown parsing moved off main thread** — app stays responsive while rendering messages
+- **Linux packages now install AppStream metadata**
+
+The V2 desktop sidecar is now opt-in, backed by the bundled CLI service, with collapsible model provider sections in V2 settings.
+
+---
+
+## Session Management: Chaos → Order
+
+Session handling got a **fundamental overhaul**:
+
+- **Chronological message ordering** now stays correct even when imported or legacy message IDs are out of order
+- **Revert and fork actions** use real message chronology instead of message ID ordering
+- **Truncation cleanup** removes stale files by file timestamp more reliably
+- **Repeated compaction** keeps earlier tool-call history in summaries instead of dropping orphaned results
+- **Blob-based attachments** now load correctly in the web UI
+- **Session timelines** respect chronological message boundaries more reliably
+- **Stored messages** stay ordered by creation time
+- **Session lists** sort by persisted activity time more reliably
+- **Sessions without titles** fall back to generated names instead of appearing blank
+- **Project search** matches any known recent project instead of only the first five
+
+This means your history is actually trustworthy — forks, reverts, and imports behave the way you'd expect.
+
+---
+
+## TUI & Core: The Daily Quality-of-Life Fixes
+
+- **GitHub pull request reviews** now include the PR number and URL in context
+- **Up Arrow shortcut** closes the subagent picker when first item is selected
+- **Automatic session retries capped** with jitter to reduce retry storms
+- **PDF attachments enabled** for GitHub Copilot models advertising PDF vision support
+- **DeepSeek V4 Flash sampling defaults** applied correctly on supported providers
+- **Muse family models** routed to correct Meta system prompt
+- **xAI login simplified** to single device-code flow (works better in headless/remote)
+- **Structured mid-stream provider errors preserved** so compatible providers can retry failed responses
+- **More transient provider/network errors retried** instead of failing immediately
+- **Cache writes counted in ACP usage totals**
+- **Remote workspace 5xx response bodies logged** in host logs for proxy debugging
+- **Host `directory` path no longer sent to remote workspaces** — prompts resolve from remote project root
+- **Queued ACP session updates waited for** before ending a turn
+- **Unknown top-level config fields ignored** instead of failing config parsing
+- **Projects opened from Home registered** so available to rest of app
+- **Right-click in Home** opens project menu
+- **Fallback to local directories** when project picker server doesn't support search
+- **macOS app stays running** after last window closes, reopens window on activation
+- **Chinese terminology updated** to widely recognized translations
+- **Server's current default model used** instead of stale local config
+
+---
+
+## The Upstream Sync: Opencode v1.17.13 → v1.18.13
+
+OpenCode (the SST/Anomaly version) adopts upstream improvements from the opencode-ai fork, including:
+
+- **Code mode MCP adapter** for running confined orchestration scripts against connected MCP tools
+- **`execute` tool hidden** unless code mode is enabled
+- **Model-specific system prompt** for Meta Muse Spark
+- **Azure AI support for GPT-5.6**
+- **Paginated MCP tool catalogs** no longer lose tool metadata or output schema validation
+- **Low reasoning effort preserved** for OpenRouter small-model variants
+- **GitHub Copilot model routing** honors each model's advertised endpoint
+- **Session lists match equivalent instance directories** reliably
+- **Cerebras reasoning replay** fixed
+- **Z.ai context-window overflow errors** better classified
+- **Unavailable config directories handled gracefully**
+- **Reasoning effort variants exposed** for Grok models
+- **xAI prompt cache routing** improved
+- **Meta model handling** improved
+- **Zero billing batch size crashes prevented** for GitHub Copilot
+- **OpenAI pro reasoning mode supported**
+- **Response storage disabled by default** for xAI Responses
+- **OAuth support added** for Luna Responses Lite
+- **Codex context limits used** for GPT-5.6 over OAuth
+- **Obsolete Codex workaround removed** that could interfere with OpenAI Luna Responses Lite
+- **TUI spinner registration fixed** — loading indicators keep rendering
+- **CLI environment variables forwarded** to TUI worker
+
+---
+
+## Subagent Permission Fix (Big for Teams)
+
+**Subagent permission errors that referenced phantom deny rules** are fixed. A read-only or delegating agent's `readOnlyBash` allowlist is no longer projected onto a writable subagent as a bash ceiling — so a delegated subagent can run its own allowed commands (e.g., `git status`). Edit, notebook, and MCP denials are still inherited as hard ceilings.
+
+This matters if you use delegated agents for code review, testing, or documentation — they no longer get blocked by parent-agent restrictions that shouldn't apply to them.
+
+---
+
+## Clickable File References in Agent Responses
+
+Code spans in agent responses that match real files in your workspace **become clickable links** that open the file at the referenced line. Non-existent paths stay as plain code. Includes fallback workspace search and "File not found" warning when clicking dead links.
+
+This is a small UX thing that compounds: when the agent says "look at `src/auth/login.ts:42`", you *click it*. No more copy-paste-navigate.
+
+---
+
+## Model Reasoning Variants: See What You're Getting
+
+The model's **default reasoning variant now shows and selects in chat and Agent Manager**. No more guessing which reasoning tier you're actually on.
+
+---
+
+## AWS & GCP Auth: Structured Credentials Supported
+
+**Structured AWS access keys and Google Cloud service-account JSON** now supported when connecting Bedrock and Vertex AI in VS Code. No more manual env var juggling.
+
+---
+
+## Agent Manager PR Actions
+
+**Resolve/unresolve review threads, jump to comments section, and scroll-to-top for PR diff view** — the Agent Manager is becoming a genuine code review companion, not just a code writer.
+
+---
+
+## WarpGrep Removed (Good Riddance)
+
+The built-in experimental Morph WarpGrep codebase search tool and its retired configuration flag are gone. The upstream opencode search is better anyway.
+
+---
+
+## Workspace Restoration Preserved
+
+**Workspace restoration outcomes preserved when reverting fresh VS Code sessions** — your layout, open files, and state survive the revert.
+
+---
+
+## How to Update
+
+```bash
+# If installed via install script
+curl -fsSL https://opencode.ai/install | bash
+
+# Or via npm
+npm update -g @opencode/opencode
+
+# Verify
+opencode --version
+# Should show 1.18.18
+```
+
+---
+
+## The Bottom Line
+
+**v1.18.18 is the first Opencode release that feels like a polished product instead of a promising project.**
+
+The MCP reliability alone makes it viable for production workflows. The provider routing fixes mean you stop fighting the model. The desktop stability means you can keep the app open all day. The session ordering fixes mean your history is actually useful.
+
+If you're on the fence about open-source vs. commercial agents — this release narrows the gap significantly. Opencode has always had the better architecture (skills, slash commands, explicit lifecycle). Now it has the reliability to match.
+
+---
+
+## Related Reading
+
+- [OpenCode Deep Dive: The Skill-Driven Open-Source Coding Agent](/blog/deep-dive-opencode-skill-driven-coding-agent/)
+- [OpenCode vs Codex: Which Terminal Agent Wins?](/blog/opencode-vs-codex/)
+- [OpenCode vs Claude Code: Free Agent vs. Paid IDE](/blog/opencode-vs-claude-code-free-agent/)
+- [OpenCode Provider-Neutral Architecture: Biggest Advantage](/blog/opencode-provider-neutral-biggest-advantage/)
+- [Complete AGENTS.md Guide for Coding Agents](/blog/agents-md-complete-guide/)
+
+---
+
+*Published August 15, 2026 — covers Opencode v1.18.18 released August 13, 2026. Full changelop: [opencode.ai/changelog](https://opencode.ai/changelog)*
