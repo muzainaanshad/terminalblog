@@ -1,15 +1,15 @@
 ---
-title: "Oh My Pi v17.3.2 Fixes Subagent Stalls, Hashline Paths, and Antigravity Quota — What Beginners Need to Know"
-description: "Oh My Pi v17.3.2 (Aug 13) fixes the parent TUI stall after subagent results, corrects hashline path collisions, classifies Antigravity 429 quota errors with smart retries, and adds deepseek-v4-pro and gemini-3.7-flash models. The v17 series keeps shipping daily fixes beginners actually feel."
+title: "Oh My Pi v17.3.3 Fixes Gemini Reasoning Loops, Hashline Edge Cases, and TUI Rendering — What Beginners Need to Know"
+description: "Oh My Pi v17.3.3 (Aug 14) stops Gemini from looping on thought-only responses, recovers from malformed function calls, fixes hashline dangling range separators, and renders TUI markdown tables correctly. The v17 series keeps shipping daily fixes beginners actually feel."
 pubDate: "2026-08-09T10:00:00Z"
-updatedDate: "2026-08-13T23:00:00Z"
-tags: ["oh-my-pi", "v17", "v17.3.2", "release", "subagent-stall", "hashline-fix", "antigravity-quota", "terminal-agent", "coding-agent", "beginner"]
+updatedDate: "2026-08-14T10:00:00Z"
+tags: ["oh-my-pi", "v17", "v17.3.3", "release", "gemini-reasoning", "hashline-fix", "tui-rendering", "terminal-agent", "coding-agent", "beginner"]
 tool: "oh-my-pi"
 author: "sage"
-image: "/api/og?title=Oh+My+Pi+v17.3.2+Subagent+Stall+Hashline+Antigravity&tool=oh-my-pi"
+image: "/api/og?title=Oh+My+Pi+v17.3.3+Gemini+Reasoning+Hashline+TUI&tool=oh-my-pi"
 ---
 
-Oh My Pi — the open-source terminal coding agent that has been quietly shipping daily releases while bigger names take weeks — just crossed into version **17**. The v17 series started with v17.0.0 on July 15, 2026, and the latest release, **v17.3.2 (Aug 13)**, keeps the momentum going with fixes beginners will actually feel: the parent TUI no longer stalls after subagent results, hashline headers now retain workspace-relative paths to prevent collisions, Antigravity quota errors are classified with smart retry delays, and new models `deepseek-v4-pro:preview` and `gemini-3.7-flash` are available out of the box.
+Oh My Pi — the open-source terminal coding agent that has been quietly shipping daily releases while bigger names take weeks — just crossed into version **17**. The v17 series started with v17.0.0 on July 15, 2026, and the latest release, **v17.3.3 (Aug 14)**, keeps the momentum going with fixes beginners will actually feel: it stops Gemini from looping on thought-only responses, recovers from malformed function calls, fixes hashline dangling range separators, and renders TUI markdown tables correctly — building on v17.3.2's fixes for parent TUI stalls, hashline path collisions, Antigravity quota classification, and new models `deepseek-v4-pro:preview` and `gemini-3.7-flash`.
 
 If you last looked at Oh My Pi during the v16 era, this is the update to care about: v17 is not a pile of small fixes. It reorganizes how the agent's tools work under the hood, and two of its headline changes — the unified `hub` tool and the new `xd://` virtual-file system — will change how you approve, watch, and share agent work. The August 9 hotfix batch (v17.2.12) fixed memory leaks and idle CPU spin. v17.2.14 and v17.2.15 added genuinely useful new capabilities like `omp compress`, natural-language `omp cleanse`, and MCP fixes. Now v17.3.2 polishes the daily-driver experience with reliability fixes that matter.
 
@@ -94,6 +94,14 @@ The same batch fixed two correctness bugs you might have hit: shell "minimizatio
 - **New models available:** `deepseek-v4-pro:preview` and `gemini-3.7-flash` are now in the catalog. Antigravity client-version discovery is dynamic, so version-gated models appear without code changes.
 - **`omp update` fixed for foreign npm/bun aliases.** The update command no longer misclassifies globally linked checkouts while preserving package-manager ownership ([#8468](https://github.com/can1357/oh-my-pi/issues/8468)).
 
+**v17.3.3 (August 14) — Gemini reasoning loops, hashline edge cases, and TUI rendering fixed.** This patch targets the daily experience with Gemini models and the edit/apply pipeline:
+
+- **Gemini thought-only `STOP` responses no longer loop.** Previously, when Gemini emitted a reasoning-only turn without final output, the agent could retry identically and spin up duplicate Antigravity endpoint streams. Now the agent distinguishes these from empty transports and uses a bounded final-answer reminder to recover the session cleanly ([#8493](https://github.com/can1357/oh-my-pi/pull/8493)).
+- **Malformed function calls get smart retries.** When every emitted tool call in a Gemini turn is proven unexecuted (`MALFORMED_FUNCTION_CALL`), the agent retries the turn while preserving real tool-result and visible-output replay guards — so you don't lose legitimate progress.
+- **Pinned retry banner.** Current terminal retry errors now stay in one pinned banner with attempt context, surfacing local continuation failures instead of stale provider errors that confuse debugging.
+- **Hashline dangling range separators recovered.** Hunk headers like `PUT 244.=:`, `CUT 5.=` (which previously failed as orphan payload lines) are now normalized to single-line ranges `N.=N` so edits apply cleanly.
+- **TUI markdown rendering fixed.** When Gemini emits a lone closing Markdown fence without its opener, the TUI no longer renders final headings and tables as one raw code block — they display correctly.
+
 ## What breaks when you upgrade
 
 Breaking changes in v17.0.0 are the real upgrade hazard:
@@ -106,11 +114,11 @@ For a typical beginner workflow — `omp` in a repo, describe a change, approve 
 
 ## How to update
 
-Oh My Pi generally self-updates, but the official upgrade paths are: macOS/Linux via `curl -fsSL https://omp.sh/install | sh`, Windows via `irm https://omp.sh/install.ps1 | iex`, Homebrew users via `brew upgrade can1357/tap/omp`, and npm users via `bun update -g @oh-my-pi/pi-coding-agent`. Run the version check after updating to confirm you are on **v17.2.15**. If you are automating agents, watch for config settings referencing the old discovery or resolve paths and replace them per the v17.0.0 release notes.
+Oh My Pi generally self-updates, but the official upgrade paths are: macOS/Linux via `curl -fsSL https://omp.sh/install | sh`, Windows via `irm https://omp.sh/install.ps1 | iex`, Homebrew users via `brew upgrade can1357/tap/omp`, and npm users via `bun update -g @oh-my-pi/pi-coding-agent`. Run the version check after updating to confirm you are on **v17.3.3**. If you are automating agents, watch for config settings referencing the old discovery or resolve paths and replace them per the v17.0.0 release notes.
 
 ## The bottom line
 
-v17 is the biggest internal change to the Oh My Pi agent in months: one tool to rule messaging, background jobs, and long-running processes; transparent `xd://` approvals instead of hidden ones; and a serious plugins standard that makes extension safer. For beginners the practical wins keep stacking: the stability fixes in v17.2.12 (no more memory leaks, idle CPU spin, or dropped search sources), reasoning controls in v17.2.14, and now v17.2.15's `omp compress`, natural-language `omp cleanse`, MCP fixes, handoff artifact preservation, and hardened tar parsing. If you skipped the v16 series updates, the jump to v17.2.15 is absolutely worth it.
+v17 is the biggest internal change to the Oh My Pi agent in months: one tool to rule messaging, background jobs, and long-running processes; transparent `xd://` approvals instead of hidden ones; and a serious plugins standard that makes extension safer. For beginners the practical wins keep stacking: the stability fixes in v17.2.12 (no more memory leaks, idle CPU spin, or dropped search sources), reasoning controls in v17.2.14, v17.2.15's `omp compress`, natural-language `omp cleanse`, MCP fixes, handoff artifact preservation, and hardened tar parsing, v17.3.2's TUI stall fix, hashline path fix, and Antigravity quota smarts, and now v17.3.3's Gemini reasoning-loop kill, malformed-call recovery, hashline edge-case normalization, and TUI markdown rendering fix. If you skipped the v16 series updates, the jump to v17.3.3 is absolutely worth it.
 
 ## Related articles
 

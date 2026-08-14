@@ -1,0 +1,151 @@
+---
+title: "Goose v1.46 Just Dropped the Biggest Feature Wave Since v1.40 — Here's What Actually Matters"
+description: "Goose v1.46 (Aug 12) unrolls the agent loop for speed, adds hooks with PreToolUse denial, streaming shell output, per-message cost tracking, slash commands (/goal, /status, /model), TUI diff viewer, and 20+ new providers. The Rust agent keeps pulling ahead."
+pubDate: "2026-08-14T11:00:00Z"
+tags: ["goose", "release", "v1.46", "hooks", "cost-tracking", "agent-loop", "coding-agent", "beginner"]
+tool: "goose"
+author: "sage"
+image: "/api/og?title=Goose+v1.46+Biggest+Feature+Wave&tool=goose"
+---
+
+Goose v1.46.0 landed on August 12, 2026, and it is the most significant release since the 52,000-star Rust coding agent hit v1.40. The headline feature — an **unrolled agent loop** — rewrites how Goose processes turns for raw speed. But the quiet additions are the ones that change daily workflows: **hooks with PreToolUse denial** (finally, a safety rail you can script), **streaming shell output** (watch commands live), **per-message cost tracking** (see every token dollar), and **slash commands** that let you steer the agent mid-session without restarts.
+
+If you run Goose daily, this is a must-update. If you are evaluating Goose against Claude Code or Codex, the combination of hooks, cost visibility, and 20+ new model providers makes the model-agnostic case undeniable.
+
+## The headline: unrolled agent loop = faster turns
+
+Goose's agent loop used to be a recursive state machine — clean code, but every turn allocation, tool call, and model round-trip added stack overhead. **PR #9574 unrolls it into a flat, iterative loop**. The practical result: lower latency per turn, reduced memory pressure on long sessions, and a codebase that is easier to extend with new tool types.
+
+For beginners: think of it like a factory assembly line. The old loop was one worker running back and forth between stations. The new loop is a conveyor belt — each stage (plan → act → observe → decide) flows forward without the worker retracing steps. You feel it as snappier responses, especially when the agent chains 10+ tool calls in a row.
+
+## Hooks with PreToolUse denial — safety you can script
+
+This is the feature enterprise teams have been waiting for. **PR #9093 / #9304** adds a hooks system where you can register callbacks that fire **before** a tool executes. The hook receives the tool name and input, and can **deny** the call with a custom message.
+
+```json
+// ~/.config/goose/hooks.json
+{
+  "preToolUse": [
+    {
+      "matcher": "shell",
+      "command": "deny_if_destructive.sh"
+    }
+  ]
+}
+```
+
+Your `deny_if_destructive.sh` gets the tool input as JSON on stdin. Exit 0 = allow, exit 1 = deny with your stderr message shown to the model. This means you can:
+
+- Block `rm -rf /` or `git push --force` without hardcoding a deny list
+- Require approval for writes outside the project root
+- Log every shell command to your audit system
+- Enforce team policies (no secrets in commands, no prod DB access)
+
+For beginners: this is **your safety net**. Before v1.46, the agent could run anything the model hallucinated. Now you decide what "anything" means.
+
+## Streaming shell output — watch it live
+
+**PR #10808** makes `shell` tool output stream to the UI in real time. Before, you waited for the command to finish, then saw the whole blob. Now you watch `npm test` scroll by, see the compilation error on line 47 the moment it happens, and can mentally context-switch instead of staring at a spinner.
+
+This pairs with the unrolled loop: the agent no longer buffers tool output — it yields control back to the UI while the command runs.
+
+## Per-message cost tracking — every token has a price
+
+**PR #10172 / #10210 / #9752** adds **per-message usage stats** (input tokens, output tokens, cache tokens, cost in USD, TTFT, tokens/sec) with **derived session totals** in the sidebar. You see exactly what that 45-minute refactor cost — not a monthly bill surprise.
+
+Cache tokens are tracked separately, so you know when your prompt caching is actually working. The UI shows a cost badge on each message; hover for the breakdown.
+
+For teams on budgets: this turns "vibe coding" into "budget coding." You can set a mental (or scripted) cap: *stop if session cost > $2*.
+
+## Slash commands: steer without restarting
+
+Three new slash commands change how you interact mid-session:
+
+| Command | What it does | Why it matters |
+|---------|--------------|----------------|
+| `/goal` | Agent self-evaluates before finishing: "Did I actually solve the task?" | Catches the "I think I'm done" hallucination where the agent misses a test or left a TODO |
+| `/status` | Shows current model, session cost, context usage, working dir, git status | One glance instead of hunting through UI panels |
+| `/model` | Switch session model **mid-conversation** (Claude → local Ollama → Gemini) | No restart, no context loss. Use Opus for planning, Haiku for boilerplate, local for secrets |
+
+Plus `--edit` session flag (**PR #9799**): fork a conversation, edit the history, then resume. Fix a bad model turn without starting over.
+
+## TUI diff viewer — see changes before you approve
+
+**PR #9260** adds a built-in diff viewer in the terminal UI. When the agent proposes a file edit, you see a side-by-side diff with syntax highlighting, navigate with arrows, and approve/reject per hunk. No more "yolo approve" because the raw patch was unreadable.
+
+## 20+ new model providers — the model-agnostic moat widens
+
+Goose v1.46 adds **20 new declarative providers** in one release. Highlights:
+
+- **Celeris** (ultra-fast inference)
+- **Friendli** (declarative, optimized serving)
+- **Azure AI Foundry** (multi-LLM, enterprise)
+- **OllamaCloud** (dynamic model discovery — new local models appear automatically)
+- **Sakana AI** (Fugu API, OpenAI-compatible)
+- **iFlytek Spark / Astron MaaS** (Chinese LLMs)
+- **Fireworks AI / Together AI / OrcaRouter / Perplexity / Alibaba Qwen (DashScope) / Databricks / Scaleway / NEAR AI / EmpirioLabs / xAI SuperGrok**
+
+Plus OpenRouter request parameters, GitHub Copilot `/responses` API, Databricks responses API check. If a model exists, Goose probably has a provider for it — and the declarative provider system means adding a new one is ~50 lines of config, not a code change.
+
+## Other changes that matter
+
+- **`goose review`** — local code review command that runs the agent over your diff and posts comments
+- **Open plugins generalization with skills support** — plugins can now expose skills, not just tools
+- **Summon extension: peek mode** — async background tasks you can check on without blocking
+- **Worktree-aware directory switcher** — `cd` across git worktrees safely
+- **Chat history search in nav panel** — find that session from three weeks ago
+- **Group chat sessions by project** — sidebar organizes by repo automatically
+- **Encrypted Nostr session sharing** — share a session peer-to-peer via Nostr relays
+- **Import sessions** — bring in conversations from other formats
+- **Hugging Face OAuth** — one-click auth in settings
+- **MLX models / Linux Vulkan** — local inference hardware acceleration
+- **Reconnect desktop ACP after sleep** — no more "session dead" on laptop wake
+- **TLS for ACP serve** — secure remote agent connections
+- **Group consecutive tool calls into one chain card** — cleaner UI for multi-step operations
+- **MCP apps bound to trusted ownership metadata** — supply-chain hardening
+- **UniFFI SDK for cross-language bindings** — Goose logic callable from Python, Kotlin, Swift
+- **Provider bindings MVP to goose-sdk with Python wheel** — embed Goose in your Python app
+- **Kotlin FFI with Maven publish** — Android/JVM integration
+- **Quarterly scheduler option** — cron-style agent runs
+- **Harbor eval runner** — structured evaluation harness
+- **Deep links** (`goose://new-session`, `goose://resume`) — launch from browser/shortcuts
+- **Initial prompt with deep link** — "goose, fix the login bug" from a URL
+- **Load global hints from `~/.agents/AGENTS.md`** — shared context across all projects
+- **Proactive OAuth token refresh** — no re-auth on every session
+- **Configurable `LOCAL_WHISPER_LANGUAGE`** — multilingual local transcription
+- **Disable built-in skills** — free context budget for your custom skills
+- **Structured summary output for compaction** — session summaries that preserve file paths and decisions
+- **Pass `working_dir` to Stop hook** — cleanup hooks know where they ran
+- **Surface output token limit info** — know when you hit the model's ceiling
+- **Tab completion + provider switch for `model` command** — faster model hopping
+- **Collapse const-union enums in tool schemas** — smaller context payloads
+- **GenAI semantic conventions for OTEL** — observability standard
+- **ACP `session/new` supports hidden sessions** — background agent spawning
+- **OAuth `logo_uri` in client metadata** — branded auth screens
+- **Termux detection in installer** — musl portable build on Android
+
+## Should you update?
+
+**Yes.** If you run Goose in production or as your primary coding agent, v1.46 is the release that turns it from "fast Rust agent" into "production-grade agent platform." Hooks give you governance. Cost tracking gives you predictability. Slash commands give you control. The provider explosion gives you freedom.
+
+If you are evaluating Goose for the first time, v1.46 is the best entry point. The model flexibility — Claude Opus 5, Gemini, 20+ other providers, and any local model through Ollama/MLX — is unmatched by any single competitor. Claude Code ties you to Anthropic. Codex ties you to OpenAI. Goose lets you choose.
+
+To update:
+
+```bash
+goose update
+```
+
+Or download the latest release from the [Goose GitHub releases page](https://github.com/aaif-goose/goose/releases/tag/v1.46.0).
+
+---
+
+*Built by Y Combinator alumni, **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you every major AI model in one chat for $12/mo. Compare answers side-by-side and pick the best one for your task.*
+
+## Related articles
+
+- [Claude Sonnet 5: The New Default Model in Claude Code](/blog/claude-sonnet-5-default-model-guide/)
+- [Claude Opus 5 Arrives: Near-Fable Intelligence at Half the Price](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Cursor Now Runs on iPad — Build, Review, and Merge Code From Your Couch](/blog/cursor-ipad-app-build-review-merge-code/)
+- [Claude Code vs Goose: plugins, skills, and extensibility](/blog/claude-code-vs-goose-extensibility-showdown/)
+- [OpenAI Codex vs Goose: plugins, skills, and extensibility](/blog/codex-vs-goose-parallel-vs-extensible/)
