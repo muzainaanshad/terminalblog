@@ -1,0 +1,159 @@
+---
+title: "NVIDIA Just Dropped a 30B Model That Runs on a Single GPU — And It's Built for Agents"
+description: "Nemotron 3.5 Lightning hit August 11: 30B MoE with 3B active params, 1M context, 4x throughput. Kilo Code already integrated it. Here's why this changes local agent economics."
+pubDate: "2026-08-13T14:00:00Z"
+tags: ["nvidia", "nemotron", "local-models", "kilo-code", "coding-agents", "open-weights"]
+tool: "kilo"
+author: "rho"
+image: "/api/og?title=Nemotron+3.5+Lightning+Local+Agents&tool=kilo-code"
+---
+
+NVIDIA didn't announce this with a keynote. They dropped a blog post on August 11 and open-sourced the weights. By afternoon, **Kilo Code had it running in their CLI, VS Code extension, and gateway**.
+
+Nemotron 3.5 Lightning is a 30-billion-parameter Mixture-of-Experts model with only 3 billion active parameters. It was distilled from Nemotron 3 Ultra — a model that's been top-ten on the Kilo Leaderboard since launch, trading blows with MiniMax and DeepSeek's best.
+
+The kicker: **it runs on a single consumer GPU**. And it's built specifically for always-on agents.
+
+---
+
+## Why This Isn't Just Another "Small Model" Release
+
+Every week someone claims their new 7B/8B/30B model "punches above its weight." Most don't. Nemotron 3.5 Lightning is different for three reasons:
+
+### 1. It Was Built for Agent Workloads, Then Benchmarked on Them
+
+NVIDIA didn't train a chat model and hope it works for agents. They **distilled from a frontier agent model** (Nemotron 3 Ultra) targeting agentic benchmarks specifically. The architecture supports **1 million token context windows** — not because marketing said so, but because always-on agents need to ingest entire codebases, logs, and documentation without forgetting the task.
+
+### 2. The Throughput Numbers Are Absurd
+
+Kilo's internal benchmarks show **up to 4x higher throughput** compared to competing models at similar accuracy. On PinchBench (an agentic evaluation suite), Nemotron 3.5 Lightning matches Qwen 3.6 35B **30% faster**.
+
+That's not "good for its size." That's **production-grade throughput for multi-agent orchestration**.
+
+### 3. It Has a "Personality" That Actually Helps Agents
+
+Kilo engineers noticed something weird during testing: the model is **opinionated**. When asked to create a PR, it responded with a Shakespearean quip: *"To create a PR, or not to create a PR, that's the question."*
+
+This sounds like a bug. It's not. In an **Agent Manager framework** (where an Orchestrator breaks work into bounded sub-tasks), that spirited disposition translates to **relentless execution within strict guardrails**. Give it vague high-level planning? It drifts. Give it "here's the exact file, here's the exact change, verify it compiles"? It crushes it at speeds larger models can't match.
+
+---
+
+## The Two Variants: Instant vs Thinking
+
+| Variant | Use Case | Kilo Benchmark Highlights |
+|---------|----------|---------------------------|
+| **Instant** | Low-risk, deterministic tasks | 100% success on tagging, strong on undo/reset, commit construction, remote handling |
+| **Thinking** | Complex git ops, multi-step reasoning | ~73% exact completion on personal git benchmarks, 16/16 on critical ops (inspect, revert, stash, undo recovery) |
+
+**Rule of thumb**: Use **Instant** for high-volume repetitive work (PR descriptions, branch names, simple UI tweaks). Use **Thinking** when the sub-task needs actual reasoning but you still want the speed advantage.
+
+---
+
+## How to Run It Today (Zero Config)
+
+### Via Kilo Code (Easiest)
+
+```bash
+# VS Code Extension: Ctrl+Shift+P → "Kilo: Select Model" → Nemotron 3.5 Lightning
+# CLI:
+kilocode --model nemotron-3.5-lightning
+```
+
+Kilo's gateway serves it at **exact provider rates with no markup**. Free tier available.
+
+### Via OpenRouter (Free Tier)
+
+```bash
+# Free endpoint available
+openrouter.ai/nvidia/nemotron-3.5-lightning:free
+```
+
+### Local Inference (If You Have a GPU)
+
+```bash
+# Ollama (once available)
+ollama run nemotron-3.5-lightning
+
+# Or vLLM / llama.cpp with the HF weights
+# HF: nvidia/Nemotron-3.5-Lightning-30B-A3B
+```
+
+**Hardware reality check**: 30B total params at NVFP4 quantization ≈ **8-10 GB VRAM**. A 24GB card runs it with room for context. A 12GB card works with quantization. This is genuinely single-GPU territory.
+
+---
+
+## Where It Fits in Your Agent Stack
+
+### ✅ Perfect For
+- **Agent Manager sub-agents** — bounded tasks, strict instructions, high volume
+- **Local-first workflows** — no API keys, no data leaves your machine
+- **Git operations at scale** — the deterministic git benchmarks are genuinely impressive
+- **Rapid iteration loops** — 4x throughput means faster feedback cycles
+- **Cost-sensitive teams** — BYOK via Kilo Gateway at provider rates, or free on OpenRouter
+
+### ❌ Not For
+- **Unconstrained architectural planning** — it needs guardrails
+- **Creative writing / open-ended research** — the "personality" fights you
+- **Massive context without structure** — 1M tokens is useless if the prompt is vague
+
+---
+
+## The Bigger Signal: NVIDIA Is Serious About Agent Infrastructure
+
+This is NVIDIA's **first Nemotron 3.5 model**. Not 4.0, not "Ultra" — the *entry point* of their new generation is a 30B MoE optimized for agents.
+
+They're not chasing chat benchmarks. They're chasing **agent throughput per dollar per watt**.
+
+Combined with:
+- **Kilo's Agent Manager** (orchestrator + specialized executors)
+- **OpenRouter's free tier** (zero-cost experimentation)
+- **Local inference maturity** (llama.cpp, vLLM, Ollama all support MoE now)
+
+...the economics of running **always-on agent fleets locally just shifted**.
+
+---
+
+## Quick Start: Your First Hour
+
+```bash
+# 1. Install Kilo (if not already)
+# VS Code: Extensions → "Kilo Code"
+# CLI:
+npm install -g @kilocode/cli
+
+# 2. Select the model
+kilocode --model nemotron-3.5-lightning
+
+# 3. Give it a bounded task
+kilocode "In src/auth/login.tsx, change the button color to #2563eb and verify the build passes"
+
+# 4. Watch it finish in seconds, not minutes
+```
+
+---
+
+## What This Means for the Agent Wars
+
+**The model is commoditizing. The harness is what matters.**
+
+Nemotron 3.5 Lightning proves you don't need a 400B parameter model for agentic work. You need:
+1. A model distilled for **agent-specific capabilities**
+2. A framework that **constrains and directs** it (Agent Manager, skills, strict prompts)
+3. Infrastructure that makes it **cheap to run at scale** (local, gateway, free tiers)
+
+NVIDIA just handed the open ecosystem a Ferrari engine. Kilo built the chassis. The race is now about **who builds the best driver** — the orchestration layer, the skill system, the trust boundaries.
+
+---
+
+## Related Reading
+
+- [Kilo Code: The Lightweight Agent That Runs Everywhere](/blog/deep-dive-kilo-code-cli-lightweight-llm-orchestrator/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Run Coding Agents on Ollama: Local Models Guide](/blog/run-coding-agents-ollama-local-models-guide/)
+- [Meta Just Gave Away a Free Coding Agent Model](/blog/meta-muse-glimmer-30b-free-local-coding-agent/)
+
+---
+
+*The agent wars aren't about who has the biggest model anymore. They're about who makes the smallest model do the most work. NVIDIA just dealt a strong hand.*
+
+**Try Nemotron 3.5 Lightning in Kilo Code today. Report back what you build.**

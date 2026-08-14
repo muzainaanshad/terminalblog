@@ -1,0 +1,217 @@
+---
+title: "Cline Just Made Your Coding Sessions Bulletproof — Here's What v4.1.8 Fixed"
+description: "Cline v4.1.7 and v4.1.8 shipped in the same week with fixes that finally stop lost prompts, broken sessions, and confusing model pickers. If you've ever had Cline forget your queued messages or fail silently, this update changes everything."
+pubDate: 2026-08-13
+updatedDate: 2026-08-13
+author: "Anshad"
+tags: ["cline", "release", "coding-agent", "reliability", "beginner", "guide"]
+tool: "cline"
+image: "/api/og?title=Cline+v4.1.8+Bulletproof+Sessions&tool=cline"
+---
+
+Cline v4.1.7 dropped August 9. v4.1.8 followed two days later. Together they're the most important reliability update this free coding agent has shipped in months — and if you've ever lost work to a silent failure, you need to know what changed.
+
+## The Short Version
+
+**Your prompts no longer vanish when something interrupts a turn.** **Sessions survive hub restarts.** **The model picker actually shows you what's available in your Vertex region.** **MCP servers don't hang your session startup.** **Failed turns now show errors instead of disappearing.**
+
+If you've used Cline for more than a week, you've probably hit at least one of these. They're fixed now.
+
+---
+
+## The Problem: Silent Failures Erode Trust
+
+Coding agents live or die on reliability. You're in the middle of a refactor, you queue three follow-up prompts, something hiccups — and suddenly your queue is gone. Or the agent says "done" but the file wasn't written. Or you switch models and the session forgets everything.
+
+Cline v4.1.6 and earlier had a cluster of these papercuts:
+
+- **Queued prompts dropped silently** when a turn was interrupted or aborted
+- **Session context evaporated** after hub restarts or crashes
+- **MCP servers with bad config** could block session creation entirely
+- **Compaction silently skipped** on reasoning models (1024-token hard cap)
+- **LiteLLM requests failed** because they used the wrong API path
+- **Vertex model picker showed stale global list** instead of your region's actual models
+- **Yolo Mode toggle did nothing** — it was cosmetic, not functional
+- **Failed turns completed silently** with no error in the transcript
+
+None of these are catastrophic alone. Together they make you hesitate before trusting the agent with real work.
+
+---
+
+## What v4.1.7 Fixed (August 9)
+
+### Queued Prompts Now Survive Interruptions
+
+This is the big one. Previously, if you queued multiple prompts and the current turn got interrupted — network blip, you hit stop, the model timed out — your queued messages vanished. Gone. No warning.
+
+**Now:** Queued prompts persist across aborts. They're drained after a turn aborts itself, and the stop reason surfaces in the UI instead of the queue being silently dropped.
+
+```json
+// Before: queue = [] after any interruption
+// After: queue survives, gets processed next turn
+```
+
+### Session Context Survives Hub Restarts
+
+The Hub (Cline's background daemon) used to lose session state on restart. You'd reopen Cline and your conversation history, file context, and pending work were gone.
+
+**Now:** Session context is durable across aborts and hub restarts. An interrupted session resumes with the state it had.
+
+### MCP Servers Can't Block Session Startup Anymore
+
+A misconfigured or hung MCP server used to freeze session creation indefinitely. You'd click "New Session" and stare at a spinner forever.
+
+**Now:** Stdio servers that were never configured get a 30-second initialize budget instead of blocking forever. A hung MCP server can't take down session creation.
+
+### LiteLLM Routed Through Correct API
+
+LiteLLM proxies were getting requests via the Responses API instead of Chat Completions, causing mysterious failures.
+
+**Now:** LiteLLM routes through Chat Completions. Requests against LiteLLM proxies work again.
+
+### "View Changes" Button Restored
+
+The completion card's "View Changes" button — which lets you review everything a task touched — is back, backed by SDK checkpoints.
+
+### Copy Button on Turn-Final Responses
+
+Small but meaningful: you can now copy the final response of a turn with one click.
+
+### OAuth for Remote MCP Servers
+
+Pre-registered OAuth clients for remote MCP servers are now supported, for setups where dynamic client registration isn't available.
+
+---
+
+## What v4.1.8 Fixed (August 11)
+
+### Vertex AI: Full Model Catalog Per Region
+
+This is huge if you use Vertex. The model picker used to show a hardcoded global list that lagged behind every model launch. You'd pick a model, hit request, and *then* find out your region doesn't serve it.
+
+**Now:** The picker shows the full catalog for your specific Vertex region. Picking an unavailable model fails at request time with recovery guidance in the error row — not a silent failure later.
+
+### Fable 5 on Vertex (With Honest Pricing)
+
+Claude Fable 5 (the Mythos-family model with extra safeguards) is now in the Vertex catalog. But Vertex bills region-dependently, so Cline **reports cost as unknown** rather than applying Anthropic's list price and being wrong.
+
+> **Why this matters:** Most tools show you a fake price. Cline now admits "we don't know what Vertex will charge you in this region" — which is the only honest answer.
+
+### Custom Vertex Model IDs Pass Through Unchanged
+
+You can now enter any Vertex model ID by hand, including models the catalog doesn't list yet. Claude-style IDs route to the Anthropic-on-Vertex path automatically.
+
+### Auto-Approbe Menu Becomes Single Source of Truth
+
+The "Yolo Mode" toggle was cosmetic — nothing in the approval path actually read it. Setups that had it on are migrated to auto-approving every action, so they keep running unattended.
+
+**Now:** The auto-approve menu is the *only* way to configure unattended runs. No more phantom toggles.
+
+### Compaction Respects Max Output Tokens
+
+On reasoning models, compaction (summarizing history to fit context) was silently skipped because the summarizer hardcoded a 1024-token output cap.
+
+**Now:** The summarizer honors your `max-output-tokens` setting, defaults to 4096 (lowered when the model reports less), and logs a diagnostic when a summary comes back empty.
+
+### Stale Hub Daemon Reconnection Fixed (CLI + SDK)
+
+Upgrading Cline used to leave the CLI attached to an old Hub daemon running stale code. You'd think you're on the new version but get old behavior.
+
+**Now:** Hub daemons carry a runtime build fingerprint. An upgraded CLI retires and respawns any daemon still running older code.
+
+### Failed Turns Show Errors, Not Silence
+
+Sending a message with no model credentials — or any queued turn that fails — now shows an error in the transcript, enriched with the underlying cause and a pointer to Settings → Models.
+
+### Light-Theme Terminal Fix
+
+Queued messages were rendered in a color that washed out against light backgrounds. Fixed.
+
+### Malformed Tool Payloads Degrade Gracefully
+
+Bad tool input/output no longer breaks rendering. Formatters degrade gracefully instead of throwing.
+
+### MCP Errors Shown Per-Server
+
+MCP errors now appear on the individual server card instead of as a page-level error. A server with invalid config surfaces its error instead of silently disappearing from the list.
+
+### Composer "Agent Is Working" Stuck State Fixed
+
+The composer getting stuck on "Agent is working…" after a turn already finished — fixed.
+
+### Welcome Screen Model Connection Notice
+
+New "Connect a model" notice on the welcome screen when no provider has credentials. One click to onboarding or model settings. Reacts live as you add credentials. Correctly recognizes Bedrock/Vertex and keyless local endpoints as already connected.
+
+### "Get API Key" Links in Onboarding
+
+Direct links for popular providers in onboarding and Settings → Models, plus a link to the Cline dashboard from the Cline API key form.
+
+### Onboarding Explains What Cline Is
+
+The welcome step now explains the product. Sounds trivial, but for beginners it's the difference between "what is this?" and "okay, I get it."
+
+### Stop Button Actually Visible and Clickable
+
+Esc stops the current turn. New shortcuts: Cmd/Ctrl+N for new session, Cmd/Ctrl+, for settings.
+
+### Vertex Credential Refreshes Work Behind Proxies
+
+Vertex AI credential refreshes now use the configured fetch, fixing ADC authentication behind proxies and custom networking.
+
+### Refreshed Provider and Model Catalog
+
+Bundled catalog updated.
+
+---
+
+## What This Means for Beginners
+
+If you're new to Cline, v4.1.8 is the first version where the basics *just work*:
+
+| Before v4.1.7 | After v4.1.8 |
+|---------------|--------------|
+| Queue prompts → lose them on hiccup | Queue prompts → they survive |
+| Hub restarts → lose session | Hub restarts → session intact |
+| MCP hang → frozen startup | MCP hang → 30s timeout, session opens |
+| Pick Vertex model → fails silently later | Pick Vertex model → fails fast with guidance |
+| Yolo Mode on → unsure if working | Auto-approve menu → explicit, auditable |
+| Compaction skipped on reasoning models | Compaction works, logs diagnostics |
+| Failed turn → ghost success | Failed turn → error with cause + fix link |
+| No model connected → confusing empty state | Welcome screen → one-click connect |
+
+---
+
+## How to Update
+
+**VS Code Extension:** Extensions panel → Cline → Update (or auto-update)
+
+**CLI:**
+```bash
+npm update -g cline
+```
+
+**Desktop App (macOS):** Download latest DMG from [Cline GitHub Releases](https://github.com/cline/cline/releases) — single universal build for all Macs. Drag to Applications. Future updates arrive automatically.
+
+---
+
+## The Bigger Picture
+
+Cline has been iterating fast on *capability* (planning, tools, models). v4.1.7 and v4.1.8 show a shift toward *trustworthiness* — the unglamorous work that makes an agent safe to use on real projects.
+
+The pattern is clear: every coding agent hits a reliability wall. The ones that push through become daily drivers. The ones that don't become "that tool I tried once."
+
+Cline just pushed through.
+
+---
+
+## Related Reading
+
+- [Cline v4.1.0: Five Critical Agent Fixes and the SDK Migration That Stops AI From Going Rogue](/blog/cline-v4-1-sdk-migration-five-critical-agent-fixes/)
+- [Cline v3.25: Deep Planning, Focus Chain, and Auto-Compact](/blog/cline-v325-deep-planning-focus-chain-auto-compact/)
+- [Cline Goes Free: Zero-Cost Models, Opus 5, and a Desktop App](/blog/cline-free-models-opus-5-desktop-app/)
+- [Beware: Clinejection — How a GitHub Issue Title Became a Supply Chain Attack](/blog/beware-clinejection-supply-chain-attack-github-actions/)
+
+---
+
+*Updated August 13, 2026 — covers Cline v4.1.7 (Aug 9) and v4.1.8 (Aug 11) changelogs. Full diffs: [v4.1.6→v4.1.7](https://github.com/cline/cline/compare/v4.1.6...v4.1.7) · [v4.1.7→v4.1.8](https://github.com/cline/cline/compare/v4.1.7...v4.1.8)*
