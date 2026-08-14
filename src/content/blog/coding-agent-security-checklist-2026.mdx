@@ -213,3 +213,37 @@ If you suspect a leak, the response is mechanical: revoke the token at the provi
 - [Live adoption leaderboard](/leaderboard/)
 
 *Last verified: August 2026. When a new security class appears, we add a Beware post and link it here. This page is the index; the linked deep dives carry the reproductions and fixes.*
+
+## FAQ
+
+**Q1: Do I need to run the full checklist for every coding agent session?**
+
+No. The checklist is a setup-time and periodic audit tool. Run the `env | grep` command from Section 1 and the git checkpoint command from Section 4 before every session. The rest (MCP audit, sandbox verification, network egress) should be reviewed after major agent upgrades or monthly.
+
+**Q2: Is a "sandbox enabled" toggle in the agent config enough?**
+
+No. A config flag proves nothing. You must verify the sandbox actually scrubs environment variables, restricts filesystem access, and blocks network egress. Run the `env | grep` test from Section 1 — if it prints secrets you wouldn't paste publicly, the sandbox is leaking.
+
+**Q3: Can I trust auto-approve if I'm careful about what I ask?**
+
+No. Prompt injection via images, READMEs, and tool output can coerce the agent into running destructive commands you never asked for. The [GhostCommit PNG injection](/blog/ghostcommit-png-prompt-injection-env-theft/) and [PreToolUse raw command leak](/blog/codex-pretooluse-hook-raw-command-leak/) are real examples. Keep approval gates on for destructive actions.
+
+**Q4: What's the single most common way secrets leak from coding agents?**
+
+Environment variable inheritance. The agent's child process inherits your shell's `GITHUB_TOKEN`, `AWS_*`, `ANTHROPIC_API_KEY`, etc. by default. The [zero-sandbox-credential-leak](/blog/zero-sandbox-credential-leak/) is the canonical case: the sandbox protected filesystem and network but inherited every credential verbatim.
+
+**Q5: How do I protect against MCP server supply chain attacks?**
+
+Audit every MCP server before adding it: who built it, what network it reaches, what it writes. Prefer read-only MCP for untrusted contexts. Pin plugin versions. Treat a major-version bump like a code review. Enumerate your MCP configs with the command in Section 5.
+
+**Q6: What should I do if I suspect a secret was leaked during an agent session?**
+
+Immediate response: (1) Revoke the token at the provider (GitHub, AWS, Anthropic, etc.), (2) Rotate it locally, (3) Purge it from shell profiles and `.env` files, (4) Re-run `env | grep` from Section 1 to confirm it's gone from child processes.
+
+**Q7: Is Windows safe for coding agents?**
+
+Windows has documented gaps: click-through UAC dialogs can silently grant denied permissions ([windows-click-through-permissions](/blog/claude-code-windows-click-through-permissions/)), and Smart App Control can leave sandboxes effectively off ([smart-app-control-sandbox-fail](/blog/codex-smart-app-control-sandbox-fail/)). If you must use Windows, verify isolation manually and consider WSL2 with a verified sandbox instead.
+
+**Q8: How often should I review this checklist?**
+
+After every major agent upgrade (e.g., Claude Code v2.1.x → v2.2.x), monthly for active operators, and whenever a new [Beware post](/blog/tag/beware/) lands that maps to your stack.

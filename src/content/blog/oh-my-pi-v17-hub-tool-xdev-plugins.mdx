@@ -1,17 +1,17 @@
 ---
-title: "Oh My Pi Just Got a Compress Command, Smarter Cleanse, and MCP Fixes — v17.2.15 Changes Everything"
-description: "Oh My Pi v17.2.14 and v17.2.15 (Aug 11-12) add omp compress, natural-language cleanse, interactive picker, MCP Streamable HTTP fixes, handoff artifact preservation, and hardened tar parsing. The v17 series continues its daily-shipping pace with features beginners will actually use."
+title: "Oh My Pi v17.3.2 Fixes Subagent Stalls, Hashline Paths, and Antigravity Quota — What Beginners Need to Know"
+description: "Oh My Pi v17.3.2 (Aug 13) fixes the parent TUI stall after subagent results, corrects hashline path collisions, classifies Antigravity 429 quota errors with smart retries, and adds deepseek-v4-pro and gemini-3.7-flash models. The v17 series keeps shipping daily fixes beginners actually feel."
 pubDate: "2026-08-09T10:00:00Z"
-updatedDate: "2026-08-12T10:00:00Z"
-tags: ["oh-my-pi", "v17", "v17.2.15", "release", "omp-compress", "omp-cleanse", "mcp", "terminal-agent", "coding-agent", "beginner"]
+updatedDate: "2026-08-13T23:00:00Z"
+tags: ["oh-my-pi", "v17", "v17.3.2", "release", "subagent-stall", "hashline-fix", "antigravity-quota", "terminal-agent", "coding-agent", "beginner"]
 tool: "oh-my-pi"
 author: "sage"
-image: "/api/og?title=Oh+My+Pi+v17.2.15+Compress+Cleanse+MCP&tool=oh-my-pi"
+image: "/api/og?title=Oh+My+Pi+v17.3.2+Subagent+Stall+Hashline+Antigravity&tool=oh-my-pi"
 ---
 
-Oh My Pi — the open-source terminal coding agent that has been quietly shipping daily releases while bigger names take weeks — just crossed into version **17**. The v17 series started with v17.0.0 on July 15, 2026, and the latest releases, **v17.2.14 (Aug 11)** and **v17.2.15 (Aug 12)**, keep the momentum going with features beginners will actually use: a new `omp compress` command, a dramatically smarter `omp cleanse` with natural-language requests and an interactive picker, MCP Streamable HTTP fixes, handoff artifact preservation, and hardened tar parsing.
+Oh My Pi — the open-source terminal coding agent that has been quietly shipping daily releases while bigger names take weeks — just crossed into version **17**. The v17 series started with v17.0.0 on July 15, 2026, and the latest release, **v17.3.2 (Aug 13)**, keeps the momentum going with fixes beginners will actually feel: the parent TUI no longer stalls after subagent results, hashline headers now retain workspace-relative paths to prevent collisions, Antigravity quota errors are classified with smart retry delays, and new models `deepseek-v4-pro:preview` and `gemini-3.7-flash` are available out of the box.
 
-If you last looked at Oh My Pi during the v16 era, this is the update to care about: v17 is not a pile of small fixes. It reorganizes how the agent's tools work under the hood, and two of its headline changes — the unified `hub` tool and the new `xd://` virtual-file system — will change how you approve, watch, and share agent work. The August 9 hotfix batch (v17.2.12) fixed memory leaks and idle CPU spin. Now v17.2.14 and v17.2.15 add genuinely useful new capabilities.
+If you last looked at Oh My Pi during the v16 era, this is the update to care about: v17 is not a pile of small fixes. It reorganizes how the agent's tools work under the hood, and two of its headline changes — the unified `hub` tool and the new `xd://` virtual-file system — will change how you approve, watch, and share agent work. The August 9 hotfix batch (v17.2.12) fixed memory leaks and idle CPU spin. v17.2.14 and v17.2.15 added genuinely useful new capabilities like `omp compress`, natural-language `omp cleanse`, and MCP fixes. Now v17.3.2 polishes the daily-driver experience with reliability fixes that matter.
 
 This guide explains what actually changed across the v17 series, what breaks when you upgrade, and what beginners should do next. No assumed knowledge: if you have never opened a terminal agent, the first section tells you what Oh My Pi even is.
 
@@ -85,6 +85,14 @@ The same batch fixed two correctness bugs you might have hit: shell "minimizatio
 - **Anthropic model ID parsing** is now case-insensitive, and the high-resolution 1932px frame tier extends to Claude Opus 5 and later, preserving full history per compaction.
 
 - **SSE reconnection support.** Extended parsed Server-Sent Events to include optional `id` and `retry` fields, enabling reconnecting transports to retain stream cursors and respect server-requested retry intervals.
+
+**v17.3.2 (August 13) — Reliability polish that matters daily.** This patch fixes three issues that directly affect how the agent feels in daily use:
+
+- **Parent TUI no longer stalls after subagent results.** Previously, when a subagent submitted its result, the parent terminal interface would freeze until you switched focus or resized the window. The event loop now wakes correctly on subagent completion ([#8462](https://github.com/can1357/oh-my-pi/issues/8462)).
+- **Hashline headers retain workspace-relative paths.** A bug caused hashline headers (like `[src/settings.json#0063]`) to collapse to just the basename, which let a same-named file at the session root capture a follow-up edit and reject it with `hash is not from this session`. Paths now stay workspace-relative ([#8482](https://github.com/can1357/oh-my-pi/issues/8482)).
+- **Antigravity quota errors classified with smart retries.** HTTP 429 responses from Google's Antigravity (Cloud Code Assist) are now parsed for structured `google.rpc.ErrorInfo` reasons — `QUOTA_EXHAUSTED`, `RATE_LIMIT_EXCEEDED`, `INSUFFICIENT_G1_CREDITS_BALANCE` — and retry delays of five minutes or longer are applied to distinguish rotatable quota windows from transient throttling. Unsigned thinking blocks are also dropped instead of causing HTTP 400 errors on session resume or model switch.
+- **New models available:** `deepseek-v4-pro:preview` and `gemini-3.7-flash` are now in the catalog. Antigravity client-version discovery is dynamic, so version-gated models appear without code changes.
+- **`omp update` fixed for foreign npm/bun aliases.** The update command no longer misclassifies globally linked checkouts while preserving package-manager ownership ([#8468](https://github.com/can1357/oh-my-pi/issues/8468)).
 
 ## What breaks when you upgrade
 

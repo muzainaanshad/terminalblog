@@ -177,3 +177,33 @@ Instruction files do not replace isolation. After you write `AGENTS.md`, still r
 - [UI.md design rules](/blog/ui-md-design-rules-coding-agents/)  
 
 *Update this guide when major harnesses change how they load project instructions.*
+
+## FAQ
+
+**Q1: What is AGENTS.md?**
+
+AGENTS.md is a project instruction file placed at the repository root that tells coding agents (Claude Code, OpenCode, Cursor, Codex, etc.) how to work with your codebase. It contains build commands, architecture rules, safety constraints, and style preferences so the agent follows your repo's conventions without tribal knowledge.
+
+**Q2: Do all coding agents read AGENTS.md?**
+
+Most do, but the exact filename varies: Claude Code reads `CLAUDE.md` (and `AGENTS.md`), Cursor reads project rules, OpenCode and Hermes read `AGENTS.md`, Codex reads repository instructions. The safest approach is to maintain both `AGENTS.md` and the agent-specific variant (e.g., `CLAUDE.md`) or have one import the other.
+
+**Q3: Where should AGENTS.md live in a monorepo?**
+
+Put a root `AGENTS.md` for universal rules (no force-push, run tests, match style). Add per-package `AGENTS.md` files in subdirectories like `packages/api/` for invariants that only matter there. Nested files layer on top of the root file — they add constraints, they don't replace it.
+
+**Q4: How long should AGENTS.md be?**
+
+Aim for 200–400 lines. Beyond ~400 lines, agents start skipping sections the same way humans skim long docs. If you have more rules, promote sections into `docs/` or `skills/` files and keep the root as an index with only the truly universal rules.
+
+**Q5: Can AGENTS.md replace a permission system?**
+
+No. AGENTS.md is **advice the model is asked to follow**; a permission system is an **enforced gate the model cannot bypass**. Put intent in AGENTS.md ("never force-push main") and enforcement in the harness (deny `git push --force`, require approval for destructive actions). See the [coding agent security checklist](/blog/coding-agent-security-checklist-2026/) for the boundary that actually holds.
+
+**Q6: How do I verify the agent is actually reading my AGENTS.md?**
+
+Add a harmless canary rule: "Always echo `AGENTS_OK` as the first line of any shell output in this repo." Ask the agent a trivial task and watch for compliance. If it doesn't comply, the file isn't being loaded at the path/working directory you assumed — fix discovery first.
+
+**Q7: What's the difference between AGENTS.md and a skill file (SKILL.md)?**
+
+AGENTS.md is the always-loaded root instruction file for universal repo rules. SKILL.md files (used by OpenCode, Hermes, and other skill-driven agents) are modular workflows loaded on demand when the task matches — e.g., a "database-migration" skill loads only when you ask for migrations. Use AGENTS.md for invariants, skills for workflows.
