@@ -21,8 +21,36 @@ const toolNames: Record<string, string> = {
   'copilot-cli': 'GitHub Copilot CLI',
 };
 
+const tagDescriptions: Record<string, string> = {
+  'guide': 'Step-by-step tutorials for setting up and mastering AI coding agents — from beginner to advanced workflows.',
+  'comparison': 'Head-to-head comparisons of coding agents: Claude Code vs Cursor, Codex vs Goose, OpenCode vs Hermes, and more.',
+  'security': 'Security vulnerabilities, CVEs, sandbox escapes, credential leaks, and prompt injection attacks in coding agents.',
+  'beware': 'Critical security alerts: sandbox escapes, credential leaks, prompt injections, and supply chain attacks with repro steps.',
+  'opinion': 'Developer opinions, hot takes, and analysis on the AI coding agent ecosystem from the trenches.',
+  'release': 'New version releases and feature announcements for Claude Code, Cursor, Codex, Goose, OpenCode, and other agents.',
+  'coding-agents': 'General coverage of AI coding agents — architecture, capabilities, limitations, and ecosystem trends.',
+  'pillar': 'Comprehensive pillar pages: decision guides, setup guides, and ultimate references for coding agent operators.',
+  'viral': 'Viral discussions from HN, Reddit, and X about coding agents — what developers are actually talking about.',
+  'industry': 'Industry news affecting coding-agent operators — funding, acquisitions, model releases, platform changes.',
+  'codex': 'OpenAI Codex coverage: releases, features, bugs, pricing, and comparisons with other agents.',
+  'claude-code': 'Claude Code coverage: releases, security issues, workflows, hooks, subagents, and comparisons.',
+  'gitlawb-zero': 'Gitlawb Zero coverage: releases, features, MCP integration, and agent orchestration.',
+  'oh-my-pi': 'Oh My Pi coverage: releases, plugins, session management, and terminal-based agent workflows.',
+};
+
+function getTagTitle(tag: string): string {
+  const pretty = tag.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return `#${pretty} — terminalblog`;
+}
+
+function getTagDescription(tag: string): string {
+  const custom = tagDescriptions[tag];
+  if (custom) return custom;
+  const pretty = tag.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return `Articles tagged with ${pretty} on terminalblog — AI coding agent reviews, security alerts, comparisons, and adoption data.`;
+}
+
 export async function getStaticPaths() {
-  // Keep this list inline — Astro isolates getStaticPaths from outer consts
   const toolTags = new Set([
     'hermes', 'opencode', 'mimo', 'kilo', 'pi-dot-dev', 'gitlawb-zero',
     'oh-my-pi', 'claude-code', 'goose', 'openclaw', 'codebuff', 'cursor',
@@ -32,7 +60,6 @@ export async function getStaticPaths() {
   const tags = new Set<string>();
   for (const p of posts) {
     for (const t of p.data.tags || []) {
-      // Tool tags are served by /tool/[id] (see vercel.json redirects)
       if (!toolTags.has(t)) tags.add(t);
     }
   }
@@ -48,15 +75,16 @@ const allPosts = (await getCollection('blog'))
   .filter(p => (p.data.tags || []).includes(tag))
   .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
 
-// Thin tag pages: keep for navigation, but don't waste crawl budget ranking them
 const MIN_INDEXABLE_POSTS = 3;
-const robots =
-  allPosts.length < MIN_INDEXABLE_POSTS ? 'noindex, follow' : 'index, follow';
+const robots = allPosts.length < MIN_INDEXABLE_POSTS ? 'noindex, follow' : 'index, follow';
+
+const pageTitle = getTagTitle(tag);
+const pageDescription = getTagDescription(tag);
 ---
 
 <Layout
-  title={`#${tag} — ${SITE_TITLE}`}
-  description={`Articles tagged with #${tag} on terminalblog — AI coding agent coverage.`}
+  title={pageTitle}
+  description={pageDescription}
   robots={robots}
 >
   <div class="content" style="max-width:860px;margin:0 auto;padding:0 1.5rem;">

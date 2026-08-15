@@ -81,3 +81,20 @@ AI Now's policy brief goes further than a technical advisory. The researchers wa
 That is a strong claim. But the evidence supports it. Every major coding agent in 2026 has been shown to be exploitable through prompt injection when processing untrusted content. The "safe" modes do not fix the underlying problem — they add a classifier that can be fooled by a decoy Go source file and a README paragraph. Sandbox escapes keep getting found and patched, and each fix closes one path while the structural issue remains.
 
 The bottom line for operators: your coding agent's auto-mode is a convenience feature, not a security boundary. Do not trust it to protect you when the code it is reviewing might be adversarial. The moment you hand an agent a codebase it did not create, you are the security boundary — and that means manual approval, isolated environments, and the discipline to treat every file in the repository as potentially hostile.
+
+## FAQ
+
+**Q1: What is the "Friendly Fire" exploit?**
+The Friendly Fire exploit, published by the AI Now Institute in July 2026, demonstrates that Claude Code's auto-mode and Codex's auto-review can be tricked into executing attacker-controlled binaries when reviewing untrusted code. The attack uses a decoy source file and a README reference to fool the agent's safety classifier into running a malicious binary.
+
+**Q2: Which agents and modes are affected?**
+Confirmed affected: Claude Code auto-mode (Sonnet 4.6, Sonnet 5, Opus 4.8) and Codex auto-review (GPT-5.5). The attack transfers across models without modification.
+
+**Q3: Does running in a sandbox protect against this?**
+No. The exploit runs inside the sandbox. The researchers note that sandbox escapes (CVE-2026-39861, CVE-2026-25725) have been found in Claude Code, meaning an in-sandbox RCE can chain to a host escape. Sandboxing reduces but does not eliminate the risk.
+
+**Q4: What should I do immediately?**
+Stop pointing auto-mode or auto-review at untrusted third-party code. Use restricted-mode or manual-approval mode for any task involving external repositories. Run reviews in disposable VMs/containers with no access to production credentials.
+
+**Q5: Are CI/CD dependency review flows vulnerable?**
+Yes. Automated flows that hand new packages to a coding agent for security review create the exact attack pipeline the research describes. Remove the automated review or use a non-agentic linter/static analysis tool instead.
