@@ -1,0 +1,128 @@
+---
+title: "Cline Just Learned to Search the Web — And It Changes How You Code"
+description: "Cline v4.1.10 adds web search during tasks. Your AI coder can now look up docs, APIs, and solutions in real-time without leaving the terminal."
+pubDate: 2026-08-15
+updatedDate: 2026-08-15
+heroImage: "/blog/cline-web-search-hero.png"
+tags: ["cline", "release", "ai-coding", "web-search", "productivity"]
+tools: ["cline"]
+category: "just-shipped"
+author: "Anshad"
+readingTime: 8
+---
+
+## The Feature You've Been Waiting For
+
+You're deep in a task. Cline suggests a library you've never used. The API looks promising but the docs are... somewhere. Usually you'd stop, open a browser, search, read, come back, paste context, continue.
+
+**Not anymore.**
+
+Cline v4.1.10 dropped today with **provider-executed web search**. Models that support it can now search the web *during a turn*. The searches and results appear in your transcript. They persist across reloads. You never leave the terminal.
+
+```bash
+# Enable it in Feature Settings
+# Look for "web_search" model tool — off by default
+```
+
+That's it. One toggle. Your agent just got a research department.
+
+---
+
+## What This Actually Looks Like
+
+```
+You: "Add Stripe webhook handling to my Next.js app. Use the latest API."
+
+Cline: [searches "Stripe webhook Next.js 2026 latest API"]
+       [finds official docs, GitHub examples, recent changelog]
+       [implements with current best practices]
+       [shows you the search calls and results in the transcript]
+```
+
+The search calls **stay in your conversation history**. Reload the session tomorrow — you still see what it looked up and why. No more "wait, why did it use that parameter?"
+
+---
+
+## Why This Matters for Beginners
+
+If you're new to AI coding agents, the biggest friction point is **trust**. You watch the agent write code and wonder:
+
+- Does it know the *current* API?
+- Is it hallucinating a deprecated method?
+- Did it just guess the config format?
+
+Web search doesn't fix hallucination. But it **grounds the agent in reality**. It can verify. It can check. It can say "the docs say X" and show you the source.
+
+For a beginner, that's the difference between "hope it works" and "I can verify this."
+
+---
+
+## The Other Big Fix: No More Hub Wars
+
+Cline runs a background **Hub daemon** that manages sessions. Until now, if you had two Cline installations (say, VS Code + Cursor, or two machines), they'd fight over the Hub.
+
+**One would kill the other's sessions.** Mid-task. Abnormal socket close. Work gone.
+
+v4.1.10 fixes this with **build identity ordering**. Now:
+
+- Build identities are compared through a total order
+- At most one side retires the other
+- A newer build attaches to a busy Hub instead of replacing it
+- The swap happens *once the Hub goes idle*
+
+Your sessions survive. Period.
+
+---
+
+## What Else Landed
+
+| Change | Why You Care |
+|--------|--------------|
+| **Idle plugin sandboxes reclaimed** | No more orphaned processes eating RAM for the session lifetime |
+| **`cline doctor fix` honesty** | Now tells you exactly what survived a kill, what appeared during the fix, what's genuinely held |
+| **Model catalog refresh** | Crusoe added as provider; model lists and defaults updated across the board |
+| **Extended thinking budgets on Cline Pass** | Gateway options now reach the wire for both `cline` and `cline-pass` (was silently broken for `cline-pass`) |
+
+---
+
+## Desktop App Gets the Same Treatment
+
+Desktop v0.0.13 shipped alongside with:
+
+- **App font size slider** — scales interface, applies before paint (no flash at old size)
+- **Web search toggle in Settings** — same feature, GUI access
+- **Same Hub fixes** — no more update dialog interrupting when Hub is just finishing its own update
+- **No flash on launch** — your font size is applied before the window paints
+
+---
+
+## How to Get It
+
+**VS Code / Cursor / VSCodium:** Extension auto-updates. Check `cline --version` → should show `4.1.10`.
+
+**CLI:** `cline update` (installs on next start, won't swap mid-session anymore)
+
+**Desktop:** Auto-updates or download from [GitHub Releases](https://github.com/cline/cline/releases/tag/desktop-v0.0.13)
+
+---
+
+## The Bottom Line
+
+Cline v4.1.10 isn't a flashy rewrite. It's two things that *actually matter*:
+
+1. **Your agent can now verify its own work** against the live web
+2. **Your sessions stop dying** when multiple Cline installs exist
+
+Both are beginner-friendly. Both reduce the "does this thing actually work?" anxiety.
+
+Turn on web search. Try a task that needs fresh docs. Watch it search, cite, implement.
+
+That's the moment it clicks: *this isn't autocomplete. This is a researcher that codes.*
+
+---
+
+## Related Reading
+
+- [Cline v4.1.8: Five Critical Agent Fixes](/blog/cline-v4-1-sdk-migration-five-critical-agent-fixes/)
+- [Cline Desktop: Free Models, Zero API Keys](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Complete Guide: AI Coding Agents 2026](/blog/complete-guide-ai-coding-agents-2026/)
