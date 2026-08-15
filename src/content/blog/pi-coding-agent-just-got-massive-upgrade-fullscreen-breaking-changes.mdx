@@ -1,0 +1,173 @@
+---
+title: "Pi Coding Agent Just Got a Massive Upgrade — Fullscreen TUI, Breaking Session Model, and Transcript Search"
+description: "Pi 0.84.0 and 0.84.2 bring fullscreen terminal mode, a lane-based session architecture (breaking changes), per-directory context overrides, configurable default tools, and fullscreen transcript search. Plain-English breakdown for beginners."
+pubDate: "2026-08-15T09:00:00Z"
+tags: ["pi", "coding-agent", "release", "tui", "breaking-changes", "session-model", "ai-agent", "beginner"]
+tool: "pi-dot-dev"
+author: "sage"
+image: "/api/og?title=Pi+Coding+Agent+Massive+Upgrade&tool=pi"
+---
+
+Pi (from earendil-works) just shipped its biggest release window yet. Versions **0.84.0** (July 21) and **0.84.2** (August 14) collapse into one story: the terminal agent grew a fullscreen mode, rewrote its session backbone, and added the daily-driver polish that makes it feel like a finished product instead of a promising prototype.
+
+If you're new to Pi: it's a terminal-first AI coding agent that runs on your machine, supports 20+ model providers (Anthropic, OpenAI, Google, GitHub Copilot, OpenRouter, local llama.cpp, and more), and treats your shell as a first-class tool. Think "Cursor in the terminal" but provider-agnostic and open-source.
+
+---
+
+## The Headline: Fullscreen TUI Mode Finally Lands
+
+Before 0.84.0, Pi's terminal interface was a single scrolling pane. Now you can toggle **fullscreen mode** (`--tui-mode fullscreen` or via `/settings`) and get:
+
+- A **sticky editor** docked at the bottom — your prompt never jumps.
+- **Independently scrollable transcript** — review history while the agent works.
+- **Draggable scrollbars** with `auto`/`always`/`hidden` modes.
+- **Page scrolling** and marked-message navigation shortcuts.
+- **Stacked transient notifications** that don't cover your work.
+
+This is the difference between "a chat in a terminal" and "an IDE in a terminal." For beginners, it means you can finally keep context visible while the agent runs long tasks — no more losing the plan behind a wall of tool output.
+
+> **How to try it:** `pi --tui-mode fullscreen` or open `/settings` inside Pi and flip the TUI mode toggle.
+
+---
+
+## The Breaking Change You Need to Know: Lane-Based Session Model
+
+Pi 0.84.0 **replaced its entire session architecture** with a v4 lane-based model from `pi-agent-core`. This is a **breaking change** for anyone building on Pi's SDK or extending it:
+
+| What Changed | Impact |
+|--------------|--------|
+| `Session`, `SessionStorage`, `SessionRepo` APIs | New lane-based model with durable operation records, global facts, shared sequence numbers, tree-scoped lane views |
+| Legacy JSONL/in-memory repos removed | Use `JsonlSessionRepo` or `InMemorySessionRepo` from `pi-agent-core` v4 |
+| `RemoteSession.sessions` no longer exposes runtime phase/model/thinking | Acquire `SessionSnapshot` for that data |
+| `FileSystem.renameFile()` now required | Custom harness file-system implementations must provide atomic same-filesystem replacement |
+
+**If you only use Pi as a CLI user:** you likely won't notice except for more reliable session persistence and resume. The migration is internal.
+
+**If you build extensions/SDK consumers:** read the [0.84.0 breaking changes list](https://pi.dev/news/releases/0.84.0) — there are ~15 interface changes including `ModelRegistry.getApiKeyAndHeaders()` returning nullable headers, `message_update` events emitting deltas only, and provider refresh context store access replaced with generation-checked publications.
+
+---
+
+## Per-Directory Context Overrides (`AGENTS.override.md`)
+
+This is a quiet productivity killer feature. You can now place an **`AGENTS.override.md`** in any directory, and Pi will use it **instead of** `AGENTS.md` or `CLAUDE.md` in that same directory — while preserving context from parent/other directories.
+
+Use cases:
+- Monorepo: different coding standards per package
+- Client work: override global rules for a specific project folder
+- Experiments: test a prompt variant in one subtree without touching the main context
+
+No more symlink juggling or environment-variable hacks. Drop the file, Pi respects it.
+
+---
+
+## Configurable Default Tools (0.84.2)
+
+`defaultTools` setting (global or per-project) lets you choose which **built-in tools** load at startup. No more waiting for the agent to discover tools you never use, or manually disabling them each session.
+
+```json
+// mimocode.jsonc or project config
+{
+  "defaultTools": ["read", "write", "edit", "bash", "grep"]
+}
+```
+
+Pair this with the new `--use-theme <name>` flag (0.84.2) for per-run theme overrides without changing saved settings — great for demos or pairing sessions.
+
+---
+
+## Fullscreen Transcript Search (0.84.2)
+
+`Ctrl+Shift+F` opens **incremental fullscreen search** across your entire transcript:
+- Match highlighting with configurable theme colors
+- `Enter`/`Ctrl+G` → next match, `Shift+Enter`/`Ctrl+Shift+G` → previous
+- Works in fullscreen mode, doesn't snap back during manual scroll
+- Mouse input no longer leaks into search query
+
+If you've ever scrolled back 200 turns looking for "that one error message," this alone saves hours.
+
+---
+
+## Experimental Strict JSON-Schema Constrained Sampling (0.84.2)
+
+Enable with `PI_EXPERIMENTAL=1` and the default `read`, `bash`, `edit`, `write` tools get **strict JSON-schema constrained output**. This means the model *cannot* emit malformed tool calls — the sampler enforces the schema at token level.
+
+For beginners: fewer "tool call parsing failed" retries, faster loops, less token waste on corrections. Still experimental but a glimpse of where agent reliability is heading.
+
+---
+
+## Provider & Model Updates Worth Noting
+
+- **Baseten provider** built-in (`BASETEN_API_KEY`, defaults to `zai-org/GLM-5.2`)
+- **Kimi Coding** requests now use Pi's runtime `User-Agent`
+- **Mistral SDK transport replaced** with native Chat Completions HTTP stream — less overhead, fewer moving parts
+- **OpenAI Responses API**: deferred tool loading prefers message-anchored `additional_tools`
+- **DeepSeek API**: fixed output-limit field handling, uppercase hostname detection
+- **Google/Vertex AI**: fixed tool-call ID preservation for signed replay
+- **GitHub Copilot**: login no longer triggers API rate limits during policy updates
+- **Fireworks Kimi K3**: now uses OpenAI-compatible API with native reasoning-effort
+- **GPT-5.6 Terra/Luna** pricing updated across catalogs
+- **Qwen Token Plan**: retired `qwen3.8-max-preview` → `qwen3.8-max`
+
+---
+
+## Windows & SSH Fixes That Matter
+
+- **Windows Shift+Enter detection** fixed via native Win32 helper
+- **Truecolor detection** works when Windows Terminal doesn't pass `WT_SESSION`
+- **Keyboard input latency** reduced by letting input preempt render timer
+- **Agent harness path handling** fixed for basenames, recursive skill loading, prompt templates
+- **SSH `Alt+Enter` split input** misread as Escape → fixed, plus `PI_TUI_ESC_TIMEOUT` for high-latency connections
+- **Fullscreen selection copy** uses host clipboard, reports failure honestly when OSC 52 unsupported
+
+If you've fought Pi on Windows or over SSH, 0.84.2 is the "it just works" release.
+
+---
+
+## Extension & SDK Additions
+
+- `expandPromptTemplates` option for `pi.sendUserMessage()` — explicitly dispatch commands, expand skills/templates
+- `createGatewayBindingFetch()` for routing Cloudflare AI Gateway via Workers AI binding (no API token)
+- `AssistantMessage.endTurn` preserves Codex's `end_turn` signal for diagnostics
+- Chainable `pi.registerMarkdownTransformer()` hooks for display-only Markdown transforms
+- Vendor-neutral telemetry contracts with typed AI-request/harness schemas
+
+---
+
+## Should You Upgrade?
+
+| If you... | Verdict |
+|-----------|---------|
+| Use Pi daily as your terminal agent | **Yes** — fullscreen mode + transcript search + Windows fixes = night-and-day UX |
+| Build extensions/SDK tools | **Yes, but read breaking changes first** — ~15 interface changes require updates |
+| Run Pi in CI/automation | **Yes** — session persistence hardened, JSON/RPC events cleaned up |
+| Haven't tried Pi yet | **Perfect time** — 0.84.x is the first release that feels complete out of the box |
+
+---
+
+## How to Get It
+
+```bash
+# npm (all platforms)
+npm i -g @earendil-works/pi@latest
+
+# Or upgrade in-place
+pi update --apply
+```
+
+Full changelogs:
+- [Pi 0.84.0](https://pi.dev/news/releases/0.84.0) — breaking changes, fullscreen TUI, session model rewrite
+- [Pi 0.84.1](https://pi.dev/news/releases/0.84.1) — bash tool guideline softening, worst-case latency reduction
+- [Pi 0.84.2](https://pi.dev/news/releases/0.84.2) — transcript search, defaultTools, strict JSON sampling, theme flag, fixes
+
+---
+
+## Related Articles
+
+- [OpenCode v1.18.18: Reliability, MCP, and Desktop Overhaul — What Changed for Beginners](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+- [Goose v1.46: Unrolled Agent Loop, Hooks, and Cost Tracking — Beginner's Guide](/blog/goose-v1-46-unrolled-agent-loop-hooks-cost-tracking/)
+- [Kilo Code v7.4.21: Agent Manager, Model Search, Worktree Upgrade — What's New](/blog/kilo-code-v7-4-21-agent-manager-model-search-worktree-upgrade/)
+- [Hermes Agent v0.20.0 (Herald): Voice, A2A, Webhooks — Beginner's Guide](/blog/hermes-agent-v020-herald-voice-a2a-webhooks/)
+
+---
+
+*Pi is developed by earendil-works. This article covers 0.84.0 (July 21, 2026) and 0.84.2 (August 14, 2026). For the complete release history, see [pi.dev/news/releases](https://pi.dev/news/releases).*
