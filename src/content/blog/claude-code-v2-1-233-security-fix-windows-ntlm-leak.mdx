@@ -1,0 +1,152 @@
+---
+title: "Claude Code Just Patched a Nasty Windows Credential Leak — Here's Why It Matters"
+description: "v2.1.233 fixes an NTLM credential leak on Windows, adds memory limits for runaway builds, and resolves MCP connection storms. The security fix alone is worth the update."
+pubDate: 2026-08-15
+updatedDate: 2026-08-15
+heroImage: "/blog-placeholder-4.jpg"
+tags: ["claude-code", "security", "release", "windows"]
+tool: "claude-code"
+category: "security"
+---
+
+# Claude Code Just Patched a Nasty Windows Credential Leak — Here's Why It Matters
+
+Anthropic dropped **Claude Code v2.1.233** on August 14. Most developers will glance at the changelog, see "bug fixes," and move on. That's a mistake.
+
+Buried in the release notes is a **genuine security fix**: Windows paths using the NT `\\??\\` device prefix were bypassing UNC path validation, creating an NTLM credential-leak vector. In plain English? A malicious path could trick Claude Code into leaking your Windows authentication hash to an attacker-controlled server.
+
+That's not a theoretical issue. NTLM relay attacks are real, they're automated, and they've compromised actual enterprises. This fix closes that door.
+
+---
+
+## The Security Fix You Actually Care About
+
+### The Bug
+Windows has this quirk: paths can be written multiple ways. `C:\Users\you` works. So does `\\?\C:\Users\you`. And `\\??\C:\Users\you`. That last one — the NT device prefix — was slipping past Claude Code's UNC validation.
+
+### Why It's Dangerous
+UNC paths (like `\\server\share`) trigger automatic NTLM authentication. If an attacker can inject a crafted path that resolves to their server, your machine happily sends your NTLM hash. That hash can be cracked offline or relayed to other services.
+
+### The Fix
+v2.1.233 now catches the `\\??\` prefix and blocks it before it reaches the filesystem layer. Simple. Effective. Shipped.
+
+**If you're on Windows, update today.** Not tomorrow. Today.
+
+---
+
+## Memory Guards for Runaway Builds (Linux)
+
+Ever had a `npm install` or `cargo build` spin up and eat all your RAM? The agent keeps running, your session stalls, and you're forced to kill the terminal.
+
+New in v2.1.233: **`CLAUDE_CODE_TOOL_MEMORY_LIMIT`** — a cgroup-backed memory ceiling for Bash tool commands on Linux.
+
+```bash
+# Limit Bash tools to 4GB
+export CLAUDE_CODE_TOOL_MEMORY_LIMIT=4294967296
+```
+
+Hit the limit? The command gets OOM-killed. Your session stays alive. You keep working. This is the kind of guardrail that separates "toy" from "production tool."
+
+---
+
+## MCP Connection Storms — Fixed
+
+If you use MCP servers on serverless platforms (Vercel, Cloudflare Workers, AWS Lambda), you've probably seen this: connections that just... won't die. The server terminates idle streams after 30 seconds. Claude Code reconnects. Immediately. Forever. Your logs fill up. Your bill goes up.
+
+v2.1.233 adds proper backoff and respects the server's stream termination. No more endless reconnection loops.
+
+---
+
+## Cloud Sessions That Won't Ghost You
+
+Here's a scenario: you're in a cloud session, Claude asks for permission, you step away, the environment shuts down. Before v2.1.233, that session would be marked "lost" — even if you came back and approved the prompt.
+
+Fixed. The session state now survives environment shutdown during permission waits.
+
+---
+
+## Skill Aliases That Actually Work
+
+Bundled skills like `/checkup` and `/review` were reporting "Unknown command" in print mode (`-p`) or when plugins/MCP loaded, if a user or project skill shadowed the bundled one.
+
+The alias resolution now handles shadowing correctly. Your workflows won't randomly break because you added a custom skill.
+
+---
+
+## Windows Auto-Mode Regression — Reverted
+
+v2.1.232 introduced a regression: auto mode on Windows would repeatedly stop for manual approval on ordinary Bash commands like `cd dir && cmd > file`.
+
+v2.1.233 reverts the Bash permission changes for Cygwin-style symlinks and input redirections. A narrower, correct fix will come later. For now, auto mode works again.
+
+---
+
+## The Todo Tools Change (Breaking for Some)
+
+**Heads up:** Todo/task-tracking tools (`TaskCreate`, `TaskGet`, `TaskUpdate`, `TaskList`, `TodoWrite`) are **no longer available** on:
+- Opus 4.8+
+- Sonnet 5+
+- Fable 5+
+- Mythos 5+
+- All newer models
+
+Anthropic says these models handle task tracking natively now. If you rely on explicit todo tools, set `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` to restore them.
+
+---
+
+## Other Notable Fixes
+
+| Fix | Impact |
+|-----|--------|
+| `CLAUDE_CODE_WEBFETCH_CACHE_TTL_MS` env var | Configure WebFetch cache TTL (default 15 min) |
+| Self-hosted runner session start | Branch created without rewriting working tree; 2 fewer round trips |
+| Apps gateway error forwarding | 400/413 errors from Vertex/Foundry/AWS now carry upstream messages |
+| Plugin validation | Checks bare `.claude/skills` dir; reports frontmatter parse failures |
+| Screen reader mode | `/effort` selector renders as numbered list; no more clipped dialogs |
+| Print mode diagnostics | Unrecognized model IDs logged to stderr; map with `modelOverrides` |
+| GitHub app setup tip | No longer appears for GitLab/Bitbucket remotes |
+
+---
+
+## Should You Update?
+
+**Yes.** The Windows NTLM fix alone justifies it. The memory limit feature is a quality-of-life win for Linux users. The MCP and cloud session fixes eliminate real production annoyances.
+
+```bash
+# Update
+claude upgrade
+# Or if installed via npm
+npm update -g @anthropic-ai/claude-code
+```
+
+Verify: `claude --version` should show `2.1.233`.
+
+---
+
+## What's Next
+
+Anthropic ships Claude Code updates **fast** — sometimes daily. The v2.1.232 regression that broke Windows auto-mode? Fixed in 24 hours. The MCP connection storm? Fixed in the same release.
+
+This pace means two things:
+1. **Stay current** — security fixes land quietly in "minor" releases
+2. **Read the changelog** — the important stuff isn't always in the headline
+
+---
+
+## TL;DR
+
+- **Windows users**: Update immediately — NTLM credential leak fixed
+- **Linux users**: Get `CLAUDE_CODE_TOOL_MEMORY_LIMIT` for runaway build protection
+- **MCP users**: Serverless connection storms resolved
+- **Cloud session users**: No more ghost sessions during permission waits
+- **Todo tool users**: Newer models handle it natively; opt back in with env var if needed
+
+One command. Two minutes. Sleep better tonight.
+
+```bash
+claude upgrade
+```
+
+---
+
+*Using Claude Code daily? Bookmark the [releases page](https://github.com/anthropics/claude-code/releases) — the security fixes hide in plain sight.*
