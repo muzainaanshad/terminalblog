@@ -1,0 +1,130 @@
+---
+title: "Kilo Code v7.4.22 Makes File References Clickable, Adds Agent Manager PR Actions & AWS/GCP Auth"
+description: "Kilo Code v7.4.22 dropped August 13 with clickable inline file references in agent responses, Agent Manager PR comment actions (resolve/unresolve, jump to comments), structured AWS/GCP credentials support, and subagent permission fixes."
+pubDate: 2026-08-15
+updatedDate: 2026-08-15
+heroImage: "/kilocode-v7-4-22-hero.png"
+tags: ["kilocode", "release", "agent-manager", "aws", "gcp", "subagents", "clickable-references"]
+category: "releases"
+tools: ["kilocode"]
+difficulty: "beginner"
+readingTime: 7
+---
+
+Kilo Code v7.4.22 released **August 13, 2026** (2 days ago). This is a feature-focused update on top of the v7.4.21 foundation — four meaningful additions for daily operators.
+
+---
+
+## The 4 Headline Features
+
+### 1. Clickable File References in Agent Responses — No More Copy-Paste
+
+**What it does:** When an agent mentions a file in its response (inline code spans like `src/utils/helpers.ts`), Kilo now **validates those paths against the workspace filesystem**. Real files become clickable links that open at the referenced line. Dead links show a "File not found" warning with fallback workspace search.
+
+**Why it matters:** Agents constantly reference files — "look at `auth/middleware.ts:42`", "the bug is in `components/Button.tsx`". Before this, you'd copy the path, `Cmd+P`, paste, enter. Now: **click → open → at the right line**.
+
+**How it works:**
+- Inline code spans (` `) scanned against workspace
+- Valid paths → clickable links with line numbers
+- Invalid paths → plain code + warning on click + workspace search fallback
+- Zero config — works automatically
+
+> **PR:** [#11219](https://github.com/Kilo-Org/kilocode/pull/11219) by [@sylwester-liljegren](https://github.com/sylwester-liljegren)
+
+---
+
+### 2. Agent Manager PR Comment Actions — Review Without Leaving the IDE
+
+**What it does:** Three new actions in the Agent Manager PR view:
+- **Resolve / Unresolve** review threads — mark discussions done or reopen
+- **Jump to comments section** — instant navigation to the discussion
+- **Scroll-to-top for PR diff view** — reset position on massive diffs
+
+**Why it matters:** Code review in the terminal/IDE used to mean "open GitHub in browser." Now the full review loop (read diff → comment → resolve → next) stays in your editor.
+
+**Workflow:** Agent Manager → PR view → thread actions → done. No context switch.
+
+> **PR:** [#13071](https://github.com/Kilo-Org/kilocode/pull/13071) by [@cosi-conda](https://github.com/cosi-conda)
+
+---
+
+### 3. Structured AWS & GCP Credentials — Bedrock & Vertex AI Without Env Var Hell
+
+**What it does:** VS Code settings now accept **structured credentials** for AWS Bedrock and Google Cloud Vertex AI:
+- **AWS:** Access Key ID + Secret Access Key + Session Token + Region (as structured fields, not a giant JSON blob)
+- **GCP:** Service Account JSON (pasted or file-picked) — parsed and validated
+
+**Why it matters:** Before this, connecting Bedrock/Vertex meant `aws configure`, `gcloud auth`, env var juggling, or pasting minified JSON into a tiny settings field. Now it's a proper form with validation.
+
+**Security:** Credentials stored in VS Code secret storage (OS keychain), not `settings.json`.
+
+> **PR:** [#13100](https://github.com/Kilo-Org/kilocode/pull/13100)
+
+---
+
+### 4. Subagent Permission Fix — Delegated Agents Finally Run Their Own Allowed Commands
+
+**The bug:** A read-only or delegating agent's `readOnlyBash` allowlist was **projected onto writable subagents as a bash ceiling**. So a subagent explicitly allowed to run `git status` would be blocked because the parent had `readOnlyBash: ["git"]`.
+
+**The fix:** Subagent's **own config now wins for allowed commands**. Edit, notebook, and MCP denials still inherit as hard ceilings (security), but allowlists don't leak downward as blockers.
+
+**Why it matters:** Delegation patterns (orchestrator → worker subagents) now work as intended. The orchestrator can be restrictive; workers get their own permissions.
+
+> **PR:** [#12373](https://github.com/Kilo-Org/kilocode/pull/12373) by [@mvanhorn](https://github.com/mvanhorn)
+
+---
+
+## Upstream OpenCode Sync (v1.17.13 → v1.18.13)
+
+Kilo Code bundles OpenCode upstream. This release adopts improvements through **v1.18.13**:
+
+| Area | Highlights |
+|------|------------|
+| **Core** | Code mode MCP adapter, `execute` tool hidden unless code mode enabled, Meta Muse Spark system prompt, Azure AI GPT-5.6 support |
+| **Bugfixes** | Paginated MCP tool catalogs fixed, OpenRouter low reasoning effort preserved, GitHub Copilot routing honors chat/responses endpoint, Cerebras reasoning replay fixed, Z.ai context overflow classified correctly, Grok reasoning variants exposed, xAI prompt cache routing + PDF support, Meta model reasoning handling, Copilot zero-billing-batch crash fixed, OpenAI pro reasoning mode, xAI response storage disabled by default, Luna Responses Lite OAuth |
+| **TUI** | Spinner registration fixed, CLI env vars forwarded to TUI worker |
+
+---
+
+## Additional Fixes & Polish
+
+| Fix | Impact |
+|-----|--------|
+| **Changes chip + Git changes persist across tab switches** | Multi-repo workspaces no longer lose visibility |
+| **Model's default reasoning variant shown in chat + Agent Manager** | Transparency on what the model actually uses |
+| **Workspace restoration preserved on fresh VS Code session revert** | No lost state when reverting |
+| **Morph WarpGrep retired** | Experimental codebase search tool removed + config flag ignored |
+
+---
+
+## Installation & Upgrade
+
+```bash
+# VS Code Marketplace (auto-updates)
+# Search "Kilo Code" → Install/Update
+
+# Or via CLI
+npm install -g @kilocode/cli@7.4.22
+
+# JetBrains plugin
+# JetBrains 7.0.16 also released (pins Kilo Core 7.4.22)
+```
+
+**Breaking changes:** None. v7.4.21 → v7.4.22 is drop-in.
+
+---
+
+## TL;DR
+
+| Feature | Beginner Value | Power User Value |
+|---------|----------------|------------------|
+| Clickable file refs | 🖱️ Click to open | ⚡ Stay in flow, line-accurate |
+| Agent Manager PR actions | 📋 Review in IDE | 🔄 Full loop without browser |
+| Structured AWS/GCP auth | 🔐 No env var mess | 🛡️ Secret storage, validated |
+| Subagent permission fix | ✅ Delegation works | 🏗️ Clean orchestrator/worker patterns |
+
+**Bottom line:** v7.4.22 is a **productivity release** — each feature removes a daily friction point. Clickable refs alone save dozens of `Cmd+P` cycles per day. If you're on Kilo Code, update. No downside.
+
+---
+
+*Release: [Kilo Code v7.4.22](https://github.com/Kilo-Org/kilocode/releases/tag/v7.4.22) · [Full Changelog](https://github.com/Kilo-Org/kilocode/compare/v7.4.21...v7.4.22) · [Discord](https://discord.gg/kilocode)*
