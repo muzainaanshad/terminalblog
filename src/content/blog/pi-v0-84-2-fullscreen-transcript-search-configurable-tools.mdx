@@ -1,0 +1,197 @@
+---
+title: "Pi Just Got Fullscreen Transcript Search — And It Changes How You Find Things"
+description: "Pi v0.84.2 adds fullscreen transcript search (Ctrl+Shift+F), configurable default tools, experimental strict JSON-schema tool sampling, per-run themes, and 25+ fixes. The fullscreen UX finally feels polished."
+pubDate: 2026-08-16
+updatedDate: 2026-08-16
+tags: ["pi", "release", "tui", "fullscreen", "search", "coding-agent"]
+tool: "pi-dot-dev"
+author: "sage"
+image: "/api/og?title=Pi+v0.84.2+Fullscreen+Search&tool=pi"
+---
+
+Pi **v0.84.2** dropped August 14. This isn't a headline-grabber — it's a **polish release** that fixes the daily friction points that make you curse at your terminal. Fullscreen transcript search. Configurable startup tools. Per-run themes. Experimental strict JSON tool schemas. Plus 25 bug fixes.
+
+If you live in Pi's TUI, this is the update you've been waiting for.
+
+---
+
+## The Feature You'll Use Every Session: Fullscreen Transcript Search
+
+**`Ctrl+Shift+F`** opens fullscreen search across your entire conversation history. Incremental match highlighting. Configurable search match theme colors. `Enter`/`Ctrl+G` for next match, `Shift+Enter`/`Ctrl+Shift+G` for previous.
+
+**Why this matters:** Before this, finding "that thing I asked about three hours ago" meant scrolling. Endless scrolling. Now you search, jump, done. The matches highlight in your configured colors. You navigate with muscle memory.
+
+> **Docs:** [TUI Fullscreen Viewport](https://github.com/earendil-works/pi/blob/v0.84.2/packages/coding-agent/docs/keybindings.md#tui-fullscreen-viewport)
+
+---
+
+## Configurable Default Tools: Your Agent, Your Toolbox
+
+**`defaultTools` setting** — choose which built-in tools load at startup, globally or per project.
+
+```json
+// ~/.config/pi/settings.json or .pi/settings.json per project
+{
+  "defaultTools": ["read", "write", "edit", "bash", "grep", "task"]
+}
+```
+
+**Why this matters:** You don't need `web_search` on every project. You don't want `bash` exposed in a read-only review session. Now you declare intent once — the agent respects it.
+
+> **Docs:** [Tools Settings](https://github.com/earendil-works/pi/blob/v0.84.2/packages/coding-agent/docs/settings.md#tools)
+
+---
+
+## Per-Run Themes Without Touching Saved Settings
+
+```bash
+pi --use-theme dracula
+pi --use-theme "dracula/nord"  # light/dark pair
+```
+
+Pick a theme for *this run only*. Your saved settings stay untouched. Perfect for pairing sessions, screenshots, or just trying a new vibe.
+
+> **PR:** [#7722](https://github.com/earendil-works/pi/pull/7722) by [@rwachtler](https://github.com/rwachtler)
+
+---
+
+## Experimental Strict JSON-Schema Tool Sampling
+
+```bash
+PI_EXPERIMENTAL=1 pi
+```
+
+The default `read`, `bash`, `edit`, and `write` tools now support **strict JSON-schema constrained sampling**. The model *cannot* emit malformed tool calls — the schema enforces structure at generation time.
+
+**Why this matters:** Tool call parsing errors are the #1 cause of "agent went off the rails" moments. Strict schemas eliminate a whole class of failures before they happen.
+
+> **Experimental:** Enable with `PI_EXPERIMENTAL=1`. Not default yet.
+
+---
+
+## Fullscreen Exit Output: Choose What You See
+
+New setting: **print full transcript on exit** OR **only session resume hint**.
+
+```json
+{
+  "fullscreenExitOutput": "transcript"  // or "resumeHint"
+}
+```
+
+If you're piping output to logs, you want the transcript. If you're iterating fast, you want the one-line resume hint. Now you choose.
+
+> **Docs:** [Interactive Mode](https://github.com/earendil-works/pi/blob/v0.84.2/packages/coding-agent/docs/usage.md#interactive-mode)
+
+---
+
+## Cloudflare AI Gateway Without API Tokens
+
+Inherited `createGatewayBindingFetch()` routes Cloudflare AI Gateway requests through a **Workers AI binding** — no API token needed.
+
+```typescript
+// Zero-token Cloudflare AI Gateway access
+const fetch = createGatewayBindingFetch(env.AI_GATEWAY_BINDING);
+```
+
+> **PR:** [#7901](https://github.com/earendil-works/pi/pull/7901) by [@Maximo-Guk](https://github.com/Maximo-Guk)
+
+---
+
+## 25 Bug Fixes That Fix Your Daily Annoyances
+
+| Fix | Why You Care |
+|-----|--------------|
+| **Managed-tool downloads no longer block TUI startup** | TUI mounts first, progress shows inside it — no more staring at blank screen |
+| **Model selector no longer cancels catalog refresh** | Open selector immediately after startup? It works now |
+| **GitHub Copilot login rate limits fixed** | Concurrent policy updates limited — no more 429 storms |
+| **Fullscreen search stays put during manual scroll** | No more snapping back to current match while you're reading |
+| **Subagent examples fixed** | YAML array syntax for `tools` works. Parent model/thinking/tools preserved |
+| **Custom system prompts stop concatenating CWD** | Your prompt stays your prompt |
+| **OpenAI Responses tool calls keep namespaces** | Streaming, proxying, replay — namespaces survive |
+| **DeepSeek compatibility detection fixed** | Uppercase letters in base URL hostname? Handled |
+| **Google/Vertex tool call stops handled correctly** | Output-limit and provider-error stops no longer masquerade as normal tool use |
+| **Fullscreen mouse drag + OSC 8 links work** | Generic SGR mouse release codes handled |
+| **Focused overlays receive mouse wheel / PageUp/PageDown** | Scroll works in overlays |
+| **Selection copy uses host clipboard** | Reports failure if OSC 52 unsupported — no false success |
+| **Idle sessions stop repainting/clearing selection on focus loss** | Your selection survives alt-tab |
+| **Split `Alt+Enter` over SSH fixed** | `PI_TUI_ESC_TIMEOUT` for high-latency terminals |
+| **LaTeX control spaces across line endings fixed** | Math expressions don't fall back to raw source |
+| **Extension tool results collapse long output** | Respects tool expansion setting |
+| **JSON/RPC `message_update` events include cumulative usage** | Streaming usage tracking works |
+| **`pi.sendMessage(..., { triggerTurn: false })` fixed** | Records custom message without steering active run |
+| **Mistral SDK transport replaced with native HTTP** | Eliminated generated client + schema overhead |
+| **Kimi Coding uses Pi's `User-Agent`** | Proper identification |
+| **`nanoid` dev dependency updated** | DoS vulnerability patched |
+
+---
+
+## Fullscreen Rendering: Less Churn, More Frames
+
+Reduced fullscreen rendering allocation churn by **painting full-width layout rows directly** instead of recompositing every frame. The TUI feels snappier, especially on longer conversations.
+
+---
+
+## Subagent Inheritance: Model, Thinking, Tools Preserved
+
+Subagent examples now correctly inherit:
+- Parent session model
+- Thinking configuration
+- Tool configuration
+
+No more "why is my subagent using a different model?" surprises.
+
+> **PR:** [#7897](https://github.com/earendil-works/pi/pull/7897) by [@virtuald](https://github.com/virtuald)
+
+---
+
+## Extension API: Explicit Prompt Template Expansion
+
+`pi.sendUserMessage()` now accepts `expandPromptTemplates` option for explicitly dispatching commands and expanding skills/prompt templates.
+
+> **PR:** [#7857](https://github.com/earendil-works/pi/pull/7857) by [@mrexodia](https://github.com/mrexodia)
+
+---
+
+## Quick Reference: v0.84.2 at a Glance
+
+| Feature | Category | Beginner Value |
+|---------|----------|----------------|
+| Fullscreen transcript search (`Ctrl+Shift+F`) | UX | 🔍 Find anything instantly |
+| Configurable default tools | Config | 🎯 Right tools for the job |
+| Per-run themes (`--use-theme`) | UX | 🎨 Try themes without commitment |
+| Strict JSON-schema tool sampling | Reliability | 🛡️ Fewer tool call errors |
+| Fullscreen exit output choice | UX | 📄 Transcript or resume hint |
+| Cloudflare Workers AI binding | Cloud | 🔐 Zero-token Gateway access |
+| 25 bug fixes | Polish | ✨ Daily friction gone |
+
+---
+
+## How to Update
+
+```bash
+# npm
+npm update -g @earendil-works/pi
+# or fresh install
+npm install -g @earendil-works/pi@0.84.2
+
+# Verify
+pi --version
+# Should show 0.84.2
+```
+
+---
+
+## Bottom Line
+
+Pi v0.84.2 doesn't add a flashy new capability. It **makes the existing experience feel finished**.
+
+Fullscreen search alone changes how you navigate history. Configurable default tools means your agent stops offering `bash` when you only want `read`. Per-run themes let you experiment. Strict JSON schemas (experimental) point toward a future where tool calls *just work*.
+
+The 25 fixes read like a "thank you" to everyone who filed an issue: SSH `Alt+Enter`, Copilot rate limits, subagent inheritance, selection copy, idle repaint — the stuff that makes you trust the tool.
+
+**If you use Pi daily, update today.** The fullscreen search feature pays for the upgrade in one session.
+
+---
+
+*Release: [Pi v0.84.2](https://github.com/earendil-works/pi/releases/tag/v0.84.2) · [Full Changelog](https://github.com/earendil-works/pi/compare/v0.84.1...v0.84.2) · [Discord](https://discord.gg/pi)*
