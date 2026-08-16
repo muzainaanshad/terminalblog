@@ -1,0 +1,172 @@
+---
+title: "GitHub Copilot CLI Just Made Shared Terminal Sessions Real — Here's Why It Changes Everything"
+description: "Copilot CLI 1.0.80 introduces Agent Host Protocol (AHP): multiple terminals attaching to one session, cloud/Codespace sessions, and MCP server fixes. The terminal agent just became collaborative infrastructure."
+pubDate: "2026-08-17T10:00:00Z"
+tags: ["copilot-cli", "github", "release", "ahp", "terminal", "beginner", "guide"]
+tool: "copilot-cli"
+author: "sage"
+image: "/api/og?title=GitHub+Copilot+CLI+1.0.80+AHP&tool=copilot-cli"
+---
+
+GitHub Copilot CLI **1.0.80** landed August 13 as a pre-release, and it quietly shipped the feature terminal users have wanted for years: **Agent Host Protocol (AHP)** — multiple terminals sharing one live agent session.
+
+If you've ever wanted to start a coding task on your laptop, walk to your desk, and pick up exactly where you left off in another terminal — **this is that release**.
+
+---
+
+## The Headline: Agent Host Protocol (AHP)
+
+**`copilot --ahp`** starts a local *host* that runs the agent. Any number of terminals can `copilot --ahp` to attach to that same host. They all see the same session, the same turns, the same history — live.
+
+```
+# Terminal 1: start the host + session
+copilot --ahp
+
+# Terminal 2 (same machine, or SSH'd in): attach to it
+copilot --ahp
+```
+
+Both terminals now stream the same agent output. You type in Terminal 2, the agent responds, Terminal 1 sees it instantly. `ctrl+c` in either terminal takes control back. `ctrl+q` queues your prompt for the next turn.
+
+**This isn't screen/tmux sharing.** The agent runs *once* on the host. Terminals are just views. Close one, the agent keeps running. Open another, you're back in.
+
+### Why This Matters for Beginners
+
+- **No more "which terminal was I in?"** — one session, many windows
+- **Pair programming without screen share** — teammate SSHs in, `copilot --ahp`, you're both in the same agent
+- **Long-running tasks survive disconnects** — start a refactor, close laptop, reopen later, it's still going
+- **Dev container / Codespace parity** — same workflow locally and in the cloud
+
+---
+
+## Cloud Sessions: Your Agent in a Codespace
+
+`/ahp codespace <name>` forwards a Codespace's `copilotd` port to your local CLI. The session runs *in the Codespace* (with its compute, its dependencies, its network), but you drive it from your terminal.
+
+```
+/ahp codespace my-frontend-codespace
+```
+
+The session appears in your Sessions tab marked `CS`. Create new sessions on that Codespace with `n`. Close the tunnel with `/ahp stop <name>`.
+
+**`/ahp cloud <environment-id>`** does the same for GitHub Mission Control environments — marked `CLOUD` in the source picker.
+
+For a beginner, this means: **your terminal workflow doesn't change when you move to cloud compute.** Same commands, same session model, just bigger machines.
+
+---
+
+## The Sessions Tab Got a Complete Redesign
+
+The new **source strip** (press `h` to switch) shows every session source:
+- This CLI process (local)
+- Every AHP daemon you've connected to
+- Every Codespace / cloud environment
+
+Each source shows its health — `copilotd 0.6.5`, responding / not responding. A host that dies announces it in the timeline. No more stale session ghosts.
+
+**Shared sessions show `2 clients` (or more)** in the Sessions tab and sidebar. You *see* when someone else is attached. Presence is announced on attach, refreshed on heartbeat.
+
+---
+
+## MCP Servers Finally Work Reliably
+
+Two fixes that matter if you use Model Context Protocol servers:
+
+1. **`--enable-mcp-server`** re-enables MCP servers disabled in settings for the current run — no more editing config to test a server
+2. **30-second default timeout** for MCP tool discovery — slow servers (large tool catalogs, cold starts) no longer time out before loading
+
+Sandboxed MCP servers launched via `npx` or `uvx` now get:
+- A writable Copilot-owned package cache
+- Windows toolchain grants
+- Playwright browser grants
+
+**`readonlyPaths` nested inside your working directory now actually block writes** from built-in file tools. The sandbox respects your intent.
+
+---
+
+## Model & Plugin Updates
+
+- **MAI Code 1.1 Flash** added to the model roster
+- **`/plugin marketplace update [name]`** refreshes marketplace catalogs on demand
+- **Agent Plugins spec plugins** now read components only under `com.github.copilot/` — plugin root is no longer scanned (breaking change for plugin authors, cleaner for users)
+
+---
+
+## Quality-of-Life Fixes You'll Notice Daily
+
+| Annoyance | Fixed In 1.0.80 |
+|-----------|-----------------|
+| `--ahp` failing with "no host listening" when daemons *are* running | Now attaches to existing daemon automatically |
+| `/clear` and `/new` hidden on AHP sessions | Now work *on the host* — other clients see the cleared session |
+| Connection tokens (`wss://host?tkn=...`) printed in logs/transcripts | Now redacted everywhere — safe to share transcripts |
+| AHP sessions always starting at host workspace root | Now start in *your* CLI's directory (if host covers it) |
+| Host skills vanishing after relay reconnect | Fixed — snapshot omission no longer reads as "no skills" |
+| Status line stuck on "Loading extensions" for remote sessions | Now reports "can't load extensions into session I don't own" immediately |
+| `copilot init` silently dropping `--sandbox`/`--no-sandbox` | Flags now apply to init session |
+| Footer AI credit total lagging behind subagent spend | Updates live as background agents spend |
+| Unknown/retired settings cluttering config | Moved to actionable **Problems tab** in `/settings` |
+| Enter sometimes leaving message in queue | Now always acts on your message |
+| Very large sessions failing to load after rewind/compaction | Fixed |
+
+---
+
+## How to Update
+
+```bash
+# Prerelease channel (1.0.80-0)
+npm install -g @github/copilot@prerelease
+
+# Or via install script
+wget -qO- https://gh.io/copilot-install | bash -s -- --prerelease
+
+# Verify
+copilot --version
+# Should show 1.0.80-0
+```
+
+**Note:** `--ahp` and `/ahp` commands are gated on the `AHP_CLIENT` feature flag (staff-only for now). The rest of 1.0.80 is available to everyone.
+
+---
+
+## What This Means for Your Workflow
+
+**If you're solo:** Start `copilot --ahp` in one terminal. Open as many tabs/windows as you want — they're all the same session. Run a long task, detach, come back tomorrow.
+
+**If you pair program:** Teammate runs `copilot --ahp` (same host). You both drive. No screen share latency, no "wait let me type."
+
+**If you use Codespaces:** `/ahp codespace <name>` gives you local-terminal UX on cloud compute. Your session survives Codespace restarts.
+
+**If you run background automation:** The host keeps running. Schedule a session to run overnight, check it from your phone via SSH + `copilot --ahp`.
+
+---
+
+## The Bottom Line
+
+Copilot CLI 1.0.80 isn't a feature drop. It's an **architecture shift**.
+
+The agent moved *out of the terminal* and *into a host process*. Terminals became views. Sessions became portable across machines, clouds, and collaborators.
+
+For a beginner, this means: **learn the CLI once, use it everywhere.** Local, remote, cloud, shared — same commands, same mental model.
+
+The terminal agent just became collaborative infrastructure.
+
+---
+
+## Related Reading
+
+- [GitHub Copilot CLI vs AmpCode: IDE daily driver or terminal agent?](/blog/ampcode-vs-copilot-cli/)
+- [Copilot CLI pricing and what you actually pay at scale](/blog/ampcode-vs-copilot-cli-pricing-battle/)
+- [Best coding agents 2026 decision guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Complete AGENTS.md guide for coding agents](/blog/agents-md-complete-guide/)
+
+
+## Related articles
+
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+- [Oh My Pi v17.3.3 Fixes Gemini Reasoning Loops, Hashline Edge Cases, and TUI Rendering — What Beginners Need to Know](/blog/oh-my-pi-v17-hub-tool-xdev-plugins/)
+- [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
+---
+
+*Release: [GitHub Copilot CLI 1.0.80-0](https://github.com/github/copilot-cli/releases/tag/v1.0.80-0) · [Changelog](https://github.com/github/copilot-cli/blob/main/changelog.md#1080---2026-08-14) · [Install](https://docs.github.com/copilot/how-tos/set-up/install-copilot-cli)*
+
+*Comparing agents is half the work. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** can simplify multi-model access while you test workflows.*
