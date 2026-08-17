@@ -1,0 +1,237 @@
+---
+title: "Hermes Agent Just Dropped v0.20.3 — MCP 2.x, Bot Mode, and Self-Healing Cron in One Patch"
+description: "Hermes v0.20.3 landed hours after v0.20.2 with 125 PRs: MCP 2.x SDK migration, bundled Bot Mode plugin with teammate protocol, CommandCode provider, Python runtime hardening, Cua Driver 0.20 for computer use, and cron scheduler self-heal. Here's what matters."
+pubDate: 2026-08-17
+updatedDate: 2026-08-17
+tags: ["hermes", "release", "patch", "mcp", "bot-mode", "computer-use", "cron", "open-source", "beginner"]
+tool: "hermes"
+author: "sage"
+image: "/api/og?title=Hermes+v0.20.3+MCP+Bot+Mode&tool=hermes"
+---
+
+Hermes Agent **v0.20.3** dropped **August 16, 2026** — literally hours after v0.20.2. That's not a typo. The Nous Research team shipped **~125 merged PRs** (~250 commits across ~461 files) in a single day.
+
+If you updated to v0.20.2 this morning, here's why you should run `hermes update` again tonight.
+
+---
+
+## What v0.20.3 Actually Is
+
+**A surprise capability drop disguised as a patch.** The release notes call it "a stable tagged release for downstream consumers (Docker images, hosted deployments, fresh installs)." But the diff tells a different story: this isn't just polish — it's new infrastructure.
+
+> **Full curated release notes for this window will ship with v0.21.0**, which will document everything from v0.20.0 onward. Nothing in this window is skipped.
+
+---
+
+## The Headline Features
+
+### 1. MCP 2.x SDK Migration + Stateless Protocol Support
+
+Hermes now runs the **MCP 2.x SDK** with the **2026-07-28 stateless protocol** — the latest Model Context Protocol spec. This means:
+
+- MCP servers can be truly stateless (no persistent connections required)
+- Better compatibility with serverless and edge deployments
+- Reduced resource overhead for MCP-heavy workflows
+- Future-proofed against MCP ecosystem changes
+
+```bash
+# Your existing MCP servers should work, but check for 2.x breaking changes
+# Hermes handles the protocol negotiation automatically
+```
+
+**Why this matters:** MCP is becoming the universal plugin standard. Being on 2.x stateless means Hermes won't break when the ecosystem migrates.
+
+---
+
+### 2. Bundled Bot Mode (hermes-bots) — Core Teammate Protocol
+
+This is the **sleeper feature**. Hermes now ships with **Bot Mode** built-in — a plugin implementing the **core teammate protocol** that lets Hermes instances:
+
+- Discover and coordinate with other Hermes agents
+- Share context and delegate tasks peer-to-peer
+- Operate as a multi-agent swarm without a central orchestrator
+
+```bash
+# Enable Bot Mode
+hermes config set plugins.bot_mode.enabled true
+# Configure teammate discovery
+hermes config set plugins.bot_mode.discovery "mdns"  # or "static", "dns"
+```
+
+**Why this matters:** This is the foundation for **agent swarms**. Imagine 5 Hermes instances collaborating on a codebase — one writes tests, one refactors, one docs, one reviews, one deploys — all coordinating via the teammate protocol. That's now *native*, not a hack.
+
+---
+
+### 3. CommandCode Provider Plugin
+
+A new **CommandCode provider** joins the model routing catalog. This adds:
+
+- Direct integration with CommandCode's model offerings
+- Routing support for their specialized coding models
+- Another BYOK option for teams wanting model diversity
+
+---
+
+### 4. Python Runtime Hardening — `PYTHONHOME`/`PYTHONPATH` Isolation
+
+Subprocess Python execution now owns its runtime environment:
+
+- **`PYTHONHOME` isolation** — each subprocess gets a clean Python home
+- **`PYTHONPATH` isolation** — no more cross-contamination between tool calls
+- Eliminates the "works in shell, fails in agent" class of Python bugs
+
+**Why this matters:** If you've ever had a Python tool work perfectly in your terminal but fail mysteriously inside Hermes, this fixes the root cause.
+
+---
+
+### 5. Cua Driver 0.20 — Computer Use Runtime Contracts
+
+Hermes now implements **Cua Driver 0.20** runtime contracts for **computer use** (the ability to control a desktop/VM via keyboard/mouse/screen):
+
+- Standardized computer-use protocol
+- Sandboxed, auditable desktop automation
+- Foundation for "operator" style agents that can use any GUI app
+
+```bash
+# Computer use is opt-in and sandboxed
+hermes config set computer_use.enabled true
+hermes config set computer_use.driver "cua-0.20"
+```
+
+**Why this matters:** Computer use is the next frontier. Cua Driver 0.20 gives Hermes a *standardized, secure* way to drive GUIs — not just terminals.
+
+---
+
+### 6. Cron Scheduler Self-Heal — EMFILE Recovery, Stale Claims, Wedged Jobs
+
+The cron system got **production-grade hardening**:
+
+| Failure Mode | v0.20.2 Behavior | v0.20.3 Behavior |
+|-------------|------------------|------------------|
+| **EMFILE (too many open files)** | Cron dies silently | **Auto-recovers** — closes idle handles, retries |
+| **Stale job claims** | Jobs stuck "running" forever | **Reconciliation** — detects and reclaims stale claims |
+| **Wedged jobs** | Block scheduler indefinitely | **Re-arm** — force-reset and reschedule |
+
+**Why this matters:** If you run background automation (backups, monitoring, scheduled coding tasks), cron *will not stop working* under load anymore.
+
+---
+
+### 7. Desktop Remote-Gateway Headers & Connection Self-Healing
+
+The desktop app's gateway connections are now resilient:
+
+- **Custom headers** for remote gateway auth (API keys, tokens, mTLS certs)
+- **Connection self-healing** — detects dropped connections, re-authenticates, resumes session
+- No more "gateway disconnected, restart desktop" workflows
+
+---
+
+### 8. Session Handoff Data-Loss Fixes
+
+Multi-device session handoff (continuing a session on another machine) had edge cases where context could be lost. Those are fixed:
+
+- Complete transcript preservation during handoff
+- Tool call history integrity maintained
+- Memory/context cross-device sync reliability improved
+
+---
+
+### 9. Ecosystem Scout Ports — The "Everything Else" Wave
+
+~125 PRs means a lot of community contributions landed. Highlights:
+
+| Feature | What It Does |
+|---------|--------------|
+| **Plugin install security scanning** | Static analysis on plugins before install — no supply chain surprises |
+| **`/worktree` command** | Git worktree management native to Hermes CLI |
+| **`/rollback` hand-edit preservation** | Rolling back a session keeps your manual edits |
+| **UTF-16 file reads** | Handles Windows-encoded files without corruption |
+| **Gemini 3 tool-call ID preservation** | Fixes tool-call correlation with Google's latest models |
+| **Kanban worktree/dispatch fixes** | Project board workflows work reliably with worktrees |
+| **Cron continuity flags** | Jobs survive gateway restarts without duplication |
+
+---
+
+## What This Means for You
+
+| If You... | v0.20.3 Impact |
+|-----------|----------------|
+| **Run MCP servers** | 2.x stateless = lighter, more compatible, future-proof |
+| **Want agent swarms** | Bot Mode teammate protocol = native multi-agent coordination |
+| **Use Python tools** | Runtime isolation = "works in shell" == "works in agent" |
+| **Explore computer use** | Cua Driver 0.20 = standardized, sandboxed GUI automation |
+| **Run background cron jobs** | Self-heal = cron survives EMFILE, stalls, wedged jobs |
+| **Work across devices** | Session handoff = no more lost context when switching machines |
+| **Install community plugins** | Security scanning = safer plugin ecosystem |
+
+---
+
+## How to Update
+
+```bash
+# Existing installs (Linux, macOS, WSL2, Termux)
+hermes update
+
+# Fresh install
+curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
+
+# Verify
+hermes --version
+# Should show 0.20.3 (v2026.8.16.2)
+```
+
+---
+
+## The v0.20.x Velocity Context
+
+| Release | Date | PRs | Focus |
+|---------|------|-----|-------|
+| **v0.20.0 "Herald"** | Aug 3 | — | Voice, A2A, Webhooks |
+| **v0.20.1** | Aug 13 | 656 | Stabilization |
+| **v0.20.2** | Aug 16 | 397 | Desktop, Gateway, CLI polish |
+| **v0.20.3** | Aug 16 | **125** | **MCP 2.x, Bot Mode, Computer Use, Cron Self-Heal** |
+
+**4 days. 3 patches. 1,178 PRs.** The v0.20.x series is the fastest stabilization-to-capability cycle in Hermes history.
+
+---
+
+## What's Next: v0.21.0
+
+The team is explicit: **v0.21.0 will have the full curated release notes** for everything from v0.20.0 onward:
+
+- Complete feature area breakdowns with screenshots
+- Highlight reels
+- Complete contributor credits (1,178 PRs = a *lot* of people)
+- Migration guides for any breaking changes
+
+If you want the detailed changelog now, the compare view is live:
+[**v2026.8.16...v2026.8.16.2**](https://github.com/NousResearch/hermes-agent/compare/v2026.8.16...v2026.8.16.2)
+
+---
+
+## Bottom Line
+
+Hermes v0.20.3 is the **\"we shipped MCP 2.x, agent swarms, and computer use in a patch\"** release.
+
+125 PRs. 250 commits. 461 files. **Same day as v0.20.2.**
+
+This is what open-source velocity looks like when a team treats *capability* as a patch-level concern. The v0.20.0 "Herald" features (voice, A2A, webhooks) now have **three** layers of hardening — plus entirely new infrastructure for the next wave.
+
+**Update command takes 30 seconds. The new capabilities unlock workflows that didn't exist this morning.**
+
+```bash
+hermes update
+```
+
+---
+
+## Related Articles
+
+- [Hermes Agent v0.20.2 Just Landed — 397 Fixes in 3 Days, Desktop & Gateway Get Major Polish](/blog/hermes-agent-v0-20-2-patch-release-desktop-gateway-cli/)
+- [Hermes Agent v0.20.1 Just Dropped — 656 Fixes, One Stable Release](/blog/hermes-agent-v0-20-1-patch-release-656-fixes/)
+- [Hermes Agent v0.19 "Quicksilver": 80% Faster, Multi-Provider Routing, Skills Overhaul](/blog/hermes-agent-v019-quicksilver-80-percent-faster/)
+- [Beware: Hermes Agent Security Audit Uncovers 5 HIGH-Severity Findings](/blog/beware-hermes-agent-security-audit-5-high-severity-findings/)
+
+---
+
+*Release: [Hermes Agent v0.20.3 (2026.8.16.2)](https://github.com/NousResearch/hermes-agent/releases/tag/v2026.8.16.2) · [Full Diff](https://github.com/NousResearch/hermes-agent/compare/v2026.8.16...v2026.8.16.2) · [Discord](https://discord.gg/NousResearch)*
