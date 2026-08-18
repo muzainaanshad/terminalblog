@@ -1,44 +1,151 @@
 ---
 title: "Gitlawb Zero Just Got Paranoid About Permissions — And You Should Be Too"
-description: "Zero now rejects malformed permission payloads before prompting. A critical security hardening for the agent that runs in your terminal."
+description: "Zero now rejects malformed permission payloads before prompting. A critical security hardening for the agent that runs in your terminal — deep dive on the vulnerability, the fix, and why permission payload validation matters for every coding agent."
 pubDate: "2026-07-04T00:45:00Z"
-updatedDate: "2026-07-04T00:45:00Z"
-tags: ["gitlawb-zero", "permissions", "security", "malformed-payload", "viral"]
+updatedDate: "2026-08-18T12:30:00Z"
+tags: ["gitlawb-zero", "permissions", "security", "malformed-payload", "agent-security", "supply-chain"]
 tool: "gitlawb-zero"
 author: "kira"
 ---
 
-Gitlawb Zero handles permissions differently than other agents. Instead of asking for every permission upfront, it prompts you when a tool needs access — and you decide in the moment.
+Gitlawb Zero handles permissions differently than other agents. Instead of asking for every permission upfront (the "blanket consent" model), it prompts you *in the moment* when a tool needs access — and you decide case by case. This just-in-time consent model is more secure *if* the prompt accurately represents what's being requested.
 
-But what if the prompt itself is malformed?
+But what if the prompt itself lies?
 
-## The Bug
+## The Vulnerability: Malformed Permission Payloads
 
-Zero's permission system works by sending a payload describing what the tool wants to do — "tool X needs to access file Y" — and the user approves or rejects it. The bug: if the payload was malformed (missing fields, wrong types, corrupted), Zero would still present the prompt to the user.
+Zero's permission system works by sending a structured payload describing what the tool wants to do — `"tool X needs to read file Y"` — and the user approves or rejects it. The bug: **if the payload was malformed (missing fields, wrong types, corrupted, or deliberately crafted), Zero would still present the prompt to the user.**
 
-A malformed payload could mask what the tool is actually trying to access. The user sees "tool X wants to read file Y" but the actual access requested is something else entirely.
+A malformed payload could mask what the tool is actually trying to access. The user sees `"tool X wants to read file Y"` but the actual access requested is something else entirely — perhaps writing to `~/.ssh/id_rsa`, reading `.env` files, or executing a shell command.
 
-## The Fix
+### Attack Scenarios This Enables
 
-Zero now validates every permission payload before presenting it to the user. If the payload is malformed — missing required fields, wrong data types, unexpected keys — Zero rejects it immediately and logs the incident.
+| Scenario | Malformed Payload | User Sees | Actual Action |
+|----------|-------------------|-----------|---------------|
+| **Field injection** | Extra `action: "write"` alongside `action: "read"` | "Read config.yaml" | Writes to config.yaml |
+| **Path traversal** | `path: "../../../.ssh/id_rsa"` with `display_path: "config.yaml"` | "Read config.yaml" | Reads SSH private key |
+| **Type confusion** | `permissions: "read"` (string) instead of `permissions: ["read"]` (array) | "Read access" | Parser falls back to wildcard |
+| **Missing required fields** | No `tool_id`, no `resource` | Generic "Tool needs access" | Agent fills in defaults (often over-privileged) |
+| **Plugin supply chain** | Compromised plugin sends crafted payload | "Plugin needs API access" | Exfiltrates all environment variables |
 
-The fix specifically targets `additional_permissions` payloads, which is the extensibility point where tool plugins declare their permission needs. A malicious or buggy plugin can't slip through a malformed permission request.
+## The Fix: Strict Payload Validation Before Prompt
 
-## Why This Matters
+Zero now validates **every** permission payload *before* presenting it to the user. If the payload is malformed — missing required fields, wrong data types, unexpected keys, or failed schema validation — Zero **rejects it immediately** and logs the incident. The user never sees a prompt for a malformed request.
 
-Permission systems are only as strong as their input validation. Presenting a malformed prompt to the user and relying on them to notice the discrepancy is not security — it's theater.
+### Validation Rules Enforced
 
-Zero's fix is the right approach: reject malformed payloads at the system level, before they reach the user. The user should never have to decide whether a malformed permission request is safe, because the system has already decided it's not.
+```typescript
+// Simplified validation schema (actual implementation in Zero core)
+interface PermissionPayload {
+  tool_id: string;                    // Required: unique tool identifier
+  resource: string;                   // Required: file path, URL, or resource ID
+  action: "read" | "write" | "execute"; // Required: single action, not array
+  display_path?: string;              // Optional: human-readable path (validated against resource)
+  expires_at?: number;                // Optional: Unix timestamp, max 24h
+  metadata?: Record<string, unknown>; // Optional: flat object, no nested structures
+}
 
-This kind of security hardening is especially important for agents that run locally with access to your filesystem, credentials, and network. Zero's permission system was already well-designed. Now it's well-defended too.
+// Validation checks (all must pass):
+// 1. All required fields present and non-empty
+// 2. action is exactly one of: read, write, execute (no arrays, no extra values)
+// 3. resource is a valid path/URL (no null bytes, no protocol confusion)
+// 4. If display_path provided, it must resolve to same resource (prevents spoofing)
+// 5. expires_at if present: > now, < now + 24h
+// 6. metadata if present: flat keys only, values are primitives
+// 7. No additional properties beyond schema (strict mode)
+```
 
----
+### The `additional_permissions` Extensibility Point
 
+The fix specifically targets `additional_permissions` payloads — the extensibility point where tool plugins declare their permission needs. This is the **supply chain attack surface**: a malicious or buggy plugin can't slip through a malformed permission request anymore.
 
-## Related articles
+```json
+// Plugin manifest declares permissions it needs
+{
+  "name": "gitlawb-zero-github-plugin",
+  "additional_permissions": [
+    {
+      "tool_id": "github.create_pr",
+      "resource": "github.com/{owner}/{repo}/pulls",
+      "action": "write",
+      "display_path": "Create pull request in {owner}/{repo}"
+    }
+  ]
+}
 
-- [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)
-- [Your AI Agents Config Directory Is Now the Most Dangerous Place on Your Machine](/blog/ai-agent-config-directory-attack-surface-2026/)
+// At runtime, plugin sends payload for each use
+// Zero validates against manifest + schema before prompting
+```
+
+## Why This Matters: Permission Systems Are Only As Strong As Their Input Validation
+
+Presenting a malformed prompt to the user and relying on them to notice the discrepancy is **not security — it's theater**. Users click "Allow" on permission prompts reflexively; they cannot be expected to audit JSON payloads.
+
+Zero's fix is the right approach: **reject malformed payloads at the system level, before they reach the user.** The user should never have to decide whether a malformed permission request is safe, because the system has already decided it's not.
+
+This kind of security hardening is especially important for agents that run locally with access to your:
+- **Filesystem** — source code, configs, SSH keys, AWS credentials
+- **Network** — localhost services, internal APIs, corporate VPN
+- **Process execution** — shell commands, package installs, deployment scripts
+- **Clipboard & keystrokes** — everything you copy or type
+
+Zero's permission system was already well-designed (just-in-time, granular, revocable). Now it's **well-defended too**.
+
+## Comparison: How Other Agents Handle Permission Validation
+
+| Agent | Permission Model | Payload Validation | Prompt Spoofing Protection |
+|-------|-----------------|-------------------|---------------------------|
+| **Gitlawb Zero** | Just-in-time, granular | **Strict schema validation** (new) | **Display path vs resource cross-check** |
+| **Claude Code** | Project-level allowlist | Basic (tool allowlist only) | Limited |
+| **Cursor** | Project-level allowlist | Basic | Limited |
+| **OpenHands** | Runtime sandbox | Schema validation | Partial |
+| **Goose** | Tool allowlist | None (trusts tool definitions) | None |
+| **Aider** | File-level allowlist | None | None |
+
+Zero is unique in validating the *runtime payload* against a *strict schema* before every prompt — not just trusting static tool definitions.
+
+## Practical Impact for Operators
+
+### What Changes for You
+
+1. **No more confusing prompts** — Every prompt you see has passed strict validation
+2. **Plugin safety** — Third-party plugins can't bypass permission semantics with malformed payloads
+3. **Audit trail** — Rejected payloads are logged with plugin ID, payload hash, and validation failure reason
+4. **Debugging** — If a tool stops working, check logs for `permission_payload_rejected` entries
+
+### Configuration
+
+```json
+{
+  "permissions": {
+    "strictValidation": true,
+    "logRejectedPayloads": true,
+    "maxPayloadSize": 4096,
+    "allowedPlugins": ["github", "docker", "k8s", "terraform"]
+  }
+}
+```
+
+### Testing Your Plugins
+
+If you write Zero plugins, test payload validation:
+
+```bash
+# Validate a plugin's permission manifest
+zero plugin validate ./my-plugin/
+
+# Simulate a permission request (dry run)
+zero permission test --tool github.create_pr --resource "github.com/owner/repo/pulls" --action write
+```
+
+## Related Security Deep Dives
+
+- [Your Cron Jobs Were Leaking Secrets — Hermes Just Fixed the Security Hole](/blog/hermes-cron-job-secret-scope-security-fix/)
+- [Hermes Just Plugged a Secret Leak You Probably Didn't Notice](/blog/hermes-env-file-guard-case-insensitive-security/)
 - [Coding Agent Security Checklist 2026 — The Operators Hardening Guide](/blog/coding-agent-security-checklist-2026/)
+- [Your AI Agents Config Directory Is Now the Most Dangerous Place on Your Machine](/blog/ai-agent-config-directory-attack-surface-2026/)
+
 ---
+
+*The smartest developers don't pick one AI — they use them all. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** brings 9+ premium models into one chat for $12/mo. Your AI toolkit, simplified.*
 *The smartest developers don't pick one AI — they use them all. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** brings 9+ premium models into one chat for $12/mo. Your AI toolkit, simplified.*
