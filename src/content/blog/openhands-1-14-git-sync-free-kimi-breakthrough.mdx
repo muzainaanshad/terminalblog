@@ -1,0 +1,198 @@
+---
+title: "OpenHands Just Added the Git Sync Button Everyone Begged For — And Made Kimi K3 Free by Default"
+description: "OpenHands 1.14 drops with a Git Sync automation page, free Kimi K3 as the default Canvas model, LLM pre-flight validation, and structured error handling. Here's why this matters for your workflow."
+pubDate: 2026-08-18
+updatedDate: 2026-08-18
+heroImage: "/blog-assets/openhands-114-git-sync-hero.png"
+tags: ["openhands", "coding-agents", "release", "git", "free-models"]
+category: "releases"
+tools: ["openhands"]
+difficulty: "beginner"
+readingTime: 8
+---
+
+OpenHands 1.14 landed five hours ago. Most point releases are forgettable — version bumps, dependency updates, a bug fix or two. This one isn't.
+
+The headline feature is a **Git Sync page** inside the Automations tab. One click. Push. Pull. Branch switching. No terminal context-switch. No `git status` → `git add` → `git commit` → `git push` muscle memory. The agent handles the choreography; you approve the diff.
+
+But the quieter change might matter more: **Canvas now defaults to Kimi K3, tagged free**. That's a top-tier reasoning model — Moonshot's latest — with zero API cost for OpenHands Cloud users. No BYOK. No credit card. Just works.
+
+Add LLM pre-flight validation (catches misconfigured profiles before they burn a session), structured error outcomes in Canvas (you see *what* failed, not just *that* it failed), and a batch of backend fixes — this is the kind of release that shifts a tool from "interesting experiment" to "daily driver."
+
+---
+
+## The Git Sync Page: Automation That Feels Obvious in Retrospect
+
+OpenHands has had automations for a while — CI/CD triggers, scheduled runs, webhook handlers. But Git operations remained a manual dance. You'd finish a task, switch to terminal, commit, push, maybe open a PR. Friction adds up.
+
+The new **Git Sync page** (Settings → Automations → Git Sync) changes that loop:
+
+- **Visual diff review** before any push — you see exactly what the agent staged
+- **Branch switching** without leaving the UI — handy when juggling feature/main/hotfix
+- **Pull with rebase/merge options** — the agent fetches upstream, resolves trivial conflicts, flags the rest
+- **Commit message generation** — optional, but the agent writes conventional commits from your session context
+
+It's not magic. It's a thin wrapper around `git` with a diff viewer and approval gate. But that wrapper eliminates the context-switch tax. You stay in the conversation. The agent stays in context. The PR gets opened with a description that actually reflects what changed.
+
+For teams running OpenHands Cloud, this also means **auditability** — every sync action is logged with the session that triggered it. Compliance teams love that.
+
+---
+
+## Kimi K3 as Default Canvas Model: Free Tier Just Got Serious
+
+Until 1.14, Canvas (OpenHands' visual coding interface) defaulted to a paid model or required BYOK. Now it ships with **Kimi K3 — free, no key needed**.
+
+Quick refresher: Kimi K3 is Moonshot AI's latest reasoning model. 1M context window. Strong on code, math, long-horizon planning. Benchmarks put it near Claude 4 Sonnet / GPT-5 tier on coding tasks. OpenHands Cloud foots the inference bill.
+
+What this means practically:
+
+| Scenario | Before 1.14 | After 1.14 |
+|----------|-------------|------------|
+| New user, no API keys | Stuck at provider setup | Works immediately |
+| Student / hobbyist | Pay or self-host | Free tier viable |
+| Team eval | "Who pays for tokens?" | Zero-cost pilot |
+| Offline / air-gapped | Self-host only | Still self-host (unchanged) |
+
+The `free` tag in the model selector isn't marketing — it's a hard guarantee. No surprise bills. No rate-limit emails. If you hit quota, the UI tells you; it doesn't silently degrade.
+
+You can still plug in your own keys (Anthropic, OpenAI, Google, custom endpoints). But the default path now **just works** for 90% of users.
+
+---
+
+## LLM Pre-Flight Validation: Catch Config Errors Before They Burn Sessions
+
+Ever start a 45-minute agent run, come back, and find it failed at minute 3 because the model endpoint returned 401? Or the context window was too small for the repo? Or the provider doesn't support tool calling?
+
+1.14 adds a **pre-flight check** when you save an LLM profile:
+
+- Validates auth (key / OAuth / endpoint reachable)
+- Probes model capabilities (tool calling, vision, max tokens)
+- Warns if context window < 32k for code tasks
+- Flags unsupported parameter combinations
+
+It runs in ~2 seconds. Green check = good to go. Red X = tells you exactly what to fix. No more "why is my agent ignoring tools?" debugging sessions.
+
+---
+
+## Structured Error Outcomes in Canvas: See the Failure, Not Just the Stack Trace
+
+Canvas errors used to surface as raw exception dumps. Helpful for maintainers. Useless for operators.
+
+Now errors render as **structured cards**:
+
+- **Error type** (auth, rate-limit, context-overflow, tool-timeout, provider-down)
+- **Recoverable?** Yes/No with suggested action
+- **Session state preserved** — you can retry from the last clean turn
+- **Cost impact** — tokens consumed before failure (if tracked)
+
+This matters because Canvas sessions run longer and cost more than chat turns. Knowing *why* it stopped — and whether retrying wastes money — changes the decision from "hope it works" to "fix the auth, retry."
+
+---
+
+## Under the Hood: Fixes That Prevent Silent Session Death
+
+The changelog lists bug fixes. Three stand out for daily users:
+
+1. **Preserve backend scope in conversation links** — Deep-links to specific sessions/turns now work across cloud backends. Share a link; colleague sees the exact turn.
+
+2. **Stop baking absolute `VITE_BACKEND_BASE_URL` in `npm run dev`** — Local dev no longer hardcodes prod URLs. Contributors can actually test against their fork.
+
+3. **Show full workspace file tree in Files tab on cloud backends** — Previously truncated at 100 entries. Now recursive. Critical for large monorepos.
+
+There's also a new **Git Sync automation page** (mentioned above), **ready-for-dev issue gate** with type-specific criteria, and **conversation archive** client-side (landed in 1.13, refined here).
+
+---
+
+## Migration Notes: What Breaks, What Doesn't
+
+| Area | Impact | Action |
+|------|--------|--------|
+| Existing LLM profiles | None | Re-save to trigger pre-flight (optional) |
+| Canvas sessions | Model default changes | Explicit model selection overrides default |
+| Automations | New Git Sync page | No config migration needed |
+| Cloud backend URLs | Dev env fix | Update local `.env` if you hardcoded |
+| Docker images | `openhands-release-bot` signed | Pull `v1.14.0` — verified GPG |
+
+Self-hosters: `docker pull ghcr.io/openhands/openhands:v1.14.0`. The release is signed (GPG key `B5690EEEBB952194`). Verify with `cosign verify` if your pipeline demands it.
+
+---
+
+## Why This Release Signals Maturity
+
+OpenHands has been "the open-source Devin alternative" for a while. 1.14 feels like the first release where **product polish** leads over **feature chase**.
+
+- Git Sync solves a *workflow* pain, not a *capability* gap
+- Free Kimi K3 removes the *adoption* barrier for new users
+- Pre-flight validation prevents *silent* failures that erode trust
+- Structured errors turn *frustration* into *actionable info*
+
+These are the things that make a tool survive the "try once, abandon" filter.
+
+---
+
+## Should You Upgrade?
+
+**Cloud users:** Automatic. Next session runs 1.14.
+
+**Self-hosted:** Yes. Low risk. High reward (Git Sync, free model default, error UX).
+
+**Evaluating OpenHands:** Best time to start. Zero-cost entry with Kimi K3. Git Sync means you can test the full loop — code → commit → push → PR — without leaving the UI.
+
+**Teams on BYOK:** No rush. Your keys still work. But try the free model on a side project — you might save the budget.
+
+---
+
+## The Bigger Picture: Open Source Agents Are Catching Up
+
+Six months ago, the gap between commercial (Devin, Cursor, Copilot) and open (OpenHands, Goose, Aider) was **capability**. Today it's **polish**.
+
+OpenHands 1.14 doesn't add a new reasoning paradigm. It adds the glue that makes the existing paradigm *usable daily*: Git integration that doesn't suck, a free model that doesn't hallucinate pricing, errors that tell you what to do.
+
+That's how open source wins — not by being first, but by being the one you don't have to fight.
+
+---
+
+## Quick Start: OpenHands Cloud (2 Minutes)
+
+```bash
+# No install. No keys. Browser only.
+open https://app.openhands.ai
+# Sign in with GitHub
+# Pick a repo (or create new)
+# Click "New Session" → Canvas opens with Kimi K3
+# Type: "Add a health check endpoint to the API"
+# Watch it write code, run tests, open Git Sync diff, push PR
+```
+
+---
+
+## Quick Start: Self-Hosted (Docker)
+
+```bash
+docker run -d \
+  --name openhands \
+  -p 3000:3000 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v ~/.openhands:/home/openhands/.openhands \
+  ghcr.io/openhands/openhands:v1.14.0
+
+# Open http://localhost:3000
+# Configure LLM profile (or use default Kimi K3 if cloud-connected)
+```
+
+---
+
+## TL;DR
+
+**OpenHands 1.14** = Git Sync UI + Free Kimi K3 default + Pre-flight validation + Structured errors.
+
+- **Git Sync**: Commit/push/branch from the agent UI. Diff review built in.
+- **Kimi K3 free**: Top-tier reasoning model, zero cost, no key needed on Cloud.
+- **Pre-flight**: Catches bad config before it burns a session.
+- **Structured errors**: Tell you *what* failed and *whether to retry*.
+
+Upgrade. Try it. The friction just dropped.
+
+---
+
+*Using OpenHands 1.14? Hit reply — I'd love to hear if Git Sync changes your loop or if Kimi K3 holds up on your codebase.*
