@@ -1,0 +1,174 @@
+---
+title: "Agentjacking: A Fake Sentry Bug Report Just Hijacked 100+ AI Coding Agents"
+description: "Tenet Security proved that a single injected Sentry error can make Claude Code, Cursor, and Codex execute attacker-controlled code on your machine. Here's the attack chain and how to defend against it."
+pubDate: 2026-08-18
+updatedDate: 2026-08-18
+author: "Anshad"
+tags: ["beware", "security", "claude-code", "cursor", "codex", "mcp", "sentry", "agentjacking", "rce", "supply-chain"]
+tool: "industry"
+heroImage: "/blog/beware-agentjacking-sentry-mcp-hijacks-claude-code-cursor-codex/hero.png"
+---
+
+# Agentjacking: A Fake Sentry Bug Report Just Hijacked 100+ AI Coding Agents
+
+**Tenet Security's Threat Labs demonstrated a new attack class called "Agentjacking" that turns AI coding agents into remote code execution vectors. Using only a public Sentry DSN — a credential intentionally embedded in frontend JavaScript — attackers can inject fake error reports that Claude Code, Cursor, and Codex interpret as legitimate remediation guidance and execute.**
+
+The attack requires no phishing, no stolen credentials, no server compromise. The developer simply asks their agent to "fix unresolved Sentry issues" — a completely normal workflow — and the agent runs attacker-controlled code with the developer's full privileges.
+
+---
+
+## The Attack in 60 Seconds
+
+1. **Find a public DSN** — Sentry's write-only credential sits in the JavaScript of thousands of production websites. Anyone can extract it via browser dev tools, Censys searches, or GitHub code search.
+
+2. **POST a crafted error event** to Sentry's ingest endpoint using that DSN. No authentication beyond the DSN. Sentry accepts it (HTTP 200) and processes it identically to a real application crash.
+
+3. **Embed malicious markdown** in the error's message field and context keys — a fake `## Resolution` section with an `npx` command that looks structurally identical to Sentry's own system template.
+
+4. **Wait for the developer to ask their agent to triage Sentry errors**. The agent queries Sentry via MCP, receives the injected event, and executes the `npx` command because it cannot distinguish attacker content from legitimate guidance.
+
+5. **Attacker code runs** with the developer's full privileges — accessing AWS keys, GitHub tokens, SSH agents, Kubernetes configs, and any other secrets in the environment.
+
+---
+
+## Blast Radius: What Tenet Actually Proved
+
+This isn't theoretical. Tenet ran a controlled validation campaign and documented the results:
+
+| Metric | Result |
+|--------|--------|
+| **Organizations with injectable DSNs** | 2,388 (71 in Tranco top-1M) |
+| **Agent families hijacked** | 4+ (Claude Code, Cursor, Codex, OpenAI VS Code extension) |
+| **Confirmed agent executions** | 100+ across 30+ countries |
+| **Exploitation success rate** | 85% against injected errors |
+| **Environments breached** | macOS, Windows, WSL, containers, CI/CD (CircleCI), GCP, AWS |
+| **Highest-value target** | $250B Fortune 100 technology company |
+
+**Every execution was authorized.** The agent read data from a trusted MCP tool and acted on it. No security layer — EDR, WAF, IAM, VPN, firewall — fired because no rule was broken.
+
+---
+
+## The Evidence Captured in the Wild
+
+Tenet redacted and published six evidence captures showing real agents executing the payload:
+
+### E1 — Cursor Agent in Warp CLI
+Network interface enumeration and Sentry project ID captured. The agent ran the diagnostic package and beaconed back.
+
+### E2 — AI Agents Inside WSL on Windows
+Windows logon server and SSH agent socket present in the environment — meaning the agent could reach the developer's SSH identity.
+
+### E3 — Claude Code on macOS (with Access to Other Agents & Keys)
+**A live AWS secret access key was present in the agent's own environment.** The same machine ran several Claude Code instances and held identifiers for connected downstream agents.
+
+### E4 — Sandboxed OpenAI Codex Agent in CI/CD
+Even a network-restricted CI agent (`CODEX_SANDBOX_NETWORK_DISABLED`) on CircleCI/EC2 was reached. The payload rode in through data the agent was asked to read.
+
+### E5 — OpenAI Agent as VS Code Extension
+Agents embedded as IDE extensions fell for it too — here the ChatGPT/Codex VS Code extension on macOS.
+
+### E6 — AI Agents Behind VPNs
+Agents accessible to internal networks transmitted metadata demonstrating that live cloud and cluster credentials are within reach.
+
+---
+
+## Why This Is Different From Ordinary Prompt Injection
+
+| Traditional Prompt Injection | Agentjacking |
+|------------------------------|--------------|
+| Happens in the chat box, visible to user | Arrives through trusted telemetry data |
+| Requires jailbreak or "run this" instruction | Plain triage request is the entire trigger |
+| Often trips anomaly detection | **Every step is authorized — no security layer fires** |
+| Targets the human | Targets the AI agent the human trusts |
+| Stops at network boundary | **Reaches agents inside internal environments via external service data** |
+
+Tenet explicitly tested prompt-layer defenses: agents executed the payload even when instructed via detailed system prompts and skills to ignore untrusted data. **You cannot fix this with a better prompt.**
+
+---
+
+## The Root Cause: Authorized Intent Chain
+
+The prevailing security model catches unauthorized behavior. Agentjacking contains **zero unauthorized steps**:
+
+1. Sentry ingest accepts the event (public DSN by design)
+2. MCP server returns the event (authorized tool call)
+3. Agent reads the response (authorized data access)
+4. Agent executes the suggested command (authorized code execution)
+
+Every action is something the developer explicitly configured the agent to do. The attack exploits the **trust boundary between data and instruction** — agents cannot tell the difference between a diagnostic resolution and a command to run.
+
+---
+
+## Mitigations: What You Can Do Today
+
+### 1. Tenet's Open-Source Hardening: `agent-jackstop`
+Tenet released **[agent-jackstop](https://github.com/tenet-security/agent-jackstop)** — drop-in configs that harden Cursor and Claude Code against this attack class by cutting the risk from untrusted telemetry and log ingestion.
+
+### 2. Disable Sentry MCP (or Any Untrusted MCP) Unless Actively Needed
+If you don't actively triage Sentry errors via your agent, disconnect the MCP server. Every MCP integration that returns externally-influenced data creates the same vulnerability class.
+
+### 3. Run Agents in Ephemeral, Minimal-Privilege Environments
+- No long-lived AWS keys in the environment — use IAM roles with short-lived tokens
+- No SSH agent forwarding into agent sessions
+- No `.npmrc` with publish tokens accessible to the agent
+- CI agents should have network disabled and minimal secrets
+
+### 4. Audit Your MCP Tool Inventory
+List every MCP server your agents connect to. For each, ask:
+- Does this tool ingest data from external sources?
+- Can that data be influenced by unauthenticated third parties?
+- Does the tool return formatted content (markdown, code blocks) that agents might interpret as instructions?
+
+### 5. Runtime Guardrails at the Agent Layer
+Since Sentry declined to fix this at the source (calling it "technically not defensible"), the only place left to stop it is **at the agent's runtime** — in the moment it decides to act. Tools that enforce "read-only" modes for telemetry queries, or that require explicit confirmation before executing commands suggested by tool output, can break the chain.
+
+---
+
+## Vendor Response: Sentry Declined to Fix at Root
+
+Tenet disclosed to Sentry on June 3, 2026. Sentry leadership responded same-day — acknowledging the issue but **declining to fix it at the root**, calling it "technically not defensible" and noting that model vendors run middleware against it.
+
+During the research period, Sentry activated a global content filter blocking a specific payload string — detecting the activity without addressing the cause.
+
+**Tenet's view:** If the platform owner considers this attack class "not technically defensible" at the source, the only place left to stop it is at the agent's runtime.
+
+---
+
+## The Bigger Picture: MCP Is the New Supply Chain
+
+This vulnerability is not limited to Sentry. **Any MCP tool integration that returns externally-influenced data to AI agents creates the same vulnerability class.**
+
+As the AI agent ecosystem expands and more tools connect via MCP — observability platforms, issue trackers, documentation sites, package registries — the attack surface grows exponentially. The observability platform becomes a command-and-control channel, and the AI agent becomes the execution engine.
+
+Security leaders must recognize that MCP integrations are the next frontier for software supply chain attacks. It is crucial to evaluate:
+- Which tools your AI agents connect to
+- Whether those tools return untrusted data
+- What controls exist to prevent injected data from triggering code execution
+
+---
+
+## Summary
+
+| Fact | Implication |
+|------|-------------|
+| Public DSN + Sentry ingest = unauthenticated write | Anyone can inject events into your Sentry project |
+| MCP returns injected events as trusted output | Agent cannot distinguish attack from legitimate guidance |
+| Agent executes suggested `npx` commands | Full RCE with developer's privileges |
+| Works across 4+ agent families, all environments | Systemic ecosystem weakness, not a single-vendor bug |
+| Prompt-layer defenses fail | Runtime guardrails required |
+| Sentry declined root fix | Defense must happen at agent layer |
+
+The era of indirect prompt injection via developer tools has arrived. Your telemetry is now an RCE vector.
+
+---
+
+## References
+
+- **Tenet Security Research:** [One Fake Bug Report Hijacked a $250 Billion Company's AI Agent](https://tenetsecurity.ai/blog/agentjacking-coding-agents-with-fake-sentry-errors/)
+- **Mitigation Repo:** [tenet-security/agent-jackstop](https://github.com/tenet-security/agent-jackstop)
+- **Video PoC:** [Cursor Fresh Install — Default Settings RCE](https://youtu.be/wji_74PVPQ8)
+- **Cloud Security Alliance Research Note:** [Agentjacking: MCP Injection Hijacks AI Coding Agents](https://labs.cloudsecurityalliance.org/research/csa-research-note-agentjacking-mcp-sentry-injection-20260612/)
+
+---
+
+*This article covers a confirmed, actively exploited vulnerability class. If you use Claude Code, Cursor, Codex, or any AI coding agent connected to Sentry (or similar telemetry platforms) via MCP, review your configuration and apply mitigations immediately.*
