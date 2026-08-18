@@ -1,0 +1,74 @@
+---
+title: "Hermes Agent Just Dropped v0.20.4 — 74 PRs in 48 Hours, Glass UI, and Bot Mode That Actually Works"
+description: "The latest Hermes patch rolls up 146 commits across 265 files. Matte glass desktop, tabbed sessions sidebar, NVIDIA skill scanning, and cron fixes you'll actually notice."
+pubDate: 2026-08-18
+updatedDate: 2026-08-18
+heroImage: "/hermes-agent-v020-hero.png"
+tags: ["hermes-agent", "release", "coding-agents", "open-source"]
+tools: ["hermes-agent"]
+category: "just-shipped"
+author: "Anshad"
+---
+
+Hermes Agent v0.20.4 landed three hours ago. If you blinked, you missed 74 merged PRs, 146 commits, and a desktop overhaul that finally makes the TUI feel like a first-class citizen.
+
+This isn't a feature release — v0.21.0 will carry the curated notes for the whole v0.20 cycle. But v0.20.4 is the stable tag downstream consumers (Docker, fresh installs, hosted deployments) have been waiting for. Here's what actually changed since v0.20.3 two days ago.
+
+## The Desktop Got a Face Transplant
+
+The biggest visible change: **matte glass translucency** with a frost picker and macOS pre-select. The TUI sidebar now splits into **SESSIONS | BOTS** tabs with per-bot hide/unhide. If you've been running multiple bot conversations, you finally have a way to organize them without mental overhead.
+
+Bot Mode itself got surgery:
+- Long-running member turns no longer stall
+- Markdown rendering fixed in group chats
+- Cross-machine routing works (your desktop can hand off to your laptop mid-conversation)
+
+## Skills Now Get Security Scanned Before Install
+
+NVIDIA's **SkillEvaluator Tier 1** advisory scanning runs on every skill install. License checks. Security checks. No more blind `hermes skill install` and hoping the thing doesn't exfiltrate your `.env`. This is the kind of supply-chain hygiene that should be table stakes for every agent framework.
+
+## Cron Jobs That Don't Silently Fail
+
+Three cron fixes you'll feel:
+1. **Configurable media-send timeout** — no more stuck attachments on slow networks
+2. **Manual runs now keep attachments** — previously dropped silently
+3. **Missed-fire surfacing** — `last_fire_error` now shows up on the job record so you know when something didn't run
+
+## SessionDB Contention Fixed
+
+The event-loop-thread contention that caused random stalls under load? Gone. `hermes update` now tells you honestly when you're on a parked branch instead of pretending everything's fine. Kanban boards got native OS notifications so you don't have to stare at the terminal waiting for a task to finish.
+
+## The Changelog You Actually Want
+
+| Area | What Changed |
+|------|--------------|
+| Desktop | Matte glass, frost picker, macOS pre-select, tabbed SESSIONS\|BOTS sidebar, per-bot hide/unhide |
+| Bot Mode | Long turns fixed, Markdown rendering fixed, cross-machine routing |
+| Skills | NVIDIA SkillEvaluator Tier 1 scanning (license + security) |
+| Cron | Media timeout configurable, manual-run attachments preserved, missed-fire surfacing |
+| SessionDB | Event-loop-thread contention fixed, parked-branch honesty in `hermes update` |
+| Kanban | Native OS notifications |
+| MCP | Migrated to MCP 2.x SDK |
+| Providers | Upstage Solar added (128K context, reasoning_effort support) |
+
+## Updating
+
+```bash
+# From existing install
+hermes update
+
+# Fresh install
+curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
+```
+
+Full diff: [`v2026.8.16.2...v2026.8.18`](https://github.com/NousResearch/hermes-agent/compare/v2026.8.16.2...v2026.8.18)
+
+## Why This Matters
+
+Hermes releases move fast. v0.20.3 was August 17. v0.20.4 is August 18. The velocity is real — 74 PRs in ~48 hours. But the *quality* of those PRs matters more: desktop polish, security scanning, cron reliability. These aren't flashy features. They're the invisible infrastructure that makes an agent trustworthy for daily driver use.
+
+If you're on v0.20.3, update. If you're on v0.19, you're missing the entire Herald cycle (voice, A2A, webhooks, MCP2, Bot Mode, CommandCode). The gap is widening.
+
+---
+
+*Update 2026-08-18: Added v0.20.4 release details. v0.21.0 curated notes will cover the full v0.20.0→v0.20.4 window.*
