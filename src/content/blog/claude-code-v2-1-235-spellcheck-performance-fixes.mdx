@@ -1,0 +1,98 @@
+---
+title: "Claude Code Just Got Spellcheck — And Fixed 15 Things You've Been Complaining About"
+description: "v2.1.235 adds real-time spellcheck, cuts memory usage in cloud sessions, fixes nested markdown lists, and squashes a dozen paper-cut bugs. Here's what matters."
+pubDate: 2026-08-19
+updatedDate: 2026-08-19
+tags: ["claude-code", "release", "coding-agents"]
+tools: ["claude-code"]
+category: "just-shipped"
+author: "Anshad"
+---
+
+Claude Code v2.1.235 landed 3 hours ago. The headline feature is **real-time spellcheck** in the prompt input — underline misspelled words as you type using your installed `aspell`, `hunspell`, or `ispell`.
+
+But dig deeper and you'll find 15 fixes that clean up the rough edges from v2.1.234. Here's what changed.
+
+## Spellcheck That Actually Works
+
+Enable it in settings:
+
+```
+spellcheck: true
+```
+
+The feature uses your system's spell checker (`aspell`, `hunspell`, or `ispell`). No external API calls. No cloud dependency. Works offline.
+
+If you've ever typo'd a variable name in a prompt and watched Claude confidently hallucinate a solution around it, this one's for you.
+
+## Cloud Sessions Use Way Less Memory
+
+`/ultrareview` and `/autofix-pr` sessions running in the background no longer re-scan and re-render their event streams on every update.
+
+This was a silent memory hog. Long-running cloud sessions would gradually eat more CPU and memory just from sitting idle. Fixed.
+
+## Nested Markdown Lists Finally Align Right
+
+Depth 3+ nested lists were misaligning in the terminal UI. Wrapped list items now have proper hanging indents.
+
+If your documentation looks like this:
+```
+- Level 1
+  - Level 2
+    - Level 3 (was broken)
+```
+
+It now renders correctly. Small fix, big readability improvement.
+
+## Prompt Input Highlights Fixed
+
+Slash commands, keywords, and mentions were appearing shifted by one or more characters in multi-line prompts. The highlight now matches the actual text.
+
+## The Bug Fixes Table
+
+| Bug | Fixed |
+|-----|-------|
+| Whole-prompt-cache invalidation when language server disconnected mid-session | ✅ |
+| Shift+Tab in permission comment field approving edit + granting session-wide permission | ✅ |
+| Agent tool advertising unavailable general-purpose default | ✅ |
+| Notebook cell delete/replace dialogs omitting existing cell content | ✅ |
+| Slash commands during Claude response showing HTML entities | ✅ |
+| Prompt footer not showing "Update installed" restart notice after auto-update | ✅ |
+| Expanded task list (`ctrl+t`) starting collapsed on resume | ✅ |
+| Permission dialogs showing mismatched "don't ask again" options | ✅ |
+| Vim mode losing NORMAL mode and cursor position on transcript toggle | ✅ |
+| Dialog arrow keys + Enter in quick succession selecting wrong option | ✅ |
+| `SendMessage` accepting too-large messages then silently dropping them | ✅ |
+| `claude rc` not checking enterprise gateway availability | ✅ |
+| VS Code: Focus jumping between Claude tabs on window restore | ✅ |
+
+## Improved `grep` in Native Builds
+
+Pathological regex patterns now fail fast instead of exhausting memory. The `-m N` flag with `-A/-C` context now prints correct context.
+
+This matters if you've ever accidentally typed a regex that backtracked forever and watched Claude Code hang.
+
+## Better Context-Limit Error
+
+When auto-compact is off and you hit the context limit, the error now tells you explicitly and points to `/config` to re-enable it.
+
+No more mystery "context overflow" with no actionable guidance.
+
+## Updating
+
+```bash
+# Auto-updates on next launch, or force:
+claude update
+```
+
+Full changelog: [`v2.1.234...v2.1.235`](https://github.com/anthropics/claude-code/compare/v2.1.234...v2.1.235)
+
+## Why This Release Matters
+
+v2.1.234 was the security drop (NTLM leak fix). v2.1.235 is the quality-of-life polish.
+
+The spellcheck feature alone changes how you write prompts — no more sending typos to the model. The memory fix for cloud sessions matters if you run long `/ultrareview` jobs. The markdown list fix matters if you paste documentation into prompts.
+
+This is the "clean up the edges" release that makes the security fix from yesterday feel complete.
+
+Update. Use the spellcheck. Enjoy the lower memory footprint.
