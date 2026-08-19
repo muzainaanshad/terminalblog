@@ -8,11 +8,26 @@ import path from 'path';
 import { join } from 'path';
 import { createRequire } from 'module';
 import { SITE_TITLE } from '../../consts';
+import agentHub from '../../data/agents.json';
 
 const require = createRequire(import.meta.url);
 const { scoreAgents, metric: getMetric } = require(
   join(process.cwd(), 'scripts/lib/adoption-score.cjs')
 );
+
+/** Only real coding agents have /tool/<slug>/ hubs (see tool/[tool].astro). */
+const HUB_IDS = new Set((agentHub as { id: string }[]).map((a) => a.id));
+/** Map leaderboard snapshot ids -> canonical hub slug where the live tool page differs. */
+const HUB_ALIAS: Record<string, string> = {
+  'pi-dev': 'pi-dot-dev',
+  'mimo-code': 'mimo',
+  'kilo-code': 'kilo',
+};
+/** Return a valid /tool/<slug>/ href for an agent id, or null if no hub page exists. */
+function hubOf(id: string): string | null {
+  const slug = HUB_IDS.has(id) ? id : HUB_ALIAS[id];
+  return slug && HUB_IDS.has(slug) ? `/tool/${slug}/` : null;
+}
 
 const snapshotsDir = path.join(process.cwd(), 'src', 'data', 'adoption', 'snapshots');
 const snapshots = fs.existsSync(snapshotsDir)
@@ -133,20 +148,26 @@ function fmt(n: number | null) {
             </tr>
           </thead>
           <tbody>
-            {top.map((a: any, i: number) => (
+            {top.map((a: any, i: number) => {
+              const href = hubOf(a.id);
+              return (
               <tr>
                 <td>{i + 1}</td>
                 <td>
-                  <a href={`https://terminalblog.com/tool/${a.id}/`} target="_blank" rel="noopener">
-                    {a.name || a.id}
-                  </a>
+                  {href ? (
+                    <a href={`https://terminalblog.com${href}`} target="_blank" rel="noopener">
+                      {a.name || a.id}
+                    </a>
+                  ) : (
+                    <span>{a.name || a.id}</span>
+                  )}
                 </td>
                 <td class="num">{fmt(getMetric(a, 'github_stars'))}</td>
                 <td class="num">{fmt(getMetric(a, 'commits_30d'))}</td>
                 <td class="num score">{a.adoption_score}</td>
                 <td class="num">{a.value_score ?? '—'}</td>
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       )}
