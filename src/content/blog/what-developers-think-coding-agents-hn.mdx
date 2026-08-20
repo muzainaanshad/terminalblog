@@ -1,0 +1,162 @@
+---
+title: "Anthropic's Lock-In Play and Opus 5's 'Agent Speak' — What 300+ HN Developers Revealed This Week"
+description: "Two explosive Hacker News threads (153 + 164 comments) expose the real friction: Anthropic refusing open standard AGENTS.md in favor of proprietary CLAUDE.md, and Opus 5's verbose 'agent speak' polluting codebases. Here's what developers are actually doing about it."
+pubDate: 2026-08-20
+updatedDate: 2026-08-20
+author: Anshad
+tags: ["coding-agents", "claude-code", "anthropic", "industry"]
+tool: industry
+heroImage: "/images/hn-coding-agents-opinion.jpg"
+---
+
+Two Hacker News threads exploded this week with 300+ combined comments. They weren't about benchmarks or new features. They were about **frustration** — the kind that makes developers switch tools, cancel subscriptions, and write their own harnesses.
+
+Here's what developers actually think when the marketing stops.
+
+---
+
+## The Story: Two Threads, Same Root Cause
+
+**Thread 1:** "Feature Request: Support AGENTS.md" — 153 comments, 259 points. A year-old GitHub issue asking Anthropic to support the open-standard `AGENTS.md` file format (used by Codex, Cursor, Windsurf, and others) instead of requiring their proprietary `CLAUDE.md`.
+
+**Thread 2:** "Opus 5.0 drives incoherence into the stratosphere" — 164 comments, 181 points. Developers documenting how Opus 5's output has become verbose, pseudo-philosophical, and littered with phrases like "load-bearing" that appear hundreds of times in codebases.
+
+Both threads point to the same tension: **Anthropic optimizing for lock-in over developer experience.**
+
+---
+
+## What Happened: The AGENTS.md Standoff
+
+`AGENTS.md` emerged as a community standard — a single markdown file at repo root that tells *any* coding agent (Claude Code, Codex, Cursor, etc.) how to work in that project. Think of it as `.editorconfig` for AI agents.
+
+Every major harness adopted it. **Except Claude Code.**
+
+Anthropic's response (via employee bcherny): close the issue as "completed" by linking to a third-party plugin (`tweakcc`) that adds support via a workaround. Not native support. A plugin maintained by someone else.
+
+### Developer Reactions: "This Is a Moat Play"
+
+The comments reveal a pattern. Developers aren't mad about the file name. They're mad about the **signal**.
+
+> **"Anthropic are the only ones who think they can ignore the open standards. Absolute dirt bags."** — wilg
+
+> **"So, a supposedly trillion dollar worth, about to IPO company thinks their moat is a specifically named Markdown file."** — moezd
+
+> **"Making your tool less compatible with the rest of the ecosystem at large not only makes it harder to move your tool, but also harder to move away from your tool."** — embedding-shape
+
+The workaround is trivial — `ln -s AGENTS.md CLAUDE.md` or adding `@AGENTS.md` inside `CLAUDE.md`. Multiple commenters confirmed it works. But that's not the point.
+
+> **"The ease of workaround is besides the point, this is about Anthropic's approach... silent nerfing, silent prompt modifications, refusals of valid user prompts, watermarking, and lies about distillation."** — JohnMakin
+
+Developers see a company that built goodwill as the "open, safety-focused alternative" now behaving like every other platform: **capture the developer, own the workflow, resist interoperability.**
+
+---
+
+## The Real Insight: Harness vs. Model Confusion
+
+A crucial distinction emerged in the comments that most coverage misses: **Claude Code (the harness) ≠ Claude (the model).**
+
+> **"You're asking the wrong question here. There is: How exactly does Claude Code *not support* AGENTS.md? How exactly does the Claude suite of Models not support AGENTS.md? The problem being pointed at... is referring to the Claude Code Harness not supporting AGENTS.md."** — agentdev001
+
+The model reads whatever you put in context. The **harness** decides what gets loaded automatically at session start. Anthropic controls the harness. They chose not to auto-load `AGENTS.md`.
+
+This matters because developers increasingly use **multiple harnesses** (Claude Code, Codex, OpenCode, Pi) with the same models. They want one `AGENTS.md` that works everywhere.
+
+> **"New guidelines... configure and update existing CC setups to be CC/Codex agnostic. Plus setting up both allows Claude Code to delegate tasks to Codex to reduce usage."** — 8cvor6j844qw_d6
+
+The market is moving toward **harness-agnostic workflows**. Anthropic is moving the opposite direction.
+
+---
+
+## The Second Thread: Opus 5's "Agent Speak" Problem
+
+While the AGENTS.md thread is about *control*, the Opus 5 thread is about *usability*.
+
+Developers report that Opus 5 (and Sonnet 5 / Fable) generate output that's:
+- **Verbose but low-signal** — 8 paragraphs where 1 sentence would do
+- **Pseudo-technical jargon** — "load-bearing," "statement-list walk without the per-list pending-fiber flush," "no-op fuel"
+- **Self-arguing** — the model debates with itself in output, then recommends against the task you asked for
+- **Style-drifting** — instructions to "be concise" work for 1-2 turns, then revert
+
+### Developer Reactions: "Actively Starting to Hate It"
+
+> **"I did a grep for load-bearing in our codebase and it now appears hundreds of times. I'm actively starting to hate Opus because of this shite."** — Bluestein (thread author)
+
+> **"It's gotten to the point where I'm now having to add a linter into our codebase to keep Claudism's out of it... From now on I'm just going to make that fail the build. Fuck this noise."** — ViewTrick1002
+
+> **"I've had success with 'ELI12' (explain like I'm 12)... I also have a writing steering file that makes Opus's writing less insufferable. Otherwise it's really bad."** — wenc
+
+> **"My 5.6 Sol just spent five hours cleaning up the mess Opus 5 left in the codebase... This model is total waste of time to work with."** — vlad-asis
+
+> **"I'm voting with my wallet. My plan downgrade kicks in next month. Thanks Opus 5 for helping me kick the habit."** — cadamsdotcom
+
+### The Leading Theory: Chain-of-Thought Leakage
+
+Multiple developers suspect the "agent speak" comes from **reasoning tokens leaking into final output** — the model's internal monologue (trained via RL on chain-of-thought) bleeding into user-facing text.
+
+> **"I'm wondering if some of Opus's chain of thought patterns have bled into its 'human readable text output' circuitry... 'the bug is in the lock, not the query' reads like some of the shorthands it might use in its own chain of thought."** — m12k
+
+> **"This is an exaggeratedly precise yet bad at communication with humans way of talking [that] snuck in through reasoning RL... might be useful when it talks to itself (CoT)."** — make3
+
+If true, this isn't a bug — it's a **training artifact** that won't be fixed by prompt engineering.
+
+---
+
+## What Developers Are Actually Doing
+
+The comments reveal a quiet migration:
+
+| Action | Evidence |
+|--------|----------|
+| **Symlink workarounds** | `ln -s AGENTS.md CLAUDE.md` mentioned by 10+ commenters |
+| **Switching harnesses** | Pi, OpenCode, Codex TUI, "T3 Code" cited as better UX |
+| **Switching models** | GPT-5.6 Sol, Gemini, open-weight models (GLM, Qwen) via OpenRouter |
+| **Writing custom harnesses** | "Mine's 50 lines... much faster and cheaper than official harnesses" — andai |
+| **Downgrading/canceling subscriptions** | "Plan downgrade kicks in next month" — cadamsdotcom |
+
+> **"I use a custom harness... 50 lines... vendored in my own LLM micro library (100 LoC)... much faster and cheaper than the official harnesses for some reason. (Absence of sysprompt bigger than my repo probably helps there...)"** — andai
+
+> **"Pi with Claude is better than Claude Code in my experience. But I even use old GLM5.2 with Pi and generally have a better experience than current Claude Code."** — epistasis
+
+The **harness layer** is where the competition actually lives. Models are commoditizing; the UX wrapper determines daily friction.
+
+---
+
+## What It Means for You
+
+### If You're Using Claude Code Today
+
+1. **Add the symlink.** `ln -s AGENTS.md CLAUDE.md` in every repo. It's the pragmatic fix.
+2. **Keep `AGENTS.md` as source of truth.** Write instructions once; let the symlink handle Claude Code.
+3. **Test other harnesses.** OpenCode, Pi, or Codex CLI take 10 minutes to try. You may prefer the UX.
+4. **Don't marry the harness.** The model is the asset; the harness is interchangeable plumbing.
+
+### If You're Evaluating Coding Agents
+
+| Factor | What HN Developers Say |
+|--------|------------------------|
+| **Model quality** | Opus 5 codes well, writes terribly. Sonnet 5 similar. GPT-5.6 Sol preferred for implementation. |
+| **Harness UX** | Claude Code = bloated, hidden info, "rambling." Pi/OpenCode = more control, less friction. |
+| **Lock-in risk** | High with Anthropic (proprietary formats, subscription tied to harness). Lower with open harnesses. |
+| **Cost control** | Tools like Frugal Tokens, AgentsView, Codeburn emerging to track spend across harnesses. |
+
+### The Bigger Picture
+
+Two years ago, "AI coding assistant" meant Copilot. Today, developers run **fleets**: Claude Code for architecture, Codex for implementation, local models via OpenCode for cheap edits, custom harnesses for specific workflows.
+
+The winners will be **harnesses that:**
+- Respect open standards (`AGENTS.md`, MCP, skill specs)
+- Give users control over context injection
+- Don't hold subscriptions hostage to their UI
+- Stay thin — the model does the work
+
+Anthropic currently fails on three of four. The market notices.
+
+---
+
+## The Bottom Line
+
+The HN threads aren't complaining about AI coding. They're complaining about **bad product decisions layered on top of good models.**
+
+Developers will route around lock-in. They'll symlink, wrapper-script, and custom-harness their way to a workflow that respects their time. The only question is whether Anthropic adapts before the routing becomes permanent.
+
+*Want the raw threads? [AGENTS.md issue](https://github.com/anthropics/claude-code/issues/6235) | [Opus 5 discussion](https://github.com/anthropics/claude-code/issues/77136)*
