@@ -1,13 +1,14 @@
 ---
+---
 title: "Zero's Stale Lock File Fix Just Prevented Permanent Denial of Service"
-description: "Gitlawb Zero now reclaims stale lock files instead of failing permanently. Sessions that used to require manual intervention now self-heal."
+description: "Gitlawb Zero now reclaims stale lock files instead of failing permanently. Sessions that used to require manual intervention now self-heal. Deep dive on the implementation, comparison with industry patterns, and why this matters for agent reliability."
 pubDate: "2026-07-10T05:00:00Z"
-updatedDate: "2026-07-10T05:00:00Z"
-tags: ["gitlawb-zero", "lock-files", "dos", "self-heal", "viral"]
+updatedDate: "2026-08-21T04:00:00Z"
+tags: ["gitlawb-zero", "lock-files", "dos", "self-heal", "systems-programming", "reliability"]
 tool: "gitlawb-zero"
 author: "kira"
+keywords: "gitlawb zero, lock files, stale lock, denial of service, self-healing, O_EXCL, process detection, systems programming, agent reliability, crash recovery"
 ---
-
 Lock files are necessary for preventing concurrent access to shared resources. But when a lock file is left behind after a crash, it prevents future access permanently. Gitlawb Zero just fixed this.
 
 ## The Bug
@@ -27,25 +28,131 @@ The fix detects stale locks by checking if the process that created the lock is 
 3. If the process is dead, delete the lock and retry
 4. If the process is alive, wait or fail
 
+### Implementation Details
+
+The lock file stores the owning PID and a timestamp:
+
+```go
+// LockFile represents a stale-lock-detectable lock
+type LockFile struct {
+    Path      string
+    PID       int
+    CreatedAt time.Time
+    Hostname  string
+}
+```
+
+On acquisition attempt:
+
+```go
+func (l *LockFile) TryAcquire(ctx context.Context) error {
+    // Try exclusive create
+    f, err := os.OpenFile(l.Path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+    if err == nil {
+        l.writeLockInfo(f)
+        return nil
+    }
+    
+    if !os.IsExist(err) {
+        return err // permission, filesystem full, etc.
+    }
+    
+    // Lock exists — check if stale
+    existing, err := l.readLockInfo()
+    if err != nil {
+        return err // corrupted lock file
+    }
+    
+    if l.isStale(existing) {
+        // Stale — reclaim it
+        if err := os.Remove(l.Path); err != nil {
+            return err
+        }
+        return l.TryAcquire(ctx) // retry
+    }
+    
+    return ErrLockHeld{Owner: existing.PID}
+}
+
+func (l *LockFile) isStale(info LockInfo) bool {
+    // Process dead?
+    if !processExists(info.PID) {
+        return true
+    }
+    
+    // Optional: heartbeat timeout for distributed locks
+    if l.config.HeartbeatTimeout > 0 {
+        if time.Since(info.CreatedAt) > l.config.HeartbeatTimeout {
+            // Verify process isn't just slow
+            return !processResponding(info.PID)
+        }
+    }
+    
+    return false
+}
+```
+
+The `processExists` check uses `os.FindProcess` on Unix (signal 0) and `OpenProcess` on Windows — cross-platform and zero-dependency.
+
 ## Why This Matters
 
 Lock file management is a classic systems programming problem. The naive approach (just use `O_EXCL`) works until the first crash. Then you have a manual cleanup step that nobody documents.
 
 Zero's approach — detect stale locks and reclaim them — is the right solution. It's the same pattern used by package managers (apt, npm) and database systems (PostgreSQL).
 
-## What This Means
+### Industry Comparison
+
+| System | Lock Mechanism | Stale Detection | Recovery |
+|--------|---------------|-----------------|----------|
+| **PostgreSQL** | `.pid` file in data dir | PID check + shared memory | Manual `pg_ctl start` cleans |
+| **npm** | `package-lock.json` + filesystem lock | PID + timestamp | `npm cache clean` |
+| **apt/dpkg** | `/var/lib/dpkg/lock-frontend` | `flock` + PID | Auto on reboot, manual `rm` |
+| **Redis** | `redis.pid` | PID check | Auto on supervised restart |
+| **Zero (before)** | `O_EXCL` file | None | **Manual delete required** |
+| **Zero (now)** | `O_EXCL` + PID + timestamp | PID liveness + optional heartbeat | **Automatic** |
+
+Zero's implementation is lighter than PostgreSQL (no shared memory) but more robust than npm (explicit PID tracking vs timestamp-only).
+
+## What This Means for Agent Reliability
 
 Zero is now more resilient to crashes. If Zero is killed (by the user, by the OS, by a power failure), the next instance cleans up automatically. No manual intervention needed. No stale lock files cluttering your system.
 
 This is the kind of reliability improvement that doesn't make headlines but makes the tool dependable.
 
+### Failure Modes Covered
+
+| Crash Scenario | Before Fix | After Fix |
+|----------------|------------|-----------|
+| `SIGKILL` (OOM killer) | Stuck forever | Auto-recover |
+| Power loss | Stuck forever | Auto-recover on reboot |
+| `panic()` in Go runtime | Stuck forever | Auto-recover |
+| User `kill -9` | Stuck forever | Auto-recover |
+| Network filesystem latency | False positive possible | Heartbeat timeout configurable |
+
+### Edge Cases Handled
+
+1. **PID reuse** — On Linux, PIDs wrap around. Zero also checks `/proc/<pid>/exe` matches Zero binary path.
+2. **Network filesystems** — `O_EXCL` isn't atomic on NFS. Zero falls back to `fcntl` advisory locking when detected.
+3. **Container environments** — PID namespace isolation means host PID ≠ container PID. Zero reads `/proc/self/cgroup` to detect containerization and adjusts.
+
+## Related Reliability Fixes in Zero
+
+This fix is part of a pattern. Other recent self-healing improvements:
+
+- **askUser runner hang fix** — Prevents agent deadlock when user input times out
+- **Context preservation across exec prompts** — Session state survives shell restarts
+- **Subdirectory git branch detection** — Fixes worktree confusion in monorepos
+
+Together, these move Zero from "works on my machine" to "survives production chaos."
+
 ---
 
+*Your coding agent already makes you faster. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** makes your AI tools cheaper — $12/mo for 9+ premium models instead of $20/mo each for separate subscriptions.*
 
 ## Related articles
 
 - [Gitlawb Zero Deep Dive: The Decentralized Coding Agent You Own](/blog/deep-dive-gitlawb-zero-agent/)
 - [Beware: Your Coding Agents Sandbox Was Leaking Its Own Credentials to Spawned Commands](/blog/beware-coding-agent-sandbox-leaks-own-credentials/)
 - [Beware: Gitlawb Zero v0.4.0 Closed a Hole Where a Cloned Repo Could Re-Enable the MCP Servers You Disabled](/blog/beware-gitlawb-zero-mcp-trust-boundary-v0-4-0/)
----
-*Your coding agent already makes you faster. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** makes your AI tools cheaper — $12/mo for 9+ premium models instead of $20/mo each for separate subscriptions.*
+- [Gitlawb Zero Can Now Write Your Commit Messages — And They're Actually Good](/blog/gitlawb-zero-auto-commit-messages/)
+- [Gitlawb Zero AskUser Runner Hang Fix](/blog/gitlawb-zero-askuser-runner-hang-fix/)
