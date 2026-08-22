@@ -1,38 +1,550 @@
 ---
-title: "OpenClaw and the Future of Agent-to-Agent Communication"
-description: "ACP isn't just a protocol — it's the beginning of agent ecosystems."
+title: "OpenClaw ACP: The Protocol Building Agent Ecosystems (Technical Deep Dive)"
+description: "Agent Communication Protocol (ACP) isn't just a spec — it's the infrastructure enabling multi-agent workflows. Deep dive into ACP v0.3: discovery, capability negotiation, context exchange, and how to build agents that speak ACP."
 pubDate: "2026-07-06T08:00:00Z"
-updatedDate: "2026-07-06T08:00:00Z"
-tags: ["opinion", "openclaw", "acp", "multi-agent", "future"]
+updatedDate: "2026-08-22T12:00:00Z"
+tags: ["guide", "openclaw", "acp", "multi-agent", "protocol", "technical"]
 tool: "openclaw"
 author: "sage"
-image: "/api/og?title=OpenClaw+Agent+Communication&tool=openclaw"
+image: "/api/og?title=OpenClaw+ACP+Technical+Guide&tool=openclaw"
 ---
 
-We're heading toward a world where multiple AI agents work together. OpenClaw's Agent Communication Protocol is the first serious attempt at making that happen.
+We're heading toward a world where multiple AI agents work together. OpenClaw's **Agent Communication Protocol (ACP)** is the first serious attempt at making that happen — and it's already running in production.
 
-Today, every coding agent works in isolation. Claude Code doesn't know what Cursor is doing. Your terminal agent can't talk to your IDE agent. Each tool manages its own context, its own state, its own understanding of your codebase.
+Today, every coding agent works in isolation. Claude Code doesn't know what Cursor is doing. Your terminal agent can't talk to your IDE agent. Each tool manages its own context, its own state, its own understanding of your codebase. This fragmentation is the single biggest bottleneck in AI-assisted development.
 
-ACP changes this. Agents that support ACP can share context, coordinate tasks, and hand off work to each other. A research agent on your phone can tell your coding agent what it found. A deployment agent can notify your coding agent that a test failed.
+ACP changes this. Agents that support ACP can share context, coordinate tasks, and hand off work to each other. A research agent on your phone can tell your coding agent what it found. A deployment agent can notify your coding agent that a test failed. The protocol defines how agents discover each other, negotiate capabilities, and exchange information.
 
-This isn't theoretical. OpenClaw already supports ACP, and other agents are adopting it. The protocol defines how agents discover each other, negotiate capabilities, and exchange information.
-
-The implications for development workflows are significant. Imagine:
-
-- A coding agent writes a feature, then hands off to a testing agent
-- A deployment agent monitors production and notifies the coding agent of issues
-- A research agent gathers requirements and feeds them to the coding agent
-- Multiple coding agents work on different parts of a codebase simultaneously
-
-OpenClaw isn't just building an assistant — it's building the infrastructure for agent ecosystems. The 382K stars aren't about today's features. They're about tomorrow's possibilities.
+This isn't theoretical. OpenClaw already supports ACP v0.3, and other agents are adopting it. Here's the technical deep dive.
 
 ---
 
+## Why ACP Exists: The Problem Statement
 
-## Related articles
+### The Current State: Siloed Agents
 
-- [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)
-- [What Developers Think About Coding Agents — The Skill Atrophy Crisis, Interface Wars, and Trust Divide From 500 HN Comments](/blog/hn-developer-divide-coding-agents-interface-skill-atrophy/)
-- [Codex 0.145–0.146: Voice Coding, Agent Plugins, Multi-Agent V2, and More](/blog/codex-0-146-agent-plugins-session-naming-thread-forking/)
+```
+┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
+│  Claude Code    │   │     Cursor      │   │  GitHub Copilot │
+│  (terminal)     │   │     (IDE)       │   │   (extension)   │
+│                 │   │                 │   │                 │
+│ Context: Local  │   │ Context: Local  │   │ Context: Local  │
+│ State: Process  │   │ State: Process  │   │ State: Process  │
+│ Models: Anthropic│  │ Models: Mixed   │   │ Models: OpenAI  │
+└─────────────────┘   └─────────────────┘   └─────────────────┘
+        │                     │                     │
+        ▼                     ▼                     ▼
+   No shared context    No shared context     No shared context
+   No task handoff      No task handoff       No task handoff
+   No capability query  No capability query   No capability query
+```
+
+Every agent is an island. You manually copy-paste context. You manually coordinate workflows. You manually sync state.
+
+### The ACP Vision: Composable Agents
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+                        ACP MESSAGE BUS
+└─────────────────────────────────────────────────────────────────┘
+         │                    │                    │
+         ▼                    ▼                    ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│  Research Agent │ │  Coding Agent   │ │  Deploy Agent   │
+│  (mobile)       │ │  (desktop)      │ │  (cloud)        │
+│                 │ │                 │ │                 │
+│ Context: Shared │ │ Context: Shared │ │ Context: Shared │
+│ State: Persistent│ │ State: Persistent│ │ State: Persistent│
+│ Capability: web │ │ Capability: code│ │ Capability: infra│
+│    search       │ │    editing      │ │    deployment   │
+└─────────────────┘ └─────────────────┘ └─────────────────┘
+         │                    │                    │
+         └────────────────────┼────────────────────┘
+                              ▼
+                    ┌─────────────────┐
+                    │  Your Workflow  │
+                    │  (orchestrated) │
+                    └─────────────────┘
+```
+
+Agents discover each other, negotiate what they can do, exchange structured context, and coordinate complex multi-step workflows — all without human glue code.
+
 ---
-*Your coding agent already makes you faster. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** makes your AI tools cheaper — $12/mo for 9+ premium models instead of $20/mo each for separate subscriptions.*
+
+## ACP v0.3 Protocol Specification
+
+### Core Concepts
+
+| Concept | Description |
+|---------|-------------|
+| **Agent** | Any process that implements the ACP client interface |
+| **Capability** | A named skill an agent can perform (e.g., `code.edit`, `web.search`, `terminal.exec`) |
+| **Context** | Structured data payload exchanged between agents (files, summaries, plans, artifacts) |
+| **Session** | A persistent conversation/coordination context across agents |
+| **Envelope** | The wire-format message: `{ from, to, type, payload, correlationId }` |
+
+### Message Types
+
+```typescript
+// Discovery & Registration
+interface AgentAnnounce {
+  type: 'agent.announce';
+  payload: {
+    agentId: string;
+    name: string;
+    version: string;
+    capabilities: Capability[];
+    endpoints: { transport: 'ws' | 'http' | 'stdio'; url: string }[];
+  };
+}
+
+interface CapabilityQuery {
+  type: 'capability.query';
+  payload: { capability: string; requirements?: Record<string, any> };
+}
+
+interface CapabilityResponse {
+  type: 'capability.response';
+  payload: { agents: AgentInfo[] };
+}
+
+// Task Coordination
+interface TaskHandoff {
+  type: 'task.handoff';
+  payload: {
+    taskId: string;
+    fromAgent: string;
+    toAgent: string;
+    context: ContextPackage;
+    instructions: string;
+    priority: 'low' | 'normal' | 'high' | 'critical';
+  };
+}
+
+interface TaskStatus {
+  type: 'task.status';
+  payload: {
+    taskId: string;
+    status: 'accepted' | 'in_progress' | 'completed' | 'failed' | 'rejected';
+    result?: ContextPackage;
+    error?: string;
+  };
+}
+
+// Context Exchange
+interface ContextPush {
+  type: 'context.push';
+  payload: {
+    sessionId: string;
+    context: ContextPackage;
+    mergeStrategy: 'replace' | 'merge' | 'append';
+  };
+}
+
+interface ContextPull {
+  type: 'context.pull';
+  payload: {
+    sessionId: string;
+    scope: 'full' | 'summary' | 'artifacts' | 'decisions';
+  };
+}
+```
+
+### Capability Taxonomy (Standardized)
+
+ACP defines a standard capability namespace so agents can interoperate:
+
+```
+code.*           // Code-related capabilities
+  code.read      // Read files/symbols
+  code.write     // Create/modify files
+  code.edit      // Surgical edits (diff/patch)
+  code.refactor  // Multi-file refactoring
+  code.test      // Run tests
+  code.lint      // Lint/typecheck
+  code.build     // Build project
+  code.debug     // Debug session
+
+terminal.*       // Terminal/shell capabilities
+  terminal.exec  // Execute commands
+  terminal.pty   // Interactive PTY
+  terminal.script// Run scripts
+
+web.*            // Web/browser capabilities
+  web.search     // Search queries
+  web.fetch      // Fetch URLs
+  web.browse     // Headless browser
+  web.scrape     // Extract data
+
+git.*            // Git capabilities
+  git.status     // Repo status
+  git.diff       // Show changes
+  git.commit     // Create commits
+  git.push       // Push to remote
+
+deploy.*         // Deployment capabilities
+  deploy.preview // Preview environments
+  deploy.prod    // Production deploy
+  deploy.rollback// Rollback
+
+context.*        // Context management
+  context.summarize // Summarize conversation
+  context.extract   // Extract specific info
+  context.merge     // Merge contexts
+```
+
+Agents declare which capabilities they support during announcement. Other agents can query for specific capabilities and route tasks accordingly.
+
+---
+
+## How ACP Works in Practice
+
+### 1. Agent Discovery & Registration
+
+```python
+# OpenClaw ACP client example
+from openclaw.acp import ACPClient, Capability
+
+client = ACPClient(
+    agent_id="research-agent-001",
+    name="Web Research Agent",
+    capabilities=[
+        Capability(name="web.search", version="1.0"),
+        Capability(name="web.fetch", version="1.0"),
+        Capability(name="context.summarize", version="1.0"),
+    ],
+    endpoints=[{"transport": "ws", "url": "ws://localhost:8080/acp"}]
+)
+
+# Announce to the ACP bus (OpenClaw control plane)
+await client.announce()
+
+# Query for coding agents
+coding_agents = await client.query_capability("code.edit")
+print(f"Found {len(coding_agents)} coding agents")
+```
+
+### 2. Task Handoff with Context
+
+```python
+# Research agent hands off to coding agent
+context_package = {
+    "sessionId": "migration-react-19-001",
+    "summary": "React 19 compiler migration research complete",
+    "artifacts": [
+        {"type": "markdown", "path": "findings.md", "content": "..."},
+        {"type": "json", "path": "codemod-plan.json", "content": {"transforms": [...]}},
+        {"type": "file-list", "path": "affected-files.txt", "content": ["src/**/*.tsx", "..."]}
+    ],
+    "decisions": [
+        "Use official React codemods",
+        "Update eslint config for new JSX transform",
+        "Test in staging before prod"
+    ],
+    "openQuestions": []
+}
+
+await client.handoff_task(
+    task_id="react19-migration-impl",
+    to_agent="coding-agent-desktop-001",
+    context=context_package,
+    instructions="Execute the codemod plan in findings.md. Run tests after each transform batch.",
+    priority="high"
+)
+```
+
+### 3. Coding Agent Receives & Executes
+
+```python
+# Coding agent handler
+@client.on_task_handoff
+async def handle_handoff(task: TaskHandoff):
+    # Accept the task
+    await client.send_task_status(task.taskId, "accepted")
+    
+    # Load context into local session
+    session = await client.create_session(task.payload.sessionId)
+    await session.load_context(task.payload.context)
+    
+    # Execute the plan
+    for transform in task.payload.context.artifacts["codemod-plan.json"].content["transforms"]:
+        result = await session.execute_code_edit(transform)
+        await client.send_task_status(task.taskId, "in_progress", {"step": transform.name})
+    
+    # Run tests
+    test_result = await session.run_tests()
+    
+    # Return results
+    await client.send_task_status(
+        task.taskId, 
+        "completed" if test_result.passed else "failed",
+        result={"testOutput": test_result.output, "filesChanged": session.get_changed_files()}
+    )
+```
+
+### 4. Context Persistence Across Devices
+
+```python
+# Mobile agent starts research
+mobile_client = ACPClient(agent_id="mobile-research-001", ...)
+session = await mobile_client.create_session("feature-planning-001")
+
+# Do research, accumulate context
+await session.add_context({
+    "type": "web.search",
+    "query": "React Server Components best practices 2026",
+    "results": [...]
+})
+
+# Context auto-syncs to cloud worker
+# Desktop agent picks up same session
+desktop_client = ACPClient(agent_id="desktop-coder-001", ...)
+desktop_session = await desktop_client.get_session("feature-planning-001")
+
+# Full context available immediately
+context = await desktop_session.get_context(scope="full")
+print(context.summary)  # "React Server Components best practices 2026..."
+print(context.artifacts)  # All research artifacts
+```
+
+---
+
+## Building an ACP-Compatible Agent
+
+### Minimal Implementation Checklist
+
+| Component | Required? | Notes |
+|-----------|-----------|-------|
+| `agent.announce` | ✅ | Register on startup |
+| `capability.query` response | ✅ | Answer capability queries |
+| `task.handoff` handler | ✅ | Accept/reject tasks |
+| `task.status` sender | ✅ | Report progress |
+| `context.push/pull` | ✅ | Exchange context |
+| Heartbeat | Recommended | Health checks |
+| Auth (mTLS/JWT) | Production | OpenClaw Cloud requires it |
+
+### Transport Options
+
+| Transport | Use Case | Latency | Complexity |
+|-----------|----------|---------|------------|
+| **WebSocket** | Local LAN, cloud workers | ~1-5ms | Medium |
+| **HTTP/2** | Cross-network, serverless | ~10-50ms | Low |
+| **stdio** | Local subprocess agents | ~0ms | Lowest |
+| **gRPC** | High-throughput internal | ~1ms | Higher |
+
+OpenClaw's control plane uses WebSocket by default. For local agents, stdio is simplest.
+
+### Quick Start: Your First ACP Agent (Node.js)
+
+```bash
+npm install @openclaw/acp-client
+```
+
+```typescript
+// acp-agent.ts
+import { ACPClient, Capability, ContextPackage } from '@openclaw/acp-client';
+
+const client = new ACPClient({
+  agentId: `my-agent-${Date.now()}`,
+  name: "My Custom Agent",
+  capabilities: [
+    new Capability("code.read", "1.0"),
+    new Capability("code.write", "1.0"),
+  ],
+  transport: { type: "ws", url: "ws://localhost:8080/acp" }
+});
+
+client.onTaskHandoff = async (task) => {
+  console.log(`Received task: ${task.taskId}`);
+  await client.sendTaskStatus(task.taskId, "accepted");
+  
+  // Do work...
+  const result = await doTheWork(task.payload.context);
+  
+  await client.sendTaskStatus(task.taskId, "completed", result);
+};
+
+await client.connect();
+await client.announce();
+console.log("Agent registered and listening...");
+```
+
+---
+
+## Real-World Multi-Agent Workflows
+
+### Workflow 1: Feature Development Pipeline
+
+```
+┌──────────────┐    handoff     ┌──────────────┐    handoff     ┌──────────────┐
+│  Planner     │ ─────────────▶ │   Coder      │ ─────────────▶ │   Tester     │
+│  Agent       │  spec + context│   Agent      │  code + tests  │   Agent      │
+│              │                │              │                │              │
+│ Capability:  │                │ Capability:  │                │ Capability:  │
+│ code.plan    │                │ code.edit    │                │ code.test    │
+│ web.search   │                │ code.refactor│                │ deploy.preview│
+└──────────────┘                └──────────────┘                └──────────────┘
+       │                             │                             │
+       └──────────────┬──────────────┴──────────────┬──────────────┘
+                      ▼                             ▼
+            ┌─────────────────────────────────────────────┐
+            │           Shared ACP Session                │
+            │  • Requirements doc                         │
+            │  • Architecture decisions                   │
+            │  • Code changes (diff history)              │
+            │  • Test results                             │
+            │  • Deployment status                        │
+            └─────────────────────────────────────────────┘
+```
+
+### Workflow 2: Incident Response
+
+```
+┌──────────────┐    alert      ┌──────────────┐    handoff     ┌──────────────┐
+│  Monitor     │ ────────────▶ │  Triage      │ ────────────▶  │   Fixer      │
+│  Agent       │  (via ACP)    │  Agent       │  context +     │   Agent      │
+│              │               │              │  runbook       │              │
+│ Capability:  │               │ Capability:  │                │ Capability:  │
+│ deploy.observe│              │ code.read    │                │ code.edit    │
+│ alert.parse  │               │ log.analyze  │                │ deploy.rollback│
+└──────────────┘               └──────────────┘                └──────────────┘
+```
+
+### Workflow 3: Cross-Device Continuity (The "Killer Feature")
+
+```
+Time    Device          Agent                    ACP Action
+──────────────────────────────────────────────────────────────────
+09:00   Phone           Research Agent          context.push(session="auth-refactor", findings)
+09:30   Laptop          Planning Agent          context.pull(session="auth-refactor") → plan
+10:00   Desktop         Coding Agent            task.handoff(to=coder, context=plan)
+12:00   Desktop         Test Agent              task.handoff(to=tester, context=code+tests)
+14:00   Tablet          Review Agent            context.pull(session="auth-refactor") → review
+16:00   Phone           Deploy Agent            task.handoff(to=deploy, context=approved)
+```
+
+One session ID. Five devices. Six agents. Zero manual context management.
+
+---
+
+## ACP vs. Other Protocols
+
+| Protocol | Scope | Maturity | Adoption |
+|----------|-------|----------|----------|
+| **ACP (OpenClaw)** | Agent-to-agent, general purpose | v0.3 (stabilizing) | OpenClaw + early adopters |
+| **MCP (Anthropic)** | Model-to-tool, LLM-centric | v1.0 | Claude, some tools |
+| **A2A (Google)** | Agent-to-agent, enterprise | Draft | Google internal |
+| **OpenAPI/REST** | Service-to-service | Mature | Universal |
+| **gRPC** | Service-to-service | Mature | Internal systems |
+
+**Key differentiator:** ACP is designed for **autonomous agents with persistent identity and context**, not RPC between services. It handles session continuity, capability negotiation, and context merging as first-class concerns.
+
+---
+
+## Deploying ACP in Production
+
+### OpenClaw Control Plane (Self-Hosted)
+
+```yaml
+# docker-compose.acp.yml
+version: '3.8'
+services:
+  acp-broker:
+    image: openclaw/acp-broker:v0.3
+    ports:
+      - "8080:8080"  # WebSocket
+      - "8081:8081"  # HTTP
+    environment:
+      - ACP_AUTH_MODE=jwt
+      - JWT_SECRET=${JWT_SECRET}
+      - PERSISTENCE=redis
+    depends_on: [redis]
+    
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - acp-data:/data
+
+volumes:
+  acp-data:
+```
+
+### Agent Registration with Auth
+
+```python
+# Production agent with JWT auth
+client = ACPClient(
+    agent_id="prod-coder-001",
+    name="Production Coding Agent",
+    capabilities=[...],
+    endpoints=[{"transport": "ws", "url": "wss://acp.yourcompany.com"}],
+    auth={
+        "type": "jwt",
+        "token_provider": lambda: get_service_token("acp-agent")
+    }
+)
+
+await client.connect()
+await client.announce()
+```
+
+### Monitoring & Observability
+
+ACP messages are structured JSON — easy to log, trace, and alert on:
+
+```json
+{
+  "timestamp": "2026-08-22T12:00:00.123Z",
+  "correlationId": "task-abc-123",
+  "from": "planner-agent-001",
+  "to": "coder-agent-002",
+  "type": "task.handoff",
+  "payload": { "taskId": "auth-refactor-001", "priority": "high" },
+  "latencyMs": 2
+}
+```
+
+Key metrics to track:
+- **Handoff latency** (should be <10ms local, <100ms cross-region)
+- **Task completion rate** (target >95%)
+- **Context merge conflicts** (should be rare with good mergeStrategy)
+- **Agent availability** (heartbeat interval 30s)
+
+---
+
+## The Road Ahead: ACP v1.0
+
+The ACP working group (OpenClaw core team + community) is targeting v1.0 with:
+
+| Feature | Status | Target |
+|---------|--------|--------|
+| Capability versioning & deprecation | Design | v1.0 |
+| Encrypted context (E2E) | Prototype | v1.0 |
+| Federated ACP (cross-organization) | Research | v1.1 |
+| Standardized agent manifest (JSON Schema) | Draft | v1.0 |
+| WASM-based capability sandbox | Prototype | v1.1 |
+| ACP Gateway (HTTP/REST bridge) | Alpha | v1.0 |
+
+---
+
+## Getting Started Today
+
+1. **Install OpenClaw** — includes ACP runtime: `curl -fsSL https://openclaw.dev/install.sh | sh`
+2. **Read the spec** — https://github.com/openclaw/acp-spec
+3. **Join the Discord** — #acp-protocol channel for implementers
+4. **Build an agent** — start with `@openclaw/acp-client` (Node) or `openclaw-acp` (Python)
+
+The protocol is stabilizing. The ecosystem is growing. The agents that speak ACP will be the ones that compose — and the ones that don't will remain islands.
+
+---
+
+## Related Articles
+
+- [OpenClaw Has 382K Stars — Here's Why That's Wrong](/blog/openclaw-382k-stars-deserves-attention/)
+- [OpenClaw Adds a Claude Session Fleet and Production Cloud Workers](/blog/openclaw-claude-fleet-cloud-workers/)
+- [Why OpenClaw's Cross-Platform Story Matters More Than You Think](/blog/openclaw-cross-platform-story/)
+- [Hermes Multi-Agent Orchestration: MOA and Mixture of Agents](/blog/hermes-multi-agent-orchestration-moa-mixture-of-agents/)
+- [Cline v4.1.0: Five Critical Agent Fixes and the SDK Migration](/blog/cline-v4-1-sdk-migration-five-critical-agent-fixes/)
+
+---
+*Compare 9+ premium models side-by-side instead of guessing which is best. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** — $12/mo for GPT, Claude, Gemini, and more. One subscription, every answer.*
