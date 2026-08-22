@@ -1,0 +1,184 @@
+---
+title: "Hermes Agent's ZIP Update Fallback Silently Destroys Your Local Patches — Windows Users, Check Your Repo"
+description: "On Windows, when git file I/O breaks, hermes update falls back to a ZIP extraction path that overwrites uncommitted changes without warning. Here's how to check if you're affected and what the fix does."
+pubDate: 2026-08-22
+updatedDate: 2026-08-22
+heroImage: "/api/og?title=Hermes+Agent+ZIP+Update+Silent+Data+Loss&tool=industry"
+tags: ["hermes-agent", "bug", "windows", "data-loss", "update"]
+tool: "industry"
+---
+
+## The Bug in One Sentence
+
+**When `hermes update` hits a git file I/O error on Windows (common with antivirus/NTFS filter drivers), it silently falls back to extracting a release ZIP over your working tree — destroying uncommitted local modifications without any warning, then reports success.**
+
+---
+
+## Who Is Affected
+
+- **Windows users** running Hermes Agent from a git clone (not the standalone installer)
+- **Anyone maintaining local patches** — security posture guards, vendor tweaks, experimental edits, custom tool configs
+- **Users with antivirus/EDR** that interferes with git file operations (Windows Defender, CrowdStrike, SentinelOne, etc.)
+
+If you only use the standalone installer (`hermes-installer.exe`) or never modify tracked files, you're not affected.
+
+---
+
+## What Happened
+
+Hermes Agent's update command (`hermes_cli/update_cmd.py`) has two paths:
+
+| Path | Trigger | Local Change Handling |
+|------|---------|----------------------|
+| **Git path** (normal) | Git works | Calls `_stash_local_changes_if_needed()` — stashes, updates, restores. Aborts if stash fails with *"Commit, stash, or clean up your local changes manually"* |
+| **ZIP fallback** | Git file I/O broken (Windows) | **No check, no stash, no warning** — extracts ZIP directly over working tree, moves HEAD, reports success |
+
+The ZIP path exists for a legitimate reason: on Windows, antivirus or NTFS filter drivers can cause `git checkout` / `git reset` to fail with file-creation errors. The fallback downloads a release archive and extracts it. But it skipped the local-change safety checks that the git path has had all along.
+
+**Result:** Your uncommitted modifications vanish. `git status` shows a clean tree (HEAD moved to new commit). The update prints success. You only discover the loss later when your patched behavior stops working.
+
+---
+
+## Real-World Impact
+
+The issue reporter (uni5592427) observed this in the field on **2026-08-19**:
+
+> Four separate local modifications — two security-guard files, a delivery fallback, a policy gate — were all silently destroyed by this path during a single update.
+
+This isn't theoretical. If you run Hermes on Windows with any local customizations (common for operators who harden the agent for production), a routine `hermes update` can wipe them without a trace.
+
+---
+
+## How to Check If You're Affected
+
+### 1. Do you have uncommitted changes right now?
+
+```bash
+cd /path/to/hermes-agent
+git status --porcelain
+```
+
+If this outputs anything, you have local changes that the ZIP fallback would destroy.
+
+### 2. Are you on Windows with antivirus/EDR?
+
+```powershell
+# Check if any filter drivers are loaded that might interfere
+fltmc instances
+```
+
+Common culprits: `FileInfo`, `luafv`, `Wof`, and third-party AV filter drivers.
+
+### 3. Simulate the condition (safe test)
+
+```bash
+# Make a harmless local change
+echo "# test" >> cron/scheduler.py
+git status --porcelain  # Should show M cron/scheduler.py
+
+# Force the ZIP path by making git fail (simulated)
+# This is what happens when AV locks files during update
+# The real trigger is non-deterministic — but if you've ever
+# seen "git checkout failed" or "file in use" errors on Windows,
+# you've hit the condition that selects the ZIP fallback.
+```
+
+### 4. Check your update history
+
+```bash
+git reflog --oneline -20
+```
+
+Look for `hermes update` commits where you expected local changes to persist but didn't.
+
+---
+
+## The Fix (PR #91990)
+
+The fix is minimal and matches the git path's behavior:
+
+```python
+# In _update_via_zip(), before extraction:
+if subprocess.run(["git", "status", "--porcelain"], capture_output=True).stdout.strip():
+    raise RuntimeError(
+        "Working tree has uncommitted changes. "
+        "Commit, stash, or clean up your local changes manually "
+        "before running hermes update."
+    )
+```
+
+**What this does:**
+- Runs `git status --porcelain` before ZIP extraction
+- If non-empty (dirty tree), **aborts with the same message** the git path uses
+- User must commit, stash, or discard changes — then re-run update
+- No data loss, no silent destruction
+
+The PR also adds tests verifying:
+- Clean tree → ZIP update proceeds
+- Dirty tree → ZIP update aborts with clear message
+- Stashed changes → ZIP update proceeds, stash can be restored
+
+---
+
+## What You Should Do Now
+
+### If you have local patches **right now**:
+
+```bash
+# 1. Stash or commit your changes BEFORE updating
+git stash push -m "pre-update local patches $(date)"
+
+# 2. Update safely
+hermes update
+
+# 3. Restore your patches
+git stash pop
+# Resolve any conflicts if the upstream changed files you patched
+```
+
+### If you've already lost patches:
+
+```bash
+# Check reflog for the update commit that wiped you
+git reflog
+
+# If the update was recent, your pre-update state is still in reflog
+git show HEAD@{1}:cron/scheduler.py  # Example: recover a file
+# Or reset to pre-update commit (loses the update too)
+git reset --hard HEAD@{1}
+```
+
+### Going forward:
+
+- **Always `git stash` before `hermes update`** on Windows until you're on a version with the fix
+- The fix is in PR #91990 — watch for it in the next release (v0.20.6+)
+- Consider the standalone installer if you don't need local patches — it avoids this entire code path
+
+---
+
+## Why This Matters for Agent Operators
+
+This bug highlights a class of failure that's easy to miss in AI agent tooling: **fallback paths with weaker safety guarantees than the primary path**.
+
+The git path had proper stash/abort logic. The ZIP fallback — added for Windows compatibility — didn't. Because the trigger (AV/NTFS interference) is non-deterministic and environment-dependent, it slipped through testing.
+
+For operators running agents in production:
+- **Audit fallback/error-recovery paths** in your tooling
+- **Test updates in a clone first** — `git clone ... && cd clone && hermes update`
+- **Keep local patches in a separate branch** with a rebase workflow, not uncommitted changes
+
+---
+
+## Related Issues
+
+- [#91996](https://github.com/NousResearch/hermes-agent/issues/91996) — Delegation transcripts can write to wrong profile (cross-profile leakage)
+- [#92008](https://github.com/NousResearch/hermes-agent/issues/92008) — SSH backend mutual reaping during concurrent Bot Mode startup
+- [#18594](https://github.com/NousResearch/hermes-agent/issues/18594) — Broader `get_hermes_home()` wrong-profile fallback class
+
+---
+
+## Bottom Line
+
+**If you run Hermes Agent from git on Windows and maintain local patches, stash them before every update.** The fix is merged in PR #91990 and will ship in the next release. Until then, treat `hermes update` as a destructive operation on Windows unless your tree is clean.
+
+*Found this useful? Check out [Hermes Agent's security audit findings](/blog/beware-hermes-agent-security-audit-5-high-severity-findings) for more operator-focused coverage.*
