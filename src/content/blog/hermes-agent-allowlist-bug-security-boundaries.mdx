@@ -1,0 +1,167 @@
+---
+title: "Hermes Agent's Allowlist Bug: When Security Boundaries Disagree"
+description: "A subtle inconsistency in Hermes Agent's command approval system reveals how hard it is to get security boundaries right in AI agents — and why consistency matters more than strictness."
+pubDate: 2026-08-23
+updatedDate: 2026-08-23
+author: "Anshad"
+tags: ["hermes-agent", "security", "ai-agents", "debugging", "approval-system"]
+tool: "industry"
+heroImage: "/blog/hermes-allowlist-bug/hero.png"
+heroAlt: "Terminal showing Hermes Agent approval flow with conflicting allowlist checks"
+---
+
+## The Bug That Wasn't a Bypass
+
+On August 22, 2026, Hermes Agent user [krzostrowski](https://github.com/krzostrowski) filed [issue #92405](https://github.com/NousResearch/hermes-agent/issues/92405): the `command_allowlist` — the mechanism operators use to pre-approve dangerous command patterns — was being **ignored** in single-query (`-q`) mode.
+
+The twist? This wasn't a security bypass. It was the opposite: **commands the operator explicitly approved were being blocked anyway.**
+
+```bash
+# User runs this in interactive mode — works fine
+hermes chat "run python3 <<EOF\nprint(1)\nEOF"
+
+# Same command in single-query mode — BLOCKED
+hermes -q "run python3 <<EOF\nprint(1)\nEOF"
+# BLOCKED: Command flagged as dangerous (script execution via heredoc) 
+# but single-query mode (-q) runs without a user present to approve...
+```
+
+The operator had added `script execution via heredoc` to their allowlist by answering "Always" during an interactive prompt. That approval worked in interactive sessions. But in headless (`-q`) mode, the same allowlist entry was **silently ignored**.
+
+## Two Guards, Two Different Allowlist Checks
+
+Hermes has two code paths that evaluate dangerous commands:
+
+| Code Path | Function | Allowlist Check Used |
+|-----------|----------|---------------------|
+| Interactive / shared gate | `check_dangerous_command` → `approval.py:~3476` | `is_approved(session_key, pattern_key)` — matches **pattern-class keys** |
+| Single-query / cron | `check_all_command_guards` → `approval.py:4396` | `_command_matches_permanent_allowlist(command)` — matches **literal command text / glob** |
+
+Here's the problem: when you answer "Always" to an approval prompt, Hermes stores the **pattern-class key** (e.g., `script execution via heredoc`), not the literal command. The single-query path only checks for literal command matches — so the pattern-class key **can never match** a real command.
+
+```python
+# In check_all_command_guards (single-query path)
+is_dangerous, pattern_key, description = detect_dangerous_command(command)
+if is_dangerous:
+    # THIS CHECK ONLY LOOKS AT LITERAL COMMAND TEXT
+    if not _command_matches_permanent_allowlist(command):
+        return {"approved": False, "message": "BLOCKED..."}
+    # is_approved() is NEVER CALLED HERE
+```
+
+Meanwhile, the interactive path does it correctly:
+
+```python
+# In check_dangerous_command (interactive path)  
+is_dangerous, pattern_key, description = detect_dangerous_command(command)
+if is_dangerous and not is_approved(session_key, pattern_key):
+    # Prompt user for approval...
+```
+
+**Same `detect_dangerous_command` call. Same `pattern_key` available. Different allowlist check.**
+
+## Real Impact: Silent Budget Exhaustion
+
+This isn't cosmetic. The reporter measured one day of logs on a single install:
+
+| Metric | Count |
+|--------|-------|
+| `BLOCKED` events | 43 (22× `-e/-c`, 21× heredoc) |
+| Sessions hitting a block | 10 |
+| …ending in `max_iterations_reached(12/12)` | **6** |
+| All `max_iterations_reached` that day | 8 |
+
+**6 of 8 budget exhaustions were caused by this bug.** The agent burns its entire iteration budget retrying commands the operator already approved. The turn ends "normally" (`reason=max_iterations_reached`), so nothing surfaces as a failure — the work just silently doesn't get done.
+
+## The Fix: Consistency Over Strictness
+
+The fix (in [PR #92585](https://github.com/NousResearch/hermes-agent/pull/92585)) is straightforward: make the single-query path consult `is_approved()` with the pattern key, just like the interactive path does.
+
+```python
+# Fixed logic in check_all_command_guards
+is_dangerous, pattern_key, description = detect_dangerous_command(command)
+if is_dangerous and not is_approved(get_current_session_key(), pattern_key):
+    return {"approved": False, ...}
+```
+
+This restores the invariant: **if an operator approved a pattern class, it stays approved everywhere.**
+
+## What This Teaches Us About AI Agent Security
+
+### 1. Security Boundaries Must Be Consistent, Not Just Strict
+
+The bug existed because two code paths implemented "deny by default" differently. One respected the operator's intent (allowlist = pattern classes). The other implemented a stricter but wrong check (allowlist = literal commands only).
+
+In AI agents, **inconsistent enforcement is a vulnerability** — even when it fails closed. It creates:
+- Silent failures that look like "agent incompetence"
+- Operator distrust ("I approved this, why is it blocked?")
+- Workarounds that weaken real security (operators disable guards entirely)
+
+### 2. Pattern-Class vs. Literal Matching Is a Design Choice
+
+Hermes stores approvals as **pattern classes** (semantic categories like "recursive delete", "script execution via heredoc") rather than literal commands. This is the right design — it lets one "Always" cover `rm -rf /tmp/*` AND `rm -rf ~/cache/*` AND `find /tmp -delete`.
+
+But **every enforcement point must speak the same language**. If one gate checks pattern classes and another checks literals, the system lies to the operator.
+
+### 3. Headless Mode Is a Different Security Context — Not a Looser One
+
+Single-query (`-q`) and cron modes run without a human present. The temptation is to make them **stricter** (deny everything not explicitly allowlisted by literal command). But that breaks the operator's mental model: "I approved heredoc scripts, so heredoc scripts should work."
+
+The correct approach: **same allowlist semantics, different default behavior**. If the operator approved a pattern class, honor it. If they didn't, deny (since no human is there to say "yes this once").
+
+### 4. Silent Failures Are Worse Than Loud Ones
+
+The most dangerous aspect of this bug: **it looked like success**. The agent returned `max_iterations_reached` — a "normal" termination reason. No error, no alert, no "hey your allowlist isn't working."
+
+In production AI agents, **silent degradation is the threat model**. An agent that quietly does 30% less work because of a config inconsistency is harder to detect than one that crashes.
+
+## How to Check If You're Affected
+
+If you run Hermes Agent v0.20.4 or earlier with `approvals.mode: smart` and `single_query_mode: deny` (the default):
+
+```bash
+# Check your version
+hermes --version
+
+# Test if your allowlist works in -q mode
+hermes -q "python3 <<EOF\nprint('test')\nEOF"
+# If this shows BLOCKED but the same command works in interactive mode, you're affected
+```
+
+**Fix:** Upgrade to the version containing PR #92585 (post-v0.20.4).
+
+## The Broader Pattern
+
+This bug isn't unique to Hermes. Every AI agent with approval systems faces the same challenge:
+
+| Agent | Approval Model | Known Inconsistencies |
+|-------|---------------|----------------------|
+| **Hermes** | Pattern-class allowlist + interactive prompts | Fixed in #92585: single-query ignored pattern-class allowlist |
+| **Claude Code** | Per-command approval + `--allowed-tools` | GitHub Actions flaw: issue-triggered workflows bypassed human review |
+| **OpenCode** | Unauthenticated HTTP server (pre-1.1.10) | CVE-2026-22812: server enabled by default, no auth |
+| **Cursor** | Git operations + agent autonomy | CVE-2026-26268: agent runs git checkout → triggers malicious hook |
+| **Cline** | Auto-approve modes + npm publish tokens | "Clinejection": compromised token published malicious package |
+
+**The pattern:** AI agents introduce new execution paths (headless mode, GitHub Actions, HTTP servers, git hooks) that **bypass or reimplement** the original approval logic. Each new path is a chance for inconsistency.
+
+## What Operators Should Do
+
+1. **Audit your approval config** — run the test above. Verify `-q` mode respects your interactive approvals.
+
+2. **Demand consistency in tools you use** — if an agent has "interactive" and "headless" modes, ask: *Do they share the same allowlist semantics?*
+
+3. **Monitor for silent degradation** — track `max_iterations_reached` rates. A spike often means "agent fighting its own guards."
+
+4. **Treat headless mode as a first-class security context** — not an afterthought. It should have the *same* allowlist logic, just a *different* default (deny vs. prompt).
+
+## Summary
+
+Hermes #92405 wasn't a headline-grabbing RCE. It was a **consistency bug** — two security gates disagreeing on what "approved" means. The result: operators thought they'd configured the agent correctly, but headless runs silently failed.
+
+In AI agent security, **consistency is the foundation**. A slightly permissive but consistent boundary is safer than a strict but inconsistent one — because operators can reason about the former, and monitoring can detect the latter.
+
+The fix is merged. The lesson remains: **every path through your agent's approval system must speak the same language.** When they don't, the operator's intent gets lost in translation — and the agent quietly stops doing its job.
+
+---
+
+*Running Hermes Agent? Check your version and test your allowlist in `-q` mode. The fix is in PR #92585 and will be in the next release.*
