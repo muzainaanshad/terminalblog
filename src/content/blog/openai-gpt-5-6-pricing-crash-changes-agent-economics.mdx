@@ -1,0 +1,141 @@
+---
+title: "OpenAI Just Slashed GPT-5.6 Prices 80% — Coding Agents Got Way Cheaper"
+description: "GPT-5.6 Luna dropped 80%, Terra 20%, and now Sol gets 2.5x faster Fast mode. The math for running AI coding agents at scale just fundamentally changed."
+pubDate: "2026-08-23T10:00:00Z"
+tags: ["news", "pricing", "gpt-5.6", "coding-ai", "openai", "codex", "cursor", "agent-economics"]
+tool: "industry"
+author: "jax"
+---
+
+OpenAI didn't announce it with a keynote. They just updated the pricing page.
+
+**GPT-5.6 Luna: 80% cheaper.**  
+**GPT-5.6 Terra: 20% cheaper.**  
+**GPT-5.6 Sol: 2.5x faster with new Fast mode (at 2x price).**
+
+Effective July 30 for Luna and Terra, August 21 for Sol's Fast mode. If you run coding agents — Cursor, Codex, Claude Code, OpenCode, Zed, any of them — your per-agent cost structure just shifted overnight.
+
+---
+
+## The Numbers That Matter
+
+| Model | Old Price (per 1M tokens) | New Price (per 1M tokens) | Change |
+|-------|---------------------------|---------------------------|--------|
+| **GPT-5.6 Sol** | $5.00 / $30.00 | $5.00 / $30.00 | No change (base) |
+| **GPT-5.6 Sol Fast** | N/A | $10.00 / $60.00 | New tier: 2.5× speed |
+| **GPT-5.6 Terra** | $2.50 / $15.00 | $2.00 / $12.00 | **-20%** |
+| **GPT-5.6 Luna** | $1.00 / $6.00 | **$0.20 / $1.20** | **-80%** |
+
+Cached reads stay at 90% discount. Cache writes cost 1.25× base input (new for GPT-5.6+). Minimum cache life: 30 minutes.
+
+---
+
+## Why This Breaks the Old Cost Models
+
+Most teams budget for agents like this: *model cost × tokens per call × calls per day*.
+
+**That math just broke.**
+
+### Luna at $0.20 / $1.20 is effectively "too cheap to meter" for agent workflows
+
+At the old $1.00 / $6.00, a 500-call daily workflow at 3K tokens/call cost ~$9/day. At new pricing: **$1.80/day**. That's **$54/month → $2,600/year per developer** saved.
+
+Luna now undercuts GPT-5.4 nano ($0.20 / $1.25) while beating it on every agent benchmark. OpenAI's own data shows Luna at 84.7% on Terminal-Bench 2.1 — ahead of GPT-5.5 (85.6%) at 1/25th the cost.
+
+### Terra at $2.00 / $12.00 is the new "default production model" for coding agents
+
+Terra scores 87.4% on Terminal-Bench 2.1 vs GPT-5.5's 85.6% — **at 40% of GPT-5.5's price**. For teams that need reliability over raw speed, Terra is now the obvious default. You'd need a specific failure mode to justify Sol.
+
+### Sol Fast mode (2.5× speed, 2× price) changes the latency/cost tradeoff
+
+When you need *answers now* — debugging a production outage, unblocking a deploy — Fast mode delivers Sol quality at 2.5× throughput. The per-task cost is similar (2× price / 2.5× speed = 0.8× cost per unit time), but the *wall-clock* difference matters when humans are waiting.
+
+---
+
+## What This Means for Your Agent Stack
+
+### If you use **Cursor** (ChatGPT Work / Codex)
+- Free/Go users: Terra is now your default — cheaper credits, same quota
+- Plus/Pro/Enterprise: You can route routine work to Luna, complex work to Terra, fire-drills to Sol Fast
+- **Action:** Check your Cursor model settings. Default may still be Sol.
+
+### If you use **Codex CLI / ChatGPT Codex**
+- Same tier access as Cursor
+- `/fast` flag in Codex now maps to Sol Fast mode
+- **Action:** Update your `AGENTS.md` or team docs with the new routing logic
+
+### If you use **Claude Code / Anthropic API**
+- Fable 5 still leads on long-context and instruction nuance (see [our benchmark deep-dive](/blog/gpt-5-6-claude-fable-code-arena))
+- But the *price gap* widened: Fable 5 at ~$15/$75 vs Terra at $2/$12 is **7.5× more expensive**
+- **Action:** Keep Fable 5 for security-sensitive and long-context tasks. Move volume to Terra/Luna via OpenRouter or multi-provider setup.
+
+### If you use **OpenCode / OpenRouter / BYOK setups**
+- OpenRouter already reflects new pricing
+- **Action:** Re-run your cost projections. The "use the best model" advice is now "use the cheapest model that clears your quality bar"
+
+### If you self-host or use **local models**
+- The bar for "worth paying for API" just moved significantly higher
+- Luna at $0.20/$1.20 competes with GPU hour costs for small workloads
+- **Action:** Recalculate your break-even point
+
+---
+
+## The New Agent Routing Logic (Steal This)
+
+```yaml
+# Recommended model routing for coding agent teams (August 2026)
+
+routine_refactoring: gpt-5.6-luna      # $0.20/$1.20 — 84.7% Terminal-Bench
+feature_development: gpt-5.6-terra     # $2.00/$12.00 — 87.4% Terminal-Bench
+security_review:     claude-fable-5    # Premium — long-context, safety
+production_debug:    gpt-5.6-sol-fast  # $10/$60 — 2.5× speed when blocked
+architecture_design: gpt-5.6-sol       # $5/$30 — max reasoning, no rush
+```
+
+**The rule:** Default to Luna. Escalate to Terra when quality dips. Escalate to Sol/Sol Fast only when you hit a documented failure mode. Reserve Claude for the 5% of tasks where its specific strengths pay off.
+
+---
+
+## Hidden Gotchas
+
+### 1. Cache writes now cost 1.25× base input
+For GPT-5.6+, writing a cacheable prefix costs 25% more. But a single cache read (90% discount) pays it back. **Design your prompts with explicit cache breakpoints** — OpenAI added `cache_breakpoint` support in the Responses API for this exact reason.
+
+### 2. Fast mode is not "Sol but faster" — it's a separate SKU
+You opt in via `processing_mode: "fast"` in the API or `/fast` in Codex. It's not automatic. If your agent framework doesn't expose this, you're leaving speed on the table.
+
+### 3. Subscription credit burn changed
+ChatGPT Work and Codex subscribers: Terra and Luna now consume **fewer credits per call**. Your quota lasts longer. But Sol Fast burns credits 2× faster. Monitor your usage dashboard.
+
+### 4. The "Sol = GPT-5.5 price" trap
+GPT-5.5 is still $5/$30. GPT-5.6 Sol is $5/$30. But GPT-5.6 Sol *beats* GPT-5.5 on every coding benchmark. **There is zero reason to use GPT-5.5 for new deployments.**
+
+---
+
+## The Bottom Line
+
+**The era of "agent costs are negligible" just became real.**
+
+At Luna pricing, a 10-person team running 5,000 agent calls/day spends ~$18/day on model costs. That's **$540/month total** — less than one senior engineer's daily rate.
+
+The bottleneck is no longer model pricing. It's:
+- Context management efficiency
+- Prompt engineering quality  
+- Agent loop design (how many calls per task)
+- Tool calling overhead
+
+**OpenAI just removed the last excuse for not running agents at scale.**
+
+---
+
+## What to Do Today
+
+1. **Audit your current model assignments** — are you defaulting to Sol/Terra when Luna would work?
+2. **Update your team's AGENTS.md / model routing config** — bake in the new tier logic
+3. **Enable cache breakpoints** in your agent prompts if you use Responses API
+4. **Test Sol Fast mode** on your slowest agent workflows — measure wall-clock improvement
+5. **Re-run your monthly cost projection** — you'll likely cut 40-80% off the model line item
+
+---
+
+*The pricing data in this article reflects OpenAI's official API pricing page as of August 21, 2026. Rates can change without notice. Always verify at [developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing) before committing spend.*
