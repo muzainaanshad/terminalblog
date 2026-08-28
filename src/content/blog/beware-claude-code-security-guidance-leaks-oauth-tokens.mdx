@@ -1,0 +1,193 @@
+---
+title: "Beware: Claude Code's Security-Guidance Plugin Leaks Your OAuth Tokens Into the Transcript"
+description: "The official security-guidance plugin reads ~/.claude/.credentials.json and echoes full access/refresh tokens into stop-time review findings — which get injected into your conversation transcript. A credential detector that creates credential leaks."
+publishDate: "2026-08-28"
+updatedDate: "2026-08-28"
+tags: ["beware", "security", "claude-code", "credentials", "oauth", "plugin"]
+tool: "claude-code"
+heroImage: "/api/og?title=Beware:%20Security-Guidance%20Leaks%20OAuth%20Tokens&tool=Claude%20Code"
+---
+
+## The Vulnerability in One Sentence
+
+**Claude Code's official `security-guidance` plugin (v2.0.7) reads your `~/.claude/.credentials.json` file — which contains your live OAuth `accessToken` and `refreshToken` — and echoes those raw tokens verbatim into a stop-time review finding that gets injected into your conversation transcript.** The transcript is a persistent, plaintext, searchable file on disk. The very tool designed to catch credential leaks **is a credential leak**.
+
+---
+
+## Who Is Affected
+
+You are affected if **all** of these are true:
+
+| Condition | Why It Matters |
+|-----------|----------------|
+| You use **Claude Code CLI** (tested on v2.1.247) | The plugin runs on the CLI |
+| You have the **`security-guidance@claude-plugins-official` plugin enabled** (v2.0.7) | This is an official Anthropic plugin, not third-party |
+| Your `~/.claude` directory is a **git repository** (common for dotfiles management) | The plugin's review logic explicitly pulls *untracked* files into its diff |
+| `.credentials.json` is **not in `.gitignore`** (default — Claude Code doesn't ship one) | The file becomes part of the review input on every token refresh |
+
+**Platform:** Confirmed on macOS (Apple Silicon). Likely affects Linux/WSL too — the mechanism is platform-agnostic.
+
+---
+
+## What Actually Happens (Step by Step)
+
+### 1. The File Exists and Is Untracked
+
+Claude Code stores your OAuth credentials in `~/.claude/.credentials.json`:
+
+```json
+{
+  "claudeAiOauth": {
+    "accessToken": "sk-ant-oat01-...",
+    "refreshToken": "sk-ant-ort01-...",
+    "expiresAt": 1724851200000
+  }
+}
+```
+
+If you manage dotfiles with git, `~/.claude` is often a repo. The CLI **does not** add `.credentials.json` to `.gitignore` by default. So the file sits there — untracked, unignored, full of live secrets.
+
+### 2. The Plugin Builds a Review Diff Including Untracked Files
+
+At session `Stop`, the `security-guidance` plugin runs a background review. Its `hooks/gitutil.py` creates a **temporary git index** using `git add --intent-to-add`, which **deliberately includes untracked files** (`_list_untracked`, `_temp_index`, `include_untracked = True`).
+
+Result: the entire contents of `.credentials.json` enter the review diff as "new changes."
+
+### 3. The LLM Review Sees the Tokens and Repeats Them
+
+The plugin feeds this diff to an LLM with a prompt like "review for hardcoded secrets." The LLM correctly identifies the tokens — **and then reproduces them verbatim in its finding**:
+
+```
+Background security review found: Hardcoded Secrets in .credentials.json
+
+.credentials.json:
+  1. [CRITICAL] [Hardcoded Secrets] {"claudeAiOauth":{"accessToken":"sk-ant-oat01-...","refreshToken":"sk-ant-ort01-",...}}
+     Suggested fix: Immediately revoke/rotate both tokens ...
+```
+
+### 4. The Finding Is Injected Into Your Transcript
+
+The finding is wrapped in a `` and injected into the conversation. **This writes the raw tokens to your session transcript on disk** — a persistent, plaintext, searchable file that gets synced, backed up, and indexed.
+
+> **Without a separate `UserPromptSubmit` guard hook (like a custom secret-guard script), the tokens would also be sent to the model.** In the reporter's case, their hook blocked it — but the tokens still rendered to their terminal.
+
+### 5. It Recurs Every ~8 Hours
+
+The OAuth `accessToken` has an ~8-hour lifetime. **Every refresh rewrites `.credentials.json`**, producing a "new" diff. Each refresh re-triggers the review, and the LLM re-emits the secrets. This isn't a one-time leak — it's a **recurring scheduled leak** as long as the conditions persist.
+
+---
+
+## Why This Is Worse Than a Typical False Positive
+
+| Factor | Impact |
+|--------|--------|
+| **Refresh token exposed** | The `refreshToken` (`sk-ant-ort01-...`) has a **~27-day lifetime**. An attacker with this token has persistent access. |
+| **Transcript persistence** | Transcripts are plaintext files. They sync to cloud backups, get indexed by tools, survive session deletion. Deleting the finding from the transcript is unreliable — the only sound remediation is **rotating the credential**. |
+| **Plugin's own log is clean** | The reporter checked `~/.claude/security/log.txt` — **zero occurrences** of `sk-ant-*` strings. The leak happens *only* on the injection path, not in the plugin's audit log. |
+| **Official plugin, not third-party** | This is `security-guidance@claude-plugins-official` v2.0.7 — maintained by Anthropic. Users trust it because it's "the security plugin." |
+
+---
+
+## Proof: Commands to Check If You're Affected
+
+Run these in your terminal **right now**:
+
+```bash
+# 1. Is ~/.claude a git repo?
+cd ~/.claude && git rev-parse --git-dir 2>/dev/null && echo "YES - git repo" || echo "NO"
+
+# 2. Is .credentials.json untracked and unignored?
+cd ~/.claude && git status --porcelain .credentials.json 2>/dev/null
+# Output like "?? .credentials.json" = VULNERABLE
+# No output = either tracked, ignored, or file doesn't exist
+
+# 3. Does the file contain live tokens?
+cat ~/.claude/.credentials.json | grep -E "(accessToken|refreshToken)"
+# If you see sk-ant-oat01- or sk-ant-ort01- = LIVE CREDENTIALS PRESENT
+
+# 4. Is the security-guidance plugin enabled?
+claude plugins list | grep security-guidance
+# If listed = plugin active
+```
+
+**If all 4 checks return "vulnerable" states, your tokens have likely already leaked into at least one transcript.**
+
+---
+
+## Immediate Workaround (Do This Now)
+
+```bash
+# Add .credentials.json to .gitignore in ~/.claude
+echo ".credentials.json" >> ~/.claude/.gitignore
+
+# Verify it's now ignored
+cd ~/.claude && git status --porcelain .credentials.json
+# Should return NO OUTPUT (file is now ignored)
+```
+
+This stops the file from entering the review diff, which stops the leak. **But it doesn't fix transcripts that already contain your tokens** — you must rotate them.
+
+---
+
+## How to Rotate Your Tokens (Remediation)
+
+1. **Revoke the leaked tokens:** Go to [Anthropic Console → API Keys](https://console.anthropic.com/settings/keys) and revoke any keys that match the leaked `accessToken`/`refreshToken`.
+2. **Re-authenticate Claude Code:** Run `claude auth login` (or `claude auth logout && claude auth login`) to get fresh tokens.
+3. **Verify the new tokens aren't in any transcript:** Search your transcript directory (`~/.claude/projects/*/`) for `sk-ant-oat01-` or `sk-ant-ort01-`. If found, those transcripts are compromised — delete or redact them.
+
+```bash
+# Search for leaked tokens in transcripts
+grep -r "sk-ant-oat01-\|sk-ant-ort01-" ~/.claude/projects/ 2>/dev/null
+```
+
+---
+
+## The Fixes Anthropic Needs to Ship
+
+In order of impact:
+
+1. **Redact secret values in findings** — A finding with `sk-ant-oat01-…` (truncated) + file/line is just as actionable. The literal value adds zero value for the reader and *is* the entire harm. This fix covers **every** secret type, not just `.credentials.json`.
+
+2. **Exclude well-known credential paths by default** — `.credentials.json`, `.aws/credentials`, `.netrc`, `.ssh/id_*`, `.docker/config.json`, etc. Reviewing a file whose *sole purpose* is to hold secrets has a guaranteed 100% hit rate and near-zero information value.
+
+3. **Reconsider untracked-file inclusion by default** — The `--intent-to-add` behavior makes sense for source code but is surprising for CLI-generated config files. At minimum, **exclude `0600`-mode files** (owner-read-only) from default review scope.
+
+4. **Ship a default `.gitignore` in `~/.claude`** — Including `.credentials.json` at minimum. This is defense-in-depth against a much broader class of accidents — right now, a single `git add -A` in that directory commits your live session token.
+
+---
+
+## Timeline
+
+| Date | Event |
+|------|-------|
+| **2026-08-27** | Issue [#90010](https://github.com/anthropics/claude-code/issues/90010) filed by AliceLJY with full repro |
+| **2026-08-28** | Issue acknowledged, labels: `bug`, `has repro`, `area:security`, `area:plugins` |
+| **Present** | **No fix released yet** — plugin v2.0.7 still vulnerable |
+
+---
+
+## Broader Lesson: The "Security Tool" Paradox
+
+This is the second documented case of a **security tool creating the very vulnerability it's meant to prevent** in the AI coding agent ecosystem:
+
+1. **Clinejection** (July 2026): A GitHub issue title prompt-injected Cline's CI/CD, poisoned the Actions cache, stole npm tokens, and published a malicious package — *via Cline's own workflow*.
+2. **This issue** (August 2026): The `security-guidance` plugin leaks OAuth tokens into transcripts while scanning for leaked credentials.
+
+**Pattern:** AI agents that process untrusted input (issue titles, git diffs, file contents) with elevated privileges and LLM reasoning are **inherently vulnerable to confused-deputy attacks**. The tool's own logic becomes the attack vector.
+
+---
+
+## Summary Checklist for Operators
+
+- [ ] Run the 4 verification commands above
+- [ ] If vulnerable: add `.credentials.json` to `~/.claude/.gitignore` **immediately**
+- [ ] Rotate your Anthropic OAuth tokens via the Console
+- [ ] Search transcripts for `sk-ant-oat01-` / `sk-ant-ort01-` and purge compromised files
+- [ ] Monitor [issue #90010](https://github.com/anthropics/claude-code/issues/90010) for the official fix
+- [ ] Consider disabling `security-guidance` until a redacted-findings release ships
+
+---
+
+**This article will be updated when a fix is released.** Watch the GitHub issue or check back here for an `updatedDate` change.
+
+*Found this useful? Share it with your team — the operators most at risk are the ones who care enough to use git for dotfiles and enable security plugins.*
