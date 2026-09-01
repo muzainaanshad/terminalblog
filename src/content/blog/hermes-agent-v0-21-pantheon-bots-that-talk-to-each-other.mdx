@@ -1,0 +1,163 @@
+---
+title: "Hermes Agent v0.21 Just Made Your Bots Talk to Each Other — Here's What Changed"
+description: "Hermes Agent v0.21.0 'Pantheon' ships Bot Mode with group chats, bot-to-bot DMs, cron jobs that remember, live subagent steering, and a full MCP command center. Beginner-friendly breakdown of the biggest release yet."
+pubDate: "2026-09-01T09:45:00Z"
+tags: ["hermes-agent", "open-source", "release", "bot-mode", "multi-agent", "cron", "mcp", "ai-agent", "coding-agent", "beginner"]
+tool: "hermes"
+author: "sage"
+image: "/api/og?title=Hermes+v0.21.0+Pantheon+Release&tool=hermes-agent"
+---
+
+Hermes Agent v0.21.0, codenamed **Pantheon**, dropped on August 31, 2026 — and the name fits.
+
+> **The numbers:** ~5,800 commits · ~2,475 merged PRs · ~5,680 files changed · ~869,000 insertions · ~135,000 deletions · **~2,100 issues closed** · 760+ contributors since v0.20.0.
+
+v0.20.0 made Hermes the "herald" — it could speak and carry messages to other agents. In v0.21.0, "the gods assemble." Your agents now form a society with names, faces, and group chats where they talk to each other and to you like teammates, not tools.
+
+If you're new to coding agents, this is the release where multi-agent stopped meaning "plumbing" and started meaning "Discord server full of AI coworkers."
+
+## 1. Bot Mode — your agents become a team, built in
+
+The headline feature: **Bot Mode is now bundled and on by default** in the desktop app.
+
+Every agent profile gets:
+- A **name** you choose
+- A **deterministic avatar face** (generated from the name, with randomize/lock controls)
+- A spot in a **shared roster**
+
+You can create **Discord-style group chats** where multiple bots and you talk in one room. @-mention any bot from the composer. Give rooms names and pictures.
+
+**Before:** Multi-agent meant writing config files, managing handoffs, and debugging why Agent A couldn't talk to Agent B.
+
+**After:** It looks like a chat app full of coworkers. You create a room called "Code Review," add your "Reviewer Bot" and "Test Bot," and they discuss your PR while you watch — or jump in.
+
+This is the biggest UX leap for beginners. You don't need to understand orchestration. You just invite bots to a room and ask them to work together.
+
+## 2. `hermes peer` — bots can DM each other
+
+Any Hermes agent can now message any other **by handle**, across profiles and gateways, from the CLI or from inside a conversation.
+
+Example workflow:
+1. Ask your **Research Bot** to investigate a library.
+2. Tell it to hand findings to your **Coding Bot**.
+3. The Coding Bot replies in its own Bot Chat — where you can read it.
+
+The key detail: **replies land in each agent's canonical Bot Chat**, so conversations between agents are durable and inspectable. Not fire-and-forget. You can audit what they said to each other.
+
+For beginners: this is like having specialists who pass work between themselves, but you stay in the loop because every conversation has a paper trail.
+
+## 3. Cron jobs that actually remember
+
+Scheduled jobs used to be goldfish — every run started from zero. Now:
+
+- **Cron agents load and update persistent memory** like every other agent
+- **`continuity=true`** carries each run's output into the next (so a monitor can dedupe against what it already reported)
+- Every job gets a **durable notepad scratchpad**
+- **Monitor-mode jobs skip the LLM entirely** when nothing changed (saves tokens)
+- Cron output can land in a bot's Bot Chat — where the bot actually responds
+
+Your 9am briefing job now knows what it told you yesterday. Your security scanner remembers which issues it already flagged. This turns scheduled tasks from "dumb alarms" into "agents that learn."
+
+## 4. Steer your subagents while they run
+
+The `delegate_task` tool gained **live orchestration**:
+- List running children
+- **Steer one mid-flight** with a course correction
+- Stop it early and keep the partial result
+
+Plus:
+- Optional **JSON-schema validation** on child outputs
+- Per-delegation cost surfaced in results
+- Raised defaults: **250 iterations, 10 concurrent children**
+
+Before, delegation was "fire and pray." Now it's managed parallel work. You can watch five subagents churning through tasks, nudge one that's going sideways, and pull results from another that finished early.
+
+## 5. The MCP command center
+
+MCP (Model Context Protocol) servers and the catalog merged into **one coherent desktop page**:
+
+- **Drag-in "paste anything" import** — paste a URL or config and Hermes figures it out
+- **Background health checks** — nudges you to re-auth *before* a tool call fails
+- **Fleet cost/usage overlay** — schema token estimates and 30-day usage per server
+- **`hermes://` deep links** — install an MCP server with explicit confirmation
+
+Managing twenty MCP servers used to be config-file archaeology. Now it's a dashboard. For beginners: MCP is how agents connect to external tools (databases, APIs, file systems). This update makes that connectivity visible and manageable.
+
+## 6. The agent drives the desktop's browser
+
+The in-app browser stopped being a window the agent could only look at. Hermes now:
+
+- **Navigates, clicks, and reads it directly**
+- Pages can be **popped out** to your system browser
+- Full link context menus
+
+Ask it to walk a docs site or debug a web app and watch it happen inside your own app. This is huge for research workflows and debugging web interfaces.
+
+## 7. CLI power wave
+
+The terminal interface got a Ghostty-level polish pass:
+
+- **Ctrl+P** opens a fuzzy command palette
+- **`/model` picker** filters as you type
+- **`/status`** shows reasoning mode, pending approvals, and context usage
+- Status bar can display **live cache-hit %, latency, and tokens/sec** with per-field toggles
+- **Global emergency stop**
+- **Session pin/unpin**
+- Rotating task-oriented composer placeholders
+- **Terminal pets** — because a companion should have a companion
+
+## 8. Security hardening across the board
+
+Several quiet but important changes:
+
+- **Protected agent-instruction files** (AGENTS.md, skills, memory stores) now always require write approval — a prompt-injected agent can't quietly rewrite its own standing orders
+- Deep **redaction sweep** closed secret-leak gaps across terminal errors, `.env` file reads, checkpoints, and ACP logs
+- Approval system learned **Windows destructive commands**
+- **macOS permission grants survive updates** via a stable TCC signing identity
+
+## 9. Six new providers and a model catalog wave
+
+New built-in providers:
+- **Meta Model API (Muse Spark)**
+- **CommandCode** (GOAT/Pro/Max plans)
+- **Tencent TokenPlan**
+- **Nebius Token Factory**
+- **Ramp Router**
+- **Actual Computer**
+
+New models in the pickers:
+- GLM-5.3-Flash
+- qwen3.8-max/flash
+- Gemini 3.7 Flash
+- MiniMax M3 free
+- Nemotron 3.5 Lightning
+
+Plus **`model_overrides`** — patch any model's context window or pricing yourself without waiting on a release.
+
+## Also in this release
+
+- **Data-training-tier warnings** — unified selection-guard registry warns you across every picker surface when a model trains on your data
+- **Pip-installed model providers** discovered via entry points — third parties can ship providers as packages
+- **TTL result caching** for web_search/web_extract
+- **Lean-tail compression** as the default
+- **Opt-in OS-keychain encryption** for stored secrets (no more per-launch macOS Keychain prompts)
+
+## How to try it (beginner steps)
+
+1. **Update:** Run `hermes update` if you already have it installed.
+2. **Try Bot Mode:** Open the desktop app, create a new bot profile, give it a name, and watch its face generate. Create a room, add your bot, and start a conversation.
+3. **Set up a cron job that remembers:** Use the cron system to schedule a task, enable `continuity=true`, and watch it learn from previous runs.
+4. **Steer a subagent:** Delegate a task, then use the live orchestration controls to check on it mid-flight.
+5. **Explore the MCP dashboard:** Open the MCP page in desktop and see all your connected tools in one place.
+
+## Bottom line
+
+Pantheon is the release where Hermes stopped being "one agent you talk to" and became "a platform where multiple agents talk to each other — and to you."
+
+Bot Mode, bot-to-bot DMs, cron memory, live subagent steering, and the MCP command center all point in the same direction: **multi-agent is now a user experience, not an architecture problem.**
+
+If you've been waiting for coding agents to feel less like a REPL and more like a team, this is the one.
+
+---
+
+*Hermes Agent is open-source (MIT) and available at [github.com/NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent).*
