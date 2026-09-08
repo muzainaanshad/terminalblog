@@ -300,67 +300,93 @@ def print_report(conn):
     print("TERMINALBLOG ANALYTICS REPORT")
     print("=" * 60)
     
-    # GSC Summary
+    # GSC Summary (trailing 28 days from latest snapshot)
     print("\n--- Search Console (last 28 days) ---")
     try:
-        c.execute("SELECT SUM(clicks), SUM(impressions), AVG(ctr), AVG(position) FROM gsc_daily")
+        c.execute("""SELECT SUM(clicks_total), SUM(impressions_total), AVG(ctr_avg), AVG(position_avg)
+                     FROM gsc_daily WHERE date >= date((SELECT MAX(date) FROM gsc_daily), '-27 days')""")
         row = c.fetchone()
         if row and row[0]:
             print(f"  Total clicks: {row[0]:,}")
             print(f"  Total impressions: {row[1]:,}")
             print(f"  Avg CTR: {row[2]:.2%}")
             print(f"  Avg position: {row[3]:.1f}")
-    except:
-        print("  No data")
+        else:
+            print("  No data")
+    except Exception as e:
+        print(f"  No data ({e})")
     
-    # Top queries
+    # Top queries (latest snapshot only)
     print("\n  Top 10 Queries:")
     try:
-        c.execute("SELECT query, clicks, impressions, position FROM gsc_queries ORDER BY clicks DESC LIMIT 10")
-        for row in c.fetchall():
+        c.execute("""SELECT query, clicks, impressions, position FROM gsc_queries
+                     WHERE date = (SELECT MAX(date) FROM gsc_queries)
+                     ORDER BY clicks DESC LIMIT 10""")
+        rows = c.fetchall()
+        if not rows:
+            print("    No data")
+        for row in rows:
             print(f"    [{row[1]} clicks] [pos {row[3]:.0f}] {row[0]}")
-    except:
-        print("    No data")
+    except Exception as e:
+        print(f"    No data ({e})")
     
-    # Top pages (GSC)
+    # Top pages (GSC, latest snapshot only)
     print("\n  Top 10 Pages (by clicks):")
     try:
-        c.execute("SELECT page, clicks, impressions, position FROM gsc_pages ORDER BY clicks DESC LIMIT 10")
-        for row in c.fetchall():
+        c.execute("""SELECT page, clicks, impressions, position FROM gsc_pages
+                     WHERE date = (SELECT MAX(date) FROM gsc_pages)
+                     ORDER BY clicks DESC LIMIT 10""")
+        rows = c.fetchall()
+        if not rows:
+            print("    No data")
+        for row in rows:
             path = row[0].replace("https://terminalblog.com", "")
             print(f"    [{row[1]} clicks] [pos {row[3]:.0f}] {path}")
-    except:
-        print("    No data")
+    except Exception as e:
+        print(f"    No data ({e})")
     
-    # GA4 Summary
+    # GA4 Summary (last 7 days, dates stored as YYYYMMDD)
     print("\n--- GA4 (last 7 days) ---")
     try:
-        c.execute("SELECT SUM(users), SUM(sessions), SUM(pageviews) FROM ga4_daily WHERE date >= date('now', '-7 days')")
+        c.execute("""SELECT SUM(users), SUM(sessions), SUM(pageviews) FROM ga4_daily
+                     WHERE date >= strftime('%Y%m%d', 'now', '-7 days')""")
         row = c.fetchone()
         if row and row[0]:
             print(f"  Users: {row[0]:,}")
             print(f"  Sessions: {row[1]:,}")
             print(f"  Pageviews: {row[2]:,}")
-    except:
-        print("  No data")
+        else:
+            print("  No data")
+    except Exception as e:
+        print(f"  No data ({e})")
     
-    # Top pages (GA4)
+    # Top pages (GA4, latest snapshot only)
     print("\n  Top 10 Pages (by views):")
     try:
-        c.execute("SELECT page_path, page_title, views FROM ga4_pages ORDER BY views DESC LIMIT 10")
-        for row in c.fetchall():
+        c.execute("""SELECT page_path, page_title, views FROM ga4_pages
+                     WHERE date = (SELECT MAX(date) FROM ga4_pages)
+                     ORDER BY views DESC LIMIT 10""")
+        rows = c.fetchall()
+        if not rows:
+            print("    No data")
+        for row in rows:
             print(f"    [{row[2]} views] {row[0]}")
-    except:
-        print("    No data")
+    except Exception as e:
+        print(f"    No data ({e})")
     
-    # Traffic sources
+    # Traffic sources (latest snapshot only)
     print("\n  Traffic Sources:")
     try:
-        c.execute("SELECT source, medium, sessions FROM ga4_sources ORDER BY sessions DESC LIMIT 10")
-        for row in c.fetchall():
+        c.execute("""SELECT source, medium, sessions FROM ga4_sources
+                     WHERE date = (SELECT MAX(date) FROM ga4_sources)
+                     ORDER BY sessions DESC LIMIT 10""")
+        rows = c.fetchall()
+        if not rows:
+            print("    No data")
+        for row in rows:
             print(f"    [{row[2]} sessions] {row[0]} / {row[1]}")
-    except:
-        print("    No data")
+    except Exception as e:
+        print(f"    No data ({e})")
     
     print("\n" + "=" * 60)
 
