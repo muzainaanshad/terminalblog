@@ -1,17 +1,17 @@
 ---
-title: "Cline Desktop Launches with Free Coding Models — Zero API Keys Required"
-description: "Cline's standalone desktop app now at v0.0.10 adds a universal Mac download, a token usage meter, and edit-any-message — on top of free coding models that need zero API keys."
+title: "Cline Desktop Grew Up Fast — Here's What v0.0.24 Actually Fixes"
+description: "Cline's desktop app hit v0.0.24 with a storm of quality fixes: chat stream duplication, silent mid-task stops, checkpoint performance, and session imports from Claude Code and Codex. Free models still included."
 pubDate: "2026-08-01T09:00:00Z"
-updatedDate: "2026-08-08T10:00:00Z"
-tags: ["cline", "desktop", "free-models", "release", "coding-agent", "open-source"]
+updatedDate: "2026-09-09T14:30:00Z"
+tags: ["cline", "desktop", "free-models", "release", "coding-agent", "open-source", "update"]
 tool: "cline"
 author: "sage"
 image: "/api/og?title=Cline+Desktop+Free+Models&tool=cline"
 ---
 
-Cline — the 61,000-star open-source coding agent — made two moves that lower the barrier to entry for AI-assisted coding. First, it shipped a standalone macOS desktop app that runs agent sessions independently of any IDE. Second, it added free coding models to every Cline surface: the desktop app, the VS Code extension, and the command-line interface. You do not need an API key to try Cline.
+Cline — the 67,000-star open-source coding agent — made two moves that lower the barrier to entry for AI-assisted coding. First, it shipped a standalone macOS desktop app that runs agent sessions independently of any IDE. Second, it added free coding models to every Cline surface: the desktop app, the VS Code extension, and the command-line interface. You do not need an API key to try Cline.
 
-The desktop app launched as **v0.0.4 on July 22, 2026** and has been updating almost every other day since. As of **August 7 it sits at v0.0.10**, and the latest round of releases removes several small frictions that trip up first-time users: a single universal Mac download, a visible token-usage meter, the ability to edit any earlier message, and errors that finally tell you what went wrong instead of failing silently.
+The desktop app launched as **v0.0.4 on July 22, 2026** and has been updating almost every other day since. As of **September 9 it is at v0.0.24** on both macOS and Windows, with over a dozen releases fixing chat-stream duplication, silent mid-task stops, and checkpoint performance — on top of the universal Mac download, token usage meter, and edit-any-message from August.
 
 If you have been curious about coding agents but hesitated because of billing setup or vendor lock-in, this is the week to try one.
 
@@ -75,9 +75,73 @@ One change that affects all Cline users: agentic compaction is now the default c
 
 This matters because long coding sessions — the kind where you iterate on a feature over an hour or more — previously lost coherence after compaction. With agentic compaction, the agent remembers what it did, what it decided, and what remains to be done. Combined with the new token ring, you get much fewer "surprise amnesia" moments.
 
+## September 2026 Update: What v0.0.11–v0.0.24 Fixed
+
+Cline Desktop has shipped fourteen releases since the August 7 snapshot above. The biggest theme is **trust** — fixing the bugs that made users uncertain whether the app was working correctly. Here are the changes that matter most, in plain language:
+
+### Your chat no longer lies to you
+
+In v0.0.24, the live chat stream used to show duplicated text. The sidecar architecture had two internal listeners receiving the same session events, and when a session was already running when you opened it, every message token appeared twice. The fix asks the observer listener directly whether it should render, instead of guessing from a timer. The result: what you see in the transcript is exactly what the agent said, nothing more.
+
+### Queued messages actually arrive
+
+When you typed a follow-up message while the agent was still busy, the app queued it — but the queue could silently erase your message bubble. A race condition between the queue drain and the transcript refresh meant your text disappeared and the reply appeared with no user message attached. v0.0.24 fixes this by deferring the transcript replacement to the newer turn.
+
+### The agent asks before giving up
+
+Before v0.0.24, when a model got stuck in a loop (five identical tool calls or six consecutive failures), the run ended silently and the composer went idle. You had no idea the agent had given up. Now you get a prompt: "Try a different approach" or "Stop this run." The guidance is injected into the running turn so the model knows why it paused, instead of repeating the same broken call.
+
+### Editor errors finally say what went wrong
+
+The `editor` tool now names the file, states whether `old_text` was null or omitted, and tells you how to recover. Previously, models like Kimi-k3 that fill optional parameters with null got a terse "old_text is required" and re-sent the same broken call until the loop detector killed the run.
+
+### Import sessions from Claude Code, Codex, and opencode
+
+This is the migration feature for people who have been using other coding agents. Sessions imported from Claude Code, Codex, or opencode now show up in the chat with a clear source label. On the first resumed turn, the foreign history is summarized so the model understands the context. The original transcript stays intact — the summary is additive, not destructive.
+
+### Checkpoints no longer freeze large projects
+
+Checkpoint creation previously rebuilt a throwaway git index on every message. If you had multiple gigabytes of untracked files — common with cloud-synced projects — each message could take 90 seconds or more. v0.0.24 keeps one snapshot index per session. From the second turn onward, checkpoint creation is near-instant, and the saved snapshots are byte-identical to before.
+
+### Background commands no longer hang
+
+Commands that background a child process (`cmd &`, `nohup`, Git Bash equivalents) used to hang until the timeout because the inherited stdio pipes stayed open after the shell exited. Now they settle with the real exit code and a note that background output continues in the terminal.
+
+### Windows gets a proper title bar
+
+v0.0.24 adds a custom title bar on Windows with caption controls that follow the compact title-bar height in narrow windows. The taskbar icon was updated as well. Small quality-of-life change, but it makes the app feel native instead of like an Electron port.
+
+### Token counts for every session
+
+The sessions view previously only hydrated the four most recent rows with token counts and costs — every other row showed "-". Now every visible session is hydrated on demand, with reads capped and re-run when status changes. You can see the actual cost of a session from three days ago without opening it.
+
+### Agent Plugins from your filesystem
+
+In v0.0.23, packages under `~/.agents/plugins` are discovered and run by the shared Hub. Each plugin's `plugin.json` is validated, its skills become available to the agent, and its MCP servers start automatically. This is separate from Cline Plugins — Agent Plugins are a community-level extension point that works across Cline surfaces.
+
+### Hub update dialog no longer loops
+
+A build-mismatch dialog used to appear on every launch if you had both the desktop app and CLI installed from different commits. It offered "Update and restart" which led to "no app update available" — an infinite loop. Now the dialog only appears when an actual update is staged, and "Later" sticks across session switches.
+
+### More fixes worth noting
+
+- **Sign-in confirmation code** now appears in the app while you wait for the browser, so you can match it against what the browser shows you.
+- **Voice input failures** from provider setup issues now take you straight to voice settings instead of showing a toast you cannot act on.
+- **Session history with many children** no longer renders empty — child rows sort after their root, so a busy session cannot hide itself and every older session from the sidebar.
+- **Cline Pass model selection** is preserved when starting a new chat — the catalog is treated as discovery data, not validation, so models missing from a partial catalog are not silently swapped.
+- **One wedged MCP server** no longer blocks all others from shutting down.
+
+### Is It Worth Updating?
+
+If you tried Cline Desktop in August and bounced off bugs — duplicated text, messages disappearing, the app silently going idle — the v0.0.24 release is the reason to come back. These are not cosmetic tweaks. They fix the interactions that determined whether you trusted the tool.
+
+If you are a Claude Code user considering switching, the session import feature means you do not lose your existing work. Bring a session over, and the agent picks up where the last one left off.
+
+If you are brand new to coding agents, none of these fixes matter to you yet — you will just get a working app. Start with a free model, ask it to explain a function in your codebase, and see how the agent loop works.
+
 ## How to Get Started
 
-**Desktop app:** Download the DMG from the [Cline GitHub Releases page](https://github.com/cline/cline/releases). There is now a single universal build for all Macs — no architecture choice needed. Open the DMG, drag the app to Applications, and future updates arrive automatically.
+**Desktop app:** Download the installer from the [Cline GitHub Releases page](https://github.com/cline/cline/releases). macOS users get a single universal build (no architecture choice needed); Windows users get a native app with a custom title bar. Open the installer, drag the app to Applications (Mac) or run the setup (Windows), and future updates arrive automatically.
 
 **VS Code extension:** Open the Extensions panel in VS Code, search for "Cline," and install or update. Free models appear in the model picker after updating.
 

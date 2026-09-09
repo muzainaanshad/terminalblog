@@ -60,7 +60,9 @@ export async function getStaticPaths() {
   const tags = new Set<string>();
   for (const p of posts) {
     for (const t of p.data.tags || []) {
-      if (!toolTags.has(t)) tags.add(t);
+      // Normalize to lowercase to avoid case-duplicate tag pages (centaur/Centaur)
+      const norm = t.toLowerCase();
+      if (!toolTags.has(norm)) tags.add(norm);
     }
   }
   return Array.from(tags).map(tag => ({
@@ -72,7 +74,7 @@ export async function getStaticPaths() {
 const { tag } = Astro.props;
 
 const allPosts = (await getCollection('blog'))
-  .filter(p => (p.data.tags || []).includes(tag))
+  .filter(p => (p.data.tags || []).map(t => t.toLowerCase()).includes(tag))
   .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
 
 const MIN_INDEXABLE_POSTS = 3;
