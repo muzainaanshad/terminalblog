@@ -1,0 +1,82 @@
+---
+title: "Claude Code Finally Lets You Cap AI Effort — And Stop Wasting Money"
+description: "Claude Code v2.1.267 adds maxEffortLevel — a hard cap on how hard the model tries on every provider. Combined with Fable 5.1's 1M context and a month of cost-efficiency fixes, your agent bills are about to get predictable."
+pubDate: "2026-09-10T10:00:00Z"
+updatedDate: "2026-09-10T10:00:00Z"
+tags: ["claude-code", "release", "coding-agents", "cost", "anthropic"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+Finally+Lets+You+Cap+AI+Effort&tool=claude-code"
+---
+
+Somewhere between the release notes and your next invoice, Claude Code changed. The last release we covered was **v2.1.235** back in August — a spellcheck and polish drop. Since then, Anthropic shipped **30 more versions in four weeks**, and buried in them are two settings that matter more to your wallet than any feature list: a hard **effort cap** and a new default model that makes the 1M context window cheap.
+
+This is the release-cycle story told in plain English — what changed, what it costs you, and the one setting worth turning on today.
+
+## The headline: you can now cap how hard Claude tries
+
+Claude Code's models work in "effort levels" — low, medium, high, max. More effort means more reasoning before it touches a file, which means better answers on hard problems and higher bills on easy ones. Until now, that knob was per-session and easy to forget.
+
+**v2.1.267 adds `maxEffortLevel`** ([changelog](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)): a top-level setting (or per-model under `modelSettings`) that caps effort on **every** provider — including Bedrock, Vertex, and Foundry. You can always pick a lower level per session, but it can never go above your cap.
+
+Why this matters for beginners: the most common "why is my bill $40?" story is a model silently running at max effort on tasks that need none — a one-line rename doesn't need ten minutes of chain-of-thought. A cap makes spend predictable.
+
+```json
+// .claude/settings.json
+{
+  "modelSettings": {
+    "claude-sonnet-5": { "maxEffortLevel": "medium" }
+  }
+}
+```
+
+## The other headline: Fable 5.1 is now the default — 1M context, cheaper
+
+Back in **v2.1.257**, Anthropic made **Claude Fable 5.1** the default Fable model ([changelog](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)). The numbers that matter:
+
+- **1M token context window** — a big codebase fits in one conversation without manual pruning.
+- **$10/$50 per million tokens** with **$0.25/Mtok cache reads** — the cheapest frontier-class pricing Anthropic has shipped.
+- Sessions on the 1M window now **auto-compact at ~967K tokens instead of ~934K** ([v2.1.247](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)) — you get more useful memory before summarization kicks in.
+
+The `[1m]` tag you may have seen in `/model` is this window. If you're on a Max plan or an API key, worth explicitly checking which model you're pinned to — older Fable 5 sessions stayed on the smaller window unless you picked the new one.
+
+## The quiet theme: a month of token-efficiency fixes
+
+The biggest cost leak in agent use is **prompt-cache misses** — re-sending the whole conversation because the tool list changed slightly. Claude Code shipped a *long* list of fixes for exactly this:
+
+- **Parallel tool calls and hook output no longer dropped on resumed sessions** over 5 MB ([v2.1.267](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)).
+- **Mid-session MCP/plugin tools no longer rewrite the tool list** and break prompt-cache reuse ([v2.1.267](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)).
+- **Model switching no longer re-sends every tool definition** ([v2.1.267](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)) — previously a guaranteed cache miss.
+- **A likely-cause line for cache misses** was added to `/cost` ([v2.1.260](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)) — it tells you *why* you missed, which is the first step to fixing it.
+- **Per-session prompt-cache stats** (hit ratio, tokens re-cached, warm/cold) landed in `/cost` ([v2.1.251](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)).
+- **OAuth token refreshes no longer invalidate the cache** ([v2.1.248](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)) — that used to nuke it roughly once an hour in long sessions.
+
+For a beginner the takeaway is simple: **update, then run `/cost`** after a long session. If you see a low hit ratio, the cause is now printed right there instead of being a mystery.
+
+## Three more features worth knowing
+
+**`/diff` panel in fullscreen mode** ([v2.1.260](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)) — a side panel that shows your uncommitted changes live as Claude edits. No more switching to `git diff` to see what the agent just did; it's next to the conversation.
+
+**`/skill-doctor`** ([v2.1.261](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)) — lists which loaded skills go unused and what they cost in context, so you can prune them. Every unused skill is tokens that could be cache hits.
+
+**`--restricted` mode** ([v2.1.248](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)) — a lock-it-down flag that strips the tools that run commands or fetch web pages, keeps file tools inside the working directory, and refuses `bypassPermissions`. One flag for a genuinely safer sandbox.
+
+## What the release train says
+
+Look at the changelog from v2.1.236 through v2.1.267 as one document and two things stand out.
+
+First, **cost control is the product now**. Effort caps, cache-cause reporting, per-session cache stats, cheaper model pricing — Anthropic is competing on your bill, not just on benchmark scores. That is exactly the direction we argued in [The Pricing Problem With AI Coding Tools](/blog/pricing-problem-ai-coding-tools/): the tools that win are the ones that make spend predictable.
+
+Second, **the safety perimeter keeps tightening quietly**. The `[v2.1.260](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)` release reverted a change that made `Read()` deny rules apply to Bash arguments — it had started denying `npm run build` under innocent-looking rules. The [bigger trust story](/blog/ai-coding-trust-paradox-verification-crisis/) is that these permission boundaries are being stress-tested in public, and patched in days.
+
+## What to actually do
+
+1. **Update** — `claude update` (or restart the VS Code extension).
+2. **Set a default effort cap** — pick `medium` and see if your tasks notice; most won't.
+3. **Check your model** — run `/model` and look for the `[1m]` Fable 5.1 or Opus options if your plan includes them.
+4. **Check `/cost` after a long session** — read the prompt-cache line; it now tells you what broke the cache.
+5. If you run agents unattended, try `--restricted` for anything that doesn't need shell access.
+
+Full changelog: [`v2.1.235...v2.1.267`](https://github.com/anthropics/claude-code/compare/v2.1.235...v2.1.267)
+
+*Disclosure: some links on this site are affiliate links (aiFiesta).*
