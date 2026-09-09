@@ -1,0 +1,62 @@
+---
+title: "This AI Agent Finally Knows When to Give Up — Qwen Code v0.23.1"
+description: "Qwen Code v0.23.1 adds goals that pause themselves after three stuck turns, worktree-isolated parallel tasks, and spend windows. The open-source agent is learning the most important autonomy skill: knowing when to stop."
+pubDate: "2026-09-08T19:15:00Z"
+updatedDate: "2026-09-08T19:15:00Z"
+tags: ["release", "qwen-code", "coding-agents", "workflows", "autonomy"]
+tool: "qwen-code"
+author: "sage"
+image: "/api/og?title=Qwen+Code+v0.23.1+Goals+That+Pause+Themselves&tool=qwen-code"
+---
+
+You leave a coding agent running a "fix all failing tests" goal, come back 40 minutes later, and it's still grinding the same failing test — burning tokens, churning your git history, and getting nowhere. Every agent user has lived this. The newest Qwen Code release (v0.23.1, published September 8, 2026) adds a guardrail that attacks exactly this failure mode: **goals now pause themselves after three autonomous turns that make no progress** ([#11239](https://github.com/QwenLM/qwen-code/pull/11239)).
+
+That one line is worth more than a dozen new features. It is the most honest thing an agent can learn: knowing when to stop is a competency, not a bug.
+
+## Goals that know their budget
+
+Qwen Code's "goals" are long-running autonomous jobs — the agent works through a task over many turns, with checkpoints and verification. v0.23.1 turns goals from a fire-and-forget timer into a monitored budget:
+
+- **No-progress auto-pause.** After three consecutive autonomous turns that make no progress, the goal pauses instead of spinning ([#11239](https://github.com/QwenLM/qwen-code/pull/11239)). You get called back for a decision instead of a surprise token bill.
+- **Spend windows.** The web shell now shows what a goal has spent against the window it is allowed ([#11254](https://github.com/QwenLM/qwen-code/pull/11254), [#11248](https://github.com/QwenLM/qwen-code/pull/11248)) — the same accounting in two places, so operators can see burn rate before it becomes a problem.
+- **Sized checkpoint verification.** The checkpoint verifier that guards goal claims can now be sized for a full claim list, and operators can set the timeout themselves ([#11305](https://github.com/QwenLM/qwen-code/pull/11305)).
+
+The pattern matters beyond Qwen. Every serious agent vendor is converging on the same realization: autonomous loops need **external brakes** — budget ceilings, stuck-detection, and human checkpoints — or they become cost hazards. Qwen Code just made those brakes first-class features instead of afterthoughts.
+
+## Parallel tasks that can't cross-contaminate
+
+The second headline is **worktree-isolated named tasks** ([#10643](https://github.com/QwenLM/qwen-code/pull/10643)). Each named task runs in its own Git worktree, so you can launch several tasks at once and they edit separate working trees instead of stepping on each other. This is the fix for the classic multi-agent disaster: two tasks editing the same file, one silently overwriting the other's work.
+
+The isolation extends to cleanup: deleting a daemon session now **reaps its owned worktrees** ([#11309](https://github.com/QwenLM/qwen-code/pull/11309)), and named sessions get worktree resets ([#11015](https://github.com/QwenLM/qwen-code/pull/11015)). No more orphaned branches and half-checked-out worktrees accumulating on disk like digital hoarding.
+
+For anyone who has run parallel agents in one repo, this is the difference between "parallel" as a marketing word and parallel that actually works. Pair it with the live subagent status in the transcript ([#10939](https://github.com/QwenLM/qwen-code/pull/10939)) and you can finally *watch* what your background agents are doing instead of guessing.
+
+## Sessions stop fighting each other
+
+A quieter but important theme: v0.23.1 hardens concurrent sessions so they don't corrupt each other.
+
+- **Session leases for conversation writers** ([#10924](https://github.com/QwenLM/qwen-code/pull/10924)) — writers must hold a lease; no more two processes scribbling in the same conversation.
+- **Concurrent standalone daemons with session fencing** ([#11207](https://github.com/QwenLM/qwen-code/pull/11207)) — multiple daemons can run side by side without stomping each other's sessions.
+- **Bounded turn navigation** — the daemon and SDK now support indexed turn navigation with snapshots and transcript paging ([#10751](https://github.com/QwenLM/qwen-code/pull/10751)), with continuous history in the web shell ([#11208](https://github.com/QwenLM/qwen-code/pull/11208)).
+
+If you have ever had two agent sessions "fight" over state — one deleting the other's transcript, a stale session clobbering a fresh one — this release is aimed squarely at you. Our [coding-agent security checklist](/blog/coding-agent-security-checklist-2026/) has warned about cross-session contamination for months; Qwen is now shipping the plumbing to prevent it at the protocol level.
+
+## Everything else worth knowing
+
+- **Daemon memory**: agents can now write to daemon memory ([#11311](https://github.com/QwenLM/qwen-code/pull/11311)) and delete from it ([#11337](https://github.com/QwenLM/qwen-code/pull/11337)) — persistent memory without restart hacks. This follows the arc we covered in [OpenHands' persistent memory work](/blog/openhands-agent-canvas-1-10-0-persistent-memory-automations/); context that survives sessions is becoming table stakes.
+- **Controller tokens**: a user-minted controller token can drive a session without per-message review ([#11090](https://github.com/QwenLM/qwen-code/pull/11090)) — useful for automation, but read the permission implications carefully.
+- **`todo_write` is now opt-in** ([#10645](https://github.com/QwenLM/qwen-code/pull/10645)) — the agent no longer writes todo files unless you configure it. Less repo noise.
+- **Output styles**: custom output styling from `~/.qwen/output-styles` and `.qwen/output-styles` ([#10761](https://github.com/QwenLM/qwen-code/pull/10761)).
+- **DingTalk security fix**: secrets no longer printed to stdout during SDK connect logging ([#10945](https://github.com/QwenLM/qwen-code/pull/10945)).
+
+## The breaking change
+
+One heads-up for teams using Qwen Code's web UI: the `@qwen-code/webui` package is **retired** in v0.23.1 ([#9812](https://github.com/QwenLM/qwen-code/pull/9812)) — its functionality has moved into the main package and web shell. If you installed it separately, update your setup before upgrading, or the build breaks.
+
+## The takeaway
+
+Qwen Code v0.23.1 is not the flashiest release of the month, but it is one of the most mature. No new model, no hype — just the boring, essential infrastructure of trustworthy autonomy: goals that admit when they're stuck, tasks that can't collide, and sessions that can't corrupt each other.
+
+The earlier v0.21.8 release fixed a trust boundary and shared prompt caches ([Qwen Code v0.21.8 breakdown](/blog/qwen-code-v0-21-8-trust-cache-fork-autofix/)). This release fixes something harder: the social contract between you and your agent. You give it a budget, it spends it transparently, and when it runs into a wall, it stops and asks instead of burning your money against the wall.
+
+That is the direction every coding agent needs to go — and Qwen Code, at 27,700+ GitHub stars, just got there first in a way you can actually configure.
