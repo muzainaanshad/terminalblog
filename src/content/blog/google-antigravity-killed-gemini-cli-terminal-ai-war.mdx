@@ -1,8 +1,8 @@
 ---
 title: "Google Just Killed Gemini CLI — Antigravity 2.0 Is the New Terminal King"
-description: "Google sunset Gemini CLI on June 18. Antigravity 2.0 and its Go-built CLI replace it with multi-agent orchestration, async workflows, and a unified harness. Here's what changed and how to migrate."
+description: "Google sunset Gemini CLI on June 18. Antigravity 2.0 and its Go-built CLI replace it with multi-agent orchestration, async workflows, and a unified harness. Plus: the quiet Sept 2026 security-hardening wave in Gemini CLI v0.58–v0.60. Here's what changed and how to migrate."
 pubDate: 2026-08-20
-updatedDate: 2026-08-20
+updatedDate: 2026-09-10
 author: "Anshad"
 category: "AI Coding Agents"
 tags: ["google", "antigravity", "gemini-cli", "terminal", "ai-agents", "migration"]
@@ -28,7 +28,7 @@ This isn't a v1.1. It's a platform pivot. And it changes how Google fits into th
 
 **June 18, 2026** — Hard cutoff. Gemini CLI + Gemini Code Assist IDE extensions stop serving free/Pro/Ultra users. Enterprise customers on Standard/Enterprise licenses keep access.
 
-**Now** — Migration window is closed. You're either on Antigravity or you're shopping for a new terminal agent.
+**Now** — Migration window is closed. You're either on Antigravity or you're shopping for a new terminal agent. (Enterprise and self-managed users still on Gemini CLI hit a fresh security-hardening wave in September — more below.)
 
 ---
 
@@ -149,7 +149,7 @@ Google's internal teams "dual-wield" — Antigravity 2.0 for planning/review, CL
 
 ---
 
-## How It Stacks Up (August 2026)
+## How It Stacks Up (Sept 2026)
 
 | Factor | Antigravity CLI | Claude Code | Codex CLI | OpenCode / Kilo / Aider |
 |--------|-----------------|-------------|-----------|-------------------------|
@@ -180,6 +180,42 @@ This isn't really about a CLI. It's about **owning the agent layer.**
 4. **Enterprise lock-in** — Standard/Enterprise customers stay on Gemini CLI *for now*, but migration path points to Antigravity Enterprise Platform.
 
 Google is building the **AWS for AI agents.** The CLI is just the developer on-ramp.
+
+---
+
+## Since the Cutoff: The Quiet Security Hardening (Sept 2026)
+
+Gemini CLI might be "dead" for individuals, but **the codebase is very much alive** — and the releases since the June cutoff have become a security-hardening story worth reading even if you've switched agents. Between **v0.58.0 (Sept 1) and v0.60.0-preview.0 (Sept 8)** the team shipped fixes that read like a checklist of everything that can go wrong when an AI agent touches a real machine. If you run agents in CI or on servers — any agent — these are the failure modes to know:
+
+### 1. The sandbox now blocks container escapes
+
+v0.58.0 isolates **Docker and container-runtime sockets and binaries** inside the macOS Seatbelt sandbox ([PR #28935](https://github.com/google-gemini/gemini-cli/pull/28935)). Why that's a big deal: a sandboxed agent is only as strong as its weakest boundary, and the classic escape is reaching the host's Docker socket — from there you have root on the machine. v0.60.0-preview.0 continues the theme: **the temporary directory and the settings directory are now isolated in the container**, and the Seatbelt sandbox gets its own tmpdir ([PR #29171](https://github.com/google-gemini/gemini-cli/pull/29171), [PR #29216](https://github.com/google-gemini/gemini-cli/pull/29216)).
+
+### 2. MCP OAuth is getting locked down
+
+v0.60.0-preview.0 enforces **RFC 9207 issuer identification** in the MCP OAuth flow ([PR #29117](https://github.com/google-gemini/gemini-cli/pull/29117)) — meaning the agent now verifies the token issuer instead of trusting whatever the OAuth endpoint says. For beginners: this kills a whole class of token-hijack attacks where a malicious MCP server answers an auth redirect and walks away with your credentials.
+
+### 3. Files, symlinks, and path tricks are being closed
+
+- `v0.58.0`: consistent symlink evaluation in ignore-path handling ([PR #28915](https://github.com/google-gemini/gemini-cli/pull/28915))
+- `v0.60.0-preview.0`: workspace path boundary checks + symlink resolution in command safety and file discovery ([PR #29170](https://github.com/google-gemini/gemini-cli/pull/29170)); strict permission/ownership checks on **system-wide config paths** ([PR #29115](https://github.com/google-gemini/gemini-cli/pull/29115)); and an **NTFS 8.3 short-name (SFN) path** mitigation for Windows ([PR #29116](https://github.com/google-gemini/gemini-cli/pull/29116)) — an obscure but real way to slip past path allowlists on Windows.
+- The extension loader got **hardened path resolution and boundary validation** ([PR #29169](https://github.com/google-gemini/gemini-cli/pull/29169)).
+
+### 4. Untrusted tool output can't set the agenda
+
+Two fixes target the "the tool's output is attacker-controlled" problem: **envelope metadata provenance for untrusted tool outputs** ([PR #29215](https://github.com/google-gemini/gemini-cli/pull/29215)) and a **consent prompt for environment changes** that sanitizes runtime-altering env vars ([PR #28863](https://github.com/google-gemini/gemini-cli/pull/28863)). This is the same attack family as the [Comment-and-Control CI secret theft](/blog/claude-code-gemini-cli-prompt-injection-steals-ci-secrets/) — the agent treating untrusted output as instructions.
+
+### 5. A hardcoded API key got scrubbed
+
+v0.60.0-preview.0 **sanitized and removed a hardcoded Google CrUX API key** from `chrome-devtools-mcp` ([PR #29158](https://github.com/google-gemini/gemini-cli/pull/29158)). Hardcoded keys in agent tooling are the supply-chain version of a password on a Post-it: one leaked repo away from abuse.
+
+### What to do with this
+
+- **If you still run Gemini CLI** (enterprise or self-managed): upgrade past v0.60.0-preview.0 — most of these are proactive hardening, not announced vulns, but the container-isolation and OAuth fixes are exactly the kind you want *before* an incident.
+- **If you're on another agent**: this is the pattern to demand from your tool. Claude Code's [worktree sandbox escapes](/blog/beware-cve-2026-55607-claude-code-worktree-sandbox-escape/) and [config-directory attack surface](/blog/ai-agent-config-directory-attack-surface-2026/) show the same battle. Any agent that touches files, runs commands, and talks to MCP servers needs: sandbox boundary isolation, OAuth issuer verification, symlink-aware path checks, and provenance handling for tool output.
+- **Check your own stack** for the two boring-but-lethal classes: hardcoded keys in tooling, and permissive sandboxes that leave the Docker socket or settings dir reachable.
+
+The takeaway is quietly reassuring: even a product Google "killed" spent September hardening exactly the boundaries security researchers keep finding in every agent. That's the direction the whole category is moving — and it's a good sign.
 
 ---
 
@@ -223,6 +259,7 @@ The platform is early. But the foundation — unified harness, Go CLI, async mul
 - **Unified harness** across CLI, desktop, cloud, SDK = Google's moat
 - **Model lock-in** to Gemini is the trade-off
 - **Migration** is straightforward for skills/MCP/hooks; conversation history needs manual export
+- **Since the cutoff:** Gemini CLI v0.58–v0.60 quietly hardened sandbox isolation, MCP OAuth issuer checks, symlink/path boundaries, and config-path permissions — the same security arc all agents are on
 
 The terminal AI war just got a new front. Google isn't playing catch-up anymore — they're building the platform they should've built in 2025.
 
