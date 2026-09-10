@@ -1,8 +1,8 @@
 ---
-title: "Cline Desktop Grew Up Fast — Here's What v0.0.24 Actually Fixes"
-description: "Cline's desktop app hit v0.0.24 with a storm of quality fixes: chat stream duplication, silent mid-task stops, checkpoint performance, and session imports from Claude Code and Codex. Free models still included."
+title: "Cline Desktop Grew Up Fast — Here's What v0.0.25 Actually Fixes"
+description: "Cline's desktop app hit v0.0.25 with a storm of quality fixes and a smarter model catalog: ChatGPT/Codex plans now show only what you can use, Windows updates stop failing, and the default model shifted for 36 providers. Free models still included."
 pubDate: "2026-08-01T09:00:00Z"
-updatedDate: "2026-09-09T14:30:00Z"
+updatedDate: "2026-09-10T12:00:00Z"
 tags: ["cline", "desktop", "free-models", "release", "coding-agent", "open-source", "update"]
 tool: "cline"
 author: "sage"
@@ -11,7 +11,7 @@ image: "/api/og?title=Cline+Desktop+Free+Models&tool=cline"
 
 Cline — the 67,000-star open-source coding agent — made two moves that lower the barrier to entry for AI-assisted coding. First, it shipped a standalone macOS desktop app that runs agent sessions independently of any IDE. Second, it added free coding models to every Cline surface: the desktop app, the VS Code extension, and the command-line interface. You do not need an API key to try Cline.
 
-The desktop app launched as **v0.0.4 on July 22, 2026** and has been updating almost every other day since. As of **September 9 it is at v0.0.24** on both macOS and Windows, with over a dozen releases fixing chat-stream duplication, silent mid-task stops, and checkpoint performance — on top of the universal Mac download, token usage meter, and edit-any-message from August.
+The desktop app launched as **v0.0.4 on July 22, 2026** and has been updating almost every other day since. As of **September 10 it is at v0.0.25** on both macOS and Windows, with over a dozen releases fixing chat-stream duplication, silent mid-task stops, and checkpoint performance — on top of the universal Mac download, token usage meter, and edit-any-message from August.
 
 If you have been curious about coding agents but hesitated because of billing setup or vendor lock-in, this is the week to try one.
 
@@ -134,6 +134,41 @@ A build-mismatch dialog used to appear on every launch if you had both the deskt
 ### Is It Worth Updating?
 
 If you tried Cline Desktop in August and bounced off bugs — duplicated text, messages disappearing, the app silently going idle — the v0.0.24 release is the reason to come back. These are not cosmetic tweaks. They fix the interactions that determined whether you trusted the tool.
+
+## September 10 Update: What v0.0.25 Changed
+
+Cline Desktop shipped **v0.0.25 on September 10, 2026** — less than 24 hours after v0.0.24. This one is smaller but smarter. Two fixes remove real daily friction, and one change affects every existing user silently.
+
+### Your model picker no longer lies to you
+
+The single most useful change in v0.0.25 is for ChatGPT/Codex subscribers: the model picker now lists **only the models your plan can actually use**. Two separate code paths were pulling from the shared OpenAI catalog, so GPT-4o, GPT-4.1, and `chatgpt-image-latest` showed up next to the Codex models — and the runtime then lost the Codex context caps. The result was models you could not use, with the wrong context window.
+
+Now the picker matches what the backend accepts: the retired `gpt-5.4` and `gpt-5.4-mini` are gone (OpenAI retired them for ChatGPT accounts on **August 31**), the default moves to **`gpt-5.6-terra`**, and every Codex model is capped at its real backend budget — **400K/272K/128K tokens** — instead of inheriting the API's 1.05M limits. If you use Cline with a ChatGPT plan, your picker now shows you exactly what works.
+
+### Windows updates stop failing
+
+On Windows, updates used to fail with "Error opening file for writing." The cause is a sidecar quirk: the compiled sidecar re-executes itself as a detached Cline Hub daemon that outlives the app by design — but the installer only kills the main binary, so `code-sidecar.exe` was still holding the file and the update stalled until you killed the process by hand.
+
+The v0.0.25 installer now stops the daemon first, matched on the full path — so updating one channel (say, stable) no longer takes down a side-by-side Cline Beta's sessions either. If you update Cline on Windows and it just works now, this is why.
+
+### The model catalog got reshuffled — check your default
+
+v0.0.25 refreshed the built-in model catalog, which is shipped with the app so it is correct at first launch. It adds **NaN (nan.builders)** and changes the resolved **default model for 36 providers** — including Bedrock, Vertex, OpenRouter, Kilo, GitHub Copilot, Gemini, Cerebras, Fireworks, Requesty, and Vercel AI Gateway. Several move off Claude Fable 5.1 to **GPT-6 Astra**, Vertex goes to **Gemini 3.8 Flash**, and OpenRouter/Kilo move to **Inception Mercury 2.5**.
+
+This matters even if you do nothing: if you use one of those providers without pinning a model, your next session may run on a different model than yesterday. It will still work — but if you had tuned prompts around a specific default, check `Settings → Models` and pin what you want.
+
+### Prompt loss and sign-in friction, fixed
+
+- Your message is **no longer lost** when a send fails before the turn starts (for example, an OAuth refresh throwing on first switch to Codex). The text and attachments now return to the composer, merged with anything you attached while the send was pending.
+- Providers that authenticate through a local CLI — **Claude Code, Codex CLI** — can now start sessions **without an API key**. They showed as "Configured" via local-auth before, but session start still refused them with "Missing API key." That refusal is gone.
+- **OpenCode** is now treated as a local CLI provider instead of an OAuth one — no more browser sign-in button that could not do anything; it authenticates from the credentials the opencode CLI stores.
+- **Session import** from Claude Code, Codex, and opencode moved to its own page in `Settings` instead of a row buried in General.
+- The composer's provider picker now marks which providers you have already configured, and the model picker distinguishes models that share a name (Cline Pass subscription models are listed separately from the free fallback tier).
+- Published macOS DMGs finally show the intended window layout and background again — a GitHub Actions quirk had been shipping a stock Finder window since the custom artwork landed.
+
+### Is v0.0.25 worth it?
+
+Yes — especially if you are on **Windows** (updates failed before), use **ChatGPT/Codex** (the picker was showing unusable models), or use **Claude Code/Codex CLI auth** (sessions now start without pasting an API key). And because the catalog reshuffle touched 36 providers, every existing user should glance at their default model once after updating.
 
 If you are a Claude Code user considering switching, the session import feature means you do not lose your existing work. Bring a session over, and the agent picks up where the last one left off.
 
