@@ -1,8 +1,8 @@
 ---
 title: "Your Claude Code May Ask 700+ Permission Prompts Per Session — Here's How to Check"
-description: "Claude Code's compound-command permission system can flood you with hundreds of prompts per session, even for read-only commands like cd, ls, and git status. Here's the workaround."
+description: "Claude Code's compound-command permission flood is still alive in September 2026 — the issue was auto-closed by a stale bot, not fixed. Here's the current workaround stack that survived 60 days of community testing."
 pubDate: "2026-07-11T17:25:00Z"
-updatedDate: "2026-07-11T17:25:00Z"
+updatedDate: "2026-09-10T14:00:00Z"
 tags: ["bug", "claude-code", "security", "permissions", "windows", "featured"]
 tool: "claude-code"
 author: "kira_bug_hunter"
@@ -11,15 +11,32 @@ image: "/api/og?title=Your+Claude+Code+May+Ask+700%2B+Permission+Prompts+Per+Ses
 
 If you use Claude Code for multi-session orchestration — running parallel workflows, fan-out subagents, or status checks across worktrees — you may have noticed something maddening: hundreds of permission prompts. For commands that only read files.
 
-A freshly filed issue ([#76718](https://github.com/anthropics/claude-code/issues/76718)) documents a compound-command permission bug that makes multi-session workflows nearly unusable. The reporter approved **over 700 prompts** across two days of running parallel-session workflows. Every single prompt was for a non-mutating chain like `cd X && git status -sb && echo --- && git log --oneline -5 && echo --- && gh pr list`.
+Two months ago we covered the root cause ([the compound-command permission bug, issue #76718](https://github.com/anthropics/claude-code/issues/76718)): a chain like `cd X && git status -sb && echo --- && git log --oneline -5` triggers a permission dialog even when every segment is individually allowlisted, because the permission engine evaluates compound chains as single units with a ~5-saved-rule ceiling.
 
-The bug is its permission engine evaluates compound commands as single units, not by their individual segments. Even when every segment (`cd`, `git status`, `echo`, `gh pr list`) has a matching allow rule, the compound chain still prompts. The system caps at roughly 5 saved rules per compound command, so a 6-segment chain of individually-allowlisted reads still hits the user with a dialog.
+Here's what happened since — and it's worse than "still not fixed."
 
-The report is labeled **bug**, **has repro**, **platform:windows**, **area:bash**, and **area:permissions** — the full stack of flags that says Anthropic can reproduce it and knows where the fix lives.
+## The bug didn't get fixed. It got *hidden*.
+
+On **September 8, 2026**, the issue was **auto-closed by a stale-issue bot** with the message "Closing for now — inactive for too long." Not by Anthropic acknowledging a fix. Not by a resolution. By an automation that closes anything without recent comments.
+
+The reporter pushed back the next day: the bug still reproduces on current versions, the "inactive" label is wrong (it has a full repro with version), and the auto-close behavior itself is now documented in a separate open issue — [#87647: "Over 6k issues labeled with 'has repro' have been auto-closed since March 2026"](https://github.com/anthropics/claude-code/issues/87647). That is a six-thousand-bug sweep. If your workaround relied on "they'll fix it soon," the issue tracker is no longer a reliable signal that a fix is coming.
+
+The **practical takeaway**: the compound-command permission flood is still present in Claude Code as of v2.1.267 (September 9, 2026). The five-rule ceiling and the `cd`-scored-as-path-read edge both still bite.
+
+## Wait — didn't some changelog entries fix this?
+
+It's easy to get hopeful reading the changelog. Two old entries look like they address it:
+
+- **[v2.1.59]**: "Improved 'always allow' prefix suggestions for compound bash commands (e.g. `cd /tmp && git fetch && git push`) to compute smarter per-subcommand prefixes instead of treating the whole command as one"
+- **[v2.1.77]**: "Fixed 'Always Allow' on compound bash commands (e.g. `cd src && npm test`) saving a single rule for the full string instead of per-subcommand, leading to dead rules and repeated permission prompts"
+
+Both are real, and both fix a *related* defect: when you clicked "Always Allow" on a compound command, Claude used to save one rule for the entire raw string (`cd src && npm test`), which then never matched again because any variation broke it — causing *repeated* prompts. Saving per-subcommand rules fixed that class of **self-inflicted** re-prompting.
+
+That is not the same bug as #76718. The 700-prompt flood comes from the **segment-count ceiling** (5 saved rules max per compound command, so a 6-segment read-only chain always prompts no matter how many rules you save) and the `cd` path-read scoring. Those two behaviors are unchanged in current releases, which is exactly why the issue's reporter says it still reproduces.
 
 ## Are you affected?
 
-You're affected if you use compound commands (chained with `&&`, `||`, `;`, `|`, or `&`) in Claude Code sessions, especially in multi-session or fan-out workflows. The bug is confirmed on Windows (Max plan) but the permission architecture is cross-platform.
+Same check as before — you're affected if you use compound commands (chained with `&&`, `||`, `;`, `|`, or `&`) in sessions, especially multi-session or fan-out workflows:
 
 ```bash
 # Quick repro: run an individually-allowlisted compound chain
@@ -29,53 +46,50 @@ claude -p "cd /tmp && ls && echo ok"
 # you are hitting the compound-command ceiling
 ```
 
-Look for the warning signs: mid-run prompts that interrupt a parallel fan-out, or an "allowlist" file that's grown past 700+ entries from clicking "Allow" hundreds of times.
+The two days of maintenance confirm this is not a Windows-only quirk: community reports from mid-July (the most active discussion window, nine comments) came from Windows, macOS, and Linux users running multi-session orchestration. The `cd <path> && git status && ...` inspection chain is the default shape for basically every read-only fan-out check.
 
-## The fix
+## What survived 60 days of community testing
 
-There's no official fix yet, but the reporter shares a working workaround — a custom `PreToolUse` hook that parses compound commands, splits on shell operators, and auto-allows provably non-destructive chains:
+The original PreToolUse auto-allow hook idea is still the right shape, but the thread turned up **two real edge cases that will make a naive hook auto-allow things it shouldn't** — worth knowing before you copy any snippet from this thread:
 
-```python
-# PreToolUse hook logic (Python pseudocode)
-def on_pre_tool_use(tool_use):
-    if tool_use.name == "Bash":
-        segments = split_compound(tool_use.input)
-        if all(is_read_only(s) for s in segments):
-            return {"permission_decision": "allow"}
-    return None  # fall through to normal prompt
-```
+1. **A hook that reads only the first line of stdin misses the rest of the chain.** The `read -ra SEGMENTS` one-liner floating around consumes a single line, so `SEGMENTS` ends up holding only the first segment — the loop never sees `rm -rf` hiding in segment four, and the hook allows the whole command. Confirmed by feeding the hook its stdin JSON. If you write this hook, split the *entire* command string, not one line.
+2. **Chain-splitting is per-check, so a rule can be right in one place and wrong in the next.** A destructive-rm rule walks the whole chain and blocks `true && rm -rf ~/dir`. But a sibling rule that only inspects the command head passes the same shape — same separator, same "prefix a harmless command, then the real one" structure, opposite result. Whatever hook you use, split once and apply every check to every segment.
 
-The reporter's hook allows only chains where every segment is provably non-destructive — `cd`, `ls`, `git status/log/diff`, `gh pr list`, `echo` — while falling through to normal prompting for anything with `rm`, `reset`, `--force`, `branch -D`, write redirects, or credential-store paths.
+The second-most-upvoted workaround in the thread is simpler and arguably more robust than a hook: **stop emitting compound commands for inspection entirely.** Every read-only step (`git status`, `git log`, `gh pr list`) goes out as a separate discrete Bash call instead of a chain. Independent calls run in parallel anyway, so it costs nothing, and it sidesteps the 5-rule ceiling completely rather than trying to patch around it. If you control the agent's tool-calling prompt (or your own scripts), this is the lowest-maintenance fix.
 
-Requested fixes from the report (any would resolve this):
-1. Auto-approve compound commands when every decomposed segment matches an allow rule — remove the ~5-rule ceiling
-2. Don't score `cd` into a workspace subdirectory as a gating path-read
-3. Ship a built-in "safe read-only command" auto-allow that survives chaining
+## Why this keeps being a security problem
 
-## Why it happened
+The deeper issue the thread keeps circling is that prompt flooding **trains rubber-stamping**. Hundreds of benign prompts per session push operators toward `--dangerously-skip-permissions` just to get work done — and that eliminates the entire security value of the permission system for the destructive commands it's supposed to catch.
 
-Claude Code's permission system splits compound commands on `&&`, `||`, `;`, `|`, and `&`, then evaluates each segment against the allowlist. But evaluation caps at roughly 5 saved rules per compound command, so a 6-segment chain always prompts. Worse, `cd` into a workspace subdirectory is scored as a path-read operation, not as `Bash(cd:*)`, so it doesn't match the common allow rule users expect. The net effect: **no amount of allowlist tuning fixes it** for longer chains.
+On top of the flood, a contributor documented a *display* defect that makes the problem worse: when a compound command is blocked, **the reason shown is often not the segment that actually triggered the stop.** A real example from the thread: a chain that ends in `rm -rf .mypy_cache/*` displayed the reason "Compound command contains cd with write operation" — the blocked segment was the `rm -rf`, but the dialog blamed the `cd`. If you're approving based on the displayed reason, you can approve a destructive segment while thinking you're approving a benign one.
 
-Beyond the annoyance, this is a security concern. Flooding users with hundreds of benign prompts trains a rubber-stamp reflex — users start clicking "Allow" without reading. That degrades the security value of prompts that *should* stop you — an `rm -rf`, a force-push, a destructive script. The system teaches users to ignore it.
+## What to do now
+
+1. **Don't wait for the issue tracker.** "Closed" here means "bot swept it," not "fixed." If you're affected, upvote [#87647](https://github.com/anthropics/claude-code/issues/87647) so the auto-close heuristics get pressure — that's the meta-bug that hid this one.
+2. **Switch read-only inspection to discrete calls** instead of `&&` chains. It's the workaround with zero maintenance and no hook edge cases.
+3. **If you use a PreToolUse hook**, split the full command string (not the first line) and run every segment through every check. Prefer the strictest result: auto-allow only when *all* segments are provably non-destructive; fall through to prompting for anything with `rm`, `reset`, `--force`, `branch -D`, write redirects, or credential-store paths.
+4. **Read the displayed reason skeptically.** It may name the wrong segment. For anything that contains a mutation, treat the whole chain as dangerous regardless of what the dialog says.
+
+The underlying requested fixes are unchanged from the original report: auto-approve compound commands when every decomposed segment matches an allow rule (remove the ~5-rule ceiling), don't score `cd` into a workspace subdirectory as a gating path-read, and ship a built-in "safe read-only command" auto-allow that survives chaining. Until then, the workarounds above are what 60 days of community testing says actually works.
 
 ## FAQ
 
+**Q: Is the compound-command bug fixed in current Claude Code?**
+A: No. The issue was auto-closed by a stale-issue bot on September 8, 2026, not resolved. The reporter and the community confirm it still reproduces on current versions (v2.1.267 at the time of writing). The changelog fixes in v2.1.59/v2.1.77 addressed a related "always allow saves the full string" defect, not the 5-rule ceiling or `cd` scoring.
+
 **Q: Can I just enable "Allow all" to skip the prompts?**
-A: You can, but it bypasses all permission gating — including mutations you'd want to catch. The PreToolUse hook is safer because it auto-allows only non-destructive commands while still prompting on actual changes.
+A: You can, but it bypasses all permission gating — including mutations you'd want to catch. The community-validated alternative is emitting read-only checks as discrete parallel Bash calls, or a PreToolUse hook that only auto-allows chains where every segment is provably non-destructive.
 
 **Q: Does this affect single-session Claude Code use?**
-A: Less noticeable, but yes. Any compound command longer than ~5 segments triggers a prompt even if every segment is individually allowlisted. Single-command users hit it less often because chains tend to be shorter.
-
-**Q: Will the fix remove the ~5-rule ceiling?**
-A: That's one of three requested fixes. If Anthropic removes the ceiling, compound commands where every segment is already allowlisted would pass through silently — preserving security for mutations while eliminating the false prompts.
+A: Less noticeable, but yes. Any compound command longer than ~5 segments triggers a prompt even if every segment is individually allowlisted. Single-command users hit it less because chains tend to be shorter.
 
 ---
-
 
 ## Related articles
 
 - [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
 - [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
 - [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)
+- [Claude Code Finally Lets You Cap AI Effort — And Stop Wasting Money](/blog/claude-code-effort-cap-fable-5-1-cost-control/)
 ---
 *The smartest developers don't pick one AI — they use them all. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** brings 9+ premium models into one chat for $12/mo. Your AI toolkit, simplified.*
