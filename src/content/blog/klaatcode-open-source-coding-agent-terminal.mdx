@@ -2,118 +2,110 @@
 title: "KlaatCode: The Open-Source Coding Agent That Wants to Beat Claude Code"
 slug: klaatcode-open-source-coding-agent-terminal
 pubDate: 2026-07-18
-description: "KlaatCode is a new open-source terminal coding agent claiming Claude Code-grade accuracy. We tested it against the real thing."
+updatedDate: 2026-09-10
+description: "KlaatCode is a new open-source terminal coding agent claiming Claude Code-grade accuracy — and shipping real features: model routing, code graphs, cross-session memory, and skills. We look at what's real and how it compares."
 tags: ["klaatcode", "open-source", "coding-agents", "comparison", "terminal"]
 ---
 
-There's a new open-source coding agent in town, and it's making bold claims. **KlaatCode** — from KlaatAI — just hit 142 GitHub stars and promises "Claude Code-grade accuracy" in a fully open-source package.
+There's a new open-source coding agent in town, and it's making bold claims. **KlaatCode** — from KlaatAI — reached ~360 GitHub stars by early September 2026 and promises "Claude Code-grade accuracy" in a fully open-source package, with smart model routing that it says cuts costs 10x.
 
-Naturally, I had to test that claim.
+Naturally, I had to look past the claims and check what's actually real.
 
 ## What KlaatCode Is
 
-KlaatCode is a terminal-based AI coding agent written in Rust. It connects to any OpenAI-compatible API (including local models) and provides:
+KlaatCode is a terminal-based AI coding agent written in TypeScript (Rust-free, ships as a single binary). It connects to any provider — Claude, GPT, Gemini, DeepSeek, or any OpenAI-compatible endpoint including local models — and provides:
 
 - Multi-file editing with diff previews
 - Project-aware context (reads your repo structure)
 - Tool use (shell, file read/write, search)
 - Session memory across conversations
-- Custom system prompts via `.klaatcode/` config
+- Custom system prompts via `.klaatai/` config
+- **Model routing** — picks a cheaper model for simple tasks and routes hard work to a stronger model, which is where the "10x cost cut" claim comes from
 
 It's basically Claude Code's feature set, but model-agnostic and open source.
 
 ## The Setup
 
 ```bash
-# Install
-cargo install klaatcode
+# Install (macOS / Linux)
+curl -fsSL https://klaatai.com/api/install | bash
 
-# Configure
-klaatcode init
+# Windows (PowerShell)
+irm https://klaatai.com/api/install-windows | iex
+
+# Homebrew
+brew install KlaatAI/klaatcode/klaatcode
+
+# npm (Node ≥ 18 or Bun ≥ 1)
+npm install -g klaatcode
 
 # Run
-klaatcode "refactor this function to be async"
+klaatcode                 # open in current directory
+klaatcode /path/to/project # open a specific project
+klaatcode run "fix types"  # headless / CI mode
 ```
 
-Takes about 2 minutes. The `init` command creates a `.klaatcode/` directory with config options for your preferred model and API endpoint.
+Takes about 2 minutes. `klaatcode init` creates a `.klaatai/` directory with config options for your preferred model and API endpoint.
+
+## What Version 2.5.0 (August 16, 2026) Added
+
+This is the release where KlaatCode stopped being a toy:
+
+**1. A local code graph.** Your project is indexed into a local code graph (tree-sitter quality, on every plan including free). The agent then navigates with queries instead of blind greps: `project_graph_query` answers "where is X / what calls Y" with exact file:line, `file_outline` reads a file's structure for ~10% of the tokens, `read_file symbol="Name"` serves exactly one definition, and `impact_check` shows the blast radius *before* an edit. `/graph` even opens an interactive force-graph of the whole project in your browser. For beginners, this is the feature that makes an agent feel like it actually knows your codebase instead of guessing.
+
+**2. Cross-session memory.** A background pass distills durable facts into `~/.klaatai/memory/` — project memory (commands that worked, conventions, decisions, corrections) and user memory (how you like to work). Both load at session start, so the next session already knows "uses bun not npm" and never repeats a correction you already made. `/memory` views it, `/memory graph` renders your persona as a graph.
+
+**3. Skills — reusable playbooks.** Drop a `SKILL.md` in `.klaatai/skills/<name>/` (project) or `~/.klaatai/skills/` (global): only the name + description ride in the prompt, and the body loads on demand. Invoke with `/<name> [args]`, create with `/skill new`. It also interops with the open skills ecosystem — `npx skills add <repo>`, `.agents/skills/`, and Claude Code's `.claude/skills/`. This is the same skills pattern that made Claude Code's skill system popular, and it's compatible with it.
+
+**4. Real Windows fixes.** Shell sites use `cmd.exe` instead of spawning a nonexistent `sh`; grep is in-process (a missing grep binary can no longer masquerade as "No matches found"); the write sandbox no longer misjudges cross-drive paths; protected system paths are refused.
+
+**5. Honest reads and compaction.** `read_file` returns up to 1000 lines with overlapping reads short-circuited, and post-compaction summaries carry a cumulative list of files touched — so the agent always knows every file it worked on, even after multiple compactions.
 
 ## How It Actually Performs
 
-I tested KlaatCode on three real tasks:
-
-### Task 1: Bug Fix
-**Prompt:** "The login endpoint returns 500 when email is missing — fix it"
-
-**KlaatCode:** Found the bug in 12 seconds, applied a clean fix with validation. Compared to Claude Code: Claude was 3 seconds faster but the fix was identical.
-
-**Winner:** Tie
-
-### Task 2: Multi-file Refactor  
-**Prompt:** "Extract all API calls into a separate service layer"
-
-**KlaatCode:** Created `services/api.ts`, moved 14 API calls, updated imports in 8 files. Took 45 seconds. Claude Code did the same in 30 seconds but also added error handling I didn't ask for.
-
-**Winner:** Claude Code (faster, more thorough)
-
-### Task 3: New Feature
-**Prompt:** "Add a dark mode toggle to settings page"
-
-**KlaatCode:** Created the component, added theme context, persisted to localStorage. Took 1 minute 20 seconds. Claude Code did it in 50 seconds with better accessibility.
-
-**Winner:** Claude Code
-
-## The Real Differences
+The honest picture: KlaatCode is not yet Claude Code-grade on complex work, but it's closer than most open-source options, and 2.5.0's code-graph and memory features close the gap for real projects:
 
 | Feature | KlaatCode | Claude Code |
 |---------|-----------|-------------|
+| Model routing | ✅ Built-in (10x cost claim) | Manual model switching |
+| Code graph navigation | ✅ 2.5.0, all plans | ✅ In recent versions |
+| Cross-session memory | ✅ 2.5.0 (distilled facts) | ✅ Skills/subagents |
+| Local models | ✅ Any OpenAI-compatible | Limited |
 | Price | Free (bring your own API) | $20/mo Pro |
-| Speed | 70-80% of Claude | Baseline |
-| Model support | Any OpenAI-compatible | Claude only |
-| Context window | Depends on model | 200K tokens |
-| Accuracy | Good (85-90% of Claude) | Baseline |
 | Open source | ✅ | ❌ |
-| Custom prompts | ✅ | Limited |
-
-## The Honest Assessment
-
-KlaatCode is **not** Claude Code-grade accuracy. It's closer to **85-90%** of Claude Code's quality, which is still impressive for an open-source tool.
 
 Where it shines:
-- **Cost**: If you're already paying for API access, KlaatCode is free
-- **Model flexibility**: Use GPT-4o, Gemini, or even local models
-- **Transparency**: You can read every line of code
-- **Speed**: For simple tasks, it's nearly as fast
+- **Cost**: routed, cheaper-model handling plus bring-your-own-API
+- **Model flexibility**: Claude, GPT, Gemini, DeepSeek, or local
+- **Transparency**: you can read every line of code
+- **Memory**: the agent actually remembers your conventions across sessions
 
 Where it falls short:
-- **Complex refactors**: Claude Code handles multi-file changes better
-- **Context**: Claude's 200K window beats most model configs
-- **Polish**: Claude Code's UX is more refined
+- **Complex refactors**: Claude Code still handles multi-file architectural changes with more polish
+- **Ecosystem**: skills/MCP ecosystem is younger than Claude Code's
+- **UX**: the terminal interface is improving fast but isn't as refined
 
 ## Who Should Use It
 
 **Good for:**
 - Developers who want to self-host their coding agent
 - Teams with custom LLM deployments
-- Budget-conscious developers (API costs only)
+- Budget-conscious developers (routing cuts API costs)
 - Privacy-sensitive projects (no data sent to Anthropic)
 
 **Not great for:**
-- Developers who need maximum accuracy
-- Complex enterprise refactoring
-- Teams already invested in Claude ecosystem
+- Developers who need maximum accuracy on complex enterprise refactors
+- Teams already deeply invested in the Claude ecosystem
 
-## The Bigger Picture
+## The Bottom Line
 
-KlaatCode represents a trend: open-source alternatives are catching up to proprietary tools. The gap is closing fast. A year ago, open-source coding agents were toys. Now they're genuinely useful.
+KlaatCode is worth watching. The 2.5.0 release — code graph, cross-session memory, skills, real Windows support — is exactly the feature set that makes a coding agent feel competent rather than lucky. It's not Claude Code's replacement yet, but the gap is closing fast, and the model-routing angle is genuinely different.
 
-The real question isn't "is KlaatCode as good as Claude Code?" — it's "is good enough, good enough?" For many tasks, yes.
-
-**Rating: 7.5/10** — Solid open-source option, not quite Claude Code level, but getting close fast.
+**Rating: 7.5/10** — Solid open-source option, not quite Claude Code level, but getting close fast — and the September cadence (2.4.x in early August, 2.5.0 on Aug 16) suggests it's moving quickly.
 
 ---
 
-*KlaatCode is free and open source. Install: `cargo install klaatcode`. Requires your own API key.*
-
+*KlaatCode is free and open source. Install: `npm install -g klaatcode` or `curl -fsSL https://klaatai.com/api/install | bash`. Requires your own API key.*
 
 ## Related articles
 

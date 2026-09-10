@@ -1,8 +1,8 @@
 ---
 title: "OpenClaw Just Became the Control Plane Your Agent Fleet Was Waiting For"
-description: "OpenClaw 2026.7.1-2 and 2026.6.34 (Aug 3–8) harden the gateway, fix Codex subagent stalls, add safer browser boundaries, and recover sessions through restarts. The control-plane vision — driving Codex, Claude, OpenCode, and Pi from one cockpit — is now shipping in stable."
+description: "OpenClaw 2026.7.1-2 and 2026.6.34 (Aug 3–8) harden the gateway, fix Codex subagent stalls, add safer browser boundaries, and recover sessions through restarts. September's 2026.9.1–9.3 add GPT-6 Astra, durable approvals, shareable conversation links, and Team Reports. The control-plane vision — driving Codex, Claude, OpenCode, and Pi from one cockpit — is now shipping in stable."
 pubDate: "2026-07-18T09:30:00Z"
-updatedDate: "2026-08-15T10:00:00Z"
+updatedDate: "2026-09-10T11:00:00Z"
 updated: true
 tags: ["release", "openclaw", "orchestration", "control-plane", "coding-agents", "security", "reliability", "featured"]
 tool: "openclaw"
@@ -79,6 +79,20 @@ Three things across these releases show the control-plane ambition is deliberate
 
 ---
 
+## The September wave (2026.9.1–9.3, Sep 3–8) — the control plane grows teeth
+
+Three releases landed in the first week of September. Together they answer the two objections a control plane always gets — "it's fragile" and "it's a toy":
+
+**2026.9.1 (Sep 3) — updates that don't kill your session.** `openclaw update` now rolls back the npm candidate when post-update Doctor fails, preserves your config and secret references across a failed upgrade, and hands failures to a built-in triage agent. A Gateway that stays up: malformed legacy cron rows are quarantined instead of blocking boot, migration warnings degrade the Gateway instead of refusing to start, and Windows Gateways stay online after an agent restart. Codex approvals became durable — "Allow Always" persists for MCP tools, and approved placements are reused instead of re-asked. Fresh installs even get a quick-start lane that detects existing Claude Code or Codex logins and verifies them live. This is the "I can run it unattended" release.
+
+**2026.9.2 (Sep 5) — GPT-6 Astra + settings without restarts.** OpenClaw became one of the first harnesses with **GPT-6 Astra** support (`openai/gpt-6-astra` via API key or eligible ChatGPT/Codex account, text + image, Responses tool calls, reasoning controls, `/think ultra`). More importantly for operators: many agent, model, tool, channel, browser, node, access, and terminal settings now apply **through their running owners without a Gateway restart** — a long-standing annoyance for anyone running OpenClaw as a long-lived hub. Active, queued, and delegated replies now survive Gateway restarts. Swarm (concurrent sub-agents with structured results) became default-on, and session tools default to all-session visibility with agent-to-agent access — the orchestration story keeps compounding.
+
+**2026.9.3 (Sep 8) — the trust and audit release.** Updates rehearse in isolated candidate state before activation — failed changes roll back instead of wedging your install. Secrets and credential handling keep getting stricter: management failures verify before repair, and failed updates require explicit consent before a report leaves your machine. New capabilities aimed squarely at the "fleet operator" persona: **Team Reports** (authenticated daily/weekly/monthly GitHub activity + chosen Discord channels, with stored history and optional model summaries), **shareable read-only conversation links** with revocable access (public view omits tools, reasoning, files, images, and widgets), a **searchable meeting library** with full transcript archives, provider-account management in Models settings, and a Skill Workshop that keeps skills in one persistent collection across workspaces. Two breaking notes: OpenClaw now **requires Node 24.16+/26.1+** (older Node causes SQLite text truncation), and a few plugin SDK helpers moved — see the migration guide if you build plugins.
+
+**The pattern:** every September release moves the same direction — make the Gateway trustworthy enough to be *the* long-lived process your other agents hang off. GPT-6 Astra gives it a top-tier native brain, durable approvals remove the babysitting, Team Reports and shareable transcripts turn it into a team audit surface, and update rehearsal makes upgrades something you don't fear. That is exactly the control-plane checklist.
+
+---
+
 ## What this means for your workflow
 
 If the trend holds, the question "which coding agent should I use?" starts to erode into "which cockpit should I sit in?" OpenClaw's bet is that the answer is a layer that can hand a job to whichever agent is best at it — Codex for one class of task, Claude for another, OpenCode for a third — without you leaving the session.
@@ -95,7 +109,7 @@ A control plane is only as safe as its weakest spoke. OpenClaw reaching into Cod
 
 ## Bottom line
 
-OpenClaw 2026.7.2 beta looked like polish on the surface. **The stable releases 2026.7.1-2 and 2026.6.34 prove the architectural bet is real**: gateway restart safety, Codex subagent recovery, browser sandbox hardening, session durability through crashes, and channel recovery that survives overload. This is the control plane for your agent fleet — not just another agent in it. Whether that is the future of coding-agent UX or a bridge too far depends on trust, but the architectural bet is already on the table, and it's now running on stable. If you run more than one coding agent today, this is the release to watch. For the head-to-head on what OpenClaw already does versus OpenCode, see the [OpenClaw vs OpenCode comparison](/blog/opencode-vs-openclaw/).
+OpenClaw 2026.7.2 beta looked like polish on the surface. **The stable releases 2026.7.1-2 and 2026.6.34 prove the architectural bet is real**: gateway restart safety, Codex subagent recovery, browser sandbox hardening, session durability through crashes, and channel recovery that survives overload. This is the control plane for your agent fleet — not just another agent in it. Whether that is the future of coding-agent UX or a bridge too far depends on trust, but the architectural bet is already on the table, and it's now running on stable. If you run more than one coding agent today, this is the release wave to watch — and Codex's own September wave ([GPT-6 Astra default, worktrees, Windows daemon](/blog/codex-0-154-gpt6-astra-worktrees-windows-daemon/)) is the perfect example of the workloads OpenClaw now routes natively. For the head-to-head on what OpenClaw already does versus OpenCode, see the [OpenClaw vs OpenCode comparison](/blog/opencode-vs-openclaw/).
 
 ---
 
@@ -104,18 +118,18 @@ OpenClaw 2026.7.2 beta looked like polish on the surface. **The stable releases 
 OpenClaw installs via npm or container:
 
 ```bash
-# npm (extended-stable channel resolves to 2026.6.34)
-npm install -g openclaw@extended-stable
+# npm (latest channel resolves to 2026.9.x)
+npm install -g openclaw@latest
 
-# or specific version
-npm install -g openclaw@2026.6.34
+# or a specific September release
+npm install -g openclaw@2026.9.3
 
 # Docker
-docker pull openclaw/openclaw:2026.6.34
-docker pull openclaw/openclaw:extended-stable
+docker pull openclaw/openclaw:2026.9.3
+docker pull openclaw/openclaw:latest
 ```
 
-Verify with `openclaw --version` or check the Gateway health endpoint.
+**Node requirement (2026.9.x):** OpenClaw 2026.9.3 requires Node **24.16+** on the 24.x line or **26.1+**; Node 26 is recommended. Older Node builds are no longer supported and older Node risks SQLite text truncation. Upgrade Node *before* OpenClaw, then verify with `openclaw --version` or check the Gateway health endpoint.
 
 ---
 
