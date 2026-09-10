@@ -1,0 +1,118 @@
+---
+title: "Codex Just Made GPT-6 Astra Its Default — and Nobody Is Talking About It"
+description: "OpenAI Codex shipped seven stable releases in three weeks: GPT-6 Astra is now the bundled default model, experimental worktrees landed, and Windows finally gets a background daemon. A beginner-friendly look at the release wave everyone missed."
+pubDate: "2026-09-10T14:00:00Z"
+tags: ["codex", "openai", "release", "gpt-6", "astra", "worktrees", "coding-agent", "beginner"]
+tool: "codex"
+author: "sage"
+image: "/api/og?title=Codex+Made+GPT-6+Astra+Its+Default&tool=codex"
+---
+
+While everyone was watching Claude Code's release train, OpenAI's Codex quietly shipped **seven stable releases in three weeks** — 0.148 on August 18 all the way to 0.154.0 on September 9. No hype, no launch event, just a changelog that keeps getting longer.
+
+And buried in that wave are three things that genuinely change how Codex feels to use: **GPT-6 Astra is now the bundled default model**, **experimental worktrees finally landed**, and **Windows users get a real background daemon**. Here's what each one means if you're not a release-notes reader.
+
+## 1. GPT-6 Astra is the default now
+
+The last time we covered Codex ([0.147, portable plugins and auto-approvals](/blog/codex-0-147-portable-plugins-auto-approval/)), the model story was GPT-5.6. A month later, the model picker and the Amazon Bedrock catalogs list **GPT-6 Astra**, and starting in 0.153.4 it is the **bundled default when you haven't pinned a model** ([0.153.4 release notes](https://github.com/openai/codex/releases/tag/rust-v0.153.4)).
+
+For beginners, "default model" is the single most important line in any agent changelog: it is what runs when you just type `codex` and start working. Two things to know about Astra's tiers:
+
+- The **Fast tier** is described in-app as **"2x speed, increased usage"** — OpenAI actually corrected the label from 1.5x to 2x in 0.153.2, which tells you how quickly they're iterating on it.
+- It is also available through **Amazon Bedrock**, so teams already on AWS can route Codex through their existing account instead of a ChatGPT login ([0.154.0](https://github.com/openai/codex/releases/tag/rust-v0.154.0), [0.153.3](https://github.com/openai/codex/releases/tag/rust-v0.153.3)).
+
+The same wave that made Goose the most model-agnostic agent in open source ([Goose v1.47–v1.50](/blog/goose-v1-50-gpt6-astra-web-search-security-wave/)) is landing inside Codex: newest frontier model, first-class, as the default.
+
+## 2. Experimental worktrees: dangerous experiments without the danger
+
+The headline feature of 0.154.0 is **experimental worktree support**. If you haven't run into worktrees: they let you create **isolated checkouts of your repository** — separate folders where the agent can go wild without touching your working copy.
+
+Codex's version ([#42652, #43069, #43120, #43286](https://github.com/openai/codex/releases/tag/rust-v0.154.0)) works like this:
+
+- `codex exec --worktree` or `/worktree` inside a session creates an isolated checkout for **new or forked sessions**
+- You can **browse and resume** those worktrees later from the TUI
+- The whole thing lives behind a feature flag, so nothing changes until you opt in
+
+Why this matters for beginners: the scariest thing about letting an agent refactor your code is "what if it breaks my working tree mid-task?" With worktrees, the agent experiments in a side copy, and you review the diff before anything touches your real branch. This is the same direction Claude Code ([worktree sandbox escapes have been a real attack story](/blog/beware-cve-2026-55607-claude-code-worktree-sandbox-escape/)) and Qwen Code have been pushing — isolation is the pattern.
+
+## 3. Windows finally gets a first-class background server
+
+Codex 0.154.0 gives **Windows sessions a shared background Codex server**, with daemon lifecycle commands and **managed updates** ([#42405, #42392](https://github.com/openai/codex/releases/tag/rust-v0.154.0)). If you've ever had a terminal agent die because you closed the window it started in, this is the fix: sessions now survive in a background process you can reconnect to.
+
+It's part of a month-long Windows hardening push, which is worth calling out for anyone on the platform:
+
+- **Windows Store PowerShell** sandbox execution fixed in 0.152.0
+- Sandbox fixes for **Unicode user paths** in 0.150.0 (the classic `C:\Users\اسم` problem) and Microsoft Store PowerShell in 0.152.0
+- Native sandbox provisioning and a private-desktop command runner in the 0.154.0 line
+
+Windows has long been the stepchild of terminal agents — the tooling assumed macOS and Linux. That's changing, version by version.
+
+## 4. The agents dashboard: multi-task workflows became usable
+
+0.149.0 and 0.150.0 turned Codex into something closer to a **task manager** than a single-session REPL:
+
+- `codex agents` — an interactive dashboard to **search, start, open, rename, and stop tasks** ([0.149.0](https://github.com/openai/codex/releases/tag/rust-v0.149.0))
+- `codex queue` — send messages to existing **local or remote sessions**, so a running task can be steered from outside
+- `@mentions` of other Codex tasks — reference another task by name and ask agents to read, create, or message it ([0.150.0](https://github.com/openai/codex/releases/tag/rust-v0.150.0))
+- `/cd`, `/pwd`, `/cwd` — manage the working directory mid-session instead of restarting
+
+The practical picture: spawn one long-running task, `codex queue` it a follow-up, and `@`-reference its output from a second task. That's the multi-agent pattern without a separate orchestration tool.
+
+## 5. Vim mode grew up
+
+Codex's Vim mode picked up a surprising amount of polish across the wave:
+
+- `/` and `?` search with `n`/`N` navigation (0.152.0)
+- `u` undo and `Ctrl+R` redo, preserving complete drafts including pasted content (0.153.0)
+- `.` to repeat your last edit (0.150.0)
+- `R` replace mode with dot-repeat and better Escape handling in legacy terminals (0.154.0)
+
+If you live in a terminal, this turns the composer from "a text box that happens to be in Vim" into an editor that behaves the way your muscle memory expects.
+
+## 6. Safety got quieter and stricter
+
+The security-relevant changes are easy to miss because they don't make headlines — but they're the reason to actually update:
+
+- **Untrusted projects no longer supply project-level `AGENTS.md` instructions** (0.150.0) — the prompt-injection vector of "clone a repo, open it, get hijacked" took a direct hit
+- **Startup avoids running workspace-controlled helpers before trust is established**, and the macOS sandbox blocks terminal input injection (0.154.0)
+- **Sandbox restrictions fail closed** for denied or unreadable paths on Linux and Windows (0.148.0)
+- **Deny-read rules survive permission changes**, and managed policy stays enforced
+- **Credential redaction improved** in app-server diagnostics (0.150.0) — provider, auth-refresh, and attestation fields are scrubbed
+- **Guardian review history now survives compaction, restarts, and forks** (0.152.0–0.153.0), and stale approvals are rejected after new user instructions
+
+That last cluster matters: Guardian is Codex's approval-review system, and "history survives compaction" means the agent can't quietly forget an earlier approval or denial when the conversation gets summarized. For anyone running Codex unattended, this is the difference between a guardrail and decoration.
+
+## 7. Plugins became manageable, MCP got polished
+
+The plugin story, which started with 0.146/0.147, matured:
+
+- **`codex plugins` CLI can list, install, and remove plugins from remote marketplaces** (0.153.0) — no more hand-editing config to try a plugin
+- **Existing sessions pick up newly installed plugin tools** and refresh skills after upgrades (0.154.0)
+- **MCP connections coordinate OAuth token refreshes** and surface login challenges instead of silently replaying rejected calls (0.154.0)
+- Extensions can **inspect or replace MCP tool results** before they reach the model (0.151.0) — a debugging superpower
+- Individual MCP tools support an `output_token_limit` (0.152.0) so one chatty server can't blow your context
+
+## What to actually do
+
+1. **Update**: `codex update` — or if you're on the desktop app, let the managed updater run.
+2. **Check your model**: run `/model` and confirm you're on GPT-6 Astra; if you're on a Max/Pro plan, the Fast tier is the "2x speed" option.
+3. **Try worktrees for your next scary refactor**: `codex exec --worktree` and let it experiment in an isolated checkout.
+4. **Windows users**: update and look for the daemon lifecycle commands — background sessions that survive window closes.
+5. **Re-check automation safety**: if you run Codex unattended, the AGENTS.md trust change and Guardian compaction fixes in 0.150–0.153 are worth an upgrade alone.
+
+## What the wave says
+
+Three weeks, seven releases, no launch event. OpenAI is treating Codex like infrastructure now — shipping model support, isolation primitives, and trust fixes in small, boring increments. That's actually the most reliable kind of progress for a tool you build on: the interesting features (Astra, worktrees) get attention, but the safety fixes are what make it safe to leave running.
+
+If you've been comparing agents on marketing instead of release notes, this is the wave that should update your mental model of Codex.
+
+Full changelog: [`rust-v0.148.0...rust-v0.154.0`](https://github.com/openai/codex/compare/rust-v0.148.0...rust-v0.154.0)
+
+*Disclosure: some links on this site are affiliate links (aiFiesta).*
+
+## Related articles
+
+- [Codex 0.147.0: Portable Plugins, Automatically Approved Reviews, and Safer Defaults](/blog/codex-0-147-portable-plugins-auto-approval/)
+- [Claude Code vs Codex: The Terminal Battle](/blog/claude-code-vs-codex-terminal-battle/)
+- [Goose Just Got GPT-6 Astra and Web Search Built In — the September Wave Is Huge](/blog/goose-v1-50-gpt6-astra-web-search-security-wave/)
+- [OpenCode vs Codex](/blog/opencode-vs-codex/)
