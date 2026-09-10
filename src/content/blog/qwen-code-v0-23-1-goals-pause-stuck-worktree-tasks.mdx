@@ -1,9 +1,9 @@
 ---
 title: "This AI Agent Finally Knows When to Give Up — Qwen Code v0.23.1"
-description: "Qwen Code v0.23.1 adds goals that pause themselves after three stuck turns, worktree-isolated parallel tasks, and spend windows — v0.23.2 turns on built-in web search and reasoning-effort controls, and Desktop hit 0.3.0. The open-source agent is learning the most important autonomy skill: knowing when to stop."
+description: "Qwen Code v0.23.1 adds goals that pause themselves after three stuck turns, worktree-isolated parallel tasks, and spend windows — v0.23.2 turns on built-in web search and reasoning-effort controls, Desktop hit 0.3.0, and v0.23.3 lets you delegate subagent turns to Claude Code over ACP. The open-source agent is learning the most important autonomy skill: knowing when to stop — and when to call a specialist."
 pubDate: "2026-09-08T19:15:00Z"
-updatedDate: "2026-09-10T15:00:00Z"
-tags: ["release", "qwen-code", "coding-agents", "workflows", "autonomy"]
+updatedDate: "2026-09-10T16:10:00Z"
+tags: ["release", "qwen-code", "coding-agents", "workflows", "autonomy", "acp", "claude-code"]
 tool: "qwen-code"
 author: "sage"
 image: "/api/og?title=Qwen+Code+v0.23.1+Goals+That+Pause+Themselves&tool=qwen-code"
@@ -81,6 +81,21 @@ The same day v0.23.2 landed, **Qwen Code Desktop hit v0.3.0** (September 10). It
 - The **daemon gained a REST integration entry point** (guarded) — a sign the desktop shell is becoming scriptable.
 
 If you only use Qwen Code in the terminal, nothing changes. If you want the windowed version: grab the 0.3.0 installer, expect (and dismiss) the SmartScreen prompt, and pin your model — the desktop catalog reshuffle behavior applies here too.
+
+## And then v0.23.3 let you hand a turn to Claude Code
+
+Two days later, **v0.23.3 landed** (September 10) with one feature that changes what "open-source" can mean for a coding agent: **you can now delegate a subagent turn to an external agent over ACP — Claude Code first** ([#11003](https://github.com/QwenLM/qwen-code/pull/11003)).
+
+**What it does:** a subagent definition can declare an `executor` block naming an external command. When that subagent is called, the turn runs in that external process instead of in-process — and every event it produces is re-published through the exact same transcript, permission, and Web Shell pipeline Qwen uses for its own agents. Claude Code is the first (and for now, only) external agent wired up.
+
+**Why it matters:** before this, running a second vendor's agent from Qwen Code meant handing the whole session to a different backend — a clunky all-or-nothing move. Delegation flips the model: the parent Qwen session stays authoritative, and a *specific* subagent (say, "deep review" or "refactor specialist") gets dispatched to whatever agent is best at that job. Think contractor, not takeover.
+
+Two details worth knowing before you configure it:
+
+- The executor is **loud about being honored**. If a definition declares an executor the host can't run, the call fails loudly instead of silently falling back to in-process — the old behavior ran the work in-process anyway, *and billed it to the wrong provider*.
+- The rest of v0.23.3 is polish around the same autonomy theme: **smarter reasoning presets** for Kimi/Qwen/DeepSeek ([#11349](https://github.com/QwenLM/qwen-code/pull/11349)), **one bounded self-review before an address-review commit** ([#11516](https://github.com/QwenLM/qwen-code/pull/11516)), a **Responses API content generator** ([#8169](https://github.com/QwenLM/qwen-code/pull/8169)), better session-overview navigation in the web shell ([#11238](https://github.com/QwenLM/qwen-code/pull/11238)), clickable URLs in user messages ([#11464](https://github.com/QwenLM/qwen-code/pull/11464)), and a Windows fix that stops orphaned `conhost.exe` processes by hosting PTYs via bundled ConPTY ([#11497](https://github.com/QwenLM/qwen-code/pull/11497)). Also: goal checkpoints that overrun their budget now **retry instead of spending a stall** ([#11365](https://github.com/QwenLM/qwen-code/pull/11365)).
+
+The through-line of the whole v0.23.x wave is the same one this article started with: brakes first, features second — stop when stuck, spend transparently, and hand off a turn when another agent is a better fit.
 
 ## Related articles
 
