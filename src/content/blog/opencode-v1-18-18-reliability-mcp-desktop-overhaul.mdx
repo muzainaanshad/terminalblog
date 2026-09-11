@@ -1,8 +1,9 @@
 ---
 title: "Opencode Just Became the Open-Source Coding Agent You Can Actually Trust"
-description: "v1.18.18 fixes the MCP reconnect loops, provider model routing, desktop freezes, and session chaos that made you hesitate. The 160K-star agent is finally reliable enough for daily work."
+description: "Opencode's v1.18.18→v1.18.30 wave fixes the MCP reconnect loops, hangs, and model routing that made you hesitate — and lands GPT-6 Astra for ChatGPT subscribers. The 160K-star agent is finally reliable enough for daily work."
 pubDate: "2026-08-15T14:00:00Z"
-tags: ["opencode", "release", "open-source", "mcp", "desktop", "beginner", "guide"]
+updatedDate: "2026-09-11T09:00:00Z"
+tags: ["opencode", "release", "open-source", "mcp", "desktop", "beginner", "guide", "gpt-6"]
 tool: "opencode"
 author: "sage"
 image: "/api/og?title=Opencode+v1.18.18+Reliability+Overhaul&tool=opencode"
@@ -11,6 +12,53 @@ image: "/api/og?title=Opencode+v1.18.18+Reliability+Overhaul&tool=opencode"
 Opencode v1.18.18 dropped **two days ago** (August 13, 2026) and it's the kind of release that turns a "cool project" into a daily driver. The 160,000-star open-source coding agent spent the last month quietly fixing the paper cuts that made you keep a commercial backup: MCP servers getting stuck in reconnect loops, provider model configs breaking mid-session, desktop app freezes, and session ordering chaos.
 
 If you tried Opencode a few months ago and walked away frustrated — **this is the version to come back for**.
+
+Since then, the release train kept rolling: **twelve more versions (v1.18.19 → v1.18.30) landed between August 20 and September 9**, and the theme is consistent — fewer freezes, better retries, and model support that keeps pace with the frontier. The two fixes beginners will feel most are the **new five-minute timeouts** (no more infinite spinner on a slow model startup) and **GPT-6 Astra finally showing up for OpenAI subscription users**.
+
+Here's the wave, sorted by what actually matters for daily use.
+
+## GPT-6 Astra Arrives for ChatGPT Subscribers
+
+The single most useful change in the wave is a fix most release notes skip over. In **v1.18.29**, Codex OAuth model filtering learned to recognize integer GPT versions like `gpt-6` — which means **gpt-6-astra no longer vanishes from the model picker for people signed in with a ChatGPT subscription**.
+
+If you've been reading about GPT-6 Astra ([Codex's new default](/blog/codex-0-154-gpt6-astra-worktrees-windows-daemon/), [Goose v1.50](/blog/goose-v1-50-gpt6-astra-web-search-security-wave/)) and wondering why it never appeared in Opencode, this was the bug. **v1.18.30** follows up with the Astra system prompt for GPT-6 models, so the agent actually tunes its behavior for the model family instead of treating it like a generic GPT.
+
+For anyone running Opencode against their OpenAI subscription, this turns "I can't use my newest model" into "my newest model is my default."
+
+## The Hangs Are Finally Capped
+
+Long-time Opencode users know the worst failure mode: the agent sends a request, the provider takes its time warming up a big model, and the terminal sits there spinning — with no error and no escape.
+
+**v1.18.27** fixes that class of problem with sensible defaults:
+- **Provider header timeouts default to five minutes**, so slow model startups fail with a real error instead of hanging forever
+- **Streamed chunk timeouts also default to five minutes**, with `false` supported to disable them if you genuinely need unlimited waits
+- Hitting a timeout now avoids unhandled errors when canceling half-finished SSE reads
+
+**v1.18.20** attacks the other half of the equation: when a provider responds with `finish_reason: network_error` (or variants like `network-error`), Opencode now **retries the response instead of silently ending the turn**. xAI capacity and temporary unavailability stream errors get the same retry treatment. The practical result: a flaky network or an overloaded provider no longer kills your session mid-task.
+
+## Cloudflare AI Gateway: Now a First-Class Route
+
+If you route models through Cloudflare's AI Gateway, two releases matter:
+- **v1.18.19** added native OpenAI and Anthropic passthroughs for Cloudflare AI Gateway models
+- **v1.18.23** fixed routing for third-party providers (non-Workers models now work through the gateway's REST API) and converts dotted Anthropic model IDs like `claude-haiku-4.5` to the dashed slug Anthropic expects
+
+Taken together: a Cloudflare-gated setup that used to break on Anthropic model names or silently drop non-Workers providers now behaves like a direct connection.
+
+## Subagent Failures Become Resumable
+
+For teams running multi-agent workflows, **v1.18.20** closes a silent-failure gap: failed subagent tool calls now surface with a **resumable `task_id`** instead of returning an empty result. Permission requests triggered by subagents during `opencode run` are also answered properly now — previously they could stall a headless run.
+
+## ChatGPT Subscription Parity Keeps Improving
+
+Alongside the Astra fix, **v1.18.19** matched Codex rate limits more closely to ChatGPT subscription limits (so heavy OpenAI usage behaves the same whether you're in Codex or Opencode), and **v1.18.28** sends the session ID as GitHub Copilot's interaction header for better request tracking across a session. **v1.18.26** makes Claude 5 sessions tolerate stale thinking blocks instead of failing after prompt or tool changes, and lets Bedrock GPT-5.6 models accept `none` reasoning effort.
+
+## The Rest of the Wave (Quick Hits)
+
+- **v1.18.30 provider hygiene**: Bedrock DeepSeek model IDs (including ARN-based IDs) preserved correctly; Azure and OpenAI provider SDKs updated with compatibility fixes; reasoning effort variants for supported GitLab GPT and Claude models
+- **Azure CLI sign-in** now asks for the resource name directly instead of querying Azure management APIs (v1.18.26); Entra ID sign-in through the Azure CLI also landed in v1.18.24
+- **Desktop**: session renames save reliably from the title editor and tab context menu (v1.18.26); device auth uses the desktop client ID; archived sessions disappear from the Home list immediately (v1.18.24)
+- **`/connect`** now correctly shows which providers are authenticated (v1.18.19)
+- Malformed model pricing no longer breaks usage cost calculation; OpenAI websocket requests exceeding message-size limits fall back gracefully (v1.18.19)
 
 ---
 
@@ -198,7 +246,7 @@ npm update -g @opencode/opencode
 
 # Verify
 opencode --version
-# Should show 1.18.18
+# Should show 1.18.30 (latest in the wave covered here)
 ```
 
 ---
@@ -229,7 +277,7 @@ If you're on the fence about open-source vs. commercial agents — this release 
 - [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
 ---
 
-*Published August 15, 2026 — covers Opencode v1.18.18 released August 13, 2026. Full changelog: [opencode.ai/changelog](https://opencode.ai/changelog)*
+*Published August 15, 2026; updated September 11, 2026 — covers Opencode v1.18.18 through v1.18.30 (August 13 – September 9, 2026). Full changelog: [opencode.ai/changelog](https://opencode.ai/changelog)*
 
 ## FAQ
 
@@ -248,7 +296,7 @@ Chronological message ordering now stays correct even with imported/legacy messa
 **Q5: What are the provider routing fixes?**
 OpenCode now respects provider-defined reasoning options: GitHub Copilot model routing honors advertised endpoints, Azure Cognitive Services restored, OpenAI Responses phase handling fixed, Cerebras reasoning replay fixed, and more. Models work the way providers intended.
 
-**Q6: How do I update to v1.18.18?**
+**Q6: How do I update to v1.18.30?**
 `curl -fsSL https://opencode.ai/install | bash` or `npm update -g @opencode/opencode`. Verify with `opencode --version`.
 
 **Q7: Is Opencode ready for daily work?**
