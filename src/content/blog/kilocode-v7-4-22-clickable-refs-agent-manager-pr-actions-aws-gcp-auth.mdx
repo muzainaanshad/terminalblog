@@ -1,99 +1,96 @@
 ---
-title: "Kilo Code v7.4.22 Makes File References Clickable, Adds Agent Manager PR Actions & AWS/GCP Auth"
-description: "Kilo Code v7.4.22 dropped August 13 with clickable inline file references in agent responses, Agent Manager PR comment actions (resolve/unresolve, jump to comments), structured AWS/GCP credentials support, and subagent permission fixes."
+title: "Kilo Code Just Made Long Agent Runs Manageable — /goal, Notifications, and PR Fixes"
+description: "Kilo Code v7.6.0 (September 10) adds /goal for long-lived tasks with pause/resume, OS notifications, and Agent Manager PR merge flow — while v7.5.x fixed PR review, worktrees, and keep-awake. The open-source Cursor alternative keeps shipping product craft."
 pubDate: 2026-08-15
-updatedDate: 2026-08-15
-image: "/api/og?title=Kilo+Code+v7.4.22+Release&tool=kilocode"
-tags: ["kilocode", "release", "agent-manager", "aws", "gcp", "subagents", "clickable-references"]
+updatedDate: 2026-09-10T12:45:00Z
+updated: true
+image: "/api/og?title=Kilo+Code+v7.6.0+Release&tool=kilocode"
+tags: ["kilocode", "release", "agent-manager", "goal", "notifications", "pr-review", "worktrees"]
 category: "releases"
 tools: ["kilocode"]
 difficulty: "beginner"
-readingTime: 7
+readingTime: 8
 ---
 
-Kilo Code v7.4.22 released **August 13, 2026** (2 days ago). This is a feature-focused update on top of the v7.4.21 foundation — four meaningful additions for daily operators.
-
----
-
-## The 4 Headline Features
-
-### 1. Clickable File References in Agent Responses — No More Copy-Paste
-
-**What it does:** When an agent mentions a file in its response (inline code spans like `src/utils/helpers.ts`), Kilo now **validates those paths against the workspace filesystem**. Real files become clickable links that open at the referenced line. Dead links show a "File not found" warning with fallback workspace search.
-
-**Why it matters:** Agents constantly reference files — "look at `auth/middleware.ts:42`", "the bug is in `components/Button.tsx`". Before this, you'd copy the path, `Cmd+P`, paste, enter. Now: **click → open → at the right line**.
-
-**How it works:**
-- Inline code spans (` `) scanned against workspace
-- Valid paths → clickable links with line numbers
-- Invalid paths → plain code + warning on click + workspace search fallback
-- Zero config — works automatically
-
-> **PR:** [#11219](https://github.com/Kilo-Org/kilocode/pull/11219) by [@sylwester-liljegren](https://github.com/sylwester-liljegren)
+Kilo Code released **v7.6.0 on September 10, 2026** — a month after v7.4.22 shipped 12+ releases (through v7.5.16) aimed at long-running agent work: a proper `/goal` command with pause/resume, native OS notifications, and Agent Manager PR fixes that finally close the loop with GitHub. If you last looked at Kilo in August, this is the version that turns a good agent into a hands-off one.
 
 ---
 
-### 2. Agent Manager PR Comment Actions — Review Without Leaving the IDE
+## The headline: `/goal` — tell it the outcome, it works until done
 
-**What it does:** Three new actions in the Agent Manager PR view:
-- **Resolve / Unresolve** review threads — mark discussions done or reopen
-- **Jump to comments section** — instant navigation to the discussion
-- **Scroll-to-top for PR diff view** — reset position on massive diffs
+**What it does:** `/goal` lets you describe a long-lived objective ("migrate the auth module to the new SDK and update the tests") instead of a single command. Kilo keeps working toward it with **shared pause, resume, and clear controls** in the terminal *and* VS Code.
 
-**Why it matters:** Code review in the terminal/IDE used to mean "open GitHub in browser." Now the full review loop (read diff → comment → resolve → next) stays in your editor.
+**Why it matters:** the old model was "prompt → response → prompt again." `/goal` is the beginning of "set the outcome and supervise" — the agent keeps going autonomously, pauses when it needs you (no-action replies, terminal failures, Stop, new messages, backend restarts), and reports completion or a blocker through a Goal-only reporting tool.
 
-**Workflow:** Agent Manager → PR view → thread actions → done. No context switch.
+**The flow:**
+- Compose **multiline goals with images and file attachments** in VS Code.
+- Pending goal submissions become read-only while running; your draft survives a Cancel.
+- Goals persist as **Active, Complete, Blocked, or Paused** with their objective and reason — after a backend restart, a complete goal stays complete and its resume action is labeled *Restart*.
+- Clarification questions are disabled during active goals and delegated work (permission approvals still ask); safe, reversible decisions run autonomously.
 
-> **PR:** [#13071](https://github.com/Kilo-Org/kilocode/pull/13071) by [@cosi-conda](https://github.com/cosi-conda)
-
----
-
-### 3. Structured AWS & GCP Credentials — Bedrock & Vertex AI Without Env Var Hell
-
-**What it does:** VS Code settings now accept **structured credentials** for AWS Bedrock and Google Cloud Vertex AI:
-- **AWS:** Access Key ID + Secret Access Key + Session Token + Region (as structured fields, not a giant JSON blob)
-- **GCP:** Service Account JSON (pasted or file-picked) — parsed and validated
-
-**Why it matters:** Before this, connecting Bedrock/Vertex meant `aws configure`, `gcloud auth`, env var juggling, or pasting minified JSON into a tiny settings field. Now it's a proper form with validation.
-
-**Security:** Credentials stored in VS Code secret storage (OS keychain), not `settings.json`.
-
-> **PR:** [#13100](https://github.com/Kilo-Org/kilocode/pull/13100)
+The command is reserved: if you have a custom command or MCP prompt named `goal`, rename it. ([PR #13679](https://github.com/Kilo-Org/kilocode/pull/13679))
 
 ---
 
-### 4. Subagent Permission Fix — Delegated Agents Finally Run Their Own Allowed Commands
+## Notifications: Kilo now taps you on the shoulder
 
-**The bug:** A read-only or delegating agent's `readOnlyBash` allowlist was **projected onto writable subagents as a bash ceiling**. So a subagent explicitly allowed to run `git status` would be blocked because the parent had `readOnlyBash: ["git"]`.
+**What it does:** Kilo can alert you when it **finishes a task, needs your input or permission, or hits a terminal error** — via VS Code notifications, native OS notifications (Windows, macOS, Linux), or both.
 
-**The fix:** Subagent's **own config now wins for allowed commands**. Edit, notebook, and MCP denials still inherit as hard ceilings (security), but allowlists don't leak downward as blockers.
+**Why it matters:** the whole point of `/goal` is leaving the machine alone. But leaving it alone only works if the agent can *get you back* — a blocked goal sitting silently for an hour is worse than no goal at all.
 
-**Why it matters:** Delegation patterns (orchestrator → worker subagents) now work as intended. The orchestrator can be restrictive; workers get their own permissions.
+**The details:**
+- Native OS notifications reach you while the editor is in the background.
+- VS Code notifications wait with a **Show** action that opens the session and jumps to the latest message.
+- Notifications are **skipped for the session you're already looking at** (no nagging) and follow your selected language.
+- A **Test** button confirms native notifications work on your system before you rely on them.
 
-> **PR:** [#12373](https://github.com/Kilo-Org/kilocode/pull/12373) by [@mvanhorn](https://github.com/mvanhorn)
-
----
-
-## Upstream OpenCode Sync (v1.17.13 → v1.18.13)
-
-Kilo Code bundles OpenCode upstream. This release adopts improvements through **v1.18.13**:
-
-| Area | Highlights |
-|------|------------|
-| **Core** | Code mode MCP adapter, `execute` tool hidden unless code mode enabled, Meta Muse Spark system prompt, Azure AI GPT-5.6 support |
-| **Bugfixes** | Paginated MCP tool catalogs fixed, OpenRouter low reasoning effort preserved, GitHub Copilot routing honors chat/responses endpoint, Cerebras reasoning replay fixed, Z.ai context overflow classified correctly, Grok reasoning variants exposed, xAI prompt cache routing + PDF support, Meta model reasoning handling, Copilot zero-billing-batch crash fixed, OpenAI pro reasoning mode, xAI response storage disabled by default, Luna Responses Lite OAuth |
-| **TUI** | Spinner registration fixed, CLI env vars forwarded to TUI worker |
+([PR #13771](https://github.com/Kilo-Org/kilocode/pull/13771))
 
 ---
 
-## Additional Fixes & Polish
+## Agent Manager: the PR loop closes
 
-| Fix | Impact |
-|-----|--------|
-| **Changes chip + Git changes persist across tab switches** | Multi-repo workspaces no longer lose visibility |
-| **Model's default reasoning variant shown in chat + Agent Manager** | Transparency on what the model actually uses |
-| **Workspace restoration preserved on fresh VS Code session revert** | No lost state when reverting |
-| **Morph WarpGrep retired** | Experimental codebase search tool removed + config flag ignored |
+The Agent Manager quietly became a full GitHub review client in v7.5.x, and v7.6.0 finishes the job:
+
+- **Send PR CI failures or review comments back to the agent** — it commits and pushes the fix without a follow-up prompt (permission prompts still confirm each commit; disable via "Push Pull Request Fixes" in Settings → Agent Behaviour).
+- **PR conversation timeline** — commits, force pushes, merges, approvals, and the PR description shown in order ([#13958](https://github.com/Kilo-Org/kilocode/pull/13958)).
+- **Approvals and merge readiness** with GitHub-backed branch updates, merge methods, auto-merge, and **conflict resolution with Kilo** ([#13953](https://github.com/Kilo-Org/kilocode/pull/13953)).
+- **Write and preview multiline PR comments and code suggestions** from the PR panel or diff view, reply, edit, or delete your own comments — preview and apply suggested changes to the local worktree without staging or pushing ([#13903](https://github.com/Kilo-Org/kilocode/pull/13903)).
+- From v7.5.16: **emoji reactions on PR comments**, review threads with author avatars inline, and failed CI checks sent to the agent with compact feedback and on-demand log retrieval ([#13541](https://github.com/Kilo-Org/kilocode/pull/13541), [#13881](https://github.com/Kilo-Org/kilocode/pull/13881)).
+
+The workflow — agent writes code → PR opens → CI fails → you send the failure → agent fixes and pushes — now lives entirely inside the IDE.
+
+---
+
+## Keep Awake & /caffeinate: the machine stays on, safely
+
+Long agent runs get killed by your OS falling asleep. Two fixes:
+
+- **v7.5.16 added a default-off Keep Awake toggle** that prevents system sleep during busy agent sessions *without* keeping the display on or disabling screen locking ([#12974](https://github.com/Kilo-Org/kilocode/pull/12974)).
+- **v7.6.0 adds the `/caffeinate` command** with notifications that explain when Kilo is keeping the computer awake — so you always know why your laptop isn't sleeping ([#13927](https://github.com/Kilo-Org/kilocode/pull/13927)).
+
+---
+
+## Claude Code users: bring your setup over
+
+Kilo v7.6.0 adds an **opt-in, one-time import of supported global Claude Code instructions, simple skills, and disabled MCP definitions** ([#13929](https://github.com/Kilo-Org/kilocode/pull/13929)). If you've been meaning to try an open-source agent but didn't want to redo your Claude Code config, the migration path just got real.
+
+---
+
+## What else shipped in the v7.5.x wave (August 21 → September 8)
+
+| Feature | Why it matters |
+|---|---|
+| **Preview local apps in Agent Manager** with embedded dev tools, grouped diagnostics, element feedback ([#13501](https://github.com/Kilo-Org/kilocode/pull/13501)) | Frontend changes verified without leaving the IDE |
+| **Edit queued messages in VS Code** before they send ([#13556](https://github.com/Kilo-Org/kilocode/pull/13556)) | Fix a typo in a long prompt without re-sending |
+| **Orchestrator picks model/provider/reasoning per subagent task** (experimental, [#13557](https://github.com/Kilo-Org/kilocode/pull/13557)) | Parallel teams tuned per worker |
+| **Agent Manager intro** explaining worktrees, parallel agents, PR status, conflicts ([#13734](https://github.com/Kilo-Org/kilocode/pull/13734)) | Onboarding that doesn't assume you know the model |
+| **Start sessions in a selected managed worktree** ([#13861](https://github.com/Kilo-Org/kilocode/pull/13861)) | Isolate work per task, keep the base clean |
+| **Keep Awake toggle** ([#12974](https://github.com/Kilo-Org/kilocode/pull/12974)) | Long runs survive an idle laptop |
+| **CPU savings**: badge polling pauses when panels are hidden ([#13795](https://github.com/Kilo-Org/kilocode/pull/13795)) | Big repos stop burning CPU in the background |
+| **Faster cold loads** of large sessions and token-usage totals ([#13868](https://github.com/Kilo-Org/kilocode/pull/13868)) | Big conversations open instantly |
+| **Shift+Tab reasoning-variant cycling** works even with the slash menu open ([#13792](https://github.com/Kilo-Org/kilocode/pull/13792)) | Muscle-memory friendly |
+| **JetBrains 7.1.6** | Worktree moves/forks, Ctrl+1/2/3/0 mode cycling, faster Windows startup, worktree indexing excluded |
 
 ---
 
@@ -104,27 +101,26 @@ Kilo Code bundles OpenCode upstream. This release adopts improvements through **
 # Search "Kilo Code" → Install/Update
 
 # Or via CLI
-npm install -g @kilocode/cli@7.4.22
+npm install -g @kilocode/cli@7.6.0
 
-# JetBrains plugin
-# JetBrains 7.0.16 also released (pins Kilo Core 7.4.22)
+# JetBrains plugin: 7.1.6
 ```
 
-**Breaking changes:** None. v7.4.21 → v7.4.22 is drop-in.
+**Breaking changes:** if you have a custom command or MCP prompt named `goal`, rename it — the name is now reserved.
 
 ---
 
 ## TL;DR
 
 | Feature | Beginner Value | Power User Value |
-|---------|----------------|------------------|
-| Clickable file refs | 🖱️ Click to open | ⚡ Stay in flow, line-accurate |
-| Agent Manager PR actions | 📋 Review in IDE | 🔄 Full loop without browser |
-| Structured AWS/GCP auth | 🔐 No env var mess | 🛡️ Secret storage, validated |
-| Subagent permission fix | ✅ Delegation works | 🏗️ Clean orchestrator/worker patterns |
+|---|---|---|
+| `/goal` with pause/resume | Set a task, walk away | Long autonomous runs with safe checkpoints |
+| OS + VS Code notifications | Agent tells you when it's done | Background work without babysitting |
+| PR fixes from the panel | CI failures sent straight to agent | Full review loop without the browser |
+| Claude Code import | Bring your config over | One-time migration, zero rebuild |
+| Keep Awake / caffeinate | No more dead long runs | Explicit control over machine sleep |
 
-**Bottom line:** v7.4.22 is a **productivity release** — each feature removes a daily friction point. Clickable refs alone save dozens of `Cmd+P` cycles per day. If you're on Kilo Code, update. No downside.
-
+**Bottom line:** v7.4.22 made Kilo sharp. **v7.5.x–v7.6.0 make it something you can leave running** — goals instead of prompts, notifications instead of polling, and a PR loop that closes inside the IDE. If you're on any version before v7.6.0, update today. No downside.
 
 ## Related articles
 
@@ -133,4 +129,4 @@ npm install -g @kilocode/cli@7.4.22
 - [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
 ---
 
-*Release: [Kilo Code v7.4.22](https://github.com/Kilo-Org/kilocode/releases/tag/v7.4.22) · [Full Changelog](https://github.com/Kilo-Org/kilocode/compare/v7.4.21...v7.4.22) · [Discord](https://discord.gg/kilocode)*
+*Release: [Kilo Code v7.6.0](https://github.com/Kilo-Org/kilocode/releases/tag/v7.6.0) · [Full Changelog](https://github.com/Kilo-Org/kilocode/releases) · [Discord](https://discord.gg/kilocode)*
