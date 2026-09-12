@@ -1,0 +1,114 @@
+---
+title: "Claude Code Just Let You Prove Your Plugins Actually Work — No More Guessing"
+description: "Claude Code v2.1.269 adds claude plugin eval — scored, reproducible eval runs that tell you if a plugin or skill actually helps, with a no-plugin baseline, HTML report, and CI gating. Plus the operator fixes that matter in this release."
+pubDate: "2026-09-12T08:30:00Z"
+updatedDate: "2026-09-12T08:30:00Z"
+tags: ["claude-code", "release", "plugins", "skills", "evals", "coding-agents"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+plugin+eval&tool=claude-code"
+---
+
+Your plugin stack has been a leap of faith. You installed a dozen skills, told yourself they were helping, and never once got a number out of Claude about whether they actually did. **Claude Code v2.1.269 just changed that** with `claude plugin eval` — a built-in way to run a plugin against a suite of test prompts, score the results, and compare them against a baseline with no plugin at all.
+
+This is the first time the agent itself can tell you, in a reproducible way, *what a plugin contributes* — or whether it's just eating context and tokens. Here's what landed and why it matters for anyone who runs plugins, skills, or subagents in anger.
+
+## The problem plugin eval solves
+
+Plugins in Claude Code are powerful: they bundle skills, subagents, hooks, LSP servers, default settings, and MCP servers into one installable unit. The ecosystem is booming — marketplaces, team plugin directories, plugin archives you can point `--plugin-dir` at ([v2.1.265](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md) added folder-of-plugins loading).
+
+But there's always been a gaping hole: **you couldn't test them.** `claude plugin validate` ([docs](https://code.claude.com/docs/en/plugins)) checks syntax and schema — it will tell you a manifest is malformed, but not whether the plugin *changes Claude's behavior in a good way*. So plugin authors shipped "it works for me," and users installed things that sounded useful but silently did nothing.
+
+`claude plugin eval` closes that hole.
+
+## How plugin eval works
+
+From the plugin root (the directory with `plugin.json`), run the new command:
+
+```bash
+claude plugin eval init   # one-time: Claude proposes cases + graders
+claude plugin eval        # run the suite, get scores
+```
+
+Here's the shape of it, straight from the [docs](https://code.claude.com/docs/en/plugin-evals):
+
+- **A suite lives in `evals/` inside your plugin.** Each case is a realistic user prompt plus one or more **graders** — pass/fail checks on what Claude produced: a regex over the reply, whether a particular tool was called, or a rubric a second model judges against.
+- **Each case runs three times by default.** One run of a non-deterministic agent tells you nothing; the mean across runs gives a signal.
+- **You get a no-plugin baseline automatically.** Each case's runs are repeated *without* the plugin loaded, and you get two scores: `WITH` and `W/OUT`. Their difference (Δ) is what the plugin actually contributed. If a case scores 1.0 both ways, the plugin isn't what made it pass.
+- **`claude plugin eval init` does the hard part for you.** It opens an interactive session where Claude reads your plugin, asks what a good result looks like, proposes prompts that should and shouldn't trigger it, designs graders, pilots them once, and writes the case files. Or ask Claude directly in a session at the plugin root to run it.
+- **Output**: a results directory with `aggregate-result.json` and a self-contained `report.html` — no external requests, so you can attach it to a CI job.
+
+## The killer part: gate CI on it
+
+This is where it stops being a dev tool and becomes an engineering practice. The docs give a complete CI invocation:
+
+```bash
+claude plugin eval \
+  --trust-plugin \
+  --json results.json \
+  --threshold 0.8 \
+  --model claude-sonnet-5 \
+  --judge-model claude-haiku-4-5 \
+  --no-publish \
+  --max-cost-usd 20
+```
+
+Exit codes are explicitly defined:
+
+| Exit code | Meaning |
+|-----------|---------|
+| 0 | Every case ≥ threshold, all files loaded |
+| 1 | A case scored below threshold, a file failed to load, no cases found, run couldn't start, or the directory isn't trusted without `--trust-plugin` |
+| 2 | Partial run: cost ceiling hit or credentials rejected (still writes `results.json` with `partial: true`) |
+| 130 / 143 | Interrupted / terminated |
+
+Pin both models so scores stay comparable over time, keep the report local with `--no-publish`, and put a cost ceiling on it. A plugin change that drops a case below threshold now *fails the build* — predictable regression testing for agent behavior, without hand-waving.
+
+A few operational notes worth knowing:
+
+- Eval runs and judge graders are **real model calls on your account** — they count against your plan or API bill. The reported cost is a list-price estimate.
+- `claude plugin eval init --bare <name>` gives you a blank template for CI (no TTY for questions).
+- Plugins that call no judge are cheaper: for quick every-change suites, use graders that don't invoke a second model and `--ablation none` where you don't need the Δ baseline.
+- Runs are isolated: fresh non-interactive sessions with only your plugin loaded.
+
+## The rest of v2.1.269 — what an operator notices
+
+Beyond plugin eval, this release is dense with genuinely useful fixes. The ones that'll hit you in daily work:
+
+**Trust and permission boundaries tightened.** A deny/ask rule starting with `!` previously applied *beyond* the settings source that wrote it; now it scopes to its own source, and a bare `!` negation is ignored ([v2.1.269](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)). And a real one: **`Edit()` deny rules and the write-path check now apply to files a Bash `tee` command writes** — a `Bash(tee:*)` allow rule no longer covers destinations outside the working directories. That's permission rules meaning what they say.
+
+**Plugin archive hygiene.** Extracted plugin archives were readable by other local users, kept world-writable bits, and left stale files surviving re-extraction. Now fixed — relevant on multi-user machines and shared CI runners.
+
+**Prompt-cache stability.** Two fixes target the cache getting invalidated on resumption: after a response cut off at the output-token limit and auto-resumed, and after interrupting Claude mid-thought. Both were silently hurting cache reuse (read: your bill).
+
+**Failure resilience.** `/goal` runs that previously stalled on API errors, network drops, or token limits now retry with backoff, or pause and say why — including waiting out a usage-limit reset. And `CLAUDE_CODE_RESUME_INTERRUPTED_TURN` no longer re-runs turns that failed with an API error more than 6 hours earlier (or older than `CLAUDE_CODE_RESUME_INTERRUPTED_TURN_MAX_AGE_MS` when set).
+
+**Terminal/keyboard fixes.** The kitty-protocol terminal regression from v2.1.247 is fixed (F1/F2/F4, st Delete, urxvt Alt+arrows, WezTerm Shift+punctuation), and terminals that answer the kitty keyboard query (foot, Alacritty 0.16+) now get Shift+Enter and Ctrl+Shift shortcuts. Windows: PowerShell tool commands sent to the background no longer die when Claude Code exits.
+
+**VS Code.** An agent map ("N agents" footer pill → map with per-agent cards, Stop, read-only transcripts), a Hooks dialog, a Permission rules dialog, live progress rows for subagents in Focus view.
+
+Also worth knowing: `bashOutputMaxChars` and `taskOutputMaxChars` (from v2.1.261) let you raise how much command output Claude receives inline before it saves to file, up to 128K chars — useful if you work with chatty builds.
+
+## The bigger story
+
+Look at v2.1.269 in context and a pattern is unmistakable. The previous release wave (v2.1.267–268) made spend predictable — effort caps, gateway pricing parity, WebFetch deadlines. This one makes *agent behavior* testable. Together they're the same bet: **turning the agent from a vibe into infrastructure** — something you can benchmark, gate, and budget.
+
+That matters beyond Claude Code. If plugin evals become the norm — and they will, because "CI fails on a plugin regression" is a genuinely compelling workflow — then plugin quality becomes measurable across the whole ecosystem. Marketplaces can rank by eval scores. Teams can decide *with data* whether a skill is pulling its weight or just burning context. That's the kind of shift that changes how the plugin economy works, not just how one tool works.
+
+## What to do
+
+1. **Update**: `claude update` (or restart the VS Code extension).
+2. If you maintain any plugin or skill: run `claude plugin eval init` and get a baseline. Even two cases is a start.
+3. If you're a plugin *user*: the `${WITH} vs ${W/OUT}` delta is now your friend — a plugin that scores the same with and without isn't earning its context.
+4. If you run a team: add plugin eval to CI with a threshold and `--max-cost-usd` ceiling. A plugin update that regresses a case fails the build, not your users.
+5. Review your permission rules for `tee` writes — the scope change is a behavior change if you relied on the old (looser) reading.
+
+Full changelog: [`v2.1.268...v2.1.269`](https://github.com/anthropics/claude-code/compare/v2.1.268...v2.1.269)
+
+*Disclosure: some links on this site are affiliate links (aiFiesta).*
+
+## Related articles
+
+- [Claude Code Finally Lets You Cap AI Effort — And Stop Wasting Money](/blog/claude-code-effort-cap-fable-5-1-cost-control/)
+- [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
+- [The Agent Loop Just Became a Plugin — and That Changes Everything About Who Wins the Coding Agent Wars](/blog/agent-loop-plugin-harness-wars-2026/)
