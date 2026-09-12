@@ -1,8 +1,8 @@
 ---
-title: "Cline Desktop Grew Up Fast — Here's What v0.0.24 Actually Fixes"
-description: "Cline's desktop app hit v0.0.24 with a storm of quality fixes: chat stream duplication, silent mid-task stops, checkpoint performance, and session imports from Claude Code and Codex. Free models still included."
+title: "Cline Desktop Just Put Your PR Card Right in the Composer — Windows Users Finally Get Working Updates"
+description: "Cline Desktop's v0.0.24→v0.0.26 wave puts your branch's pull request inside the composer, fixes the Windows update that always failed, stops losing your prompt on send errors, and finally explains auth failures in plain English. Free models still included."
 pubDate: "2026-08-01T09:00:00Z"
-updatedDate: "2026-09-09T14:30:00Z"
+updatedDate: "2026-09-12T05:00:00Z"
 tags: ["cline", "desktop", "free-models", "release", "coding-agent", "open-source", "update"]
 tool: "cline"
 author: "sage"
@@ -11,7 +11,7 @@ image: "/api/og?title=Cline+Desktop+Free+Models&tool=cline"
 
 Cline — the 67,000-star open-source coding agent — made two moves that lower the barrier to entry for AI-assisted coding. First, it shipped a standalone macOS desktop app that runs agent sessions independently of any IDE. Second, it added free coding models to every Cline surface: the desktop app, the VS Code extension, and the command-line interface. You do not need an API key to try Cline.
 
-The desktop app launched as **v0.0.4 on July 22, 2026** and has been updating almost every other day since. As of **September 9 it is at v0.0.24** on both macOS and Windows, with over a dozen releases fixing chat-stream duplication, silent mid-task stops, and checkpoint performance — on top of the universal Mac download, token usage meter, and edit-any-message from August.
+The desktop app launched as **v0.0.4 on July 22, 2026** and has been updating almost every other day since. As of **September 11 it is at v0.0.26** on both macOS and Windows, with the v0.0.24→v0.0.26 wave fixing Windows updates that silently failed, lost prompts on failed sends, and a session state that lied about whether the agent was still working — on top of the universal Mac download, token usage meter, and edit-any-message from August.
 
 If you have been curious about coding agents but hesitated because of billing setup or vendor lock-in, this is the week to try one.
 
@@ -134,6 +134,55 @@ A build-mismatch dialog used to appear on every launch if you had both the deskt
 ### Is It Worth Updating?
 
 If you tried Cline Desktop in August and bounced off bugs — duplicated text, messages disappearing, the app silently going idle — the v0.0.24 release is the reason to come back. These are not cosmetic tweaks. They fix the interactions that determined whether you trusted the tool.
+
+## The Latest Wave: What v0.0.25 and v0.0.26 Do (September 10–11)
+
+Less than 48 hours after v0.0.24, Cline shipped v0.0.25 and v0.0.26. The headline feature — a live PR card in the composer — is the kind of thing that makes a coding agent feel like a teammate instead of a terminal. Here's the wave in plain language.
+
+### Your pull request is now one glance away
+
+In v0.0.26, the composer shows your current branch's GitHub PR — number, merge status, changed-line totals, and CI checks. It refreshes every 30 seconds while visible. If there's no PR yet, a **Create PR** button opens GitHub's comparison form. Click anywhere on the card to inspect individual CI checks right in the app.
+
+One honest caveat: Cline does the watching, not the doing. It needs GitHub CLI (`gh`) installed and signed in, and it never pushes commits or submits the PR for you. It's a dashboard, not a replacement for your review workflow — but for anyone who has alt-tabbed between a terminal and GitHub five times a day, it kills a whole class of context switching.
+
+### Windows updates finally work
+
+The dreaded "Error opening file for writing" on Windows is gone. The root cause was a classic: the compiled sidecar re-executed itself as a detached background daemon that outlives the app, the NSIS installer only killed the main binary, and the daemon silently held `code-sidecar.exe` so the update stalled until you killed it by hand. The installer now stops it first — matched on the full path, so updating one channel won't kill a side-by-side Cline Beta's sessions.
+
+### Your prompt is no longer eaten by a failed send
+
+If you hit send and the turn failed before starting — say, an OAuth refresh threw — the old behavior wiped your typed message and you retyped everything. Now the text and attachments return to the composer, merged with anything you added while the send was pending. If you'd already started typing something else, it leaves your new draft alone. Small fix, huge sanity saver.
+
+### "Please log in" now tells you *where*
+
+Providers that log in through a local CLI — Claude Code, Codex CLI, OpenCode — used to show a confusing browser sign-in button that could not do anything, or dumped you at a generic settings page. Now:
+- **Claude Code, Codex CLI, and OpenCode** sessions can start without an API key, using the credentials their own CLIs store — OpenCode is correctly treated as a local-CLI provider instead of an OAuth one.
+- **Auth failures** ("OAuth session expired", "Not logged in · Please run /login") now point you at the actual CLI to fix, not Settings → Models.
+- **Signing out of ChatGPT (Codex) actually sticks** — the legacy stored credentials used to silently re-import you on the next action. Now they're cleared too.
+
+That last one was a security-adjacent paper cut: you clicked "sign out" and Cline signed you back in behind your back.
+
+### ChatGPT (Codex) model list is now honest
+
+The shared OpenAI catalog was leaking models you couldn't actually use into the picker — retired GPT-5.4 models, GPT-4o/4.1, `chatgpt-image-latest` — and the runtime was inheriting 1.05M token limits the backend doesn't give ChatGPT accounts. Now ChatGPT subscribers see only what their plan can use, with the real budgets (400K/272K/128K). The default moves to `gpt-5.6-terra`.
+
+### Model defaults changed for 36 providers — check what you're pinned to
+
+v0.0.25 refreshed the model catalog: NaN joined, and the resolved default model changed for 36 providers including Bedrock, Vertex, OpenRouter, Kilo, GitHub Copilot, Gemini, Cerebras, Fireworks, Requesty, and Vercel AI Gateway. Several moved off Claude Fable 5.1 to **GPT-6 Astra**, Vertex goes to **Gemini 3.8 Flash**, OpenRouter/Kilo to **Inception Mercury 2.5**. If you use one of these without pinning a model, your next session may silently start on a different model — worth a glance at Settings → Models.
+
+### Free models now show zero cost — and other fixes
+
+- **Cline Pass and free models report $0 cost** instead of the upstream provider's price.
+- **A forked session no longer comes back stuck on "Thinking..."** — restored sessions were being persisted as "running" when they were idle, so resuming showed a session that was never going to finish.
+- **Deleting a queued prompt no longer leaves a ghost message** in the transcript.
+- **Nested PowerShell commands no longer flood errors** — `$_` was being interpolated away by the outer parser before the inner shell saw it, so `Where-Object { $_.Name ... }` errored per item over large trees while still exiting 0.
+- **Scheduled sessions no longer stall out** — a poller bug could silently burn through retries; recurring schedules now also default to your local timezone instead of UTC.
+- **Invalid image formats** (HEIC, TIFF, SVG, BMP, ICO) are rejected at attach time instead of failing mid-turn.
+- **Prompt telemetry to Cline's tracing backend is limited to Cline/Cline Pass** — turns on your own provider keys are no longer traced, a real privacy win.
+
+### Is the new wave worth it?
+
+If you're on Windows and updates have been failing, this is the update that fixes updates. If you run agents against Claude Code/Codex/OpenCode, the local-CLI auth and honest auth errors remove the most confusing first-run friction. And if you live in GitHub PRs, the composer card is a genuinely new reason to open Cline instead of your browser.
 
 If you are a Claude Code user considering switching, the session import feature means you do not lose your existing work. Bring a session over, and the agent picks up where the last one left off.
 
