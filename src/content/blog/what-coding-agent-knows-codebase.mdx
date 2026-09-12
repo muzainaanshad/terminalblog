@@ -104,6 +104,23 @@ If you use cloud agents, at minimum:
 
 Your agent sees everything you see. Make sure you're comfortable with who else is looking.
 
+## FAQ
+
+**Q1: What files can a coding agent see in my project?**
+A coding agent with filesystem access can see everything in your repository: source code, `.env` files with credentials, configuration files with API keys, git history with all commits, internal documentation, dependency manifests, and even SSH keys or certificates if they're tracked. Claude Code will also read files outside your project directory if they're referenced in code or needed for context.
+
+**Q2: Does my code get sent to cloud servers when I use Claude Code or Cursor?**
+Yes, when you use cloud-based coding agents, your code is processed on provider servers. Claude Code sends code through Anthropic's API (Anthropic states they don't train on API data). Cursor processes code through their proxy servers. GitHub Copilot is covered by GitHub's data protection agreement. If you need to keep code local, use open-source agents like Hermes or Aider with local models via Ollama.
+
+**Q3: How do I prevent my coding agent from reading sensitive files?**
+Create a `.gitignore`-style exclude file — add `.env*`, `*.pem`, `*.key`, and sensitive directories like `secrets/` or `credentials/`. Claude Code respects `.gitignore` patterns by default. Check your agent's documentation for ignore file support. You can also use AGENTS.md to instruct the agent not to access specific directories, and use read-only database credentials for development tasks.
+
+**Q4: What is the risk of git history exposing secrets to coding agents?**
+Your git history may contain deleted files that are still recoverable — including `.env` files that were pushed and later removed. When an agent reviews code or reads git logs, it can encounter these old credentials. Run `git log --all --diff-filter=D -- '*.env' '*.key' '*.pem'` to find deleted credential files. Keep `.env` files out of git history entirely, not just out of the current tree.
+
+**Q5: Should I use local or cloud coding agents for sensitive code?**
+For proprietary algorithms, financial models, healthcare data, or anything damaging if leaked, use open-source agents with local models (Hermes + Ollama, Aider with local models). These keep all code on your machine. For open-source side projects, cloud agents are generally fine — your source code isn't valuable to a model provider. The practical rule: match your agent's data flow to your project's sensitivity level.
+
 ---
 
 *Tired of deciding which AI subscription to keep? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** bundles GPT, Claude, Gemini, Grok, DeepSeek, Perplexity and more for $12/mo — less than half of a single premium chat sub.*

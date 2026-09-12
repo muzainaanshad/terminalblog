@@ -232,3 +232,23 @@ Hooks are worth mentioning because they close the loop: a skill teaches Claude h
 5. **Watch your context budget.** Skills cost almost nothing. Subagents cost nothing until used. MCP servers cost tool-schema tokens every turn. Budget accordingly.
 
 The mistake is overthinking the architecture before shipping anything. One well-written skill beats a theoretical plan for three. Build what you need now, compose as complexity grows.
+
+## FAQ
+
+**Q1: What is the difference between a skill, a subagent, and an MCP server in Claude Code?**
+A skill is a `SKILL.md` file that changes how Claude performs a task — it loads instructions on demand (~100 tokens idle). A subagent is a separate Claude instance with its own context window that isolates noisy work from your main conversation. An MCP server is a running process that gives Claude access to external systems like databases or APIs — it adds genuinely new capabilities that skills and subagents cannot provide. Skills change behavior, subagents protect context, and MCP servers add capability.
+
+**Q2: When should I use a Claude Code skill versus an MCP server?**
+Use a skill when the task is pure instructions — a procedure, a formatting rule, a coding convention — that Claude can execute with its existing tools (file reads, shell, grep). Use an MCP server only when you need a connection to an external system Claude cannot reach on its own. The most common mistake is building an MCP server to inject instructions — if your server never touches anything outside the repo, it should have been a `SKILL.md`.
+
+**Q3: How much context do MCP servers consume compared to skills?**
+Skills cost about 100 tokens when idle (just the metadata description). MCP servers load all their tool schemas into context every turn, even when you're not using them. A chatty MCP server with 30 tools can consume significant context and compete with your actual task for reasoning space. Prefer fewer, well-scoped MCP servers over one omnibus server with many tools.
+
+**Q4: What are subagents in Claude Code and when should I use them?**
+Subagents are separate Claude instances with their own context windows, system prompts, and tool allowlists. Use them when a task generates lots of noisy intermediate output (exploring 40 files, reading large logs) that would pollute your main conversation. The subagent does the work in isolation and returns only the summary. Subagents can also route grunt work to cheaper models like Haiku to save costs.
+
+**Q5: How do skills, subagents, and MCP servers compose together in Claude Code?**
+All three are first-class composable primitives. A common pattern: an MCP server provides database access, a skill teaches Claude your query conventions, and a subagent runs the investigation in an isolated window so the main context stays clean. Claude Code supports a skill running inside a subagent (`context: fork`), and subagents can preload skills at startup. You typically use all three together in mature setups.
+
+**Q6: What is the Agent Skills open standard?**
+The Agent Skills open standard (agentskills.io) is a specification that makes `SKILL.md` files portable across different coding agents — Claude Code, Codex, Goose, and other compatible tools. A skill written once can work across multiple agents without modification, similar to how `.editorconfig` works across editors.

@@ -1,8 +1,8 @@
 ---
 title: "Claude Code Finally Lets You Cap AI Effort — And Stop Wasting Money"
-description: "Claude Code v2.1.267 adds maxEffortLevel — a hard cap on how hard the model tries on every provider. Combined with Fable 5.1's 1M context and a month of cost-efficiency fixes, your agent bills are about to get predictable."
+description: "Claude Code v2.1.267 adds maxEffortLevel — a hard cap on how hard the model tries on every provider. v2.1.268 follows with gateway pricing parity and a WebFetch timeout that ends the hung-request token burn. Combined with Fable 5.1's 1M context and a month of cost-efficiency fixes, your agent bills are about to get predictable."
 pubDate: "2026-09-10T10:00:00Z"
-updatedDate: "2026-09-10T10:00:00Z"
+updatedDate: "2026-09-11T09:00:00Z"
 tags: ["claude-code", "release", "coding-agents", "cost", "anthropic"]
 tool: "claude-code"
 author: "sage"
@@ -77,7 +77,18 @@ Second, **the safety perimeter keeps tightening quietly**. The `[v2.1.260](https
 4. **Check `/cost` after a long session** — read the prompt-cache line; it now tells you what broke the cache.
 5. If you run agents unattended, try `--restricted` for anything that doesn't need shell access.
 
-Full changelog: [`v2.1.235...v2.1.267`](https://github.com/anthropics/claude-code/compare/v2.1.235...v2.1.267)
+Full changelog: [`v2.1.235...v2.1.268`](https://github.com/anthropics/claude-code/compare/v2.1.235...v2.1.268)
+
+## Postscript — v2.1.268 keeps the same promise (September 10)
+
+The day after this post's original publish, another version landed that fits the cost-control theme exactly:
+
+- **A WebFetch that can't hang your session anymore.** The fetch tool now fails after **300 seconds** instead of spinning forever on a server that keeps the response open ([v2.1.268](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)). Set `CLAUDE_CODE_WEBFETCH_DEADLINE_MS` to adjust, or `0` to disable. If you have ever watched an agent sit on a single web request while tokens tick away, this closes that leak.
+- **Gateway pricing parity for signed-in clients** ([v2.1.268](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)) — with `pricing:` in `gateway.yaml`, `/cost` now matches the actual spend meter, so the number you see is the number you pay. Also added: a warning when `access_control.allow_cidrs` is empty (a gateway with no IP restriction), and a `gatewayInternalNetworks` setting for orgs that need to allow `/login` from their own public IP block.
+- **Third-party endpoint fix** ([v2.1.268](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)) — every turn failing with HTTP 400 on Anthropic-compatible endpoints since 2.1.265 is fixed (a regex in the Artifact input schema those endpoints rejected). If you run through a proxy or mirror, this one matters.
+- **Plugin/CLI ergonomics** — `claude plugin install/uninstall/update/enable/disable` and `plugin list` now accept `--json` with `errorDetails` ([v2.1.268](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)), and `claude self-hosted-runner --remove-session-state` cleans per-session directories when a session ends.
+
+The one-line takeaway from the whole v2.1.267→268 pair: **the bill is becoming the product.** Effort caps, honest `/cost` numbers, and fetch deadlines all attack the same enemy — money spent on work the model never needed to do. Update, set your cap, and check `/cost` after your next long session.
 
 *Disclosure: some links on this site are affiliate links (aiFiesta).*
 
