@@ -6,6 +6,20 @@ Before any content work:
 2. [docs/AUTOPILOT.md](docs/AUTOPILOT.md) — GHA + Telegram + Beehiiv map
 3. [docs/content-policy.md](docs/content-policy.md) — quality floors, firehose OFF
 
+## Sync first (prevents local/GitHub drift)
+
+GitHub Actions commits data to `origin/master` **daily** (adoption snapshots, weekly digest).
+Local Hermes work never auto-fetches, so the clone silently falls behind — that is how local
+and GitHub drift apart. Always sync before content work:
+
+```bash
+npm run sync   # git fetch + fast-forward only; never rebases or force-pushes
+```
+
+After publishing: gate → commit → `git push origin master` → ops digest. The push account must
+have access to `muzainaanshad/terminalblog` (the repo moved from `Anshad2u`, so an old cached
+credential returns **403**). See [docs/HERMES-SESSION-HANDOFF.md](docs/HERMES-SESSION-HANDOFF.md).
+
 Hermes = content factory. GitHub Actions = ops + Telegram. Do not resume paused firehose crons.
 
 ## Content policy (mandatory for posts)

@@ -4,6 +4,13 @@
 
 **Why this file exists:** Operator continues in Hermes. Read this **first** every content/ops job.
 
+**Sync discipline (added 2026-09-19):** GitHub Actions commits to `origin/master` **daily**
+(adoption snapshots, weekly digest); local Hermes work does not auto-fetch, so the clone drifts
+behind while looking fine. Run `npm run sync` (`scripts/git-sync.cjs` — fetch + `--ff-only`,
+never rebases/force-pushes) **before** every content job. **Push access:** repo is now
+`muzainaanshad/terminalblog`; a stale `Anshad2u` credential in the Git credential store gives
+**403 on push** — re-auth as an account with write access before pushing.
+
 ## Mission
 
 Grow **long-term SEO traffic** for [terminalblog.com](https://terminalblog.com) with trustworthy AI-coding-agent content. **Quality over volume.**
@@ -138,7 +145,7 @@ node scripts/telegram-ops-digest.cjs --send
 
 ## Suggested next steps in Hermes
 
-1. `cd C:\Users\muzai\terminalblog && git pull`  
+1. `cd C:\Users\muzai\terminalblog && npm run sync`  (safe fast-forward; NEVER plain `git pull` blind)  
 2. Confirm gate / thin evergreen queue (`content-refresh --days 45`)  
 3. Write **0–1** quality article OR expand 1–2 thin pillars  
 4. Fix `ping-search-engines` encoding if still red  
