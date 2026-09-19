@@ -16,9 +16,10 @@ and GitHub drift apart. Always sync before content work:
 npm run sync   # git fetch + fast-forward only; never rebases or force-pushes
 ```
 
-After publishing: gate → commit → `git push origin master` → ops digest. The push account must
-have access to `muzainaanshad/terminalblog` (the repo moved from `Anshad2u`, so an old cached
-credential returns **403**). See [docs/HERMES-SESSION-HANDOFF.md](docs/HERMES-SESSION-HANDOFF.md).
+After publishing: gate → commit → `git push origin master` → ops digest. Origin is
+**`Anshad2u/terminalblog`** (the account we own and push with). Note the repo was briefly
+re-pointed at `muzainaanshad/terminalblog` in Aug 2026, which caused a 403 with the cached
+`Anshad2u` credential; that is resolved — see [docs/HERMES-SESSION-HANDOFF.md](docs/HERMES-SESSION-HANDOFF.md).
 
 Hermes = content factory. GitHub Actions = ops + Telegram. Do not resume paused firehose crons.
 

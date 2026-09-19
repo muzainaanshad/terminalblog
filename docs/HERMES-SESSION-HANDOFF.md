@@ -7,9 +7,15 @@
 **Sync discipline (added 2026-09-19):** GitHub Actions commits to `origin/master` **daily**
 (adoption snapshots, weekly digest); local Hermes work does not auto-fetch, so the clone drifts
 behind while looking fine. Run `npm run sync` (`scripts/git-sync.cjs` — fetch + `--ff-only`,
-never rebases/force-pushes) **before** every content job. **Push access:** repo is now
-`muzainaanshad/terminalblog`; a stale `Anshad2u` credential in the Git credential store gives
-**403 on push** — re-auth as an account with write access before pushing.
+never rebases/force-pushes) **before** every content job.
+
+> **UPDATE 2026-09-19 (origin corrected):** Origin was re-pointed back to
+> **`Anshad2u/terminalblog`** — the account we own — and the two divergent histories were
+> reconciled with a merge commit (`70c98c9`) and pushed. The Aug-2026 `muzainaanshad` transfer
+> had left local authenticating as `Anshad2u`, so pushes returned **403**; no credential change
+> was needed, only the remote URL. Do **not** point origin at `muzainaanshad/terminalblog` again.
+> Note: both repos had been running the same daily snapshot cron, so any re-merge will conflict
+> only on generated `src/data/adoption/snapshots/*.json` (safe to resolve either way).
 
 ## Mission
 
