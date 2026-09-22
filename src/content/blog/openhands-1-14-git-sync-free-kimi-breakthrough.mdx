@@ -1,13 +1,13 @@
 ---
 title: "OpenHands Just Added the Git Sync Button Everyone Begged For — And Made Kimi K3 Free by Default"
-description: "OpenHands 1.14–1.17: a Git Sync automation page, free Kimi K3 as the default Canvas model, LLM provider switching, self-hosted Linux desktops, conversation tags, and automations that ship their own scripts."
+description: "OpenHands 1.14–1.21: Git Sync automation page, free Kimi K3 as default Canvas model, LLM provider switching, self-hosted Linux desktops, conversation tags, Docker execution workspaces, profile-scoped secrets, and telemetry off-switch."
 pubDate: 2026-08-18
-updatedDate: 2026-09-10
+updatedDate: 2026-09-22
 tags: ["openhands", "coding-agents", "release", "git", "free-models"]
 category: "releases"
 tools: ["openhands"]
 difficulty: "beginner"
-readingTime: 8
+readingTime: 10
 ---
 
 OpenHands 1.14 landed five hours ago. Most point releases are forgettable — version bumps, dependency updates, a bug fix or two. This one isn't.
@@ -207,11 +207,106 @@ Three releases followed 1.14 within three weeks, and they keep removing reasons 
 
 The free-model story from 1.14 also held up: v1.16 fixed default/free model handling and v1.17 added LLM pre-flight validation to stop misconfigured profiles from burning a session — the exact kind of guardrail that matters when you hand a self-hosted agent your repo.
 
+---
+
+## What 1.18–1.21 Added: Docker Workspaces, Profile Secrets, and Cleaner Cloud UX
+
+Four more releases dropped through mid-September, and they keep solving the friction points that make self-hosters hesitate.
+
+- **Docker execution workspaces** ([v1.21](https://github.com/All-Hands-AI/OpenHands/pull/17177)) — Request Docker execution environments from Docker servers directly. No more wrestling with local Docker socket permissions or networking. The agent spins up a clean workspace, runs the task, and tears it down.
+- **Profile-scoped secrets** ([v1.20](https://github.com/All-Hands-AI/OpenHands/pull/17237)) — Agent profiles can now declare which secrets they need. No more dumping every env var into every session. Least-privilege by default.
+- **Saved profile selection for automations** ([v1.20](https://github.com/All-Hands-AI/OpenHands/pull/17396)) — Automations can now pick a specific agent profile. Your nightly code-review bot uses a different model/skill set than your PR-fix automation.
+- **MCP scoping per profile** ([v1.19](https://github.com/All-Hands-AI/OpenHands/pull/17289)) — Each agent profile can attach only the MCP servers it needs. Critical for teams running multiple projects on one self-hosted instance.
+- **GPT-6 Astra model support** ([v1.19](https://github.com/All-Hands-AI/OpenHands/pull/17164)) — Early support for the next-gen OpenAI model family.
+- **Image attachment zoom** ([v1.18](https://github.com/All-Hands-AI/OpenHands/pull/17179)) — Click any screenshot/diagram in chat to view full-size. Small UX win, huge for reviewing UI changes.
+- **Automation creator controls** ([v1.18](https://github.com/All-Hands-AI/OpenHands/pull/17190)) — Only the automation creator can re-enable a disabled automation. Prevents accidental (or malicious) re-activation.
+- **Cloud settings UX fixes** ([v1.18](https://github.com/All-Hands-AI/OpenHands/pull/17253), [17254](https://github.com/All-Hands-AI/OpenHands/pull/17254), [17256](https://github.com/All-Hands-AI/OpenHands/pull/17256)) — Settings open in the same tab, hidden pages respect org lock, active org passes through gear icon. The cloud console finally behaves like a polished product.
+- **DOMPurify sanitization patch** ([v1.17](https://github.com/All-Hands-AI/OpenHands/pull/17060)) — Security fix for XSS vector in rendered content.
+- **Telemetry off-switch** ([v1.17](https://github.com/All-Hands-AI/OpenHands/pull/16908)) — `--disable-telemetry` flag for self-hosted Canvas. Privacy-first operators asked; the team delivered.
+
+---
+
+## The Pattern: Polishing Until It Stays
+
+OpenHands 1.14–1.21 isn't a feature parade. It's a friction-removal campaign:
+
+| Release | Friction Removed |
+|---------|------------------|
+| 1.14 | Git workflow (Git Sync), model cost (Free Kimi K3), config errors (Pre-flight), opaque errors (Structured cards) |
+| 1.15 | LLM provider lock-in (Provider connections UI) |
+| 1.16 | Desktop access (Linux installer), skill noise (Allow-list), free model reliability |
+| 1.17 | Cloud provider connections, cron flexibility, automation permissions, telemetry opt-out |
+| 1.18 | Image review, automation safety, cloud settings polish, security patch |
+| 1.19 | MCP scoping, GPT-6 readiness, Azure DevOps SSH, auth hardening |
+| 1.20 | Profile secrets, automation profile binding, Docker runtime forwarding |
+| 1.21 | Docker workspaces on-demand, Forgejo support, conversation hygiene, AGENTS.md refresh |
+
+Each release removes one more reason to say "maybe later." The capability ceiling hasn't moved dramatically — the *floor* has risen.
+
+---
+
+## Should You Upgrade? (Updated for 1.21)
+
+**Cloud users:** Automatic. You're already on 1.21.
+
+**Self-hosted:** Yes. Docker workspace support alone (1.21) is worth the pull for teams running CI/CD automations. Profile-scoped secrets (1.20) and MCP scoping (1.19) are the security hygiene you've been asking for.
+
+**Evaluating OpenHands:** Best time ever. Zero-cost entry with Kimi K3. Git Sync + Docker workspaces = full dev loop in-browser. Try a side project.
+
+**Teams on BYOK:** Your keys still work. But the free model + profile secrets + Docker workspaces combo might let you consolidate spend.
+
+---
+
+## Quick Start: OpenHands Cloud (2 Minutes)
+
+```bash
+# No install. No keys. Browser only.
+open https://app.openhands.ai
+# Sign in with GitHub
+# Pick a repo (or create new)
+# Click "New Session" → Canvas opens with Kimi K3
+# Type: "Add a health check endpoint to the API"
+# Watch it write code, run tests, open Git Sync diff, push PR
+```
+
+---
+
+## Quick Start: Self-Hosted (Docker)
+
+```bash
+docker run -d \
+  --name openhands \
+  -p 3000:3000 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v ~/.openhands:/home/openhands/.openhands \
+  ghcr.io/openhands/openhands:v1.21.0
+
+# Open http://localhost:3000
+# Configure LLM profile (or use default Kimi K3 if cloud-connected)
+```
+
+---
+
+## TL;DR
+
+**OpenHands 1.14–1.21** = Git Sync UI + Free Kimi K3 default + LLM provider switching + Linux desktop + Automations 2.0 + Docker workspaces + Profile secrets + MCP scoping + Telemetry off-switch.
+
+- **Git Sync**: Commit/push/branch from the agent UI. Diff review built in.
+- **Kimi K3 free**: Top-tier reasoning model, zero cost, no key needed on Cloud.
+- **1.15–1.17**: Provider connections, desktop installer, skills allow-list, conversation tags, automation permissions, custom crons, telemetry off.
+- **1.18–1.21**: Image zoom, automation creator control, cloud settings polish, DOMPurify fix, MCP scoping, GPT-6 support, profile secrets, automation profile binding, Docker workspaces on-demand, Forgejo support.
+- **Pre-flight**: Catches bad config before it burns a session.
+
+Upgrade. Try it. The friction just kept dropping.
+
+---
+
 ## Related articles
 
 - [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
 - [Oh My Pi v17.3.3 Fixes Gemini Reasoning Loops, Hashline Edge Cases, and TUI Rendering — What Beginners Need to Know](/blog/oh-my-pi-v17-hub-tool-xdev-plugins/)
 - [Context Engineering for Coding Agents: How to Make Every Token Count](/blog/context-engineering-for-coding-agents-2026/)
+
 ---
 
-*Using OpenHands 1.14? Hit reply — I'd love to hear if Git Sync changes your loop or if Kimi K3 holds up on your codebase.*
+*Using OpenHands 1.21? Hit reply — I'd love to hear if Docker workspaces change your automation game or if profile secrets finally let you sleep at night.*
