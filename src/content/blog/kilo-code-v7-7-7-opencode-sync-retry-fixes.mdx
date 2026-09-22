@@ -1,0 +1,101 @@
+---
+title: "Kilo Code v7.7.7 Just Fixed the Approval Hangs That Killed Long Runs"
+description: "Kilo Code v7.7.7 adopts OpenCode v1.18.14–18 with message ordering fixes, conversation-aware compaction, expanded reasoning effort, and the critical fix: retry transient connection drops during approval so agents never get stuck waiting."
+pubDate: "2026-09-22T10:30:00Z"
+tags: ["kilo", "release", "opencode-sync", "approval-hangs", "compaction", "reasoning-effort", "coding-agent", "beginner"]
+tool: "kilo"
+author: "sage"
+image: "/api/og?title=Kilo+Code+v7.7.7+Approval+Retry+Fix&tool=kilo"
+---
+
+Kilo Code v7.7.7 dropped today (September 22) and it's the kind of quiet patch that saves you from the most frustrating failure mode in agentic coding: **the approval hang that leaves your agent spinning forever**.
+
+The release adopts **OpenCode v1.18.14 through v1.18.18** — five upstream releases packed with message ordering fixes, conversation-aware compaction, expanded reasoning effort support, provider compatibility patches, and retry handling. But the one fix that changes your daily workflow is buried in PR #14360.
+
+---
+
+## The Fix You'll Actually Feel: Approval Retry on Transient Drops
+
+**What was happening:** You're running a long agent task. It hits a permission prompt. You click "Approve" (or auto-approve is on). The network blips for 200ms. The approval request drops. The agent **never recovers** — it sits there waiting for a response that already happened.
+
+**What v7.7.7 does:** Kilo now **retries transient connection drops during permission approval**. Auto-approve and manual approvals no longer leave agents waiting. The agent detects the drop, retries, and keeps going.
+
+This is the difference between "come back to a finished task" and "come back to a stuck agent you have to kill and restart."
+
+---
+
+## What Else Came From the OpenCode Sync (v1.18.14–18)
+
+### Message ordering fixes
+Sessions with imported or legacy messages now maintain correct chronological ordering. No more "why is my conversation out of sequence?" moments.
+
+### Conversation-aware compaction
+Compaction now understands conversation structure — it preserves tool-call history in summaries instead of dropping orphaned results. Your context stays useful after compaction.
+
+### Expanded reasoning effort support
+More models now expose their reasoning variants (low/medium/high) correctly in the picker. You see what you're actually getting.
+
+### Provider compatibility fixes
+- GitHub Copilot model routing honors each model's advertised chat/responses endpoint
+- Azure Cognitive Services endpoint support restored
+- OpenAI Responses phase handling fixed
+- Bedrock DeepSeek model IDs (including ARN-based) preserved correctly
+- xAI prompt cache routing improved with PDF file support
+
+### Retry handling
+More transient provider/network errors retried instead of failing immediately. Structured mid-stream provider errors preserved so compatible providers can retry failed responses.
+
+---
+
+## CLI Gets the Same Wave
+
+The CLI sidecar adopts the exact same OpenCode v1.18.14–18 improvements. If you run Kilo's CLI for headless work, you get the same approval retry, compaction, and provider fixes.
+
+---
+
+## What This Means for Beginners
+
+If you're new to Kilo Code (the free, open-source VS Code extension that turns your editor into an agentic engineering platform with multi-model support, worktrees, and an Agent Manager sidebar), here's the practical takeaway:
+
+1. **Long tasks are safer now** — the approval hang is the #1 way beginners lose work on autonomous runs. Fixed.
+2. **Context stays coherent** — conversation-aware compaction means your agent doesn't "forget" what it did after a long session.
+3. **Models work as advertised** — provider routing fixes mean the model you pick behaves the way the provider intended.
+
+---
+
+## How to Update
+
+Kilo Code updates through the VS Code Extensions marketplace:
+
+1. Open Extensions view (`Cmd+Shift+X` / `Ctrl+Shift+X`)
+2. Search "Kilo Code"
+3. Click **Update** (or enable auto-update)
+
+Or via CLI:
+```bash
+npm install -g @kilocode/cli@7.7.7
+```
+
+Verify: open Agent Manager, start a task that needs approval, trigger a network blip (or just wait for the next one) — the agent should retry and continue instead of hanging.
+
+---
+
+## The Bottom Line
+
+**v7.6.0 gave you `/goal` and notifications. v7.7.7 makes sure they actually finish.**
+
+The approval retry fix alone is worth the update. If you've ever come back to a stuck agent after a coffee break, you know why.
+
+---
+
+*Kilo Code is free, open-source (MIT), and available on the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=Kilo-Org.kilo-code) and [GitHub](https://github.com/Kilo-Org/kilocode).*
+
+---
+
+## Related articles
+
+- [Kilo Code v7.6.0 Just Made Long Agent Runs Manageable — /goal, Notifications, and PR Fixes](/blog/kilocode-v7-4-22-clickable-refs-agent-manager-pr-actions-aws-gcp-auth/)
+- [Kilo Code CLI: The Lightweight Agent for Quick Tasks](/blog/kilo-code-cli-lightweight-agent/)
+- [Claude Code vs Kilo Code: Which Terminal Agent Wins?](/blog/claude-code-vs-kilo/)
+- [Best Coding Agents 2026 — Decision Guide (Not Another Hype List)](/blog/best-coding-agents-2026-decision-guide/)
+- [OpenCode Deep Dive: The Skill-Driven Open-Source Coding Agent](/blog/deep-dive-opencode-skill-driven-coding-agent/)
