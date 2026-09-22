@@ -1,0 +1,138 @@
+---
+title: "Claude Code Just Adopted the Universal Agent Instruction Format — And Dropped Classifier Fees"
+description: "v2.1.277 adds AGENTS.md support so your instructions work across every coding agent. v2.1.278 makes auto mode free on server-side classifiers. The two releases that finally make Claude Code play nice with the ecosystem."
+pubDate: 2026-09-22T09:00:00Z
+tags: ["claude-code", "anthropic", "release", "agents-md", "auto-mode", "beginner"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+Adopts+AGENTS.md+Free+Auto+Mode&tool=claude-code"
+---
+
+Claude Code v2.1.277 and v2.1.278 landed back-to-back (Sept 18–19). Together, they do two things the ecosystem has been asking for: **AGENTS.md support** so your instructions aren't locked to one tool, and **free auto mode** via server-side classifiers so you stop paying for the classifier overhead.
+
+If you've been juggling CLAUDE.md, AGENTS.md, and per-agent configs — this is the release where the friction drops.
+
+---
+
+## The Big One: AGENTS.md Is Now a First-Class Citizen
+
+**What changed:** In a project with no `CLAUDE.md`, Claude Code now reads `AGENTS.md` instead. You can also switch it under "Project instructions" in `/config` (not yet on Bedrock, Vertex, or Foundry).
+
+**Why it matters:** `AGENTS.md` is the emerging standard for coding agent instructions — used by Cursor, OpenHands, Goose, Kilocode, and others. Until now, Claude Code only understood its own `CLAUDE.md`. That meant:
+
+- Maintaining two instruction files
+- Syncing changes manually
+- Losing portability when switching tools
+
+Now you write **one** `AGENTS.md` and every agent that supports the standard reads it. Your "how we do code review," "run tests before committing," "use TypeScript strict mode" — write it once, works everywhere.
+
+### What Goes in AGENTS.md (Quick Refresher)
+
+```markdown
+# Project Instructions
+
+## Code Style
+- TypeScript strict mode always
+- ESLint + Prettier on every commit
+- No `any` types without a comment explaining why
+
+## Workflow
+- Run `npm test` before pushing
+- Conventional commits required
+- PRs need 1 approval + CI green
+
+## Agent-Specific
+- Prefer editing over creating new files
+- Ask before installing dependencies
+- Use existing patterns in the codebase
+```
+
+Claude Code picks this up automatically if `CLAUDE.md` doesn't exist. Want both? Keep `CLAUDE.md` for Claude-specific overrides and `AGENTS.md` for shared instructions.
+
+---
+
+## The Quiet Money-Saver: Server-Side Auto Mode Classifier
+
+**What changed:** v2.1.278 switches auto mode to a **server-side classifier by default** on Anthropic API, Bedrock, Vertex, Foundry, and gateways. The classifier no longer runs on your token budget.
+
+**The opt-out:** `CLAUDE_CODE_AUTO_MODE_SERVER=0` (Bedrock/Vertex/Foundry/gateways only).
+
+**The indicator:** `/status` now shows an "Auto mode server" row telling you whether this session's classifier runs on the server.
+
+### Why This Matters for Your Bill
+
+Before: Auto mode ran a classifier on *your* tokens to decide "is this safe?" — every permission check cost you money.
+
+Now: The classifier runs server-side on Anthropic's infrastructure. **Zero classifier overhead on your bill.** You only pay for the actual work.
+
+For teams running hundreds of auto-mode sessions daily, this is a measurable cost reduction. For individuals, it's one less thing to optimize.
+
+---
+
+## The Bug Fix Avalanche (v2.1.277)
+
+v2.1.277 ships **80+ fixes**. The highlights that actually affect your workflow:
+
+| Area | What Was Fixed |
+|------|----------------|
+| **Sessions** | `-p` and SDK sessions no longer hang silently on internal errors — they report and exit code 1 |
+| **Resuming** | Fixed conversations failing with "text content blocks must be non-empty" after `--resume` |
+| **Auth** | Fixed unexpected logout when older Claude Code builds share a machine |
+| **Updates** | Fixed update checks erroring every 30 min; `claude update` hanging on version lookup failures |
+| **Plugins** | Fixed reinstall breaking installed copy; unchanged copies now left alone |
+| **Tools** | Grep/Glob now return errors (not empty results) when system runs out of processes/memory/handles |
+| **Edit Tool** | Fixed escaped backslash + `uXXXX` being misread as Unicode escape; fixed "regex too large" on large non-ASCII edits |
+| **Windows** | PDF reads now work on long paths (~120+ chars); `$TMPDIR` expands correctly in Bash outside sandbox |
+| **VS Code** | Added Sign Out, background shells in agent map, Copy response button, session cost/usage in dialogs |
+| **Web/Cloud** | Personal/Org environment sections; cloud environments readable from Code tab; admin settings renamed |
+
+The full list is exhaustive — [see the release notes](https://github.com/anthropics/claude-code/releases/tag/v2.1.277) if you hit a specific edge case.
+
+---
+
+## What This Means for You
+
+### If You Use Multiple Coding Agents
+Write one `AGENTS.md`. Drop it in your repo. Every agent that supports the standard (Cursor, OpenHands, Goose, Kilocode, now Claude Code) picks it up. Your instructions become portable.
+
+### If You Run Auto Mode
+You just got cheaper. The server-side classifier is on by default. Check `/status` → "Auto mode server" to confirm. No action needed.
+
+### If You've Been Burned by Bugs
+v2.1.277 is a stability release. The resume hangs, plugin corruption, update loops, Windows path limits — all addressed. Update.
+
+---
+
+## Updating
+
+```bash
+# Auto-updates on next launch, or force:
+claude update
+```
+
+**Full changelogs:**
+- [`v2.1.276...v2.1.277`](https://github.com/anthropics/claude-code/compare/v2.1.276...v2.1.277)
+- [`v2.1.277...v2.1.278`](https://github.com/anthropics/claude-code/compare/v2.1.277...v2.1.278)
+
+---
+
+## Bottom Line
+
+Two releases. Two ecosystem wins.
+
+1. **AGENTS.md support** = your instructions work everywhere. One file, every agent.
+2. **Free auto mode classifier** = lower bills, same hands-free experience.
+
+Claude Code isn't just catching up to the standard — it's making the standard useful by adopting it. If you've been waiting for the friction to drop, this is it.
+
+---
+
+*Claude Code is available at [github.com/anthropics/claude-code](https://github.com/anthropics/claude-code).*
+
+---
+
+## Related articles
+
+- [Claude Code Goes Hands-Free by Default — What You Need to Know](/blog/claude-code-auto-mode-default-august-2026/)
+- [AGENTS.md: Make Your Coding Agent 10x Smarter With One File](/blog/agents-dot-md-make-coding-agent-10x-smarter/)
+- [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
