@@ -27,11 +27,17 @@ Workflow files: `.github/workflows/*.yml`
 
 | Event | What happens |
 |-------|----------------|
-| Push to `master` | Build Astro site → deploy `terminalblog.com` |
+| Push to `master` (**production branch**) | Build Astro site → deploy `terminalblog.com` |
 | Env vars | Beehiiv keys for `/api/newsletter` |
 | Live subscribe | Homepage form → Beehiiv audience |
 
-Project name in Vercel UI: prefer **`terminalblog`** (legacy slug may still be `seo-ai-blog` until renamed).
+Project name in Vercel UI: **`terminalblog`** (legacy slug `seo-ai-blog` still aliases it).
+Project id `prj_lviFq4g7laV7NiodUehsFkrMRBjZ`, team `anshad2us-projects`.
+
+**Production branch = `master`** (set 2026-09-19). It had been `main` — a stale branch 186 commits
+behind — so pushes to `master` built *Previews* only and `terminalblog.com` froze for a week while
+the repo kept moving. Symptom to recognise: a post is in the repo and builds fine on its preview
+URL, but 404s on the live domain → check `link.productionBranch` before anything else.
 
 ---
 
@@ -54,6 +60,7 @@ Project name in Vercel UI: prefer **`terminalblog`** (legacy slug may still be `
 | `scripts/site-health.cjs` | Live URL health |
 | `scripts/seo-learn.cjs` | SEO action list |
 | `scripts/content-gate.cjs` | Publish quality / caps |
+| `scripts/git-sync.cjs` | `npm run sync` — fetch + fast-forward before content jobs (step 0 of `orchestrator.js`) |
 | `scripts/clear-historical-debt.cjs` | Thin/bad-tag cleanup tools |
 | `scripts/send-weekly-beehiiv.cjs` | Weekly digest |
 | `scripts/fetch-adoption-data.cjs` | Leaderboard data |
@@ -67,7 +74,7 @@ Project name in Vercel UI: prefer **`terminalblog`** (legacy slug may still be `
 
 | Area | Why | How to close |
 |------|-----|--------------|
-| **AI writing new blog posts** | Still needs your content engine / Hermes / manual agents | Point external AI cron at `orchestrator.js` + content-gate; Telegram can report |
+| **AI writing new blog posts** | Still needs your content engine / Hermes / manual agents | Point external AI cron at `orchestrator.js` + content-gate; Telegram can report. `orchestrator.js` now syncs with origin first, so drafts never start on a stale base |
 | **Beehiiv API blast** | Enterprise-only | RSS once, or upgrade plan |
 | **GSC live rankings** | Needs one-time service account + share in GSC | `npm run gsc:setup:win` once, then SEO Learn uses it if credentials in Actions secrets later |
 | **X / HN posting** | No autopilot bot wired | Optional future Action + API keys |

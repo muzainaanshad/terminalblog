@@ -1,6 +1,22 @@
 # Hermes session handoff (2026-07-14 — end of Grok session)
 
-> **UPDATE 2026-08-07 (cron job):** Repo transferred `Anshad2u/terminalblog` → **`muzainaanshad/terminalblog`** (origin force-pushed/rewritten; local master reset to `origin/master`). Old local history preserved in branch `backup/old-master-2026-08-07` + `/tmp/wip-2026-08-07.patch`. **Vercel Git auto-deploy is BROKEN after transfer** — pushes do not trigger deploys (`vercel git connect` fails: Vercel GH app lacks access; needs dashboard re-link by operator). Until fixed: deploy manually with `vercel --prod --yes` after pushing.
+> **UPDATE 2026-08-07 (cron job):** Repo transferred `Anshad2u/terminalblog` → **`muzainaanshad/terminalblog`** (origin force-pushed/rewritten; local master reset to `origin/master`). Old local history preserved in branch `backup/old-master-2026-08-07` + `/tmp/wip-2026-08-07.patch`. **Vercel Git auto-deploy was BROKEN after transfer** — pushes did not trigger production deploys. Until fixed, deploys were manual `vercel --prod --yes`.
+>
+> **RESOLVED 2026-09-19 — the cause was NOT GH-app access.** The Vercel project
+> `terminalblog` (`prj_lviFq4g7laV7NiodUehsFkrMRBjZ`, team `anshad2us-projects`) had its
+> production branch set to **`main`** — a stale branch last touched 2026-08-17, 186 commits
+> behind — while the repo's default branch is **`master`**. So every push to `master` produced
+> only a *Preview* build and **terminalblog.com stayed frozen** on the last manual CLI deploy
+> (2026-09-12). Fixed via `PATCH /v9/projects/{id}/branch` → `{"branch":"master"}`, then a
+> production deployment of `master` was triggered. **Do not set productionBranch back to
+> `main`.** Verify with:
+>
+> ```bash
+> curl -s -H "Authorization: Bearer $VERCEL_TOKEN" \
+>   "https://api.vercel.com/v9/projects/prj_lviFq4g7laV7NiodUehsFkrMRBjZ?teamId=team_JapmWAKeS7c9fzmtXc7RAw6Q" \
+>   | grep -o '"productionBranch":"[^"]*"'
+> # expect: "productionBranch":"master"
+> ```
 
 **Why this file exists:** Operator continues in Hermes. Read this **first** every content/ops job.
 
@@ -29,7 +45,10 @@ Grow **long-term SEO traffic** for [terminalblog.com](https://terminalblog.com) 
 | `C:\Users\muzai\seo-ai-blog` | Legacy clone — pull/sync before use; may lag |
 | Remote | `Anshad2u/terminalblog` → Vercel **`terminalblog`** → https://terminalblog.com |
 
-Push `master` → Vercel auto-deploys. Prefer push over manual `vercel --prod`.
+Push `master` → Vercel auto-deploys (production branch is `master` as of 2026-09-19).
+Prefer push over manual `vercel --prod`. If a published post still 404s on
+terminalblog.com but its path is in the repo, check `link.productionBranch` **first** — that
+mismatch is what silently froze production before.
 
 **Git at handoff:** `master` @ `33b703e` (synced origin; includes this handoff + Telegram mute).
 
@@ -120,7 +139,7 @@ Policy: [content-policy.md](./content-policy.md) · Autopilot: [AUTOPILOT.md](./
 
 ```bash
 cd C:\Users\muzai\terminalblog
-git pull origin master
+npm run sync                     # fetch + --ff-only; replaces blind `git pull`
 node scripts/content-gate.cjs --strict
 node scripts/content-refresh.cjs --days 45
 node scripts/quality-check.cjs
@@ -151,7 +170,9 @@ node scripts/telegram-ops-digest.cjs --send
 
 ## Suggested next steps in Hermes
 
-1. `cd C:\Users\muzai\terminalblog && npm run sync`  (safe fast-forward; NEVER plain `git pull` blind)  
+1. `cd C:\Users\muzai\terminalblog && npm run sync`  (safe fast-forward; NEVER plain `git pull` blind).
+   `scripts/orchestrator.js` already runs this as its **step 0**, so any job that starts from the
+   orchestrator cannot draft on a stale base.  
 2. Confirm gate / thin evergreen queue (`content-refresh --days 45`)  
 3. Write **0–1** quality article OR expand 1–2 thin pillars  
 4. Fix `ping-search-engines` encoding if still red  

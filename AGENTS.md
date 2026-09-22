@@ -16,6 +16,10 @@ and GitHub drift apart. Always sync before content work:
 npm run sync   # git fetch + fast-forward only; never rebases or force-pushes
 ```
 
+`node scripts/orchestrator.js` now runs that sync itself as **step 0**, so any job that starts
+from the orchestrator cannot draft on a stale base. Publish path (post + push) is still manual —
+Hermes runs `deliver: local`, nothing syncs origin for you.
+
 After publishing: gate → commit → `git push origin master` → ops digest. Origin is
 **`Anshad2u/terminalblog`** (the account we own and push with). Note the repo was briefly
 re-pointed at `muzainaanshad/terminalblog` in Aug 2026, which caused a 403 with the cached

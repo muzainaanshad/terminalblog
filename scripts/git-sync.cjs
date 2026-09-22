@@ -17,7 +17,12 @@ const { execFileSync } = require('child_process');
 
 function git(args, { allowFail = false } = {}) {
   try {
-    return execFileSync('git', args, { encoding: 'utf8' }).trim();
+    // Pipe stderr too: keeps git's progress chatter from interleaving with our
+    // own log lines, and keeps e.stderr populated for the error path below.
+    return execFileSync('git', args, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
   } catch (e) {
     if (allowFail) return null;
     const msg = (e.stderr || e.stdout || e.message || '').toString().trim();

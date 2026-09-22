@@ -25,6 +25,22 @@ function run(script) {
   }
 }
 
+// --- STEP 0: fast-forward to origin/master before reading any signal ---------
+// GitHub Actions commits data to origin/master daily (adoption snapshots,
+// weekly digest). Without this, Hermes drafts on a stale base and local/origin
+// silently drift apart. Non-fatal on purpose: a sync failure must never stop
+// signal collection (offline runs, dirty tree, divergence).
+console.log('=== SYNC WITH ORIGIN (BEFORE DRAFTING) ===');
+try {
+  console.log(execSync(`node ${__dirname}/git-sync.cjs`, {
+    encoding: 'utf8', timeout: 60000, env: { ...process.env },
+  }).trim());
+} catch (e) {
+  const detail = (e.stdout || e.stderr || e.message || String(e)).toString().trim();
+  console.log(`[git-sync] could not sync — continuing anyway: ${detail.slice(0, 300)}`);
+}
+console.log('');
+
 const [commits, discussions, issues, blogs, youtube] = await Promise.all([
   Promise.resolve(run('fetch-commits.js')),
   Promise.resolve(run('fetch-discussions.js')),
@@ -59,3 +75,5 @@ console.log(youtube);
 console.log('\n=== AFTER DRAFTS ===');
 console.log('Run: node scripts/content-gate.cjs --strict');
 console.log('Reject any draft that fails. Do not publish near-duplicates.');
+console.log('Then commit and push, so origin never drifts behind this clone:');
+console.log('  git add src/content/blog && git commit -m "content: ..." && git push origin master');

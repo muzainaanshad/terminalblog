@@ -2,7 +2,7 @@
 title: "Gitlawb Zero Stopped Letting Flags Eat Your Filenames — And It's a Relief"
 description: "Zero fixed a CLI parsing bug where flag values were consuming positional arguments. Your filenames won't get swallowed by flags anymore."
 pubDate: "2026-07-10T07:00:00Z"
-updatedDate: "2026-07-10T07:00:00Z"
+updatedDate: "2026-09-22T04:00:00Z"
 tags: ["gitlawb-zero", "cli", "flag-parsing", "bugfix", "viral"]
 tool: "gitlawb-zero"
 author: "kira"
@@ -19,7 +19,7 @@ Example:
 zero --model gpt-4 myfile.txt
 ```
 
-Before the fix, `myfile.txt` might get consumed as part of `--model`'s value instead of being treated as a positional argument. The result: the file never gets processed.
+Before the fix, `myfile.txt` might get consumed as part of `--model`'s value instead of being treated as a positional argument. The result: the file never gets processed, and you get a confusing error about the model not existing.
 
 ## The Fix
 
@@ -30,16 +30,47 @@ The fix adds proper boundary detection between flag values and positional argume
 - `--flag value positional` (flag with value + positional)
 - `value positional` (two positionals)
 
+The implementation uses a lookahead strategy: when a flag expecting a value encounters the next token, it checks whether that token looks like another flag (starts with `-`) or is a bare word. Bare words after a flag value are preserved as positionals.
+
 ## Why This Matters
 
 CLI parsing bugs are frustrating because they break the most basic workflows. You type a command exactly as documented, and it does something unexpected. The fix is invisible — commands now do what you typed. But that's exactly the point: good infrastructure is invisible.
+
+Zero has over 40 CLI flags across subcommands (`zero run`, `zero config`, `zero session`, `zero mcp`, etc.). Each flag that accepts a value was a potential failure point. Users scripting Zero in CI/CD pipelines, git hooks, or shell aliases were hitting this silently — commands would appear to succeed but process the wrong files.
 
 ## What This Means
 
 Zero's CLI is now more reliable. Flag-heavy commands (which Zero has many of) work as expected. For users scripting Zero or integrating it into workflows, this eliminates a class of silent bugs.
 
----
+### Common Patterns That Now Work
 
+```bash
+# Multiple flags with values followed by positionals
+zero --model gpt-4 --temperature 0.7 --max-tokens 4000 src/index.ts
+
+# Config flags mixed with files
+zero config --provider anthropic --model claude-3-opus my-config.json
+
+# Session management with file args
+zero session --name "feature-branch" --resume ./project-root
+```
+
+### Comparison: How Other Agents Handle This
+
+| Agent | CLI Parser | Flag/Positional Handling |
+|-------|------------|-------------------------|
+| **Gitlawb Zero** | Custom (fixed #619) | Explicit boundary detection |
+| **Claude Code** | Commander.js | Standard POSIX — flags before positionals |
+| **OpenCode** | Custom | Similar boundary logic |
+| **Cursor** | N/A (GUI-first) | CLI is secondary |
+
+Zero's fix is notable because it was a user-reported regression from v0.3.x to v0.4.x — the kind of bug that only shows up when real users push real workflows.
+
+## The Broader Pattern: CLI Reliability in AI Agents
+
+This bug highlights a recurring theme in coding agents: **CLI reliability is table stakes for adoption**. An agent that works beautifully in a chat interface but breaks when scripted won't survive in production workflows. Zero's architecture — a native binary with a TUI — means the CLI *is* the primary interface for many users. Fixing flag parsing isn't a feature; it's respect for the operator's time.
+
+---
 
 ## Related articles
 

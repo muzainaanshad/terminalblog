@@ -1,0 +1,186 @@
+---
+title: "What Developers Actually Think About AI Coding Agents — From 300+ HN Comments"
+description: "Hacker News discussions reveal a split: some see 10x productivity with guardrails, others warn of 'cognitive surrender' and quality collapse. Here's what 300+ developers actually said."
+pubDate: "2026-09-22"
+updatedDate: "2026-09-22"
+heroImage: "/images/hn-ai-coding-agents.png"
+tags: ["ai-coding", "claude-code", "developer-experience", "code-quality", "ci-cd"]
+category: "analysis"
+---
+
+Three major Hacker News threads in the past week pulled back the curtain on how working developers actually use — and struggle with — AI coding agents. Not the marketing posts. Not the "I built a SaaS in a weekend" tweets. The raw, unfiltered opinions of 300+ engineers who live in these tools daily.
+
+The consensus? There isn't one. But the fault lines are revealing.
+
+## The Three Conversations
+
+**Thread 1:** ["AI coding has made CI a bottleneck, so we reworked ours to keep up"](https://news.ycombinator.com/item?id=49792067) (175 comments, 162 points) — Linear's engineering team shared how AI-generated code volume overwhelmed their CI pipeline, forcing a complete rework.
+
+**Thread 2:** ["If AI coding is lowering your code quality, you're not managing quality right"](https://news.ycombinator.com/item?id=49774795) (166 comments, 119 points) — A provocative post arguing that quality problems are a process failure, not an AI failure.
+
+**Thread 3:** ["Ask HN: Do we still need code editors, or are Git clients enough?"](https://news.ycombinator.com/item?id=49780550) — A workflow question that exposed a fundamental shift: some developers now write code almost entirely in terminal-based agents (Claude Code, Codex), using IDEs only for git visualization.
+
+---
+
+## The "CI Is Melting" Problem
+
+Linear's post struck a nerve. Their test suite quadrupled since January. CI times ballooned. The culprit? AI agents generating code *and* tests at a pace human reviewers can't match.
+
+**The core tension:** Developers using agents produce 5-10x more code changes per day. But CI infrastructure — runners, parallelization, caching — hasn't scaled 5-10x.
+
+> "We have thousands of tests and is done in 2 minutes. Every time it grows above 3 I add more parallelization and keep it ultra fast." — *zackify*
+
+> "Self hosting your CI/CD runners had the biggest impact in cost savings throughout, while also allowing for more powerful machines, which directly means quicker CI/CD runs." — *fb03*
+
+> "Speed up CI and the next bottleneck just moves to deploy and rollback, which do not scale the same way." — *pushpendraw*
+
+**The surprising take:** Several commenters argued the test explosion itself is the problem.
+
+> "Despite our test suites almost quadrupling since the start of the year... Did the tests produce four times as much value, though?" — *saagarjha*
+
+> "I suspect a substantial part of this is an avalanche of useless testing... when was the last time you didn't just skip over tests? And if you ever looked at tests in an LLM-heavy PR, how many of those tests tested something useful, and not just built-ins and trivial behaviours?" — *dgroshev*
+
+> "Unit tests especially... the test is simply modified for the updated application. Unit tests especially. I have found end to end tests to be useful, and also unblocked." — *yieldcrv*
+
+**What this means for you:** If you're adopting coding agents, your CI bill and wait times will spike before your feature velocity does. The teams handling it best are investing heavily in self-hosted runners, aggressive parallelization, and — critically — being ruthless about *what* gets tested. E2E tests survive the cull; unit test bloat gets deleted.
+
+---
+
+## The "Quality Is a Skill Issue" War
+
+Thread 2 exploded because it framed quality problems as a *management failure*, not a tool failure. The responses split cleanly into two camps.
+
+### Camp A: "You're holding it wrong" (Quality is achievable)
+
+> "I completely agree. It 100% matches my experience. The C++ code I maintain now is higher quality, more maintainable, higher performance, less buggy, and faster to modify now using Claude Code. However it doesn't happen automatically. I spent a lot of time experimenting with Claude Code to figure out the right way to use it. It's a tool. Learn how to use it well." — *deterministic*
+
+> "Once the agent has these guard rails in place I usually get great quality — far better than what I would write in most cases." — *bucket2015* (OP)
+
+> "I think if you're on a team that cares about quality, LLMs can help you write quality code faster. If you're on a team that's mindful about technical debt, you can make practical trade-offs for velocity now at the expense of paying off technical debt later." — *Sharlin*
+
+**The pattern:** Developers getting good results treat agents like junior engineers who need *extensive* guardrails:
+- Detailed AGENTS.md / CLAUDE.md files with project conventions
+- Mandatory pre-commit hooks (linting, type-checking, duplicate detection)
+- Post-implementation review passes by a *different* agent instance
+- Heavy investment in E2E tests over unit tests
+- Treating "reviewing AI output" as a first-class skill to develop
+
+### Camp B: "The tool encourages slop" (Quality is structurally undermined)
+
+> "You get 0% productivity gains if you are careful and actually reviewing the code the LLM produces. The only way to actually get the massive productivity gains that AI bros claim is to throw quality out the window." — *bigstrat2003*
+
+> "When you're required to approve thousands of lines a day (code you can't possibly understand), it certainly IS causing issues that didn't exist before. Every study I've seen correlates the use of AI with large increases in the number of bugs. Look at Amazon dialing back AI after massive outages. Microsoft patch Tuesday releases are bricking computers... The rash of Facebook bugs also coincided with their move to AI." — *hajile*
+
+> "It's asking an author to suddenly become an editor. It's asking somebody who writes code to now read and debug others code. It can actually be harder to find the bug in a tricky piece of code than it can be to write your own correct code from scratch." — *DANmode*
+
+> "With AI, everyone's output looks like a Ferrari, so it is hard to know what the internals are like... reviewing AI generated code is soul crushing work and I don't know who wants to do it." — *chadash*
+
+**The cognitive surrender argument:** A striking thread from *hajile* cited research suggesting humans suffer "cognitive surrender" within 10 minutes of using AI — offloading critical thinking to the model. The resulting review burden falls on exhausted engineers rubber-stamping 10x more code than they can comprehend.
+
+> "From start to finish, it's 100% entropy outside a handful of lines worth of human input... At the end of this AI equivalent to 'the human centipede', you get a developer who's handed 10x or maybe even 100x more code than their brain would possibly process. They are suffering complete cognitive surrender... They don't understand the system and rubber stamp it so they can move on to the next 50 PRs of the day."
+
+### The uncomfortable middle ground
+
+Several senior engineers acknowledged: **AI shifts the bottleneck from "writing code" to "reviewing code" — and most orgs haven't staffed or trained for that.**
+
+> "Open source projects are currently drowning under LLM generated PRs, where those who used to write code are simply punting that work to AI, but still expecting others to review it. It's not okay to expect such a free lunch. If you moved the labour of writing code one step away, then you are yourself the first line of defence now, so you better start reviewing code that you claim to be yours." — *sameerds*
+
+> "It's asking an author to suddenly become an editor *if they decide to use the robot for a task*. Certain workplaces are demanding this — but not all. Many still just want working commits without tech debt. In fact, private and public teams alike are backed up at the PR review stage, so lots of sane places wouldn't mind individual contributors using the robot less — especially if its use increases the complexity of reviewing the task. Speed isn't the only variable to optimize for!" — *DANmode*
+
+---
+
+## The Workflow Shift: Editors Are Becoming Git Clients
+
+Thread 3 revealed a quiet revolution: **some developers barely touch a code editor anymore.**
+
+> "My workflow has shifted away from the features of code editors toward just the git integration: viewing commits, checking uncommitted changes, seeing what will go into the final PR, and so on... For the actual coding, I use Claude Code in my terminal." — *TheSaifurRahman* (OP)
+
+> "VS Code has turned into an agent/project dashboard, each panel is an opencode terminal and the files it has modified (co-located as tabs)." — *verdverm*
+
+This isn't universal. But it signals a real split:
+- **Editor-centric:** Cursor, Windsurf, VS Code + Copilot — AI inside the IDE
+- **Terminal-centric:** Claude Code, Codex CLI, OpenCode — AI in the shell, editor only for diffs/git
+
+The terminal-centric camp argues the editor's "writing code" features (IntelliSense, refactoring, navigation) matter less when an agent writes 80% of the code. What remains valuable: **visualizing changes, managing git, running tests.**
+
+---
+
+## The "Vibe Coding" Backlash
+
+Thread 1's top comment (by *Fordec*) captured a growing frustration:
+
+> "Looking at the release notes for things like say the Linux kernel it is clear that the improvements are there at a massive rate of change. But it's small stuff, it's performance improvements, it's quality of life... What did you expect? Businesses to come up with whole new business lines, or is it just that backlogs of work is getting burned down that was going to be gotten to eventually? From what I can tell from the PM forums, the next bottleneck is the Product Org coming up with ideas worth implementing as fast as the developers can deliver them."
+
+> "AI is a rocket motor. Doesn't matter where we're going, as long as we get there FAST! It's a sickness." — *hexapus*
+
+> "The lack of actual tangible results is how you know that the claims of increased productivity are false. We haven't seen a bunch of new useful apps (or anything else for that matter), which we would have if LLMs actually worked." — *bigstrat2003*
+
+Counterpoint from *lukevp*: "PS5 emulation has gone from barely working to running Dark Souls at 10+ FPS with virtually no graphical glitches... in 6 weeks. If you're not familiar with normal emulator development time, this is... quite extraordinary."
+
+**The pattern:** AI excels at *well-defined, high-toil work* (migrations, boilerplate, test generation, reverse engineering). It struggles with *product judgment* — deciding what to build, designing cohesive UX, saying "no" to feature creep.
+
+> "AI makes a lot of drudgery type coding tasks a lot easier (think code migrations, etc.) But actually coming up with, testing, and rolling out loved new user features. AI isn't that good at that and we can't really 'prompt' that out of it as easily as we can prompt a py2 to py3 conversion of old code." — *aprilthird2021*
+
+> "Code moves much faster, product taste doesn't. Once you have your marching orders you can make features 10x faster. Shots off target still miss though. It doesn't matter if your code gets generated 10x faster when it doesn't resonate with users." — *geooff_*
+
+---
+
+## What Senior Engineers Actually Do Differently
+
+Reading across all three threads, a clear profile emerges of developers who *consistently* get value without quality collapse:
+
+| Practice | Why it matters |
+|----------|----------------|
+| **Invest heavily in AGENTS.md / CLAUDE.md** | Encodes project conventions so agents don't reinvent (poorly) every session |
+| **Use "sub-agent" review passes** | Separate agent instances review code for specific issues (duplicates, naming, security) — catches what the author-agent misses |
+| **Prioritize E2E over unit tests** | Unit tests bloat with AI; E2E tests catch real regressions and resist gaming |
+| **Treat prompting as architecture** | Spend 30-50% of time planning/speccing before letting agent write |
+| **Reject "looks right" code** | Actively hunt for over-engineering, inappropriate abstractions, hidden coupling |
+| **Keep human review as gate** | Never merge without a human who understands the *intent*, not just the diff |
+| **Self-host CI runners** | Only way to keep pace with agent-generated volume without bankrupting the cloud bill |
+
+---
+
+## What This Means for You (The Beginner's Takeaway)
+
+If you're new to AI coding agents, here's what the HN trenches suggest:
+
+### 1. Don't believe the "10x" claims without the "10x review" investment
+The productivity gains are real *if* you build the quality infrastructure first. Skip that, and you get faster technical debt accumulation — not faster feature delivery.
+
+### 2. Start with terminal-based agents (Claude Code, Codex) before IDE plugins
+They force you to understand the agent's actual capabilities and limitations. IDE integrations hide too much behind autocomplete UX.
+
+### 3. Write your AGENTS.md *before* your first prompt
+Document your project's: coding standards, architectural patterns, testing philosophy, forbidden patterns, preferred libraries. Treat it like onboarding a junior dev who never forgets but also never questions.
+
+### 4. Build a "review agent" pipeline
+One agent writes. A second agent reviews for: duplicates, naming consistency, test coverage, security issues, architectural alignment. This catches 80% of the slop before human eyes see it.
+
+### 5. Ruthlessly cull unit tests; invest in E2E
+AI generates infinite unit tests that test implementation details. Delete them. Keep tests that verify user-visible behavior.
+
+### 6. Accept that you're now an editor, not an author
+The mental model shift is real. Your value moves from "writing code" to "specifying intent, reviewing output, owning architecture." If that sounds worse, not better — the tooling may not be for you yet.
+
+### 7. Watch the CI bill
+Agent adoption = 5-10x PR volume. Plan your CI scaling *before* you hit the bottleneck. Self-hosted runners on powerful machines beat cloud parallelization on cost.
+
+---
+
+## The Honest Summary
+
+HN developers aren't uniformly bullish or bearish. They're **split by experience**:
+
+- **Solo/small-team devs with strong process** → "Best tooling leap in my career"
+- **Enterprise engineers in review-heavy orgs** → "Drowning in slop PRs, review is the bottleneck"
+- **Maintainers of popular OSS** → "Flooded with low-effort AI PRs, considering closing contributions"
+- **Junior devs** → "Learning faster than ever, but worried I'm not building intuition"
+
+The tool isn't the variable. **The process around the tool is.**
+
+If you take one thing from 300+ comments: **the teams winning with AI coding agents treat them like powerful but reckless junior engineers — giving them detailed specs, strict guardrails, mandatory multi-pass reviews, and never, ever merging without a human who understands *why* the code exists.**
+
+---
+
+*Want more deep dives like this? [Subscribe to the terminalblog newsletter](/newsletter) for weekly analysis of AI coding agent trends, backed by real developer data — not press releases.*
