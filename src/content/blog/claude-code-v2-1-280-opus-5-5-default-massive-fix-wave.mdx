@@ -1,0 +1,170 @@
+---
+title: "Claude Code Just Made Opus 5.5 Default and Fixed 100+ Things You've Been Complaining About"
+description: "v2.1.280 drops Opus 5.5 as the new default (1M context), fixes dialog focus theft, auto-mode retry loops, Windows prompt scrambling, subagent hand-off bugs, and a mountain of paper cuts. Here's what actually matters."
+pubDate: 2026-09-23T09:00:00Z
+tags: ["claude-code", "release", "opus-5-5", "coding-agents", "beginner"]
+tools: ["claude-code"]
+category: "just-shipped"
+author: "Anshad"
+image: "/api/og?title=Claude+Code+v2.1.280+Opus+5.5+Default&tool=claude-code"
+---
+
+Claude Code v2.1.280 landed September 22, 2026. The headline is **Claude Opus 5.5 is now the default Opus model** — 1 million context window, $4/$20 per million tokens with $0.20/Mtok cache reads. But the real story is the **100+ fixes** that clean up months of paper cuts.
+
+If you've ever fought with dialog focus theft, auto-mode retry loops, Windows prompt scrambling, or subagents losing their minds — this release is for you.
+
+## 1. Opus 5.5 Is Now the Default (Pro, Team Standard, Max, Team Premium, Enterprise)
+
+| Plan | Old Default | New Default |
+|------|-------------|-------------|
+| Pro / Team Standard | Sonnet | **Opus 5.5** |
+| Max / Team Premium / Enterprise | Opus 4.x | **Opus 5.5** |
+
+Opus 5.5 brings **1M context** and a pricing tier that makes it viable for daily coding: $4/M input, $20/M output, with $0.20/M cache reads. The model switch is automatic on next launch — no config changes needed.
+
+**For beginners:** this means you get the strongest Anthropic model out of the box. No more "which model should I pick?" paralysis.
+
+## 2. The Dialog Focus Theft Is Finally Fixed
+
+You know the annoyance: you click to bring the terminal window forward, and suddenly you've also clicked whatever was under your cursor — a search result, a tab, a suggestion dropdown.
+
+**Fixed.** A click that only brings the window to front no longer triggers the item under the pointer. This applies to search pickers, tab bars, agent/workflow rows, slash-command links, and suggestion dropdowns.
+
+## 3. Auto Mode Retry Loops — Stopped
+
+Two separate auto-mode bugs got squashed:
+
+- **Safety check declined to review** → action now denied **once** with a message that retrying won't help (instead of infinite retries)
+- **Safety check gave no answer** → retries now **back off**, and after 10 in a row the turn stops with a message
+
+No more watching Claude burn through your token budget on a loop it can't escape.
+
+## 4. Windows Prompt Scrambling — Gone
+
+On Windows terminals, invisible character cleanup used to leave the prompt line scrambled after you hit Enter. Now the screen **repaints** so you review the exact text that will be sent.
+
+Also fixed: the cleanup was removing the **zero-width non-joiner** that Persian and Arabic text uses (e.g., the plural of "PDF"). That's gone — your non-Latin text stays intact.
+
+## 5. Voice Dictation Actually Works Now
+
+Three voice bugs fixed in one release:
+
+- **Ctrl+C** now actually stops the microphone (before: prompt cleared but mic kept recording)
+- **Esc** cancels while a transcript is processing
+- **Held Space** no longer starts dictation from transcript view or vim NORMAL mode
+
+If you use voice input, this release makes it usable.
+
+## 6. Subagent Hand-Off Bugs — Multiple Fixes
+
+Background subagents have been a source of silent failures. v2.1.280 addresses:
+
+- **Finished subagent reports lost** when the parent conversation compacted before the report was read → **fixed**
+- **Messages to background subagents silently lost** in headless/SDK sessions when the subagent was finishing → **fixed**
+- **Background subagents couldn't use LSP tool** when an LSP plugin was active → **fixed**
+- **Background shell tasks** reporting benign non-zero exits (grep with no matches) as failures → **fixed**
+- **Ctrl+C needing 3-4 presses** to exit while background subagents run → **now 2 presses**
+
+## 7. Session Resume Crashes — Hardened
+
+Multiple crash-on-resume scenarios fixed:
+
+- Damaged cached message list now **rebuilt** instead of "Claude Code exited after an unrecoverable interface error"
+- Malformed system message or memory-saved notice without file list in saved transcript → **handled gracefully**
+- Settings file replaced by a named pipe mid-read → **no longer hangs**
+
+## 8. Config & Plugin System Hardening
+
+- `/config` crashing when a preference moved to `settings.json` still holds `null` or `"false"` in `~/.claude.json` → **fixed**
+- `installed_plugins.json` keeping install-time commit after updating a plugin from GitHub repo tracking a branch/tag → **fixed**
+- Skills in `~/.claude/skills/` being moved to `.trash/` when a `manifest.json` listed their names → **fixed**
+- Plugin marketplaces imitating reserved names → **refused when added, stopped if already added**
+- Background plugin marketplace auto-update ignoring git credential helpers → **fixed** (private-repo marketplaces now work)
+
+## 9. MCP Server UX Improvements
+
+- `/mcp` showing △ in server list but ⚠ in detail view for same server → **now consistent ⚠ everywhere**
+- MCP server re-added under same name after `claude mcp remove` showing as needing auth → **now reconnects properly**
+- New env var: `CLAUDE_CODE_MAX_MCP_DESCRIPTION_LENGTH` — change the 2,048-char cap on MCP tool descriptions/server instructions per session
+
+## 10. Fullscreen Mode Polish
+
+- Mouse wheel now scrolls `/skills` list and clickable skill state options in `/plugin`
+- Search box in `/plugin`, `/skills`, `/mcp` no longer loses right border
+- Home/End now work in `/config` settings list and selection lists (`/model`, `/memory`, permission prompts)
+- PgUp/PgDn in `/skills` menu stop at first/last skill instead of wrapping
+- Tab in `/config` list no longer silently changes selected setting's value
+- Multi-select option descriptions now indent under the label, not the option number
+
+## 11. VS Code Extension — Real Features Added
+
+| Feature | Command | What It Does |
+|---------|---------|--------------|
+| Status dialog | `/status` | Session version, account, model, server details |
+| Sandbox dialog | `/sandbox` | Sandbox mode, unsandboxed fallback, excluded commands |
+| Chrome dialog | `/chrome` | Extension status, install, reconnect, permissions |
+| Export conversation | `/export` | Copy/save conversation as plain text |
+| Skills in Slash commands | `/skills` | Each skill's source, token estimate, on/off state with click-to-toggle |
+
+**Paste handling improved:** pastes over 800 chars or 2+ line breaks are marked so Claude knows it's pasted text. Invisible Unicode formatting/tag characters removed from pasted text with a notice.
+
+**Plan approval card** now offers auto mode: "Yes, and use auto mode" — matching terminal behavior.
+
+## 12. Cloud & Web Fixes That Matter
+
+- `gh` and GitHub API calls in cloud sessions on GitHub Enterprise Server **auto-renew token** after ~8 hours (was failing)
+- Routine resuming existing session with old prompt/name when edited moments before scheduled run → **fixed**
+- File links in cloud session transcripts pointing outside working directory → **now disabled with explanation**
+- Auto mode refusing retry because expired/superseded approval prompt recorded as rejection → **fixed**
+- Cloud sessions viewed in Claude app now save files where the app can open them
+
+## 13. Self-Hosted Runner & Enterprise
+
+- Lifecycle-hook commits now **sign under `--configure-git`**
+- Turn ending at `--retire-at` release **waits for turn to be reported** before stopping
+- Git in lifecycle hooks ignores hook folders and programs named in runner's shared git files
+- `GIT_ALLOW_PROTOCOL` required for local-path and `git://` remotes in hook folders
+
+## 14. The Small Wins That Add Up
+
+- **Code blocks without language** now colored like inline code — commands stand out
+- **`/btw`** asked while a tool runs now knows the call is in progress (not reading it as failed)
+- **UserPromptSubmit hook timeout** notice names which hook command timed out
+- **`@` file suggestions** — file whose name contains query ranks above folder-only matches
+- **Artifact pages** — no Print buttons, confirm dialogs, or blocked device features; email/phone shown as text; dark mode reaches form controls and scrollbars
+- **`/ultrareview` uploads** — renamed copies (`id_rsa copy`, `kubeconfig (1).yaml`) stay on your machine
+- **Cross-session messaging startup warning** explains `--debug-file` writes a debug log to your chosen path
+
+## Updating
+
+```bash
+# Auto-updates on next launch, or force:
+claude update
+```
+
+Full changelog: [`v2.1.279...v2.1.280`](https://github.com/anthropics/claude-code/compare/v2.1.279...v2.1.280)
+
+## Why This Release Matters
+
+v2.1.280 isn't a feature drop — it's a **quality flood**. The Opus 5.5 default gets attention, but the 100+ fixes are what you'll feel daily:
+
+- No more dialog focus theft
+- No more auto-mode retry loops burning tokens
+- No more Windows prompt scrambling
+- No more voice dictation that won't stop
+- No more subagent hand-off ghosts
+- No more session resume crashes
+- No more plugin marketplace credential hell
+- No more MCP server status inconsistency
+
+This is the release where Claude Code stopped feeling like a beta and started feeling like a tool you can trust in production.
+
+Update. Try Opus 5.5. Enjoy the quiet.
+
+---
+
+## Related articles
+
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+- [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
+- [Beware: Hermes Agent Security Audit Uncovers Credential Bypass, Sandbox Escape, and Session Hijacking in 5 HIGH-Severity Findings](/blog/beware-hermes-agent-security-audit-5-high-severity-findings/)
