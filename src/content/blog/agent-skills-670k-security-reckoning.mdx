@@ -103,13 +103,35 @@ But the fundamental tension remains. The standard's value comes from being minim
 
 The lesson from npm is that governance always arrives eventually, usually after an incident large enough to force it. The agent skills ecosystem would be wise to build the guardrails before that incident, not after.
 
+## FAQ
+
+**Q1: How did SKILL.md become so ubiquitous so quickly?**
+The format is deliberately minimal — just a Markdown file with YAML frontmatter that any LLM can read. No runtime, no compilation, no SDK lock-in. Anthropic published the standard in December 2025; by January 2026, Vercel had a one-command installer (`npx skills add`) that auto-detected installed agents. OpenAI, Google, JetBrains, Cursor, and GitHub Copilot all adopted it within weeks. The simplicity was the entire point.
+
+**Q2: What makes SKILL.md uniquely vulnerable compared to npm packages?**
+Traditional packages operate at the code layer — you can scan them with static analysis, run them in sandboxes. SKILL.md operates at the **instruction layer**: Markdown prose tells the LLM what to do. Three lines of Markdown were sufficient to exfiltrate SSH keys in Snyk's demo. The instructions look like legitimate setup docs to humans but are direct operational commands to the LLM. Cross-platform portability means one malicious skill hits every platform simultaneously.
+
+**Q3: What are the most critical security practices for using community skills?**
+1. Scan what you have: `uvx snyk-agent-scan@latest` auto-discovers skills across agents.
+2. Read the SKILL.md content before installing — check for instructions unrelated to the stated purpose.
+3. Pin to known-good versions; copy skill directories into your project scope rather than relying on global auto-updates.
+4. Use project-scoped skills (`.claude/skills/`) over global (`~/.claude/skills/`) — they're committed to your repo and visible to your team.
+5. Keep skills self-contained with no network dependencies.
+
+**Q4: What is the ClawHavoc campaign and why does it matter?**
+In January 2026, 1,184 malicious skills across 12 publisher accounts shared a single C2 IP address, delivering Atomic Stealer (AMOS) targeting macOS crypto wallets, SSH keys, and browser credentials. Five of the top seven most-downloaded ClawHub skills at peak infection were confirmed malware. This proved malicious skills can reach massive scale before detection.
+
+**Q5: Are curated registries like the Agent Skills Registry a real solution?**
+The curated Agent Skills Registry at tech-leads-club enforces static analysis, Snyk scanning, lockfile hashing, and human review for its 80 listed skills. It's a safer alternative to the uncurated wilds of skills.sh (669,670 skills, no submission gate, ranking by install count). However, the ecosystem's fundamental tension remains: frictionless publishing enabled 669,670 skills; adding review gates slows adoption.
+
+**Q6: What's the parallel to npm's security evolution?**
+npm in 2011-2013 had explosive growth, zero curation, install-time script execution by default, and high-profile incidents (left-pad, event-stream) that forced governance changes. The skills ecosystem is at the same inflection point, compressed into months instead of years. Snyk's `agent-scan`, signature verification in Claude Code/Codex, and curated registries are the early governance — but the gap between adoption speed and security maturity is widening.
+
 ---
 
 *Related reading: [Your AI Agent's Config Directory Is Now the Most Dangerous Place on Your Machine](/blog/ai-agent-config-directory-attack-surface-2026/) · [Coding Agents Got Amnesia. Here Are the Tools Fixing It.](/blog/coding-agents-amnesia-memory-tools-fixing-it/) · [Beware: Clinejection — How a GitHub Issue Title Became a Supply Chain Attack](/blog/beware-clinejection-supply-chain-attack-github-actions/)*
 
-
 ## Related articles
-
 - [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)
 - [Your AI Agents Config Directory Is Now the Most Dangerous Place on Your Machine](/blog/ai-agent-config-directory-attack-surface-2026/)
 - [Best Coding Agents 2026 — Decision Guide (Not Another Hype List)](/blog/best-coding-agents-2026-decision-guide/)

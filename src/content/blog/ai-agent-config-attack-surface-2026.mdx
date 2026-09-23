@@ -122,3 +122,28 @@ The AI agent ecosystem is not dealing with a bug. It is dealing with an architec
 The config file is now the payload. The developer's trust is the exploit. And the LLM is the execution engine.
 
 Until agent frameworks move to signed configuration, sandboxed config execution, or at minimum mandatory review gates for config file changes, every developer who opens an untrusted repository in Claude Code, Cursor, Gemini CLI, Copilot, or Windsurf is making a bet that the config files in that directory are exactly what they appear to be. Six campaigns in seven months suggest that bet is no longer safe.
+
+## FAQ
+
+**Q1: Why are agent config files (.cursorrules, CLAUDE.md, settings.json) more dangerous than other config files?**
+They sit at the intersection of three trust relationships: (1) developers trust them as voluntary configuration, (2) IDEs execute them automatically on every session, and (3) LLMs treat them as system-level instructions that override default behavior. No other developer tool combines all three — a Makefile executes but isn't an LLM prompt; .editorconfig is config but isn't executed; shell scripts execute but aren't fed to an LLM as system overrides.
+
+**Q2: What's the TrapDoor campaign and how did invisible Unicode work?**
+In May 2026, attackers planted `.cursorrules` and `CLAUDE.md` files with hidden instructions embedded in zero-width Unicode characters (U+200B, U+200C, U+200D, U+FEFF). Files appeared blank in standard editors but the LLM parsed them as system instructions to run a fake "security scan" that exfiltrated SSH keys, AWS credentials, browser profiles, and crypto wallet data. The same attacker opened PRs against six major AI projects (LangChain, browser-use, MetaGPT, OpenHands) with the same hidden payloads.
+
+**Q3: What makes the GhostApproval (CVE-2026-12958) vulnerability so dangerous?**
+It uses a symlink attack: a file named `project_settings.json` in a repo is actually a symbolic link to `~/.ssh/authorized_keys` or `~/.zshrc`. The README instructs the agent to append a line. When the developer approves what appears to be a safe edit, the agent resolves the write through the symlink and injects an SSH key or shell command. In testing, Claude Code's reasoning correctly identified the file was a zsh config, but the approval dialog showed only the benign filename. Windsurf completed the write before the prompt rendered, making the dialog a post-hoc undo button. Augment presented no dialog at all.
+
+**Q4: What immediate steps should every developer take today?**
+1. Add agent config files to mandatory review policy — treat `.claude/settings.json`, `.gemini/settings.json`, `.cursor/rules/`, `.cursorrules`, `.windsurfrules`, `.github/copilot-instructions.md`, `CLAUDE.md`, `AGENTS.md` like CI workflow changes.
+2. Pin config file hashes in CI — verify SHA-256 hashes before any LLM task runs.
+3. Use `npm install --ignore-scripts` in CI and onboarding to sever preinstall hook entry points.
+4. Flag `alwaysApply: true` with broad globs (`**/*`) as high-severity SAST findings.
+5. Audit your config files now: run the find command in the article to check for hooks, instructions, or zero-width chars you didn't add.
+6. Rotate tokens after any unvetted npm install.
+
+**Q5: Why don't existing security tools catch these attacks?**
+No SAST tool scans `.cursorrules` for malicious LLM instructions. No dependency auditor checks `settings.json` for `SessionStart` hook injection. No code review gate treats `CLAUDE.md` modifications as security-sensitive. No SBOM standard includes agent config files as artifacts to track. GitGuardian found 24,008 secrets in MCP config files on public GitHub — 2,117 confirmed live — just from developers not realizing their agent configs contain exfiltratable secrets by design.
+
+**Q6: What's the long-term fix for the agent config trust problem?**
+Agent frameworks need signed configuration, sandboxed config execution, or mandatory review gates for config file changes. Until then, the architectural assumption that "project directory = trusted execution boundary" is invalid in a world of open-source collaboration where anyone can open a PR, create a repo, or publish a package.

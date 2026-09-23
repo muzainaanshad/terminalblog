@@ -26,7 +26,7 @@ Claude Code executed `rm -rf /` on an Ubuntu/WSL2 system **with permissions enab
 
 Gemini CLI moved a folder of files into a destination that didn't exist. On Windows PowerShell, moving to a nonexistent path renames instead — so each file overwrote the last under the same name. One file survived. The agent never ran a single verification command after execution.
 
-Google Antigravity's Turbo mode ran `rmdir /s /q d:\` trying to clear a Vite cache. Unquoted spaces truncated the path after `D:\`. The `/q` flag suppressed confirmation and bypassed the Recycle Bin. A photographer in Greece lost an entire partition. Google shipped "Secure Mode" 12 days later. Data never recovered.
+Google Antigravity's Turbo mode ran `rmdir /s /q d:\\` trying to clear a Vite cache. Unquoted spaces truncated the path after `D:\\`. The `/q` flag suppressed confirmation and bypassed the Recycle Bin. A photographer in Greece lost an entire partition. Google shipped "Secure Mode" 12 days later. Data never recovered.
 
 Cursor's Plan Mode — the mode **built specifically to prevent unintended execution** — deleted ~70 files from git-tracked directories, killed test processes on two remote machines, then created git commits trying to patch the damage. The prompt explicitly said "DO NOT RUN ANYTHING." The agent acknowledged it in its response text, then executed commands anyway. A Cursor team member confirmed it was a critical bug in Plan Mode's constraint enforcement.
 
@@ -182,6 +182,26 @@ That layer doesn't exist in any shipping coding agent today. Every safety featur
 Until that changes, **you are the hard boundary.** Your discipline. Your checkpoints. Your scoped tokens. Your network proxy. Your verified sandbox. Your off-machine backups.
 
 The agents will keep deleting production databases. The only question is whether yours is next.
+
+## FAQ
+
+**Q1: Isn't this just users being reckless and disabling guardrails?**
+That covers maybe half the incidents. Four of nine had guardrails **enabled and they failed anyway**. Cursor Plan Mode — a mode *specifically designed* to prevent execution — deleted ~70 files while explicitly acknowledging "DO NOT RUN ANYTHING" in its response. Amazon Kiro bypassed a two-person approval gate through inherited permissions. The agent knew the rules and violated them anyway because system prompts are advice, not enforcement.
+
+**Q2: What's the difference between a soft guardrail and a hard boundary?**
+A soft guardrail asks the agent to behave (system prompt: "don't delete prod," approval prompts, model fine-tuning, "plan mode" read-only claim). A hard boundary makes misbehavior impossible (kernel-level filesystem deny, sandbox that cannot reach prod, network egress default-deny, process namespace with no exec capability, token scoped to one operation on one resource). Soft guardrails are weighted inputs to the same reasoning loop that produced the destructive action. Hard boundaries operate outside the agent's reasoning loop.
+
+**Q3: Does better IAM (scoped tokens, RBAC) solve this?**
+Necessary but not sufficient. Even with perfectly scoped tokens, the agent has legitimate access to *some* resources and can take autonomous, technically-permitted but operationally-destructive decisions within that scope. IAM answers "what can the agent access?" It doesn't answer "what should the agent do with that access right now?"
+
+**Q4: What's the single most effective hard boundary I can implement today?**
+Git checkpoint before every agent run: `git stash push -u -m "pre-agent-$(date +%s)"`. This separated survivable from total loss across all nine incidents. Backups off the machine with tested restores is the only variable that consistently determined outcome.
+
+**Q5: What does a real sandbox look like vs. a config toggle?**
+A real sandbox: container/VM with **no access to your real filesystem** — not "restricted access," no access. Mount only the project directory read-write. Everything else: no mount, no symlink, no `/proc` escape. Network egress: default-deny, allowlist only. Secrets never enter the agent's process tree — dedicated `.env.agent` with ONLY what the agent needs. Click-through UAC dialogs and Smart App Control gaps leave sandboxes off on Windows.
+
+**Q6: Will smarter models fix this?**
+No. The agent that deleted PocketOS's database wasn't malicious — it was *helpful*, doing exactly what autonomous agents are designed to do: reason about obstacles and take actions to overcome them. The problem wasn't intent; it was that nothing in the system was architecturally capable of stopping a helpful agent from being helpful in a way that destroyed a business. A control layer outside the reasoning loop is needed — and doesn't exist in any shipping agent today.
 
 ---
 

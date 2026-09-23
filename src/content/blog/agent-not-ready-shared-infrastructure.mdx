@@ -21,11 +21,29 @@ If you're running an agent as a service today, operate as if isolation does not 
 
 The industry is about to learn, expensively, that the hard part of shipping an agent to a team was never making it smart. It was making it forget the right things.
 
+## FAQ
+
+**Q1: Why can't coding agents just add multi-user support as a feature?**
+The assumption of a single trusted operator is baked into every layer — memory scoping, credential storage, session state, config management. Adding tenant isolation isn't a feature; it requires rewriting the substrate. The vendors who solve per-actor identity, encrypted per-user memory, credentials that physically cannot bleed across sessions, and session state that survives reconnects will own the enterprise market. The ones treating agents as desktop software will plateau at the solo-developer ceiling.
+
+**Q2: What's the immediate risk if I'm running an agent as a shared service today?**
+Operate as if isolation does not exist. Give every actor a separate profile. Rotate anything that ever touched a shared session. Never reuse a gateway token across a trust boundary. Assume a long-lived embedded session will eventually confuse whose context is whose, and design around it rather than waiting for a fix.
+
+**Q3: Which agents currently have the best isolation story?**
+Hermes Agent has a credential-guard system that scopes secrets so subagents can't exfiltrate them. Gitlawb Zero's local-only model means no central server holds your state. Most other agents treat isolation as a secondary concern. Before production use, run the [Coding Agent Security Checklist](/blog/coding-agent-security-checklist-2026/).
+
+**Q4: What happens when a shared agent session loses context?**
+The session loses its context cache on reconnect and must rebuild — expensively. Worse, it may drop tool connections and interfere with neighboring agents' configurations. This isn't a bug; it's the architecture working as designed for a single operator.
+
+**Q5: Is this just an enterprise problem, or do solo developers need to care?**
+Solo developers should care because the same architectural gaps cause credential leaks, context bleed, and session corruption even in single-user scenarios. The fixes (per-profile isolation, scoped credentials, durable session state) benefit everyone.
+
+**Q6: What's the timeline for proper isolation in mainstream agents?**
+Within a year, per-actor isolation will be the primary differentiator. Vendors who don't solve it will be limited to solo-developer use cases. The feature race (subagents, skills, reasoning tiers) is distracting from the trust race — isolation is the hard problem that enables everything else.
+
 ---
 
-
 ## Related articles
-
 - [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
 - [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)
 - [What Developers Think About Coding Agents — The Skill Atrophy Crisis, Interface Wars, and Trust Divide From 500 HN Comments](/blog/hn-developer-divide-coding-agents-interface-skill-atrophy/)

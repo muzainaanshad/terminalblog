@@ -158,3 +158,31 @@ Every time we discover what agents are genuinely good at, some intelligence migr
 The most important multi-agent advance of 2026 isn't a smarter coordination protocol. It's a 2015 git feature plus human judgment, beating two years of elaborate agent choreography for the most common case.
 
 And the most important optimization you can make right now? It's not switching models. It's learning to decompose.
+
+## FAQ
+
+**Q1: Why does orchestration topology matter more than model choice in 2026?**
+Models have converged — Claude Opus 4.7, GPT-5.4, Gemini 2.5 Pro, and DeepSeek V4 Pro all score within single-digit percentage points on SWE-bench Verified. The AdaptOrch framework found topology-aware orchestration achieves 12–23% improvement over static baselines, a larger gap than most model upgrades deliver. When every model can solve the problem, how you coordinate agents becomes the bottleneck.
+
+**Q2: What is the conductor pattern and why does it work?**
+The conductor pattern: (1) Decompose work into independent tasks by file boundary, not feature; (2) Dispatch one agent per task into its own git worktree; (3) Run agents in parallel unattended; (4) Review each diff as it lands; (5) Merge good, discard bad, re-prompt salvageable; (6) Repeat. The human holds the baton, agents execute in isolation, git handles convergence. It works because agent-to-agent communication was the primary failure mode — context bleeds, contradictory states, cascading hallucinations. Removing communication and letting git coordinate collapses failure modes to bad diffs humans know how to review.
+
+**Q3: Why are git worktrees (from 2015) the key primitive for parallel agents?**
+Worktrees let you check out multiple branches simultaneously in separate directories, sharing one `.git` object database. Each agent gets its own working directory, branch, and index — it can read, write, delete, and refactor without touching another agent's workspace. All agents share one git history, so merging is trivial. Filesystem boundaries map cleanly to task boundaries. Zero new infrastructure needed — no message bus, no shared state database, no distributed locking. Git already solved concurrent file editing for humans; it solves it for agents too.
+
+**Q4: What's the real bottleneck in parallel agent workflows?**
+The bottleneck has moved from the model to the human — specifically, decomposition. Developers think in features ("build the checkout flow"), but parallel agents need task boundaries defined by **file ownership and dependency**, not feature scope. If two subtasks touch the same file, they're not independent. Teams that master decomposition see 2x throughput improvements and 35% cost reductions; teams that decompose poorly get conflicting PRs and merge archaeology.
+
+**Q5: Which orchestration tools should I watch in late 2026?**
+- **Agent Orchestrator** (8.5k stars): Fleet IDE with tmux sessions, worktree isolation, CI feedback loops — full orchestration with monitoring
+- **Claude Squad**: Terminal-native tmux wrapper for parallel agents — quick setup, zero overhead
+- **Vibe Kanban**: Kanban board = worktree = agent, cross-platform — visual task tracking
+- **amux**: Single-file Python server with SQLite task board — utility for DIY orchestrators
+- **Conductor**: macOS GUI with unified diff review — UX-first workflow reference
+
+**Q6: What are self-evolving agents and are they ready for production?**
+Three approaches emerging: (1) **MOSS** — agents patch their own tool-calling logic autonomously with monotonic improvement guarantees; (2) **GenericAgent** — crystallizes execution paths into reusable Skills, building a personal skill tree; (3) **Socratic-SWE** — distills solving traces into an Agent Skill Registry that generates targeted training tasks. All share the philosophy: the agent that solves should also learn. Still speculative — the practical present is parallel orchestration with human decomposition.
+
+---
+
+*Related reading: [Your AI Agent's Config Directory Is Now the Most Dangerous Place on Your Machine](/blog/ai-agent-config-directory-attack-surface-2026/) · [Coding Agents Got Amnesia. Here Are the Tools Fixing It.](/blog/coding-agents-amnesia-memory-tools-fixing-it/) · [Beware: Clinejection — How a GitHub Issue Title Became a Supply Chain Attack](/blog/beware-clinejection-supply-chain-attack-github-actions/)*
