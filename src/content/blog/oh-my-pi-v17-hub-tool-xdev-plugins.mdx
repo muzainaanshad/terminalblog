@@ -2,7 +2,7 @@
 title: "Oh My Pi v17.3.3 Fixes Gemini Reasoning Loops, Hashline Edge Cases, and TUI Rendering — What Beginners Need to Know"
 description: "Oh My Pi v17.3.3 (Aug 14) stops Gemini from looping on thought-only responses, recovers from malformed function calls, fixes hashline dangling range separators, and renders TUI markdown tables correctly. The v17 series keeps shipping daily fixes beginners actually feel."
 pubDate: "2026-08-09T10:00:00Z"
-updatedDate: "2026-08-14T10:00:00Z"
+updatedDate: "2026-09-24T10:00:00Z"
 tags: ["oh-my-pi", "v17", "v17.3.3", "release", "gemini-reasoning", "hashline-fix", "tui-rendering", "terminal-agent", "coding-agent", "beginner"]
 tool: "oh-my-pi"
 author: "sage"
@@ -102,6 +102,36 @@ The same batch fixed two correctness bugs you might have hit: shell "minimizatio
 - **Hashline dangling range separators recovered.** Hunk headers like `PUT 244.=:`, `CUT 5.=` (which previously failed as orphan payload lines) are now normalized to single-line ranges `N.=N` so edits apply cleanly.
 - **TUI markdown rendering fixed.** When Gemini emits a lone closing Markdown fence without its opener, the TUI no longer renders final headings and tables as one raw code block — they display correctly.
 
+---
+
+## v18.3.0 — Tool Documentation, Interrupt Reasons, and Daily Polish (Sep 24)
+
+The v18 series has arrived! **v18.3.0** (Sep 24) continues the daily release cadence with meaningful improvements:
+
+### @oh-my-pi/pi-agent-core
+
+**Added:**
+- **AgentTool.docTopics support** — Agents can now document their tools on demand through the new `AgentTool.docTopics` method. This makes tool capabilities discoverable and self-documenting.
+- **`TOOL_INTERRUPT_ABORT_REASON`** — Interruptible tools can now distinguish queued steering, peer messages, or background completions from a full run abort. This gives agents much finer-grained control over interruption handling.
+
+### @oh-my-pi/pi-ai
+
+**Fixed:**
+- **Claude Opus 5.5 mid-session switch to high-effort reasoning** — Fixed an issue where switching to high-effort reasoning mid-session wasn't being applied correctly.
+
+### v18.2.11 (Sep 23) — Background Job Fixes
+
+- **Fixed background job completions interrupting foreground Bash and eval calls** — Previously, background job completions could cause foreground calls to be repeatedly moved into the background.
+- **Fixed stream finalization when a provider ends without emitting a completion or error event** — Ensures the final assistant message is preserved and corresponding message lifecycle events are emitted.
+- **Fixed tool execution being incorrectly skipped when host streams end** — Tools now execute reliably even when host stream handling has edge cases.
+
+### v18.2.10 (Sep 22) — Stream Finalization and Tool Execution
+
+- **Stream finalization fix** — When a provider ends without emitting a completion or error event, the final assistant message is now preserved with proper lifecycle events.
+- **Tool execution skip fix** — Tools were incorrectly skipped when host streams ended; this is now resolved.
+
+---
+
 ## What breaks when you upgrade
 
 Breaking changes in v17.0.0 are the real upgrade hazard:
@@ -114,11 +144,11 @@ For a typical beginner workflow — `omp` in a repo, describe a change, approve 
 
 ## How to update
 
-Oh My Pi generally self-updates, but the official upgrade paths are: macOS/Linux via `curl -fsSL https://omp.sh/install | sh`, Windows via `irm https://omp.sh/install.ps1 | iex`, Homebrew users via `brew upgrade can1357/tap/omp`, and npm users via `bun update -g @oh-my-pi/pi-coding-agent`. Run the version check after updating to confirm you are on **v17.3.3**. If you are automating agents, watch for config settings referencing the old discovery or resolve paths and replace them per the v17.0.0 release notes.
+Oh My Pi generally self-updates, but the official upgrade paths are: macOS/Linux via `curl -fsSL https://omp.sh/install | sh`, Windows via `irm https://omp.sh/install.ps1 | iex`, Homebrew users via `brew upgrade can1357/tap/omp`, and npm users via `bun update -g @oh-my-pi/pi-coding-agent`. Run the version check after updating to confirm you are on **v18.3.0**. If you are automating agents, watch for config settings referencing the old discovery or resolve paths and replace them per the v17.0.0 release notes.
 
 ## The bottom line
 
-v17 is the biggest internal change to the Oh My Pi agent in months: one tool to rule messaging, background jobs, and long-running processes; transparent `xd://` approvals instead of hidden ones; and a serious plugins standard that makes extension safer. For beginners the practical wins keep stacking: the stability fixes in v17.2.12 (no more memory leaks, idle CPU spin, or dropped search sources), reasoning controls in v17.2.14, v17.2.15's `omp compress`, natural-language `omp cleanse`, MCP fixes, handoff artifact preservation, and hardened tar parsing, v17.3.2's TUI stall fix, hashline path fix, and Antigravity quota smarts, and now v17.3.3's Gemini reasoning-loop kill, malformed-call recovery, hashline edge-case normalization, and TUI markdown rendering fix. If you skipped the v16 series updates, the jump to v17.3.3 is absolutely worth it.
+v17 was the biggest internal change to the Oh My Pi agent in months: one tool to rule messaging, background jobs, and long-running processes; transparent `xd://` approvals instead of hidden ones; and a serious plugins standard that makes extension safer. Now v18 arrives with tool documentation on demand, interrupt reason distinctions, and the same daily polish cadence. For beginners the practical wins keep stacking: the stability fixes in v17.2.12 (no more memory leaks, idle CPU spin, or dropped search sources), reasoning controls in v17.2.14, v17.2.15's `omp compress`, natural-language `omp cleanse`, MCP fixes, handoff artifact preservation, and hardened tar parsing, v17.3.2's TUI stall fix, hashline path fix, and Antigravity quota smarts, v17.3.3's Gemini reasoning-loop kill, malformed-call recovery, hashline edge-case normalization, and TUI markdown rendering fix, and now v18's AgentTool.docTopics, TOOL_INTERRUPT_ABORT_REASON, and background job fixes. If you skipped the v16 series updates, the jump to v18.3.0 is absolutely worth it.
 
 ## Related articles
 
