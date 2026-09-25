@@ -1,0 +1,313 @@
+---
+title: "Your Coding Agent Is Reading the Wrong Files — Here's How to Fix It"
+description: "Context engineering is the skill that separates developers who ship with agents from developers who burn tokens watching them hallucinate. The model doesn't matter. What you feed it does."
+pubDate: 2026-09-25
+updatedDate: 2026-09-25
+tags: ["context-engineering", "guide", "pillar", "workflow", "coding-agents", "tokens"]
+tool: "industry"
+author: "ada"
+image: "/api/og?title=Context+Engineering+for+Coding+Agents&tool=industry"
+---
+
+## Related articles
+
+- [AGENTS.md makes every coding agent 10x smarter](/blog/agents-dot-md-make-coding-agent-10x-smarter/)
+- [Complete AGENTS.md Guide for Coding Agents](/blog/agents-md-complete-guide/)
+- [Real Cost of AI Coding Agents That Nobody Talks About](/blog/real-cost-of-ai-coding-agents/)
+- [Your coding agent is a harness — the model is the commodity](/blog/your-coding-agent-is-a-harness-the-model-is-the-commodity/)
+
+---
+
+You're not paying for the model. You're paying for **what the model sees**.
+
+Two developers use the same agent, the same model, the same repo. One ships a feature in 20 minutes. The other burns $40 in tokens and gets a hallucinated API that doesn't exist.
+
+The difference isn't the model. It's **context engineering** — the discipline of feeding the agent exactly what it needs, and nothing it doesn't.
+
+This is the skill that matters more than your tool choice. More than your model choice. More than your prompt engineering.
+
+---
+
+## The Token Tax You're Already Paying
+
+Every coding agent has a context window. Most default to stuffing it full.
+
+```
+User: "Fix the auth bug"
+Agent: *reads 47 files, sends 180K tokens, hallucinates a Redis connection that was removed 6 months ago*
+```
+
+That 180K tokens cost you ~$2.70 at Claude Opus rates. The fix took 3 iterations. **$8.10 for one bug.**
+
+Now multiply by 20 tasks a day. **$162/day. $4,860/month.**
+
+The model didn't fail. Your context strategy did.
+
+---
+
+## What Context Engineering Actually Means
+
+Context engineering is not "write better prompts." It's **curate what the model sees.**
+
+Three levers, in order of impact:
+
+| Lever | What It Does | Typical Savings |
+|-------|--------------|-----------------|
+| **Repo map / file selection** | Only send files relevant to the task | 40-70% token reduction |
+| **Conversation pruning** | Drop irrelevant history, keep decisions | 20-40% token reduction |
+| **Instruction injection** | Load AGENTS.md, skills, rules at the right moment | Prevents hallucination, not token savings |
+
+Most developers ignore all three. They let the agent "figure it out" by reading everything.
+
+---
+
+## Lever 1: Stop Sending the Kitchen Sink
+
+### The Naive Approach (What Most Agents Do By Default)
+
+```
+Task: "Add rate limiting to the API"
+Agent reads: src/auth/, src/api/, src/db/, src/utils/, tests/, docs/, package.json, README, .env.example, 12 config files...
+Tokens: ~200K
+```
+
+### The Engineered Approach
+
+```
+Task: "Add rate limiting to the API"
+You provide: src/api/routes.ts, src/api/middleware.ts, src/config/rate-limit.ts, package.json (deps only)
+Tokens: ~18K
+Result: Working PR in one shot
+```
+
+**How to enforce this in your agent:**
+
+**Aider** — uses a repo map automatically. It's the gold standard.
+
+**Claude Code** — use `/compact` aggressively. Explicitly `@` only the files that matter.
+
+**OpenCode / Hermes / Goose** — use skills. A `rate-limiting` skill loads only the 4 files above.
+
+**Cursor** — `@` mention specific files. Don't use `@codebase` unless you're exploring.
+
+**Every agent** — write an AGENTS.md that lists "Where things live" so the agent *knows* where to look without searching.
+
+---
+
+## Lever 2: Conversation History Is Poison (Mostly)
+
+Agents append the full conversation to every request. A 50-message session = 100K+ tokens of garbage context.
+
+**What to keep:**
+- The original task
+- Key decisions made ("we use Redis, not in-memory")
+- The current plan
+- File paths that were actually edited
+
+**What to drop:**
+- "Let me try this approach"
+- "That didn't work, trying another way"
+- Three failed attempts at the same regex
+- The agent apologizing for the previous attempt
+
+### How to Prune Without Losing Your Mind
+
+**Manual (works everywhere):**
+```
+/compact "Keep: task, decision to use Redis, files edited: src/api/routes.ts. Drop: all failed attempts."
+```
+
+**Automated (Hermes, OpenCode skills):**
+```yaml
+# In your skill or AGENTS.md
+context:
+  max_messages: 15
+  preserve:
+    - "task"
+    - "decision:*"
+    - "file:src/**"
+  summarize_older: true
+```
+
+**Cursor / Claude Code:**
+- Use `/clear` or start a new session when the task changes
+- Don't treat the agent like a chat history — treat it like a fresh contractor every task
+
+---
+
+## Lever 3: Load Instructions at the Right Moment
+
+AGENTS.md is useless if the agent loads it *after* it's already hallucinated your stack.
+
+**The loading order that works:**
+
+1. **System prompt** (agent's built-in instructions)
+2. **AGENTS.md / CLAUDE.md** (repo rules — *always loaded first*)
+3. **Skill / skill file** (task-specific workflow — *loaded when task matches*)
+4. **Conversation context** (pruned, see above)
+5. **File contents** (only the ones you explicitly selected)
+
+**The mistake:** Putting 500 lines of architecture docs in AGENTS.md. The agent skims it, misses the rule about "no new frameworks," and installs `zustand` when you use `redux`.
+
+**The fix:** AGENTS.md = universal invariants only (< 200 lines). Everything else → `docs/` or skills, loaded on demand.
+
+---
+
+## The Context Engineering Workflow (Copy This)
+
+### Before Every Task
+
+```bash
+# 1. Checkpoint git (30 seconds, saves hours)
+git stash push -u -m "pre-agent-$(date +%s)"
+
+# 2. Identify the 3-5 files that actually matter
+# Use your knowledge, not the agent's search
+ls src/api/ src/middleware/ src/config/rate-limit.ts
+
+# 3. Launch agent with explicit context
+# Claude Code:
+claude-code "Add rate limiting to /api/*" @src/api/routes.ts @src/api/middleware.ts @src/config/rate-limit.ts @package.json
+
+# OpenCode/Hermes:
+opencode run --skill rate-limiting "Add rate limiting to /api/*"
+
+# Cursor:
+# @src/api/routes.ts @src/api/middleware.ts @src/config/rate-limit.ts @package.json
+# "Add rate limiting to /api/*"
+```
+
+### During the Task
+
+- **Watch the token count** (most agents show it)
+- **If it climbs past 50K without progress** — stop, `/compact`, re-aim
+- **If the agent reads a file you didn't expect** — ask why. It's usually a symptom of vague instructions.
+
+### After the Task
+
+```bash
+# 4. Verify what actually changed
+git status --short && git diff --stat
+
+# 5. If it touched files you didn't intend, add a rule to AGENTS.md
+# "Never modify src/db/ without explicit approval"
+```
+
+---
+
+## Real Example: The Refactor That Cost $0.03 vs $12
+
+**Task:** "Extract the user validation logic into a shared module"
+
+### Without Context Engineering (Naive)
+- Agent searches codebase → reads 80 files
+- Finds 3 validation patterns, picks the wrong one
+- Creates `src/utils/validate.ts` but misses the edge case in `src/auth/legacy.ts`
+- Tests fail → 4 iterations → **$12.40 in tokens**
+
+### With Context Engineering (Engineered)
+- You know the validation lives in `src/auth/validate.ts` and `src/api/middleware.ts`
+- You `@` only those two files + `src/types/user.ts`
+- Agent sees the exact patterns, extracts cleanly
+- Tests pass first run → **$0.03 in tokens**
+
+**413x cost difference. Same model. Same agent. Different context.**
+
+---
+
+## The Skills That Compound
+
+Context engineering isn't one trick. It's a stack of habits:
+
+| Habit | Effort | Payoff |
+|-------|--------|--------|
+| Write AGENTS.md with "Where things live" section | 20 min once | Every agent knows your architecture |
+| Create skills for recurring patterns (rate-limiting, auth, migrations) | 10 min each | One-command context for common tasks |
+| `/compact` or new session per task | Muscle memory | No history pollution |
+| Explicit file `@` mentions instead of "codebase" | Muscle memory | 10x token efficiency |
+| Git checkpoint before every agent run | 5 sec | Zero blast radius |
+
+---
+
+## What This Looks Like in Your Daily Flow
+
+**Morning:** You need to add a webhook endpoint.
+```bash
+# 30 seconds of context engineering
+@src/api/routes.ts @src/api/webhooks.ts @src/types/webhook.ts
+"Add Stripe webhook handler for payment.intent.succeeded"
+```
+Done in one shot. **$0.15.**
+
+**Afternoon:** You need to debug a flaky test.
+```bash
+# New session. No history baggage.
+@src/tests/flaky-test.spec.ts @src/services/payment.ts
+"Why does this test fail 30% of the time?"
+```
+Agent sees only what matters. Finds the race condition. **$0.40.**
+
+**Evening:** You want to refactor the user service.
+```bash
+# Skill loads 4 files automatically
+opencode run --skill refactor-user-service "Split UserService into UserReader + UserWriter"
+```
+Clean diff. **$0.80.**
+
+**Daily token bill: ~$1.35.** Not $162.
+
+---
+
+## The Hard Truth
+
+You can't outspend bad context engineering.
+
+- A $200/month Claude Max plan with naive context → $3,000/month in tokens
+- A free OpenCode + local model with engineered context → $0/month, better results
+
+The model is a commodity. The harness matters. **Your context discipline matters most.**
+
+---
+
+## Start Today
+
+1. **Write the "Where things live" section in AGENTS.md** (15 minutes)
+2. **Create one skill** for your most common task pattern (10 minutes)
+3. **Stop using `@codebase` / "search the repo"** — name the files (immediate)
+4. **Git checkpoint before every agent run** (5 seconds, saves careers)
+5. **Track your token cost per task for one week** — the data will change your behavior
+
+---
+
+## FAQ
+
+**Q1: Isn't this just "being specific with prompts"?**
+No. Prompt engineering is *what you say*. Context engineering is *what the model sees*. You can have a perfect prompt but if the model sees 100K tokens of irrelevant garbage, it will still hallucinate.
+
+**Q2: My agent doesn't support skills or repo maps. Am I stuck?**
+No. Explicit `@` mentions work in Cursor, Claude Code, Codex, Copilot CLI. `/compact` works in Claude Code. New sessions work everywhere. The principles are tool-agnostic.
+
+**Q3: How do I know which files to include?**
+You're the developer. You know your codebase. If you don't, spend 10 minutes with `grep` or your IDE's "find usages" before launching the agent. That 10 minutes saves hours of agent thrashing.
+
+**Q4: What if the agent needs a file I didn't anticipate?**
+It will ask. "I need to see `src/config/database.ts` to understand the connection pool." You `@` it. One extra turn. Better than sending 50 files it didn't need.
+
+**Q5: Does this work for greenfield projects?**
+Even more so. In a new repo, *you* define the architecture. Write it in AGENTS.md first. The agent follows your blueprint instead of inventing its own.
+
+---
+
+## Related Reading
+
+- [AGENTS.md Complete Guide — Repo Rules for Every Agent](/blog/agents-md-complete-guide/)
+- [Your Coding Agent Is a Harness — The Model Is the Commodity](/blog/your-coding-agent-is-a-harness-the-model-is-the-commodity/)
+- [Real Cost of AI Coding Agents That Nobody Talks About](/blog/real-cost-of-ai-coding-agents/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Coding Agent Security Checklist 2026](/blog/coding-agent-security-checklist-2026/)
+
+---
+
+*Context engineering is the difference between "AI writes my code" and "AI writes *my* code." The model doesn't know your repo. You do. Feed it accordingly.*
+
+*Running multiple subscriptions to compare models? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you GPT, Claude, Gemini, and 7 more premium models in one chat for $12/mo — test context strategies across models without the subscription sprawl.*
