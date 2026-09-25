@@ -1,0 +1,199 @@
+---
+title: "Kilo Code v7.8.0 Just Made Long Agent Runs Survive Network Blips"
+description: "Kilo Code v7.8.0 adopts OpenCode v1.18.19–v1.18.32 — the wave that fixed approval hangs, MCP reconnect loops, GPT-6 Astra visibility for ChatGPT subscribers, Cloudflare AI Gateway routing, and 5-minute provider timeouts. The open-source VS Code extension is finally reliable enough for daily work."
+pubDate: 2026-09-25T11:00:00Z
+tags: ["kilo", "release", "opencode-sync", "approval-hangs", "mcp", "gpt-6-astra", "cloudflare-ai-gateway", "coding-agent", "beginner"]
+tool: "kilo"
+author: "sage"
+image: "/api/og?title=Kilo+Code+v7.8.0+OpenCode+Sync+Wave&tool=kilo"
+---
+
+Kilo Code v7.8.0 dropped September 25 (pre-release), and it's the kind of update that turns "I'll try it later" into "this is my daily driver."
+
+The release adopts **OpenCode v1.18.19 through v1.18.32** — fourteen upstream releases that systematically killed the failure modes that made you keep a commercial backup: MCP servers stuck in reconnect loops, GPT-6 Astra invisible to ChatGPT subscribers, Cloudflare AI Gateway silently dropping requests, and providers that hang forever on slow model startups.
+
+If you tried Kilo Code a few months ago and walked away frustrated — **this is the version to come back for.**
+
+---
+
+## The Headline: GPT-6 Astra Finally Visible for ChatGPT Subscribers
+
+The single most useful fix in the entire wave is one most release notes skip over. In **OpenCode v1.18.29** (now in Kilo v7.8.0), Codex OAuth model filtering learned to recognize integer GPT versions like `gpt-6` — which means **`gpt-6-astra` no longer vanishes from the model picker for people signed in with a ChatGPT subscription.**
+
+If you've been reading about GPT-6 Astra ([Codex 0.154](/blog/codex-0-154-gpt6-astra-worktrees-windows-daemon/), [Goose v1.50](/blog/goose-v1-50-gpt6-astra-web-search-security-wave/)) and wondering why it never appeared in Kilo, **this was the bug.** 
+
+**v1.18.30** follows up with the Astra system prompt for GPT-6 models, so the agent actually tunes its behavior for the model family instead of treating it like a generic GPT.
+
+**For anyone running Kilo against their OpenAI subscription:** this turns "I can't use my newest model" into "my newest model is my default."
+
+---
+
+## The Hangs Are Finally Capped
+
+Long-time agent users know the worst failure mode: the agent sends a request, the provider takes its time warming up a big model, and the terminal sits there spinning — with no error and no escape.
+
+**OpenCode v1.18.27** (in Kilo v7.8.0) fixes that class of problem with sensible defaults:
+
+- **Provider header timeouts default to five minutes**, so slow model startups fail with a real error instead of hanging forever
+- **Streamed chunk timeouts also default to five minutes**, with `false` supported to disable them if you genuinely need unlimited waits
+- Hitting a timeout now avoids unhandled errors when canceling half-finished SSE reads
+
+**v1.18.20** attacks the other half: when a provider responds with `finish_reason: network_error` (or variants like `network-error`), Kilo now **retries the response instead of silently ending the turn.** xAI capacity and temporary unavailability stream errors get the same retry treatment.
+
+**The practical result:** a flaky network or an overloaded provider no longer kills your session mid-task.
+
+---
+
+## Cloudflare AI Gateway: Now a First-Class Route
+
+If you route models through Cloudflare's AI Gateway, two releases in this wave matter:
+
+- **v1.18.19** added native OpenAI and Anthropic passthroughs for Cloudflare AI Gateway models
+- **v1.18.23** fixed routing for third-party providers (non-Workers models now work through the gateway's REST API) and converts dotted Anthropic model IDs like `claude-haiku-4.5` to the dashed slug Anthropic expects
+
+Taken together: a Cloudflare-gated setup that used to break on Anthropic model names or silently drop non-Workers providers now behaves like a direct connection.
+
+---
+
+## MCP Finally Works Reliably
+
+The biggest win in v1.18.18 isn't a flashy feature. It's that **MCP SSE connections no longer get stuck in reconnect loops after server error responses.**
+
+If you've used MCP with any agent, you know the pain: the server hiccups, the client spins forever trying to reconnect, and your workflow dies. Kilo v7.8.0 now:
+
+- Reconnects MCP servers after expired SDK sessions (including concurrent requests)
+- Honors configured MCP OAuth callback ports in `mcp debug`
+- Restored compatibility with legacy MCP SDK clients
+- Improved compatibility with newer MCP servers and OAuth flows
+
+This alone makes Kilo viable for teams running custom MCP tooling — the kind of reliability that used to be a commercial-agent moat. Our [coding agent security checklist 2026](/blog/coding-agent-security-checklist-2026/) covers similar hardening principles across all agents.
+
+---
+
+## Provider Model Routing: No More Surprise Failures
+
+Kilo now **respects provider-defined reasoning options instead of falling back to the wrong reasoning controls.** This fixes a whole class of "why is my model acting dumb?" issues:
+
+- **GitHub Copilot model routing** now honors each model's advertised chat or responses endpoint
+- **Azure Cognitive Services endpoint support** restored for Azure-hosted models
+- **OpenAI Responses phase handling** fixed so it doesn't break conversations
+- **Cerebras reasoning replay** fixed — earlier assistant reasoning now sent back in provider-supported field
+- **Mistral prompt caching stabilized** with correct prompt cache keys per SDK
+- **MiniMax M3 thinking variant selection** fixed
+- **xAI prompt cache routing** improved with PDF file support in Responses models
+- **Meta model handling** improved for reasoning variants and provider requests
+
+The practical impact: you pick a model, it works the way the provider intended. No more debugging why reasoning effort seems ignored or why a model that *should* support PDFs keeps erroring.
+
+---
+
+## Desktop App: The Freezes Are Gone
+
+The desktop sidecar got a **massive stability pass**. If you've ever had the app hang on a large pasted image, freeze when closing a project, or show blank session titles — those are fixed:
+
+- **Composer lag reduced** when drafts include large pasted images or attachments
+- **Right-to-left layout issues fixed** across tabs, drawers, resizing, titlebar interactions
+- **Session tabs no longer clip** when resized smaller
+- **Home page scrolling fixed** — sticky headers and session list behave correctly
+- **Startup readiness fixed** — WSL server loading included before app reports ready
+- **Markdown parsing moved off main thread** — app stays responsive while rendering messages
+
+The V2 desktop sidecar is now opt-in, backed by the bundled CLI service, with collapsible model provider sections in V2 settings.
+
+---
+
+## Session Management: Chaos → Order
+
+Session handling got a **fundamental overhaul**:
+
+- **Chronological message ordering** now stays correct even when imported or legacy message IDs are out of order
+- **Revert and fork actions** use real message chronology instead of message ID ordering
+- **Repeated compaction** keeps earlier tool-call history in summaries instead of dropping orphaned results
+- **Session lists** sort by persisted activity time more reliably
+- **Sessions without titles** fall back to generated names instead of appearing blank
+
+This means your history is actually trustworthy — forks, reverts, and imports behave the way you'd expect.
+
+---
+
+## Subagent Permission Fix (Big for Teams)
+
+**Subagent permission errors that referenced phantom deny rules** are fixed. A read-only or delegating agent's `readOnlyBash` allowlist is no longer projected onto a writable subagent as a bash ceiling — so a delegated subagent can run its own allowed commands (e.g., `git status`). Edit, notebook, and MCP denials are still inherited as hard ceilings.
+
+This matters if you use delegated agents for code review, testing, or documentation — they no longer get blocked by parent-agent restrictions that shouldn't apply to them.
+
+---
+
+## Clickable File References in Agent Responses
+
+Code spans in agent responses that match real files in your workspace **become clickable links** that open the file at the referenced line. Non-existent paths stay as plain code. Includes fallback workspace search and "File not found" warning when clicking dead links.
+
+This is a small UX thing that compounds: when the agent says "look at `src/auth/login.ts:42`", you *click it*. No more copy-paste-navigate.
+
+---
+
+## The September 14–21 Patch Wave (v1.18.31–32)
+
+Two more patch releases dropped after v1.18.30, both included in Kilo v7.8.0:
+
+### v1.18.31 (Sep 14)
+- **ACP session state restored** — model, effort, mode, and reasoning chunk boundaries now load correctly when resuming or forking sessions
+- **Remote config auth errors** now show during startup instead of silently failing
+- **GitHub Copilot adaptive thinking** — requests summarized adaptive thinking for better reasoning visibility
+
+### v1.18.32 (Sep 21)
+- **Bedrock image attachments fixed** — now only hoisted for Claude, Nova, and Llama 4 models (prevents incorrect attachment handling)
+- **Together AI streaming usage reporting** corrected
+
+---
+
+## What This Means for Beginners
+
+If you're new to Kilo Code (the free, open-source VS Code extension that turns your editor into an agentic engineering platform with multi-model support, worktrees, and an Agent Manager sidebar), here's the practical takeaway:
+
+1. **Long tasks are safer now** — the approval hang and network hang are the #1 ways beginners lose work on autonomous runs. Fixed.
+2. **GPT-6 Astra works out of the box** — if you have ChatGPT Plus/Pro, your newest model is now visible and tuned.
+3. **MCP doesn't eat your workflow** — custom tooling via MCP is now reliable, not a debugging session.
+4. **Cloudflare AI Gateway works** — enterprise routing setups no longer silently drop requests.
+5. **Context stays coherent** — conversation-aware compaction means your agent doesn't "forget" what it did after a long session.
+
+---
+
+## How to Update
+
+Kilo Code updates through the VS Code Extensions marketplace:
+
+1. Open Extensions view (`Cmd+Shift+X` / `Ctrl+Shift+X`)
+2. Search "Kilo Code"
+3. Click **Update** (or enable auto-update)
+
+Or via CLI:
+```bash
+npm install -g @kilocode/cli@7.8.0
+```
+
+Verify: open Agent Manager, check the model picker for **GPT-6 Astra** (should appear for ChatGPT subscribers), start a long task that hits a permission prompt, trigger a network blip — the agent should retry and continue instead of hanging.
+
+---
+
+## The Bottom Line
+
+**v7.7.7 gave you approval retry. v7.8.0 gives you the entire reliability wave.**
+
+The GPT-6 Astra visibility fix alone is worth the update for OpenAI subscribers. The MCP reliability makes it viable for production workflows. The provider routing fixes mean you stop fighting the model. The desktop stability means you can keep the app open all day. The session ordering fixes mean your history is actually useful.
+
+If you're on the fence about open-source vs. commercial agents — this release narrows the gap significantly. Kilo has always had the better architecture (skills, slash commands, explicit lifecycle, Agent Manager sidebar). Now it has the reliability to match.
+
+---
+
+## Related articles
+
+- [Kilo Code v7.7.7 Just Fixed the Approval Hangs That Killed Long Runs](/blog/kilo-code-v7-7-7-opencode-sync-retry-fixes/)
+- [Kilo Code v7.6.0 Just Made Long Agent Runs Manageable](/blog/kilocode-v7-4-22-clickable-refs-agent-manager-pr-actions-aws-gcp-auth/)
+- [OpenCode Deep Dive: The Skill-Driven Open-Source Coding Agent](/blog/deep-dive-opencode-skill-driven-coding-agent/)
+- [Best Coding Agents 2026 — Decision Guide (Not Another Hype List)](/blog/best-coding-agents-2026-decision-guide/)
+- [Claude Code vs Kilo Code: Which Terminal Agent Wins?](/blog/claude-code-vs-kilo/)
+
+---
+
+*Kilo Code is free, open-source (MIT), and available on [GitHub](https://github.com/Kilo-Org/kilocode) and the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=Kilo-Org.kilocode).*

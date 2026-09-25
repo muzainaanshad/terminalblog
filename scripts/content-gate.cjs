@@ -29,7 +29,7 @@ const CODING_AGENT_TOOLS = new Set([
   'claude-code', 'hermes', 'cursor', 'opencode', 'mimo', 'kilo',
   'pi-dot-dev', 'oh-my-pi', 'gitlawb-zero', 'codex', 'goose',
   'openclaw', 'codebuff', 'ampcode', 'copilot-cli', 'industry',
-    'aider', 'cline', 'qwen-code',
+    'aider', 'cline', 'qwen-code', 'zed',
   ]);
 
 const OFF_NICHE_HINTS = [
