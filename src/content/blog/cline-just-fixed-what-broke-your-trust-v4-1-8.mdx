@@ -1,12 +1,12 @@
 ---
-title: "Cline Just Made Your Coding Sessions Bulletproof — Here's What v4.1.9 Fixed"
-description: "Cline v4.1.7, v4.1.8, and v4.1.9 shipped in one week with fixes that finally stop lost prompts, broken sessions, token refresh failures, and a broken Claude Code provider. If you've ever had Cline forget your queued messages or fail silently, this update changes everything."
+title: "Cline Just Made Your Coding Sessions Bulletproof — Here's What v4.1.21 Fixed"
+description: "Cline v4.1.7 through v4.1.21 shipped across six weeks with fixes that finally stop lost prompts, broken sessions, token refresh failures, local model output limits, and broken provider defaults. If you've ever had Cline forget your queued messages or fail silently, this update changes everything."
 pubDate: 2026-08-13
-updatedDate: 2026-08-14
+updatedDate: 2026-09-24
 author: "Anshad"
 tags: ["cline", "release", "coding-agent", "reliability", "beginner", "guide"]
 tool: "cline"
-image: "/api/og?title=Cline+v4.1.9+Bulletproof+Sessions&tool=cline"
+image: "/api/og?title=Cline+v4.1.21+Bulletproof+Sessions&tool=cline"
 ---
 
 Cline v4.1.7 dropped August 9. v4.1.8 followed two days later. Together they're the most important reliability update this free coding agent has shipped in months — and if you've ever lost work to a silent failure, you need to know what changed.
@@ -201,7 +201,7 @@ MCP errors now appear on the individual server card instead of as a page-level e
 
 ### Composer "Agent Is Working" Stuck State Fixed
 
-The composer getting stuck on "Agent is working…" after a turn already finished — fixed.
+The composer getting stuck on "Agent is working..." after a turn already finished — fixed.
 
 ### Welcome Screen Model Connection Notice
 
@@ -226,6 +226,101 @@ Vertex AI credential refreshes now use the configured fetch, fixing ADC authenti
 ### Refreshed Provider and Model Catalog
 
 Bundled catalog updated.
+
+---
+
+## v4.1.20 (September 22) — Parallel Sub-Agents, Smarter Output Budgets, 6 New Providers
+
+### Sub-Agents Run in Parallel Now
+
+Cline v4.1.20 changed how sub-agents execute: **sub-agents spawned in the same step now run their tool calls at the same time** rather than one after another. Tools that must run in order still do, and the parent still waits for every result before its next turn. This is a real speedup for multi-agent workflows — background tasks that don't depend on each other no longer queue up.
+
+### Larger Default Output Budgets for High-Limit Models
+
+Models that advertise a large output limit now get a bigger default output budget — **30% of the limit rather than a flat 32,000 tokens, whichever is larger**. Nothing changes for models under roughly 107k output tokens; longer responses can mean higher per-turn cost and latency, but you're no longer artificially capped on models that can handle more.
+
+### Model Catalog: 6 New Providers, 158 New Models
+
+The catalog expanded from **203 to 209 providers** and **6,079 to 6,237 models**. Notable additions:
+- **Kimi For Coding** splits into separate `kimi.com` and `kimi.ai` providers
+- New providers: **AI21 Labs**, **ainetcafe**, **Inco**, **OCI Generative AI**, **Tempr**, **Vispark**
+- Resolved default model changes for **36 providers** that don't pin one — most landing on DeepSeek V4.1 Flash, GLM 5.3 Flash, or MiMo V2.6 Flash
+
+### Hook Context Injection Fixed
+
+**UserPromptSubmit and TaskStart hooks can inject context again.** What those hooks returned as `contextModification` was being dropped — only `cancel` survived — so a hook meant to add repository facts or house rules to a task silently did nothing. The context is now delivered as a `<hook_context>` block on the run's first request, and a hook no longer receives its own previously injected text back as the next turn's prompt.
+
+### Unsent Composer Text Survives Retry
+
+Retry sent no composer content but still ran the same cleanup as approval actions, deleting the only copy of anything typed while a request was in flight. **Text, quote context, images, and files are now tracked as one draft that only submitting actions consume.**
+
+### Background Command Output Streams Live
+
+Output from background commands now streams into the command row while the command runs, instead of appearing only when it finishes.
+
+### Azure API Version Honored
+
+The Azure API version configured for a provider is now honored in tasks and mirrored to `providers.json`.
+
+### Rules Found Consistently Across All Locations
+
+The Rules panel listed only `.clinerules` and the Documents global folder, so rules loaded from `.cline/rules`, `~/.cline/rules`, or `~/Cline/Rules` were applied to the model but missing from the panel. On Windows with a OneDrive-redirected Documents folder, global rules were not found at all. **Now all rule locations are found and shown consistently.**
+
+### History Deletion Actually Works
+
+A task whose index entry was missing but whose file on disk survived was reported as deleted and then reappeared on the next refresh. **Deleting a task from history now actually removes it.**
+
+### Sub-Agent Approval Flow Fixed
+
+Sub-agents you configure yourself no longer ask you to approve their individual tool calls after you have already approved the delegation.
+
+### Compaction Credential Refresh Fixed
+
+Compaction no longer silently falls back to truncation partway through a long task. The summarizer kept the credentials captured when the task started, so once they refreshed its request failed with an authorization error that was swallowed; **it now follows the task's current credentials and model.**
+
+### Output Token Limit Retry for Model Turns
+
+A model turn that hits its output-token limit before making a tool call no longer ends the task. **It is retried up to three times with a reminder to respond concisely and split large work across tool calls.**
+
+---
+
+## v4.1.21 (September 24) — Local Model Output Limit Recovery, ai& Provider, Model Default Shakeup
+
+### Local Models No Longer Die Mid-Answer
+
+**This is the big one for local model users.** llama.cpp, Ollama, and LM Studio cap generation at whatever context is left, regardless of the output budget you set. Previously, a text-only reply could be cut off and fail the run. **Now: the CLI/SDK/desktop compacts the conversation and retries that turn once before falling back to the existing concise-retry recovery.** The partial answer is kept if nothing helps. Long sessions on local models finally survive output-token limits.
+
+### Hub Startup Errors Now Explain Why
+
+When the hub fails to start, the error now says **why** instead of only "No compatible hub runtime is available." The CLI/Desktop also waits **up to 15 seconds** for a freshly started hub instead of 8, since the first launch after an install or update can take 8 to 13 seconds on Windows while the new binary is scanned.
+
+### Error Messages Persist Across Session Resume
+
+A failure shown during a run, including one reported after retries ran out, used to disappear once you left the session. **It now reappears in the transcript on resume** without being sent to the model or counted by compaction.
+
+### Session Renames Persist (CLI + Desktop)
+
+`cline history update --title` and `--prompt` now persist for hub-managed sessions. The new title only changed in memory and reverted on the next launch, and updating metadata could drop other keys such as pinned state. **Now it sticks.**
+
+### Plugin Load Failures No Longer Spawn Sandboxes on Every Prompt
+
+A plugin that fails to load no longer costs a sandbox spawn on every prompt. The CLI continues without that plugin's slash commands and **retries loading it after 30 seconds**, so a transient sandbox timeout recovers on its own.
+
+### Esc Cancels Empty-Response Retry Immediately
+
+Pressing Esc during an empty-response retry now cancels right away instead of after the backoff delay.
+
+### Yolo Mode Gets Tighter Output Rules
+
+Yolo mode (`-y`) prompts the model with tighter output rules: **shorter plans, no preamble before routine tool calls, and code and edits written straight into tool calls instead of drafted in text first.** Expect less narration and fewer tokens spent restating the plan.
+
+### New Provider: ai& (ai&)
+
+A new built-in provider **ai&** — an OpenAI-compatible endpoint serving open-weight models from Japan. It reads `AIAND_API_KEY` and defaults to `zai-org/glm-5.3`.
+
+### Model Catalog: 6,386 Models, 11 Providers Now Default to Claude Opus 5.5
+
+Refreshed to **6,386 models across 209 providers**. The resolved default model changes for **19 providers** that do not pin one — **11 land on Claude Opus 5.5** (Cortecs, CrossModel, DigitalOcean, Eden AI, GitHub Copilot, both LLM Gateway providers, Ofox, Requesty, Vertex, Vivgrid). If you use one of those providers without pinning a model, expect a different default.
 
 ---
 

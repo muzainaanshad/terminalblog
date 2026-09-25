@@ -1,12 +1,13 @@
 ---
-title: "Claude Code Just Made Opus 5.5 Default and Fixed 100+ Things You've Been Complaining About"
-description: "v2.1.280 drops Opus 5.5 as the new default (1M context), fixes dialog focus theft, auto-mode retry loops, Windows prompt scrambling, subagent hand-off bugs, and a mountain of paper cuts. Here's what actually matters."
-pubDate: 2026-09-23T09:00:00Z
+title: "Claude Code Just Made Opus 5.5 Default and Fixed 100+ Things — Then v2.1.281/282 Added 200 More"
+description: "v2.1.280 drops Opus 5.5 as the new default (1M context), fixes dialog focus theft, auto-mode retry loops, Windows prompt scrambling, subagent hand-off bugs, and a mountain of paper cuts. v2.1.281 and v2.1.282 add 200+ more fixes including proxy resilience, MCP validation, session resume hardening, and VS Code integration upgrades."
+pubDate: 2026-09-22T09:00:00Z
+updatedDate: 2026-09-24T18:00:00Z
 tags: ["claude-code", "release", "opus-5-5", "coding-agents", "beginner"]
 tools: ["claude-code"]
 category: "just-shipped"
 author: "Anshad"
-image: "/api/og?title=Claude+Code+v2.1.280+Opus+5.5+Default&tool=claude-code"
+image: "/api/og?title=Claude+Code+v2.1.282+Opus+5.5+Default&tool=claude-code"
 ---
 
 Claude Code v2.1.280 landed September 22, 2026. The headline is **Claude Opus 5.5 is now the default Opus model** — 1 million context window, $4/$20 per million tokens with $0.20/Mtok cache reads. But the real story is the **100+ fixes** that clean up months of paper cuts.
@@ -134,6 +135,155 @@ Multiple crash-on-resume scenarios fixed:
 - **Artifact pages** — no Print buttons, confirm dialogs, or blocked device features; email/phone shown as text; dark mode reaches form controls and scrollbars
 - **`/ultrareview` uploads** — renamed copies (`id_rsa copy`, `kubeconfig (1).yaml`) stay on your machine
 - **Cross-session messaging startup warning** explains `--debug-file` writes a debug log to your chosen path
+
+---
+
+## v2.1.281 (September 23) — Proxy Resilience, MCP Validation, Session Resume Hardening
+
+### Proxy and Gateway Resilience (The Big One)
+
+If you run Claude Code behind a corporate proxy, gateway, or third-party relay — **this is the release you've been waiting for**. v2.1.281 systematically fixes the failure modes that made proxies unreliable:
+
+- **Resumed sessions re-sending earlier turns in changed form** — parallel tool-call turns, MCP tool inputs, or tool-search results while servers were reconnecting — no longer drop the API's prior reasoning
+- **Sessions resumed after a restart during a pending permission prompt** no longer send different history that breaks the prompt cache
+- **Resuming a session that ended during a tool call** — Claude now sees the call and is told its outcome is unknown; manual resume no longer adds a hidden "Continue" message
+- **Sessions with earlier advisor results the API could no longer read** — failing one request every turn and repeatedly losing reasoning — now repair history once
+- **Prompt cache being lost when an MCP server disconnects mid-conversation** (or is still connecting after a resume with tool search off) — fixed
+- **Responses cut short by a proxy/gateway closing the stream cleanly** — no longer shown as complete with no warning; tool calls no longer run twice on duplicated stream events
+- **Responses failing with "Content block not found" when a proxy drops a stream event mid-response** — partial response now kept, web search keeps results that already arrived
+- **Empty completed response requested twice when connection dropped before final event** — fixed
+- **Stop reason being lost when a proxy sends a trailing usage-only frame** — fixed
+- **`CLAUDE_CODE_RETRY_WATCHDOG` sessions failing on first 5xx/dropped connection after 429/529 waits** — fixed; no more sleeping uncapped and silently on long `Retry-After`
+
+### MCP Server Validation
+
+**`claude plugin validate` now checks your MCP config** and reports:
+- `.mcp.json` entries that would be silently dropped at load
+- Undeclared `${user_config.*}` references
+- Insecure URLs
+
+This catches config errors *before* they break your session.
+
+### Auto Mode Intelligence
+
+- **Auto mode recommendation in `/insights`** — estimates how many permission prompts auto mode could have handled in your recent sessions
+- **Scrollbars in fullscreen lists** (`/skills`, `/mcp`, `/plugin` Installed) — appear on hover, clickable/draggable
+
+### Session Resume & Startup
+
+- **Crash ("unrecoverable interface error") while an API request was being retried** — fixed
+- **Turn retrying indefinitely ignoring `--max-turns`** when model alternated unparseable tool calls and output-limit truncation — fixed
+- **Resuming very large sessions sometimes restoring only last few messages** — fixed
+- **Interactive startup waiting on managed-settings network request** (80ms normally, 17+ seconds when network unreachable) when no MCP servers/plugins configured — fixed
+- **Delay of up to 2 minutes before responding when reading/@-mentioning PDF >3MB** — fixed
+- **Interrupted Read of specific PDF pages leaving page render running for up to 2 minutes** — fixed
+
+### Permission & Security
+
+- **Permission dialogs and attachment checks reading paths under macOS `/.vol`, `/.nofollow`, `/.resolve` before approval** — fixed (these can reach network mounts)
+- **Recursive `rm` on command-substitution output** (e.g., `rm -rf "$(pwd)"`) running unprompted in auto/`--dangerously-skip-permissions` — now asks even with Bash allow rule
+
+---
+
+## v2.1.282 (September 24) — Web Search, Prose Width, VS Code Upgrades
+
+### Prose Width Control
+
+**New `maxProseWidth` setting** caps the width of Claude's prose in wide terminals while tables and code blocks keep the full width. Your long-form responses stay readable without horizontal scrolling.
+
+### Web Search for Unrecognized Models (Vertex AI)
+
+Vertex AI: **Web search now offered for models Claude Code doesn't recognize yet**, such as newly released ones. You're not locked out of search just because the model catalog hasn't caught up.
+
+### Telemetry Visibility
+
+- **Startup notice**, `/status`, and `claude doctor` now list telemetry variables in a project's settings files that were ignored or turned telemetry off
+- **Project and local settings ignore OpenTelemetry variables** that turn on export, set its endpoint, or capture content (`CLAUDE_CODE_ENABLE_TELEMETRY`, `OTEL_LOG_*`)
+
+### Chrome + Managed MCP Coexistence
+
+New `allowClaudeInChromeWithManagedMcp` managed setting lets `claude --chrome` run alongside an exclusive `managed-mcp.json`. The error when Chrome is blocked now names the setting.
+
+### Session Resume Hardening (Round 2)
+
+- **Every request failing with 400 error in conversations with web search results the API cannot decrypt** (e.g., from third-party gateway) — fixed
+- **More cases of continued/resumed sessions (`--continue`, `--resume`) re-sending earlier messages in changed form** that could drop earlier reasoning — fixed
+- **Earlier extended thinking dropped when `/model`, `/rename`, `/artifacts` or another immediate slash command used while Claude was working** — fixed
+- **Continued/resumed conversations losing earlier extended thinking when relaunched with `--tools` list leaving out a built-in tool offered earlier** — fixed
+- **Sessions failing every turn with "Invalid `data` in `redacted_thinking` block" API error** — Claude Code now drops thinking blocks and retries once
+- **Compaction failing when summarization request is refused** — now retries on a fallback model
+- **Failed turn ("Effort 'xhigh' isn't available with thinking turned off") after safety-related model switch** in sessions with thinking off and effort above high — fixed
+- **Unanswered Fable usage-credits prompt switching models in SDK-hosted sessions** (Claude Desktop) — turn now ends instead, Remote Control clients see model-switch notice
+- **`/model` with full Fable model id stopping at API error instead of opening usage-credits prompt** when plan needs credits not turned on yet — fixed
+- **Requests failing up to a minute with "another Claude Code process is refreshing it" login error** after that process was closed/killed mid-refresh — fixed
+- **Sessions started while another window was refreshing sign-in** not retrying organization policy fetch — fixed
+
+### Windows & Filesystem
+
+- **CLAUDE.md and rules read at startup through repository symlink reaching macOS `/Network` via `..` or `/.vol`-style kernel path** — fixed
+- **Rules link to macOS `/home` being listed** — fixed
+- **Bash permission rules with mid-pattern `:*` skipped in settings files** while `--allowedTools` honored them — now work from every source, with startup warning on how they match
+- **Command approved on restored permission prompt running twice** when remote session's worker restarted — fixed
+- **Bash and PowerShell hiding full disk quota behind "Exit code 1" and leaving large output files in temp** — fixed
+
+### Settings & Managed Config
+
+- **Managed settings ignoring mistyped boolean lock keys** (e.g., `disableClaudeAiConnectors`, `allowManagedPermissionRulesOnly`) — lock now applies, startup names the key
+- **Managed `permissions`, `autoMode`, `worktree`, `attribution` settings ignored entirely when one nested value was invalid** — rest of block now still applies
+- **Repository, user and `--add-dir` skills/commands/skills-directory plugin manifests pre-approving their own tools via `allowed-tools` under managed `allowManagedPermissionRulesOnly`** — fixed
+- **Windows/WSL managed settings: admin policy present but invalid/unreadable (HKLM, `managed-settings.json`) keeps user-writable HKCU and WSL `/etc/claude-code` from applying** — fixed
+
+### MCP & Artifacts
+
+- **Safeguard block messages on Bedrock/Mantle not showing request ID** — block messages now also show message ID
+- **Artifact publishes failing when Claude gave version a label >60 characters** — label now shortened
+- **`/artifacts`: titles line up in one column, details dropped whole instead of cut mid-word, list supports PgUp/PgDn, Home/End, mouse wheel and clicks** — improved
+
+### VS Code Extension — Real Features
+
+- **Long replies falling behind the stream** — panel no longer re-parses whole reply on every update
+- **Dictation mic button covering message input's scrollbar** when input tall enough to scroll — fixed
+- **Remote Control sessions started on this computer not opening from Web entry** in session list — now open local conversation unless running elsewhere
+- **Editor tab's sign-in screen hanging silently after extension host restarts** — now shows "stopped responding" notice
+- **Claude attaching option previews to multiple-choice questions** in chat panel where question card never shows them — fixed
+- **Session manager's cost/usage block wrapping mid-text on narrow sidebar**, showing totals from previous login after account switch — fixed
+
+### Cloud Sessions (claude.ai/code)
+
+- **Claude GitHub App status added to Settings → Connectors → GitHub** — whether app is installed/reachable, plus steps to connect/install/reconnect
+- **"Open repository" and "Open compare page" links** to repository menu of cloud session whose repo is hosted on non-GitHub Git server
+- **Attaching repository from different GitHub owner** (e.g., fork's upstream) to running cloud session that already has one, including sessions started from Slack
+- **Next run time for hourly routine fixed** — was 30 minutes off for half-hour-offset time zones (e.g., India)
+- **Routines page and Scheduled list load faster** for accounts with many scheduled check-in reminders
+- **Fast mode switch added to composer's model menu** in cloud sessions (when plan includes fast mode and model supports it)
+- **Settings shortcut on GitHub setup tip** and "Troubleshoot GitHub connection" link in repository pickers
+- **Routines with GitHub trigger for PR being converted to draft now fire** — previously never fired
+- **Cloud sessions on non-GitHub repo hiding Create PR button** that could never work
+- **GitHub setup tip no longer covers repository picker's search box/rows** while picker open — steps aside until picker closes
+- **File card when cloud session can't open a file** now says whether file no longer exists or permission settings block reading it
+
+### Claude Tag (Slack)
+
+- **Slack's native Working indicator, Stop button, and thread title** added to Claude's threads in channels
+- **Short notice when guest joining/leaving changes how Claude responds** under Restrict or Channel-only guest setting
+- **Scheduled routines silently failing in Slack workspaces connected before workspace joined Enterprise Grid** — fixed
+- **Claude asking to re-upload Slack file when brief file-scanning outage was the problem** — now retries scan, told when scanner is down
+- **Bullet starting with +, -, * rendering as empty bullet with stray nested item** — now shows as one bullet with character kept
+- **Failed cloud environment setup script notice** — now names the setup script and says to fix it first (was generic "mention me to retry")
+- **Very long Slack threads: Claude silently withholding reply after judging against weeks-old messages** — fixed; restart deep into thread no longer loses recent context
+- **Claude answering every mention with "Couldn't check this channel just now"** in channel moved from Enterprise Grid org-wide sharing to single workspace — fixed
+- **Very large Enterprise Grid workspaces getting "Couldn't check channel" again after quiet hour** — fixed
+- **Slack request blocked by org's inference hook showing generic retry notice** — thread now shows hook's deny message, Claude doesn't retry
+- **Claude offering to switch to models org can't use** — now lists/offers only models the switch will actually accept
+- **DynamoDB/Kinesis account-based endpoints failing to authenticate** through AWS connection in Claude Tag — fixed
+- **Plugins sections in Claude Tag admin settings failing to load for org admins**, listing attached plugins as raw IDs — now load and show each plugin's name
+- **Routine list in Slack thread now shows that thread's own scheduled tasks by default** instead of every routine in the channel
+
+### Code Review
+
+- **PR getting no review when reviewed commit was force-pushed away while failed review was being retried** in repo not set to review every push — fixed
+
+---
 
 ## Updating
 
