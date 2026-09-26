@@ -1,0 +1,924 @@
+---
+/**
+ * /agents-md — AGENTS.md Recipes
+ *
+ * Standalone hub: one complete, copy-paste-ready rules file per AI coding agent.
+ * No JS required for the content itself — copy buttons and the scrollspy nav
+ * are progressive enhancement only.
+ */
+
+import Layout from '../layouts/Layout.astro';
+
+const PAGE_TITLE = 'AGENTS.md Examples for Every AI Coding Agent (Copy-Paste)';
+const PAGE_DESCRIPTION =
+  'Copy-paste AGENTS.md, CLAUDE.md, .cursorrules and GEMINI.md examples for Claude Code, Codex, Cursor, OpenCode and Gemini CLI. Style, tests, security rules.';
+
+type Note = { tone: 'do' | 'dont' | 'note'; text: string };
+type ExtraBlock = { label: string; code: string; note?: string };
+
+type Recipe = {
+  id: string;
+  tool: string;
+  file: string;
+  path: string;
+  reads: string;
+  where: string;
+  blurb: string;
+  code: string;
+  notes: Note[];
+  extra?: ExtraBlock;
+};
+
+/* ------------------------------------------------------------------ *
+ * The recipes. Every `code` value is the literal file content, so the
+ * copy button pastes a working file with no editing.
+ * ------------------------------------------------------------------ */
+
+const claudeCode = `# CLAUDE.md
+
+Guidance for Claude Code in this repo. Everything here is loaded into context
+on every session, so keep it short and keep it true.
+
+## Project at a glance
+- pnpm monorepo. Packages live in \`packages/*\`, deployables in \`apps/*\`.
+- TypeScript everywhere, Postgres through Drizzle. No hand-written migrations.
+- Astro marketing site, Fastify API, background worker.
+
+## Commands
+- Install        \`pnpm install\`
+- Dev server     \`pnpm dev\`
+- Typecheck      \`pnpm typecheck\`
+- Unit tests     \`pnpm test\`
+- What CI runs   \`pnpm check\`
+
+Always use \`pnpm check\` before saying a task is done. Do not call \`vitest\`
+directly — the wrapper sets the test environment.
+
+## Working agreements
+- Read the file and its neighbours before editing. Match what is already there.
+- Edit an existing file rather than creating a near-duplicate.
+- Smallest change that solves the problem. No drive-by refactors, no
+  reformatting of untouched lines, no unrelated dependency bumps.
+- Comments explain why, never what. A comment restating the line below it is a
+  deletion, not a contribution.
+- If the plan changes materially, say so before you keep going.
+
+## Code style
+- TypeScript strict. No \`any\` — use \`unknown\` plus a narrowing guard.
+- Prefer \`type\` over \`interface\` unless you are extending something.
+- Named exports everywhere. Early return over nested conditionals.
+- Errors are values in \`packages/core\`, thrown only at the process boundary.
+- Never swallow an error with an empty \`catch\`. Log it or rethrow it.
+
+## Tests are part of the change
+- Any behaviour change ships with a test in the same commit.
+- Bug fix: add the test that fails without the fix, named after the bug.
+- Never weaken, skip, or delete a test to get to green. If a test is wrong,
+  say so explicitly and change it in its own commit.
+- Report the real command output. Never claim a suite passed that you did not run.
+
+## Commits and branches
+- Conventional Commits: feat, fix, docs, refactor, test, chore, ci, build.
+- Subject 72 characters max, imperative mood, no trailing period.
+- One logical change per commit. Branch as feat/<slug> or fix/<slug>.
+- Write the commit message only when asked.
+
+## Hard limits — do not cross
+- NEVER read, print, or edit \`.env\`, \`.env.*\`, \`*.pem\`, or anything matching
+  \`*secret*\` or \`*credential*\`.
+- NEVER run \`git push\`, \`git push --force\`, \`git reset --hard\`,
+  \`git rebase -i\`, \`git clean\`, or \`git commit\`.
+- NEVER commit directly to \`main\`, and never rewrite a pushed commit.
+- NEVER edit generated output: \`dist/\`, \`.next/\`, \`**/*.gen.ts\`, or any file
+  carrying a \`// generated\` header.
+- NEVER add a production dependency without asking first.
+- If a task genuinely needs one of the above, stop and tell me instead.
+
+## Deeper reference
+Full conventions: @docs/engineering/style-guide.md
+Test matrix: @docs/engineering/testing.md`;
+
+const codexCode = `# AGENTS.md
+
+Read before any work in this repo.
+
+How this file reaches Codex: Codex concatenates the AGENTS.md files it finds
+from the project root down to the directory it was started in, and deeper
+files win. One file per directory, and \`AGENTS.override.md\` takes precedence
+over \`AGENTS.md\`. Combined guidance is capped by \`project_doc_max_bytes\`,
+32 KiB by default — anything past the cap is silently dropped, so keep this
+file well under that.
+
+## Layout
+- \`apps/web\`        Next.js dashboard, TypeScript
+- \`apps/api\`        Fastify service, TypeScript
+- \`packages/core\`   domain logic, must stay free of I/O
+- \`infra/terraform\` never edit by hand — change and run \`make tf-plan\`
+- \`scripts/\`        repo automation, safe to run
+
+## Build, test, lint
+- Setup:   \`make bootstrap\` (toolchain plus \`pnpm install\`)
+- Unit:    \`make test\` — always this wrapper, never the raw test binary. It
+           sets the environment and picks the smallest affected package.
+- Scope:   \`make test -p <package>\` for one package.
+- Lint:    \`make fix\` formats and lints. Do not re-run tests after it.
+- Full suite: ask me first. It builds the whole matrix and is slow.
+
+## How to make a change
+1. Read the target file and its tests before editing anything.
+2. Match the existing pattern. Do not introduce a fourth way of doing a thing
+   that three files already do the same way.
+3. Make the smallest change that solves the problem.
+4. Run \`make fix\`, then \`make test -p <package>\`.
+5. Report what changed and what you verified, with real command output.
+
+## Style
+- TypeScript strict, no \`any\`. \`unknown\` plus a guard.
+- Named exports; no default exports outside entrypoints.
+- Return a discriminated union from \`packages/core\`, throw at the boundary.
+- Comments explain why, never what.
+
+## Tests
+- A behaviour change without a test is an incomplete change.
+- Bug fix: failing test first, then the fix.
+- Never delete or skip a test to reach green. If a test is genuinely wrong,
+  fix it in its own commit and call it out in the summary.
+
+## Commits
+- Conventional Commits: feat, fix, refactor, docs, test, chore, ci, build.
+- Subject 72 characters max, imperative, no trailing period.
+- One concern per commit. Update the PR description when you add commits.
+
+## Sandboxing and safety
+- Assume workspace-write sandboxing: any command reaching the network or
+  leaving the workspace needs explicit approval.
+- NEVER read or write \`.env\`, \`.env.*\`, \`*.pem\`, or \`**/credentials*\`.
+  Pull secrets at runtime with \`op run -- <cmd>\`, never inline a value.
+- NEVER \`git push\`, \`git push --force\`, \`git reset --hard\`, \`git rebase -i\`,
+  or \`git clean\`. Never commit on \`main\`.
+- NEVER edit generated files: \`**/*.gen.ts\`, \`**/schema.sql\`, \`dist/\`.
+- Ask before: adding a dependency, changing CI, touching \`infra/terraform\`,
+  running a migration, or anything that deletes data.
+
+## Keep this file alive
+When you get something wrong because a rule here was missing or stale, fix
+this file in the same change. A wrong rule costs more than a missing one.`;
+
+const cursorCode = `# .cursorrules — repo root
+
+Cursor reads this file in every conversation in this project. Newer Cursor
+versions prefer scoped \`.cursor/rules/*.mdc\` files (second block below) and
+Cursor also reads \`AGENTS.md\` directly, but this file is still the one
+Cursor's \`/init\` looks for, so keep it working.
+
+## Stack
+- Next.js App Router, TypeScript strict, Tailwind, Postgres with Drizzle.
+- pnpm only. npm and yarn are not used in this repository.
+
+## Commands
+- \`pnpm dev\`        dev server on :3000
+- \`pnpm typecheck\`  tsc --noEmit
+- \`pnpm lint\`       eslint + prettier check
+- \`pnpm test\`       vitest
+- \`pnpm check\`      what CI runs — use this before asking for review
+
+## Rules
+- Read before you write. Match the file you are editing.
+- Smallest change that works. No drive-by refactors, no reformatting.
+- No \`any\`. Prefer \`type\` over \`interface\`. Named exports.
+- Server Components by default; add \`"use client"\` only for state or handlers.
+- Every fetch goes through \`src/lib/api.ts\`. Never call \`fetch\` inline.
+- New component: colocate its test, its types, and its styles.
+
+## Tests
+- New behaviour ships with a test in the same commit.
+- Bug fix: add the failing test first, then fix it.
+- Run \`pnpm check\` before you call it done, and paste the real output.
+
+## Git
+- Conventional Commits, imperative mood, 72 characters max.
+- Branch as \`feat/<slug>\` or \`fix/<slug>\`. Never commit to \`main\`.
+- Never force push, never \`git reset --hard\`, never amend a pushed commit.
+
+## Never
+- Never read, write, or paste \`.env\`, \`.env.*\`, or \`*.pem\`.
+- Never stage \`.env\`, \`secrets/\`, or \`node_modules/\`.
+- Never run \`git push\` or \`git commit\` unless I ask.
+- Never edit \`dist/\`, \`.next/\`, or any file with a \`// generated\` header.
+- Never add a dependency without asking.`;
+
+const cursorExtra = `# .cursor/rules/typescript.mdc
+---
+description: TypeScript conventions, component patterns and the API access rule for this app
+globs: ["src/**/*.ts", "src/**/*.tsx"]
+alwaysApply: false
+---
+
+- Use \`type\`, not \`interface\`, unless you are extending.
+- No \`any\`. Use \`unknown\` plus a narrowing guard.
+- Server Components by default; \`"use client"\` only for state or handlers.
+- All data fetching goes through \`src/lib/api.ts\`.
+- Co-locate tests, types and styles with the component.
+
+# .cursor/rules/security.mdc
+---
+description: Guardrails for secrets, destructive git and generated files. Read before any edit.
+globs: []
+alwaysApply: true
+---
+
+- Never read or modify \`.env\`, \`.env.*\`, \`*.pem\`, or \`**/credentials*\`.
+- Never run \`git push --force\`, \`git reset --hard\`, or \`git clean\`.
+- Never edit files with a \`// generated\` header or anything in \`dist/\`.
+- Ask before adding a dependency or touching CI.
+
+# .cursor/rules/tests.mdc
+---
+description: Test requirements and how to run them
+globs: ["src/**/*.test.ts", "src/**/*.test.tsx", "tests/**"]
+alwaysApply: false
+---
+
+- Behaviour change requires a test in the same commit.
+- Bug fix: the failing test comes first.
+- \`pnpm check\` is the gate. Never weaken a test to pass it.`;
+
+const opencodeCode = `# AGENTS.md
+
+One rules file, many agents. This file is read by OpenCode, Codex, Cursor,
+Aider, goose, Zed and friends, so keep it tool-neutral and say nothing here
+that only makes sense for one of them.
+
+## Project
+- TypeScript + Fastify, pnpm workspaces, Postgres with Drizzle.
+- \`apps/api\` service, \`apps/web\` dashboard, \`packages/core\` domain logic with
+  no I/O, \`scripts/\` repo automation.
+- Node 22 minimum. ESM only, no CommonJS in new files.
+
+## Commands
+- Install       \`pnpm install\`
+- Dev           \`pnpm dev\`
+- Test          \`pnpm test\`
+- Typecheck     \`pnpm typecheck\`
+- Everything CI runs: \`pnpm check\`
+
+## Working agreements
+- Read the file and its tests before editing.
+- Smallest change that solves the problem. No drive-by refactors.
+- Prefer editing over creating. No near-duplicate helpers.
+- Comments explain why, never what.
+- If the plan changes, say so before continuing.
+
+## Style
+- TypeScript strict, no \`any\`, named exports, early returns.
+- \`type\` over \`interface\` unless extending.
+- Return a result union from \`packages/core\`; throw only at the boundary.
+- Format and lint are automated. Do not hand-format.
+
+## Tests
+- Behaviour change ships with a test. Bug fix: failing test first.
+- Never delete or skip a test to get green.
+- Report real output from \`pnpm check\`.
+
+## Commits
+- Conventional Commits, imperative, 72 characters max, one concern each.
+- Branch \`feat/<slug>\` or \`fix/<slug>\`. Never commit to \`main\`.
+
+## Hard limits
+- NEVER read, print, or edit \`.env\`, \`.env.*\`, \`*.pem\`, or any path matching
+  \`*secret*\` or \`*credential*\`.
+- NEVER run \`git push\`, \`git push --force\`, \`git reset --hard\`,
+  \`git clean\`, or \`git commit\`.
+- NEVER edit generated files: \`dist/\`, \`**/*.gen.ts\`, \`**/schema.sql\`.
+- NEVER add a production dependency without asking.
+- NEVER delete or overwrite files outside the repo working tree.
+
+## Monorepo
+Package-specific rules belong in a nested \`AGENTS.md\` inside the package.
+Agents that walk the tree merge them from the root down; the nearest file
+wins. Keep the root file about the things that are true everywhere.
+
+## Maintenance
+Every time an agent gets something wrong because this file was silent, fix it
+here in the same change. Stale rules are worse than no rules.`;
+
+const opencodeExtra = `{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "edit": "ask",
+    "bash": {
+      "*": "ask",
+      "git push*": "deny",
+      "git reset --hard*": "deny",
+      "git clean*": "deny",
+      "rm -rf *": "deny",
+      "npm publish*": "deny"
+    }
+  }
+}`;
+
+const geminiCode = `# GEMINI.md
+
+Context for the Gemini CLI. \`/memory show\` prints everything actually loaded
+this session and \`/memory reload\` re-scans after you edit a context file — run
+it whenever Gemini seems to be ignoring a rule. An empty or unread context
+file is the usual cause.
+
+## Share the rules instead of duplicating them
+This repo's working agreements live in \`AGENTS.md\`, which OpenCode, Codex and
+Cursor read as well. Import it instead of copying it, so one edit lands
+everywhere:
+
+@AGENTS.md
+
+Everything below is Gemini-CLI-specific.
+
+## Project facts
+- TypeScript + Fastify, pnpm workspaces, Postgres with Drizzle.
+- \`apps/api\` is the service, \`apps/web\` the dashboard, \`packages/core\` holds
+  domain logic and must stay free of I/O.
+- \`pnpm dev\` needs \`pnpm db:seed\` first on a fresh clone.
+- \`pnpm check\` is exactly what CI runs.
+
+## Extra rules for this repo
+- Keep every shell command non-interactive. Never use a command that waits
+  for input, a pager, or a credential prompt.
+- Prefer machine-readable output flags, e.g. \`--output json\`, so results can
+  be parsed instead of scraped.
+- When a task touches more than three packages, write the plan out and get
+  my confirmation before editing files.
+- Do not restructure the workspace to make a task easier.
+- Do not add dependencies to make a build pass.
+
+## Never
+- Never read or write \`.env\`, \`.env.*\`, \`*.pem\`, or \`**/credentials*\`.
+- Never run \`git push --force\`, \`git reset --hard\`, \`git clean\`, or \`rm -rf\`
+  outside a temp directory.
+- Never run a migration against anything except the local database.
+- Never print secrets, tokens, or connection strings in output.
+- Never commit. Stage what you changed and tell me what to commit.`;
+
+const recipes: Recipe[] = [
+  {
+    id: 'claude',
+    tool: 'Claude Code',
+    file: 'CLAUDE.md',
+    path: 'CLAUDE.md (repo root)',
+    reads: 'CLAUDE.md, not AGENTS.md',
+    where: 'Repo root. Loads from the root down to your cwd, concatenated, so nested files win.',
+    blurb:
+      'Claude Code does not read AGENTS.md. It reads CLAUDE.md, and the last thing it reads wins — so the root file should import shared rules and add only what is Claude-specific.',
+    code: claudeCode,
+    notes: [
+      { tone: 'do', text: 'End with @docs/... to pull a longer guide in without pasting it. Imports expand at load, and they work up to four hops deep.' },
+      { tone: 'do', text: 'Use a nested CLAUDE.md per package instead of one 600-line file. Claude loads nested files when it reads files in that subtree, so they cost nothing until needed.' },
+      { tone: 'note', text: 'HTML comments are stripped before the content enters context — use them for maintainer notes you do not want to spend tokens on.' },
+      { tone: 'dont', text: 'Do not paste style guides in. Reference the file; a copy goes stale the day the file changes.' },
+    ],
+    extra: {
+      label: 'CLAUDE.md + AGENTS.md in the same repo',
+      note: 'If the repo already has an AGENTS.md for other agents, import it from CLAUDE.md and add the Claude-only rules below it. Verify with /memory or /context.',
+      code: `# CLAUDE.md
+@AGENTS.md
+
+## Claude Code only
+- Use plan mode before any change under \`src/billing/\`.
+- Prefer a subagent for read-only exploration across more than five files.
+- Run \`/security-review\` after touching auth or session code.
+
+# or, if you need no Claude-specific content at all:
+ln -s AGENTS.md CLAUDE.md`,
+    },
+  },
+  {
+    id: 'codex',
+    tool: 'Codex',
+    file: 'AGENTS.md',
+    path: 'AGENTS.md (repo root)',
+    reads: 'AGENTS.md + AGENTS.override.md',
+    where: 'Project root down to cwd, one file per directory, override wins. Plus ~/.codex/AGENTS.md globally.',
+    blurb:
+      'Codex merges instructions from every directory between the project root and where you launched it, and reads the file again when it changes. Write per-directory overrides next to the code they govern, and keep the combined size under the 32 KiB default cap.',
+    code: codexCode,
+    notes: [
+      { tone: 'do', text: 'Drop a services/payments/AGENTS.override.md next to the service when one directory needs different test commands. Codex stops at your working directory, so overrides belong close to the work.' },
+      { tone: 'do', text: 'Keep personal defaults in ~/.codex/AGENTS.md so every repo inherits them without polluting the checkout.' },
+      { tone: 'note', text: 'Check what actually loaded with codex status, or ask the agent to list its instruction sources. If nothing loads, the file is empty.' },
+      { tone: 'dont', text: 'Do not exceed project_doc_max_bytes (32 KiB by default) — the overflow is dropped silently, so a truncated rules file looks like a rule the agent ignored.' },
+    ],
+  },
+  {
+    id: 'cursor',
+    tool: 'Cursor',
+    file: '.cursorrules',
+    path: '.cursorrules (repo root)',
+    reads: '.cursorrules, .cursor/rules/*.mdc, AGENTS.md',
+    where: 'Repo root, plus .cursor/rules/ for scoped rules and nested AGENTS.md for subdirectories.',
+    blurb:
+      'Three ways in: the root .cursorrules file, scoped .cursor/rules/*.mdc files with frontmatter, and AGENTS.md anywhere in the tree. The root file is the blunt instrument; scoped rules are the one that scales.',
+    code: cursorCode,
+    notes: [
+      { tone: 'do', text: 'Use alwaysApply: true sparingly. It burns context on every session even when the rule is irrelevant to the task in front of it.' },
+      { tone: 'do', text: 'Give every rule a real description. Cursor shows it to the agent to decide whether the rule is relevant, so "Backend code" gets you nothing and a sentence about Fastify validation gets you the right rule.' },
+      { tone: 'note', text: 'A plain .md file inside .cursor/rules is ignored — the .mdc extension is what marks it as a rule.' },
+      { tone: 'dont', text: 'Do not keep rules over 500 lines. Split by concern, or the important ones drown in the noise.' },
+    ],
+    extra: {
+      label: 'The scoped .mdc layout (preferred for larger repos)',
+      note: 'Three small files beat one big one: two attach by glob when the matching files are in context, and only the security guardrail is always applied.',
+      code: cursorExtra,
+    },
+  },
+  {
+    id: 'opencode',
+    tool: 'OpenCode',
+    file: 'AGENTS.md',
+    path: 'AGENTS.md (repo root)',
+    reads: 'AGENTS.md',
+    where: 'Repo root, plus nested AGENTS.md per package. Also opencode.json for permissions.',
+    blurb:
+      'OpenCode reads the open AGENTS.md format, so the same file works for Codex, Cursor, Aider, goose, Zed and the rest. Keep it tool-neutral, and push hard denials into opencode.json where they are enforced rather than requested.',
+    code: opencodeCode,
+    notes: [
+      { tone: 'do', text: 'Write one AGENTS.md and let every agent read it. Two near-identical rule files drift within a week and you stop trusting both.' },
+      { tone: 'do', text: 'Put the destructive-command denials in opencode.json as well as in the prose. A rule the agent can talk itself out of is not a guardrail.' },
+      { tone: 'note', text: 'Nested AGENTS.md files merge with the parent, nearest wins — the same shape Codex and Claude Code use, so the layout is portable.' },
+      { tone: 'dont', text: 'Do not describe OpenCode-only flags in the shared file. It is read by tools that do not have those flags.' },
+    ],
+    extra: {
+      label: 'opencode.json — enforce the guardrails',
+      note: 'Belt and braces: the rules file asks, the permission block refuses. Check the shape against your version, the key names move.',
+      code: opencodeExtra,
+    },
+  },
+  {
+    id: 'gemini',
+    tool: 'Gemini CLI',
+    file: 'GEMINI.md',
+    path: 'GEMINI.md (repo root)',
+    reads: 'GEMINI.md (+ @file imports)',
+    where: '~/.gemini/GEMINI.md, then the workspace and its parents, then a just-in-time scan when a file is opened.',
+    blurb:
+      'The leanest example here on purpose. Gemini supports @file imports, so it imports the shared AGENTS.md and spends its own file on the facts Gemini specifically needs — no duplicated rules to drift.',
+    code: geminiCode,
+    notes: [
+      { tone: 'do', text: 'Import shared rules with @AGENTS.md and keep GEMINI.md for Gemini-specific context. One source of truth, two agents happy.' },
+      { tone: 'do', text: 'Run /memory show to see the concatenated context, and /memory reload after editing a context file. The CLI footer shows how many context files loaded.' },
+      { tone: 'note', text: 'Imports accept relative and absolute paths and can recurse. GEMINI.md also generates a first draft with /init.' },
+      { tone: 'dont', text: 'Do not assume a rule landed. Gemini reads context files hierarchically, so a GEMINI.md one directory up is easy to miss when you were editing the wrong one.' },
+    ],
+  },
+];
+
+/* ------------------------------------------------------------------ *
+ * FAQ — single source for the visible list and the FAQPage JSON-LD.
+ * ------------------------------------------------------------------ */
+
+const faq = [
+  {
+    q: 'What is AGENTS.md?',
+    a: "AGENTS.md is a plain Markdown file in your repository root that tells AI coding agents how to work in your project: build and test commands, code style, commit conventions, and the hard limits you never want crossed. It is the agent-facing counterpart to README.md. The README explains the project to humans, AGENTS.md explains it to the agent, which is why the two should not be merged.",
+  },
+  {
+    q: 'Which AI coding agents read AGENTS.md?',
+    a: 'Codex reads AGENTS.md by default, along with AGENTS.override.md for per-directory overrides and ~/.codex/AGENTS.md for personal defaults. OpenCode, Cursor, Aider, goose, Zed, Warp, VS Code, Factory, Jules, Devin and Junie support it too. The two big exceptions are Claude Code, which reads CLAUDE.md instead, and Gemini CLI, which reads GEMINI.md — both can import your AGENTS.md with a one-line @import so you keep a single source of truth.',
+  },
+  {
+    q: 'Where should I put AGENTS.md?',
+    a: 'In the repository root, committed to version control, so the whole team and CI get identical rules. Add nested AGENTS.md files in subdirectories for package-specific rules: agents that walk the tree (Codex, Claude Code, Cursor, Gemini CLI) merge them from the root down and the closest file wins. Keep personal preferences in a global file such as ~/.codex/AGENTS.md or ~/.claude/CLAUDE.md where they are never committed.',
+  },
+  {
+    q: 'How do I write a good AGENTS.md?',
+    a: 'Write short, imperative, checkable rules. Name the exact command to run instead of "run the tests". Include the prohibitions, because that is where agents fail: never touch .env, never force push, never commit unless asked. Point at files instead of pasting their contents, keep the file in the low hundreds of lines (Codex caps combined instructions at 32 KiB by default and drops the overflow), and update the file the moment an agent does something wrong, so the correction survives the next session.',
+  },
+];
+
+/* Rules that apply to every file above. */
+const universalRules = [
+  ['Say what to run, not what to do.', '`pnpm check` beats "make sure the checks pass". A command is verifiable; an intention is not.'],
+  ['Write the prohibitions.', 'Half the value of these files is the "never" list. Agents default to plausible, destructive actions when nobody told them otherwise.'],
+  ['Reference, do not paste.', 'Point at docs/engineering/style.md instead of copying it in. A pasted copy is stale within a month and nobody notices.'],
+  ['Scope it, do not staple it on.', 'A root file for what is true everywhere, one nested file for what is true in one package.'],
+  ['Fix the file when the agent errs.', 'The moment you correct an agent, the correction belongs in the rules file, in the same commit.'],
+  ['Keep it under a few hundred lines.', 'Long files get skimmed by you and truncated by the tools. Split by concern instead.'],
+];
+
+const faqSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: faq.map(({ q, a }) => ({
+    '@type': 'Question',
+    name: q,
+    acceptedAnswer: { '@type': 'Answer', text: a },
+  })),
+};
+---
+
+<Layout title={PAGE_TITLE} description={PAGE_DESCRIPTION}>
+  <script type="application/ld+json" set:html={JSON.stringify(faqSchema)} />
+
+  <div class="amd">
+    <header class="amd-hero">
+      <div class="amd-crumbs">
+        <span class="amd-path">~/projects/your-repo</span>
+        <span class="amd-dim">&mdash; agent instruction files</span>
+      </div>
+      <h1>AGENTS.md Examples for Every AI Coding Agent</h1>
+      <p class="amd-lede">
+        Five complete rules files, ready to paste into a real repository. Copy one, delete the lines
+        that do not apply to you, commit it. Every example below carries the same skeleton:
+        commands, code style, test requirements, commit conventions, and an explicit list of things
+        the agent must never do.
+      </p>
+      <p class="amd-note">
+        A rules file is not documentation. It is a contract the agent reads before it touches
+        anything, so every line either changes a decision or gets deleted.
+      </p>
+    </header>
+
+    <section class="amd-section" id="which-file">
+      <h2>Which file does each agent read?</h2>
+      <p class="amd-sub">
+        The names differ more than the format. Three of these five read the same open file, so most
+        teams end up with one AGENTS.md plus a thin per-tool wrapper.
+      </p>
+      <div class="amd-table-wrap">
+        <table class="amd-table">
+          <thead>
+            <tr>
+              <th>Agent</th>
+              <th>Rules file</th>
+              <th>Nested overrides</th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              recipes.map((r) => (
+                <tr>
+                  <td class="amd-td-agent">{r.tool}</td>
+                  <td class="amd-td-file">
+                    <a href={`#${r.id}`}>{r.file}</a>
+                  </td>
+                  <td class="amd-td-notes">{r.where}</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <nav class="amd-nav" aria-label="Recipes">
+      <span class="amd-nav-label">jump to</span>
+      <div class="amd-nav-links">
+        {recipes.map((r) => (
+          <a href={`#${r.id}`} class="amd-chip" data-toc={r.id}>{r.tool}</a>
+        ))}
+        <a href="#rules" class="amd-chip" data-toc="rules">rules</a>
+        <a href="#faq" class="amd-chip" data-toc="faq">faq</a>
+      </div>
+    </nav>
+
+    {
+      recipes.map((r, i) => (
+        <section class="amd-section amd-recipe" id={r.id}>
+          <div class="amd-recipe-head">
+            <span class="amd-index">{String(i + 1).padStart(2, '0')}</span>
+            <div>
+              <h2>
+                {r.tool} <span class="amd-file-name">{r.file}</span>
+              </h2>
+              <p class="amd-pathline">
+                {r.path} &middot; reads <code>{r.reads}</code>
+              </p>
+            </div>
+          </div>
+
+          <p class="amd-blurb">{r.blurb}</p>
+
+          <div class="amd-code">
+            <div class="amd-code-bar">
+              <span class="amd-dots" aria-hidden="true"><i /><i /><i /></span>
+              <span class="amd-code-label">{r.path}</span>
+              <button class="amd-copy" type="button" data-copy aria-label={`Copy ${r.file}`}>
+                copy
+              </button>
+            </div>
+            <pre><code>{r.code}</code></pre>
+          </div>
+
+          <ul class="amd-notes">
+            {r.notes.map((n) => (
+              <li class={`amd-note amd-note-${n.tone}`}>
+                <span class="amd-tag">{n.tone === 'do' ? 'do' : n.tone === 'dont' ? "don't" : 'note'}</span>
+                {n.text}
+              </li>
+            ))}
+          </ul>
+
+          {r.extra && (
+            <div class="amd-extra">
+              <h3>{r.extra.label}</h3>
+              {r.extra.note && <p class="amd-sub">{r.extra.note}</p>}
+              <div class="amd-code">
+                <div class="amd-code-bar">
+                  <span class="amd-dots" aria-hidden="true"><i /><i /><i /></span>
+                  <span class="amd-code-label">{r.file}</span>
+                  <button class="amd-copy" type="button" data-copy aria-label={`Copy ${r.file} variant`}>
+                    copy
+                  </button>
+                </div>
+                <pre><code>{r.extra.code}</code></pre>
+              </div>
+            </div>
+          )}
+        </section>
+      ))
+    }
+
+    <section class="amd-section" id="rules">
+      <h2>Six rules that apply to every one of these files</h2>
+      <p class="amd-sub">
+        The formatting changes between agents. These do not.
+      </p>
+      <dl class="amd-dl">
+        {
+          universalRules.map(([term, def]) => (
+            <dt>{term}</dt>
+            <dd>{def}</dd>
+          ))
+        }
+      </dl>
+    </section>
+
+    <section class="amd-section" id="faq">
+      <h2>Frequently asked questions</h2>
+      {
+        faq.map((item) => (
+          <div class="amd-faq-item">
+            <h3>{item.q}</h3>
+            <p>{item.a}</p>
+          </div>
+        ))
+      }
+    </section>
+
+    <aside class="amd-cta">
+      <h2>Still picking an agent?</h2>
+      <p>
+        Most teams land on two: one terminal agent for the long autonomous runs and one editor agent
+        for the tight loop. aiFiesta puts every major model &mdash; Claude, GPT, Gemini and more
+        &mdash; behind one subscription, so you can compare what a task actually costs before you
+        commit a seat.
+      </p>
+      <a
+        class="amd-cta-btn"
+        href="https://terminalblog.com/api/go/aifiesta"
+        rel="sponsored nofollow"
+        target="_blank"
+      >
+        Compare models on aiFiesta &rarr;
+      </a>
+      <p class="amd-cta-note">Affiliate link. We use it ourselves to run agents on every model.</p>
+    </aside>
+
+    <footer class="amd-foot">
+      <p>
+        Source: <a href="https://terminalblog.com">terminalblog.com</a> &mdash; we track the coding
+        agent ecosystem so you do not have to. Full comparison of every agent on our
+        <a href="/cheatsheet">cheat sheet</a>.
+      </p>
+    </footer>
+  </div>
+
+  <script>
+    // Copy buttons: paste the exact file contents, fallback for insecure contexts.
+    document.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const pre = btn.closest('.amd-code')?.querySelector('pre');
+        if (!pre) return;
+        const text = pre.textContent ?? '';
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          ta.remove();
+        }
+        const original = btn.textContent;
+        btn.textContent = 'copied';
+        btn.classList.add('is-done');
+        setTimeout(() => {
+          btn.textContent = original;
+          btn.classList.remove('is-done');
+        }, 1600);
+      });
+    });
+
+    // Scrollspy for the jump nav.
+    const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('[data-toc]'));
+    const targets = links
+      .map((l) => document.getElementById(l.dataset.toc || ''))
+      .filter((el): el is HTMLElement => Boolean(el));
+
+    if (targets.length && 'IntersectionObserver' in window) {
+      const seen = new Set<string>();
+      const observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) seen.add(entry.target.id);
+            else seen.delete(entry.target.id);
+          }
+          const current = targets.find((t) => seen.has(t.id));
+          links.forEach((l) => l.classList.toggle('is-active', l.dataset.toc === current?.id));
+        },
+        { rootMargin: '-72px 0px -70% 0px', threshold: 0 }
+      );
+      targets.forEach((t) => observer.observe(t));
+    }
+  </script>
+
+  <style is:global>
+    .amd {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 3rem;
+    }
+
+    .amd-dim { color: var(--fg-dim); }
+
+    /* hero */
+    .amd-hero { margin-bottom: 2.5rem; }
+    .amd-crumbs {
+      display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: baseline;
+      font-family: var(--font-mono); font-size: 0.72rem;
+      margin-bottom: 0.9rem;
+    }
+    .amd-path { color: var(--green); }
+    .amd-crumbs .amd-dim::before { content: '$ '; color: var(--fg-dim); }
+    .amd-hero h1 {
+      font-size: 1.65rem; letter-spacing: -0.02em; margin-bottom: 0.75rem;
+    }
+    .amd-lede { font-size: 0.92rem; color: var(--fg); line-height: 1.7; max-width: 68ch; }
+    .amd-note {
+      font-size: 0.82rem; color: var(--fg-dim); line-height: 1.65;
+      border-left: 2px solid var(--green-dim); padding-left: 0.75rem; margin-top: 1rem;
+      max-width: 68ch;
+    }
+
+    /* sections */
+    .amd-section { margin: 2.5rem 0; }
+    .amd-section h2 { font-size: 1.05rem; margin-bottom: 0.5rem; }
+    .amd-sub { font-size: 0.84rem; color: var(--fg-dim); line-height: 1.65; max-width: 72ch; }
+
+    /* table */
+    .amd-table-wrap { overflow-x: auto; margin-top: 1rem; }
+    .amd-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+    .amd-table th {
+      text-align: left; padding: 0.5rem 0.65rem; background: var(--bg-alt);
+      border-bottom: 2px solid var(--green); color: var(--green);
+      font-family: var(--font-mono); font-size: 0.62rem;
+      text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap;
+    }
+    .amd-table td { padding: 0.55rem 0.65rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .amd-td-agent { font-family: var(--font-mono); color: var(--fg-bright); white-space: nowrap; }
+    .amd-td-file { font-family: var(--font-mono); white-space: nowrap; }
+    .amd-td-notes { color: var(--fg-dim); font-size: 0.75rem; line-height: 1.55; }
+
+    /* jump nav */
+    .amd-nav {
+      position: sticky; top: 0; z-index: 20;
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.6rem 0; margin: 2rem 0;
+      background: var(--bg);
+      border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    }
+    .amd-nav-label {
+      font-family: var(--font-mono); font-size: 0.62rem; color: var(--fg-dim);
+      text-transform: uppercase; letter-spacing: 0.08em; flex-shrink: 0;
+    }
+    .amd-nav-links { display: flex; gap: 0.4rem; overflow-x: auto; }
+    .amd-chip {
+      font-family: var(--font-mono); font-size: 0.7rem; color: var(--fg-dim);
+      border: 1px solid var(--border); border-radius: 999px; padding: 0.2rem 0.7rem;
+      text-decoration: none; white-space: nowrap; transition: all 0.15s;
+    }
+    .amd-chip:hover { color: var(--fg-bright); border-color: var(--fg-dim); text-decoration: none; }
+    .amd-chip.is-active { color: var(--green); border-color: var(--green); background: #22c55e12; }
+
+    /* recipe */
+    .amd-recipe-head { display: flex; gap: 0.85rem; align-items: flex-start; }
+    .amd-index {
+      font-family: var(--font-mono); font-size: 0.8rem; color: var(--green);
+      border: 1px solid var(--green-dim); border-radius: 4px;
+      padding: 0.1rem 0.4rem; line-height: 1.4; flex-shrink: 0;
+    }
+    .amd-file-name { color: var(--green); font-size: 0.8rem; }
+    .amd-pathline { font-family: var(--font-mono); font-size: 0.7rem; color: var(--fg-dim); margin-top: 0.3rem; }
+    .amd-pathline code { color: var(--fg); }
+    .amd-blurb {
+      font-size: 0.85rem; color: var(--fg-dim); line-height: 1.65;
+      max-width: 72ch; margin: 0.85rem 0 1rem;
+    }
+
+    /* code block */
+    .amd-code {
+      border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+      background: #0c0c0c; margin: 1rem 0;
+    }
+    .amd-code-bar {
+      display: flex; align-items: center; gap: 0.6rem;
+      padding: 0.45rem 0.7rem; background: var(--bg-alt);
+      border-bottom: 1px solid var(--border);
+    }
+    .amd-dots { display: inline-flex; gap: 0.28rem; }
+    .amd-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--border); }
+    .amd-code-label {
+      font-family: var(--font-mono); font-size: 0.68rem; color: var(--fg-dim);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .amd-copy {
+      margin-left: auto; flex-shrink: 0;
+      font-family: var(--font-mono); font-size: 0.65rem; color: var(--fg-dim);
+      background: transparent; border: 1px solid var(--border); border-radius: 4px;
+      padding: 0.2rem 0.55rem; cursor: pointer; transition: all 0.15s;
+    }
+    .amd-copy:hover { color: var(--green); border-color: var(--green-dim); }
+    .amd-copy.is-done { color: var(--green); border-color: var(--green); }
+    .amd-code pre {
+      margin: 0; padding: 0.9rem 1rem; overflow-x: auto;
+      font-family: var(--font-mono); font-size: 0.72rem; line-height: 1.6;
+      color: #d1d5db; background: #0c0c0c;
+    }
+
+    /* per-recipe notes */
+    .amd-notes { list-style: none; padding: 0; margin: 1rem 0 0; }
+    .amd-note {
+      font-size: 0.8rem; color: var(--fg-dim); line-height: 1.6;
+      padding: 0.3rem 0 0.3rem 0; display: flex; gap: 0.6rem; align-items: baseline;
+    }
+    .amd-tag {
+      font-family: var(--font-mono); font-size: 0.6rem; text-transform: uppercase;
+      letter-spacing: 0.05em; flex-shrink: 0; width: 3.1rem; text-align: right;
+    }
+    .amd-note-do .amd-tag { color: var(--green); }
+    .amd-note-dont .amd-tag { color: var(--red); }
+    .amd-note-note .amd-tag { color: var(--amber); }
+
+    /* extra block */
+    .amd-extra { margin-top: 1.75rem; }
+    .amd-extra h3 { font-size: 0.85rem; color: var(--fg-bright); margin-bottom: 0.4rem; }
+    .amd-extra .amd-sub { margin-bottom: 0.25rem; }
+
+    /* definition list */
+    .amd-dl { margin: 1rem 0 0; }
+    .amd-dl dt {
+      font-family: var(--font-mono); font-size: 0.8rem; color: var(--fg-bright);
+      margin-top: 0.85rem;
+    }
+    .amd-dl dd { margin: 0.2rem 0 0; font-size: 0.83rem; color: var(--fg-dim); line-height: 1.65; }
+    .amd-dl dd code, .amd-dl dd { max-width: 74ch; }
+    .amd-dl code { font-family: var(--font-mono); color: var(--green); }
+
+    /* faq */
+    .amd-faq-item { margin: 1.25rem 0; }
+    .amd-faq-item h3 { font-size: 0.9rem; margin-bottom: 0.4rem; }
+    .amd-faq-item p { font-size: 0.85rem; color: var(--fg-dim); line-height: 1.7; max-width: 74ch; }
+
+    /* cta */
+    .amd-cta {
+      margin: 3rem 0 2rem; padding: 1.5rem;
+      border: 1px solid var(--border-hl); border-left: 3px solid var(--green);
+      border-radius: 8px; background: var(--bg-alt);
+    }
+    .amd-cta h2 { font-size: 1rem; margin-bottom: 0.5rem; }
+    .amd-cta p { font-size: 0.85rem; color: var(--fg-dim); line-height: 1.7; max-width: 68ch; }
+    .amd-cta-btn {
+      display: inline-block; margin: 1rem 0 0.6rem;
+      font-family: var(--font-mono); font-size: 0.8rem; color: #000;
+      background: var(--green); border-radius: 6px; padding: 0.55rem 1.1rem;
+      text-decoration: none; font-weight: 600;
+    }
+    .amd-cta-btn:hover { background: #4ade80; text-decoration: none; }
+    .amd-cta-note { font-size: 0.68rem; color: var(--fg-dim); }
+
+    /* foot */
+    .amd-foot {
+      padding-top: 1.25rem; border-top: 1px solid var(--border);
+      font-family: var(--font-mono); font-size: 0.7rem; color: var(--fg-dim); line-height: 1.7;
+    }
+
+    @media (max-width: 700px) {
+      .amd { padding: 1.5rem 1rem 2rem; }
+      .amd-hero h1 { font-size: 1.3rem; }
+      .amd-code pre { font-size: 0.66rem; }
+      .amd-note { flex-direction: column; gap: 0.15rem; }
+      .amd-tag { width: auto; text-align: left; }
+    }
+  </style>
+</Layout>
