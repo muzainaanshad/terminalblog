@@ -1,0 +1,197 @@
+---
+title: "Best Free AI Coding Agents in 2026 — No Credit Card Required"
+description: "Five AI coding agent stacks that cost $0: OpenCode with free OpenRouter models, Ollama local models, Antigravity CLI, Aider, and Hermes — with the real rate limits."
+pubDate: "2026-09-25"
+tags: ["guide", "pillar", "free", "open-source", "coding-agents", "2026", "evergreen"]
+tool: "industry"
+author: "sage"
+image: "/api/og?title=Best+Free+AI+Coding+Agents+2026&tool=industry"
+---
+
+Yes — you can run a real coding agent in 2026 without paying a cent and without handing over a credit card. The short answer: **OpenCode pointed at free OpenRouter models** is the fastest path for daily interactive work, **Ollama plus any local-model agent** is the only genuinely unlimited and private option, and **Hermes Agent** is the most capable free option if you are willing to spend an afternoon on configuration. Aider stays the best free tool for surgical diffs, and Google's Antigravity CLI (the Gemini CLI successor) is the only free vendor path with a first-party quota system.
+
+Everything below is written with the constraints stated up front: the rate limits, the caps, the model ceilings, and the things that quietly cost you time. Free is real here. Free with no strings is not.
+
+## What this guide covers
+
+- [The free stack at a glance](#the-free-stack-at-a-glance)
+- [1. OpenCode with free OpenRouter models](#1-opencode-with-free-openrouter-models)
+- [2. Ollama plus a local-model agent](#2-ollama-plus-a-local-model-agent)
+- [3. Google Antigravity CLI, the Gemini CLI successor](#3-google-antigravity-cli-the-gemini-cli-successor)
+- [4. Aider with free API models](#4-aider-with-free-api-models)
+- [5. Hermes Agent](#5-hermes-agent)
+- [What free actually costs you](#what-free-actually-costs-you)
+- [FAQ](#faq)
+- [Recommendation matrix](#recommendation-matrix)
+
+## The free stack at a glance
+
+| Stack | Harness cost | Model cost | Card required? | Real limit | Best for |
+|---|---|---|---|---|---|
+| OpenCode + OpenRouter `:free` | $0 | $0 | No | 20 req/min, 50 req/day without credits | Best default for daily work |
+| OpenCode/Hermes + Ollama | $0 | $0 | No | Your VRAM, no rate limit at all | Privacy, offline, unlimited use |
+| Antigravity CLI + Gemini free tier | $0 | $0 | No | Per-project daily quota, changes without notice | Zero-config Google path |
+| Aider + OpenRouter `:free` | $0 | $0 | No | Same OpenRouter caps | Surgical diffs, git-first |
+| Hermes Agent + free models | $0 | $0 | No | Rate limits plus your ops time | Scheduled and unattended work |
+| OpenHands + free local/hosted models | $0 | $0 | No | Hardware and quota | Beginners, sandboxed runs |
+
+An agent is a harness plus a model. The harness is free in every row above. So the honest question is not "which agent is free" — it is "which free model do I point it at, and what breaks when the quota runs out."
+
+## 1. OpenCode with free OpenRouter models
+
+**What it is.** OpenCode is an open-source terminal agent: it reads files, writes edits, runs shell commands, and asks for permission before mutating anything. It is provider-neutral, so the same harness works against OpenRouter, Ollama, or any OpenAI-compatible endpoint. See the [OpenCode deep dive](/blog/deep-dive-opencode-skill-driven-coding-agent/) for the full profile.
+
+**Setup:**
+
+```bash
+curl -fsSL https://opencode.ai/install | bash
+```
+
+Then create a free OpenRouter account, mint a key, and point OpenCode at a `:free` model. The two workhorses are **NVIDIA Nemotron** (NVIDIA runs the free inference capacity, and the model is a real 550B-parameter mixture-of-experts with a 128K context window — covered in detail in [Nemotron 3 Ultra free on OpenRouter](/blog/nemotron-3-ultra-free-openrouter-local-coding-agent/)) and the **DeepSeek** chat variant.
+
+**The honest limitation, and it matters.** OpenRouter's free-model limits are documented, numeric, and unforgiving:
+
+| Your all-time credits purchased | Requests/minute | Requests/day |
+|---|---|---|
+| Less than $10 | 20 | **50** |
+| $10 or more | 20 | 1,000 |
+
+That first row is the one people trip over. A hard-working agent session makes dozens of requests — a repo read, a plan, an edit, a test run, a retry. Fifty requests a day is roughly **one or two real sessions**, then you are done. Lifting the ceiling to 1,000/day requires purchasing at least $10 of credits at some point, which does require a payment method. So the strictest reading of "no credit card" is: *the harness is genuinely card-free, and so is a couple of sessions a day of a frontier-class model; sustained daily use requires a one-time $10 top-up.*
+
+Do not trust a blog post for the current `:free` lineup — it rotates. Ask the API:
+
+```bash
+curl -s https://openrouter.ai/api/v1/models \
+  | jq -r '.data[] | select(.id | endswith(":free")) | .id'
+```
+
+Check your remaining free quota the same way the gateway does:
+
+```bash
+curl -s https://openrouter.ai/api/v1/key -H "Authorization: Bearer $OPENROUTER_KEY" \
+  | jq '.data.free_model_daily_requests'
+```
+
+**Verdict.** Best free default for interactive work, with the understanding that you are a guest on someone else's inference capacity. Latency at peak is worse than paid, provider nodes occasionally degrade, and the 429 is a normal Tuesday. Keep [fallback models](/blog/nemotron-vs-kimi-qwen-free-model-showdown/) configured so a cap on one model does not end the session.
+
+## 2. Ollama plus a local-model agent
+
+**What it is.** Ollama runs open-weight models on your own hardware and exposes an OpenAI-compatible API at `http://localhost:11434/v1`. Any agent that speaks that protocol — OpenCode, Hermes, Kilo, Goose — can drive a local model. The [Ollama + agents guide](/blog/run-coding-agents-ollama-local-models-guide/) has the per-agent config.
+
+**Setup:**
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull qwen3-coder:7b
+```
+
+**The honest limitation is hardware, not policy.** There is no rate limit, no quota, no 429, and no data leaving your machine. What there is:
+
+- **VRAM is the real ceiling.** 8GB of VRAM means a 7B-class model; 16GB opens up 24B-30B-class; 48GB+ is where the good local coding models live.
+- **CPU offload is a 5-10x slowdown.** If the model does not fit in VRAM, Ollama starts spilling to CPU and the agent stalls long enough that you will conclude the agent is broken. It is not — your model is too big.
+- **Local models are your own upgrade path.** New weights ship when you pull them, not when a vendor ships.
+- **Tool calling is uneven.** Qwen3-Coder, Mistral-Small and DeepSeek-Coder are trained for it. A model without tool-use training will chat happily and never touch a file.
+
+**Verdict.** The only stack in this guide that is truly unlimited, truly private, and truly $0 forever. Quality tops out well below frontier models on hard multi-file refactors, so use it for the 80% — tests, renames, docstrings, small fixes — and keep a cloud model for the 20% that needs architectural reasoning. If you have a beefy GPU, [Meta Muse Glimmer](/blog/meta-muse-glimmer-30b-free-local-coding-agent/) is worth a look.
+
+## 3. Google Antigravity CLI, the Gemini CLI successor
+
+**What it is.** Google retired Gemini CLI's free tier on June 18, 2026 — 100K stars, thousands of merged PRs, gone for free and Pro users overnight. The replacement is **Antigravity 2.0**: a desktop app, a Go-built CLI, a unified agent harness, and multi-agent orchestration. The [Gemini CLI sunset breakdown](/blog/google-antigravity-killed-gemini-cli-terminal-ai-war/) has the timeline.
+
+**Setup:** install Antigravity CLI, sign in with a Google account, and let the CLI attach to a Gemini free-tier model through Google AI Studio. No card, no OpenRouter hop, no second vendor relationship.
+
+**The honest limitation.** Free-tier Gemini access is governed by per-project quotas that Google publishes inside AI Studio and adjusts without notice. Flash-class models historically sit in the neighborhood of ~15 requests per minute and roughly 1,000-1,500 per day, and new projects can start in a lower quota tier than established ones. Treat the number in your own AI Studio console as the only truth, and expect it to move. Second: the free path is where the security surface is most interesting — prompt-injection in these harnesses has stolen CI secrets in the wild, so read [the Gemini CLI injection case](/blog/claude-code-gemini-cli-prompt-injection-steals-ci-secrets/) before you point it at a repo with production access.
+
+**Verdict.** Best free option if you want a vendor-supported path and already live in Google tooling. Weaker ecosystem story than the open-source agents, and the migration from Gemini CLI means your muscle memory and configs need rebuilding.
+
+## 4. Aider with free API models
+
+**What it is.** Aider is the most boring and most reliable free agent: a Python CLI that edits your files in whole-file or diff mode, keeps a repo map of your codebase in context, and commits every change to git so you can `/undo`, `/diff`, or `/clear` at any point. Model support expanded fast in [v0.86](/blog/aider-v0-86-gpt5-grok4-kimi-k2/), and it will happily run against free OpenRouter models.
+
+**Setup:**
+
+```bash
+pip install aider-chat
+cd your-repo && aider --model openrouter/nvidia/nemotron-3-ultra:free
+```
+
+**The honest limitation.** Aider is a driver, not an autonomous agent. It does not plan a fleet of subagents, it does not run on a schedule, and it will not chase a task through twenty tool calls while you are asleep. Its loop is you describe, it edits, git records. That is a feature if you want tight control over every diff, and a limitation if you wanted an agent that works unsupervised. Its rate limits are whatever your model provider imposes — the same OpenRouter 20/minute, 50/day without credits.
+
+**Verdict.** The best free tool for surgical, reviewable, git-native edits. If your free stack does exactly one thing well, this is the one to pick.
+
+## 5. Hermes Agent
+
+**What it is.** Hermes is an open-source agent built for operators who want more than a chat loop: multi-provider routing across a dozen-plus backends, [cron jobs](/blog/hermes-cron-jobs-scheduled-automation-tasks/) for scheduled work, background tasks, subagent delegation, a skill system, and a console dashboard. It is the most *capable* thing on this list that costs nothing. The [Hermes deep dive](/blog/deep-dive-hermes-agent-autonomous-coding-assistant/) and the [free-agent faceoff](/blog/hermes-vs-opencode-free-agent-faceoff/) cover the details.
+
+**Setup:** install the CLI, then route it to free providers:
+
+```bash
+hermes config set provider openrouter
+hermes config set openrouter.base_url https://openrouter.ai/api/v1
+hermes config set openrouter.model nvidia/nemotron-3-ultra:free
+hermes config set openrouter.api_key $OPENROUTER_KEY
+```
+
+Local models work the same way — swap in Ollama's base URL and a local model name. The [multi-provider routing post](/blog/hermes-multi-provider-model-routing-across-15-llms/) explains how to spread load across free and paid backends so one exhausted quota does not stall a scheduled job.
+
+**The honest limitation.** Free software means you run the newest commit, and autonomy means a larger blast radius when something is wrong. A security audit of the agent found [five high-severity issues](/blog/beware-hermes-agent-security-audit-5-high-severity-findings/), sandbox behavior differs across platforms, and cron jobs that hold credentials need deliberate scoping. There is no support SLA, so you are the maintainer, the on-call engineer, and the person who writes the rollback.
+
+**Verdict.** Maximum capability for $0, at the cost of an afternoon of setup and real operational discipline. Run the [coding agent security checklist](/blog/coding-agent-security-checklist-2026/) before it touches anything unattended.
+
+## What free actually costs you
+
+Every one of these stacks is $0 in dollars. None of them is $0 in effort:
+
+1. **Rate limits are the bill.** OpenRouter's 50/day without credits is the number that breaks naive free setups. Budget for a fallback model, or accept hard stops.
+2. **Latency variance.** Shared free inference capacity means 2-3 second per-token stalls at peak, and 529/503 responses when a provider node degrades.
+3. **The quality ceiling on hard refactors.** Nothing free reliably does a 10-file architectural migration with the reliability of a frontier model. Route those to a paid session.
+4. **Privacy is not free-tier default.** Code sent to a `:free` endpoint or a free vendor tier is not a confidential channel. Keep proprietary work on Ollama.
+5. **Ops tax.** Config files, upgrade churn, and debugging your own stack. This is the real line item — budget hours, not dollars.
+6. **Your own upgrade path.** No release pipeline, no changelog, no patch Tuesday. You pull the fix or you live with the bug.
+
+Before you commit to any paid plan — compare current AI tool deals at [aiFiesta](https://terminalblog.com/api/go/aifiesta).
+
+## FAQ
+
+**What is the best free AI coding agent in 2026?**
+
+For most people, OpenCode pointed at a free OpenRouter model: it installs in one command, works in any terminal, and handles real multi-file work. If you have a capable GPU, Ollama plus any agent is better because it is unlimited and private. If you want scheduled and unattended work, Hermes Agent is the most capable free option and the most work to configure.
+
+**Is there really a coding agent that needs no credit card?**
+
+Yes. OpenCode, Ollama, Aider, and Hermes are all card-free software, and OpenRouter, Google AI Studio, and a local GPU all serve free model tiers without a card. The honest caveat is volume: OpenRouter's free models allow 20 requests per minute and only 50 requests per day on an account that has never purchased credits. That is one or two solid sessions, not a working day. Lifting it to 1,000/day requires a one-time $10 credit purchase.
+
+**Are free coding agents good enough for real work?**
+
+For roughly 80% of real work, yes — tests, small fixes, renames, docs, scripts, single-module refactors. Developers report free agents handling the large majority of their edits. The gap shows up in large-codebase reasoning, long unattended sessions, and anything requiring an architectural decision across many modules. The common pattern is a free agent for daily work plus a paid model for the hardest 20%.
+
+**What is the catch with free coding agents?**
+
+Four things. Rate limits and quotas that stop you mid-task. Latency variance from shared capacity. An operational tax — you debug the stack instead of a vendor. And a weaker guarantee: free tiers are where data-handling terms are loosest, so keep proprietary code on a local model. There is also the security angle: a free agent with unattended shell access is a bigger risk than a paid one, because you usually also self-host its configuration.
+
+## Recommendation matrix
+
+| If you… | Pick | Why |
+|---|---|---|
+| Want a working agent in under 10 minutes, no card | OpenCode + free OpenRouter model | Lowest friction path to real edits |
+| Need unlimited use and code never leaves the box | Any agent + Ollama | No quota, no latency, no privacy tradeoff |
+| Want vendor support and Google tooling | Antigravity CLI | First-party quotas, single login |
+| Want surgical diffs and total git control | Aider | Git-native, undoable, boring in the best way |
+| Want scheduled or unattended work | Hermes Agent | Cron, background tasks, multi-provider routing |
+| Do heavy work daily and will exceed 50 req/day | Free harness + a $10-20 credit top-up | The realistic cost of a free-tier workflow |
+
+**The bottom line.** A free coding agent in 2026 is not a demo and not a toy — it is a legitimate daily driver for routine engineering work, provided you understand that you are trading dollars for rate limits, latency, and your own time. Start with OpenCode and one free model, hit the 50-request wall once so you feel it, then decide whether a $10 top-up or a local GPU is the better buy.
+
+## Related articles
+
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/) — the full field, paid and free
+- [What developers say about free coding agents](/blog/what-devs-say-free-coding-agents/) — community field report
+- [Nemotron 3 Ultra free on OpenRouter](/blog/nemotron-3-ultra-free-openrouter-local-coding-agent/) — the model behind most free stacks
+- [How to run coding agents with Ollama](/blog/run-coding-agents-ollama-local-models-guide/) — local setup, per agent
+- [Google killed Gemini CLI](/blog/google-antigravity-killed-gemini-cli-terminal-ai-war/) — the Antigravity migration
+- [Aider v0.86 model support](/blog/aider-v0-86-gpt5-grok4-kimi-k2/) — the free git-native agent
+- [Hermes vs OpenCode: free agents head to head](/blog/hermes-vs-opencode-free-agent-faceoff/)
+- [Coding agent security checklist](/blog/coding-agent-security-checklist-2026/) — run it before anything unattended
+- [Coding agent pricing in 2026](/blog/coding-agent-pricing-guide-2026/) — what "free" is avoiding
+
+*Last updated: September 2026.*
