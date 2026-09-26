@@ -1,0 +1,892 @@
+---
+/**
+ * /pick — "Which AI Coding Agent Should I Use?" interactive picker
+ *
+ * Six questions, pure client-side vanilla JS scoring. No framework, no fetch,
+ * no state on the server. Answers are matched against a static weight table
+ * covering the eight agents we track most: Claude Code, Codex, OpenCode,
+ * Gemini CLI, Cline, Goose, Aider, Hermes Agent.
+ *
+ * Data (pricing, pros, bestFor) is pulled from src/data/agents.json so the
+ * result card never drifts from the rest of the site.
+ */
+
+import Layout from '../layouts/Layout.astro';
+import { SITE_TITLE } from '../consts';
+import agentsHub from '../data/agents.json';
+
+const HUB_IDS = new Set((agentsHub as { id: string }[]).map((a) => a.id));
+
+/** Agents that are not in agents.json (no /tool hub) but still need a home. */
+const EXTRA = {
+  'gemini-cli': {
+    name: 'Gemini CLI',
+    type: 'Terminal agent',
+    pricing: 'Free tier (Google)',
+    bestFor: 'New users with a big free tier',
+    pros: ['Large free tier', 'Huge context window', 'Google models'],
+    external: 'https://github.com/google-gemini/gemini-cli',
+  },
+  aider: {
+    name: 'Aider',
+    type: 'Terminal agent',
+    pricing: 'Free (BYO keys)',
+    bestFor: 'Git-native editing, local models',
+    pros: ['Strong git integration', 'Runs fully local', 'Any model incl. Ollama'],
+    external: 'https://github.com/Aider-AI/aider',
+  },
+} as const;
+
+type PickMeta = {
+  id: string;
+  name: string;
+  tag: string;
+  external?: string;
+  priority: number;
+};
+
+/** Static agent metadata. `priority` only breaks exact score ties. */
+const PICKS: PickMeta[] = [
+  { id: 'claude-code', name: 'Claude Code', tag: 'Best all-round reasoner', priority: 1 },
+  { id: 'codex', name: 'Codex CLI', tag: 'Parallel ticket throughput', priority: 2 },
+  { id: 'opencode', name: 'OpenCode', tag: 'Provider-neutral terminal work', priority: 3 },
+  { id: 'gemini-cli', name: 'Gemini CLI', tag: 'Huge free tier, big context', priority: 4 },
+  { id: 'goose', name: 'Goose', tag: 'Extensible, MCP-native', priority: 5 },
+  { id: 'cline', name: 'Cline', tag: 'Autonomous runs in the editor', priority: 6 },
+  { id: 'aider', name: 'Aider', tag: 'Git-native, local-model friendly', priority: 7 },
+  { id: 'hermes', name: 'Hermes Agent', tag: 'Automation, cron, multi-model', priority: 8 },
+];
+
+const AGENTS: Record<string, any> = {};
+for (const p of PICKS) {
+  const hub = (agentsHub as any[]).find((a) => a.id === p.id);
+  const extra = (EXTRA as Record<string, any>)[p.id];
+  const base = hub || extra || {};
+  AGENTS[p.id] = {
+    id: p.id,
+    name: p.name,
+    tag: p.tag,
+    type: base.type || 'Terminal agent',
+    pricing: base.pricing || '—',
+    bestFor: base.bestFor || p.tag,
+    pros: (base.pros || []).slice(0, 3),
+    external: extra?.external,
+    internal: HUB_IDS.has(p.id),
+    link: HUB_IDS.has(p.id) ? `/tool/${p.id}/` : extra?.external || '/cheatsheet',
+    priority: p.priority,
+  };
+}
+
+type Option = {
+  value: string;
+  label: string;
+  hint: string;
+  why: string;
+  weights: Record<string, number>;
+};
+
+const QUESTIONS: { id: string; prompt: string; sub: string; options: Option[] }[] = [
+  {
+    id: 'budget',
+    prompt: 'What is your budget?',
+    sub: 'Be honest here. Agent runs get expensive fast once you stop watching them.',
+    options: [
+      {
+        value: 'free',
+        label: 'Free only — I bring my own keys',
+        hint: 'No subscription, open source preferred',
+        why: 'You are staying off a subscription, so every front-runner here is open source and runs on your own API keys.',
+        weights: { opencode: 3, goose: 3, aider: 3, hermes: 4, cline: 2, 'gemini-cli': 1 },
+      },
+      {
+        value: 'cheap',
+        label: 'Under $20/month',
+        hint: 'A small tier is fine',
+        why: 'A cheap tier is enough for most people — the free quotas on the big CLIs are wider than vendors advertise.',
+        weights: { 'gemini-cli': 3, 'claude-code': 2, codex: 2, cline: 1, opencode: 1, goose: 1, aider: 1, hermes: 1 },
+      },
+      {
+        value: 'paid',
+        label: "I'll pay for the best",
+        hint: 'Quality over cost',
+        why: 'You are buying quality, which puts the paid frontier models at the top of the list.',
+        weights: { 'claude-code': 4, codex: 3, 'gemini-cli': 1 },
+      },
+    ],
+  },
+  {
+    id: 'where',
+    prompt: 'Where should the agent run?',
+    sub: 'Local means your machine and your keys. Cloud means a hosted backend does the work.',
+    options: [
+      {
+        value: 'local',
+        label: 'On my machine',
+        hint: 'Nothing leaves the box',
+        why: 'You want the agent to run on your own hardware with your own keys.',
+        weights: { aider: 3, opencode: 3, hermes: 4, cline: 2, goose: 2, codex: 1 },
+      },
+      {
+        value: 'cloud',
+        label: 'Cloud is fine',
+        hint: 'Hosted agents, sandboxes, background runs',
+        why: 'You are fine with a hosted backend doing the heavy lifting while you do something else.',
+        weights: { codex: 3, 'gemini-cli': 2, 'claude-code': 2, cline: 1 },
+      },
+      {
+        value: 'either',
+        label: 'Either — no strong opinion',
+        hint: '',
+        why: 'You have no hard constraint on where inference happens.',
+        weights: { 'claude-code': 1, codex: 1, opencode: 1, 'gemini-cli': 1, goose: 1, cline: 1, aider: 1, hermes: 1 },
+      },
+    ],
+  },
+  {
+    id: 'surface',
+    prompt: 'Terminal or IDE?',
+    sub: 'The same model behaves very differently depending on where the agent lives.',
+    options: [
+      {
+        value: 'terminal',
+        label: 'Terminal only',
+        hint: 'I live in the shell',
+        why: 'You live in the shell, so the agent should live in the shell too.',
+        weights: { opencode: 3, aider: 3, 'claude-code': 3, goose: 2, codex: 2, hermes: 2, 'gemini-cli': 2, cline: 1 },
+      },
+      {
+        value: 'ide',
+        label: 'Inside my editor',
+        hint: 'Diff view, accept/reject, inline changes',
+        why: 'You want the agent in the editor, reviewing diffs instead of printing patches to your screen.',
+        weights: { cline: 4, goose: 2, 'claude-code': 1, codex: 1, 'gemini-cli': 1 },
+      },
+      {
+        value: 'both',
+        label: 'Either, I switch daily',
+        hint: '',
+        why: 'You move between terminal and editor all day and need both to work.',
+        weights: { cline: 2, codex: 2, 'claude-code': 2, opencode: 2, goose: 1, aider: 1, hermes: 1, 'gemini-cli': 1 },
+      },
+    ],
+  },
+  {
+    id: 'privacy',
+    prompt: 'How private does the code have to be?',
+    sub: 'This is the question that rules out half the field.',
+    options: [
+      {
+        value: 'strict',
+        label: 'Source code must never leave my machine',
+        hint: 'Client work, NDA, unreleased product',
+        why: 'Source cannot leave the machine, which rules out any hosted-only agent.',
+        weights: { aider: 3, opencode: 2, hermes: 3, cline: 2, goose: 1, 'gemini-cli': 1 },
+      },
+      {
+        value: 'vendor',
+        label: 'Trusted vendors with no-training terms are fine',
+        hint: 'Enterprise agreement, opt-out of training',
+        why: 'You accept sending context to a vendor under a no-training agreement, so the frontier CLIs are back in play.',
+        weights: { 'claude-code': 3, codex: 3, 'gemini-cli': 2, cline: 1, opencode: 1 },
+      },
+      {
+        value: 'mixed',
+        label: 'Partly sensitive',
+        hint: 'Most of the repo is open, some of it is not',
+        why: 'Most of the repo is open but some of it is sensitive, so you want a provider switch and a way to keep secrets out.',
+        weights: { 'claude-code': 2, codex: 2, opencode: 2, hermes: 3, goose: 1, cline: 1, aider: 1, 'gemini-cli': 1 },
+      },
+    ],
+  },
+  {
+    id: 'language',
+    prompt: 'What do you mostly write?',
+    sub: 'Some agents are much better at some ecosystems than others.',
+    options: [
+      {
+        value: 'tsjs',
+        label: 'TypeScript / JavaScript',
+        hint: 'Web, React, Node',
+        why: 'Web and Node work is where the agent tooling is deepest.',
+        weights: { cline: 2, 'claude-code': 2, codex: 2, opencode: 1, goose: 1, aider: 1, hermes: 1, 'gemini-cli': 1 },
+      },
+      {
+        value: 'python',
+        label: 'Python',
+        hint: 'Django, FastAPI, data, ML',
+        why: 'Python-first work, where pair-programming style agents hold up best.',
+        weights: { aider: 3, goose: 2, cline: 2, 'claude-code': 1, codex: 1, opencode: 1, hermes: 1, 'gemini-cli': 1 },
+      },
+      {
+        value: 'systems',
+        label: 'Go / Rust / C++',
+        hint: 'Systems, infra, performance work',
+        why: 'Systems languages, where a diff-based editor and compile feedback matter more than chat.',
+        weights: { aider: 4, opencode: 2, 'claude-code': 2, goose: 1, hermes: 1, cline: 1, codex: 1 },
+      },
+      {
+        value: 'polyglot',
+        label: 'Polyglot monorepo',
+        hint: 'Several languages in one repo',
+        why: 'A polyglot monorepo needs an agent that can hold several contexts at once without losing the plot.',
+        weights: { opencode: 2, 'claude-code': 2, codex: 2, goose: 2, aider: 1, cline: 1, hermes: 1, 'gemini-cli': 1 },
+      },
+    ],
+  },
+  {
+    id: 'level',
+    prompt: 'How much do you want to configure?',
+    sub: 'There is no wrong answer, but the least-configured option is not the same for everyone.',
+    options: [
+      {
+        value: 'new',
+        label: 'New to coding agents',
+        hint: 'Never had one open a PR for me',
+        why: 'You are new to agents, so setup time and obvious affordances matter more than raw benchmark scores.',
+        weights: { 'gemini-cli': 3, cline: 2, goose: 2, 'claude-code': 1, codex: 1 },
+      },
+      {
+        value: 'daily',
+        label: 'I ship code every day',
+        hint: 'It should just work on real tickets',
+        why: 'You ship code daily, so reliability on real tickets beats novelty.',
+        weights: { 'claude-code': 3, codex: 3, opencode: 1, goose: 1, cline: 1, aider: 1, hermes: 1, 'gemini-cli': 1 },
+      },
+      {
+        value: 'power',
+        label: 'Power user — I like to tinker',
+        hint: 'Swap models, script it, wire up tools',
+        why: 'You want to swap models, script the agent, run it on a schedule and wire up your own tools — which is where the automation-first open source agent pulls ahead.',
+        weights: { hermes: 4, opencode: 3, aider: 2, goose: 2, codex: 1, 'claude-code': 1, cline: 1 },
+      },
+    ],
+  },
+];
+
+const PICK_DATA = JSON.stringify({ agents: AGENTS, questions: QUESTIONS });
+---
+
+<Layout
+  title={`Which AI Coding Agent Should I Use? — ${SITE_TITLE}`}
+  description="Answer six questions about budget, privacy, language and workflow — get the AI coding agent that fits you, plus the runner-up and why."
+>
+  <div class="picker">
+    <div class="term-window pick-window">
+      <div class="term-bar">
+        <span class="term-dot red"></span>
+        <span class="term-dot yellow"></span>
+        <span class="term-dot green"></span>
+        <span class="term-title">~/pick &mdash; agent-finder.sh</span>
+      </div>
+
+      <div class="term-body pick-body">
+        <header class="pick-head">
+          <h1>Which AI Coding Agent Should I Use?</h1>
+          <p class="pick-sub">
+            Six questions, no signup, no email gate. We score your answers against the eight
+            agents we track most and show you the winner and the runner-up.
+          </p>
+        </header>
+
+        <div class="pick-progress" id="pick-progress" hidden>
+          <div class="pick-progress-row">
+            <span class="pick-prompt">~/pick $</span>
+            <span id="pick-step-label" class="pick-step-label">question 1/6</span>
+            <span id="pick-step-id" class="pick-step-id">budget</span>
+          </div>
+          <div class="pick-bar"><div class="pick-bar-fill" id="pick-bar-fill"></div></div>
+        </div>
+
+        <noscript>
+          <p class="pick-noscript">
+            The picker needs JavaScript. Without it, read the
+            <a href="/cheatsheet">full agent cheat sheet</a> or the
+            <a href="/leaderboard">adoption leaderboard</a> instead.
+          </p>
+        </noscript>
+
+        <form id="pick-form" class="pick-form" novalidate>
+          {QUESTIONS.map((q, qi) => (
+            <fieldset class="pick-step" data-step={String(qi)} data-qid={q.id}>
+              <legend class="pick-q">
+                <span class="pick-qnum">0{qi + 1}</span>
+                <span>
+                  {q.prompt}
+                  <small>{q.sub}</small>
+                </span>
+              </legend>
+              <div class="pick-options">
+                {q.options.map((o) => (
+                  <label class="pick-opt">
+                    <input type="radio" name={q.id} value={o.value} />
+                    <span class="pick-opt-body">
+                      <span class="pick-opt-label">{o.label}</span>
+                      {o.hint && <span class="pick-opt-hint">{o.hint}</span>}
+                    </span>
+                    <span class="pick-opt-mark" aria-hidden="true">&rsaquo;</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ))}
+
+          <div class="pick-nav">
+            <button type="button" class="pick-btn" id="pick-back" disabled>&larr; back</button>
+            <button type="button" class="pick-btn pick-btn-primary" id="pick-next" disabled>next &rarr;</button>
+            <span class="pick-hint" id="pick-hint">pick an option to continue</span>
+          </div>
+        </form>
+
+        <section class="pick-result" id="pick-result" hidden aria-live="polite">
+          <div class="pick-result-head">
+            <span class="pick-result-eyebrow">~/pick $ ./recommend --answers answers.json</span>
+            <h2 id="pick-result-title">&nbsp;</h2>
+            <p class="pick-result-tag" id="pick-result-tag">&nbsp;</p>
+          </div>
+
+          <div class="pick-meta">
+            <div class="pick-meta-cell">
+              <span class="pick-meta-k">type</span>
+              <span class="pick-meta-v" id="pick-result-type">&mdash;</span>
+            </div>
+            <div class="pick-meta-cell">
+              <span class="pick-meta-k">price</span>
+              <span class="pick-meta-v" id="pick-result-price">&mdash;</span>
+            </div>
+            <div class="pick-meta-cell">
+              <span class="pick-meta-k">runner-up</span>
+              <span class="pick-meta-v" id="pick-runner">&mdash;</span>
+            </div>
+          </div>
+
+          <h3 class="pick-why-h">why this one</h3>
+          <ul class="pick-why" id="pick-why"></ul>
+
+          <h3 class="pick-why-h">the runner-up</h3>
+          <p class="pick-runner-why" id="pick-runner-why">&nbsp;</p>
+
+          <div class="pick-actions">
+            <a class="pick-btn pick-btn-primary" id="pick-result-link" href="/cheatsheet">open the profile &rarr;</a>
+            <a class="pick-btn" id="pick-result-alt" href="/leaderboard">compare all agents</a>
+            <button type="button" class="pick-btn" id="pick-restart">start over</button>
+          </div>
+
+          <div class="pick-cta">
+            <span class="pick-cta-label">sponsored</span>
+            <h3 class="pick-cta-h">Before you pay: compare AI tool deals</h3>
+            <p class="pick-cta-p">
+              Agent subscriptions are only half the bill — you also need a model provider, and
+              plans change every quarter. This roundup tracks current AI tool pricing,
+              discounts and bundles side by side, so you can check the real monthly cost
+              before you commit to an agent.
+            </p>
+            <a
+              class="pick-cta-link"
+              href="https://terminalblog.com/api/go/aifiesta"
+              rel="sponsored nofollow"
+            >Compare AI tool deals &rarr;</a>
+          </div>
+
+          <p class="pick-cta-note">
+            Recommendation, not a review &mdash; check the
+            <a href="/cheatsheet">cheat sheet</a> and the
+            <a href="/blog/best-coding-agents-2026-decision-guide/">decision guide</a> before you
+            commit.
+          </p>
+        </section>
+      </div>
+    </div>
+
+    <p class="pick-foot">
+      Scores are a static opinionated table, not a benchmark. Eight agents scored:
+      Claude Code, Codex, OpenCode, Gemini CLI, Cline, Goose, Aider, Hermes Agent.
+      Full data on the <a href="/cheatsheet">cheat sheet</a>.
+    </p>
+  </div>
+
+  <script type="application/json" id="pick-data" set:html={PICK_DATA}></script>
+  <script>
+    const DATA = JSON.parse(document.getElementById('pick-data')!.textContent || '{}');
+    const AGENTS: Record<string, any> = DATA.agents || {};
+    const QUESTIONS: any[] = DATA.questions || [];
+
+    const form = document.getElementById('pick-form') as HTMLFormElement | null;
+    const result = document.getElementById('pick-result') as HTMLElement | null;
+    const progress = document.getElementById('pick-progress') as HTMLElement | null;
+    const barFill = document.getElementById('pick-bar-fill') as HTMLElement | null;
+    const stepLabel = document.getElementById('pick-step-label') as HTMLElement | null;
+    const stepId = document.getElementById('pick-step-id') as HTMLElement | null;
+    const backBtn = document.getElementById('pick-back') as HTMLButtonElement | null;
+    const nextBtn = document.getElementById('pick-next') as HTMLButtonElement | null;
+    const hint = document.getElementById('pick-hint') as HTMLElement | null;
+    const restart = document.getElementById('pick-restart') as HTMLButtonElement | null;
+
+    const steps = Array.from(document.querySelectorAll<HTMLElement>('.pick-step'));
+    const total = steps.length;
+    let current = 0;
+    let done = false;
+
+    function answerFor(qid: string): string | null {
+      const el = form?.querySelector<HTMLInputElement>(`input[name="${qid}"]:checked`);
+      return el ? el.value : null;
+    }
+
+    function score() {
+      const totals: Record<string, number> = {};
+      for (const id of Object.keys(AGENTS)) totals[id] = 0;
+      for (const q of QUESTIONS) {
+        const val = answerFor(q.id);
+        if (!val) continue;
+        const opt = q.options.find((o: any) => o.value === val);
+        if (!opt) continue;
+        for (const [id, w] of Object.entries(opt.weights as Record<string, number>)) {
+          if (id in totals) totals[id] += w as number;
+        }
+      }
+      return Object.entries(totals).sort((a, b) => {
+        if (b[1] !== a[1]) return b[1] - a[1];
+        return (AGENTS[a[0]].priority || 99) - (AGENTS[b[0]].priority || 99);
+      });
+    }
+
+    function whyBullets(winnerId: string): string[] {
+      const out: string[] = [];
+      for (const q of QUESTIONS) {
+        const val = answerFor(q.id);
+        if (!val) continue;
+        const opt = q.options.find((o: any) => o.value === val);
+        if (opt && (opt.weights?.[winnerId] || 0) > 0) out.push(opt.why);
+      }
+      for (const pro of AGENTS[winnerId].pros || []) {
+        if (out.length >= 5) break;
+        out.push(`${AGENTS[winnerId].name} — ${pro.toLowerCase()}.`);
+      }
+      return out.slice(0, 5);
+    }
+
+    function show(step: number) {
+      current = Math.max(0, Math.min(step, total - 1));
+      steps.forEach((s, i) => s.classList.toggle('is-active', i === current));
+      if (stepLabel) stepLabel.textContent = `question ${current + 1}/${total}`;
+      if (stepId) stepId.textContent = QUESTIONS[current]?.id || '';
+      if (barFill) barFill.style.width = `${((current + 1) / total) * 100}%`;
+      if (backBtn) backBtn.disabled = current === 0;
+      syncNav();
+      const active = steps[current];
+      if (active && window.innerWidth < 640) {
+        active.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+
+    function syncNav() {
+      const qid = QUESTIONS[current]?.id;
+      const answered = Boolean(answerFor(qid));
+      if (nextBtn) nextBtn.disabled = !answered;
+      if (hint) {
+        hint.textContent = answered
+          ? ''
+          : `pick an option to continue — ${QUESTIONS[current]?.options.length} choices`;
+      }
+    }
+
+    function render() {
+      const ranked = score();
+      const [winId, winScore] = ranked[0];
+      const [runId, runScore] = ranked[1] || [];
+      const win = AGENTS[winId];
+      const run = AGENTS[runId];
+
+      const set = (id: string, text: string) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+      };
+
+      set('pick-result-title', win.name);
+      set('pick-result-tag', win.tag);
+      set('pick-result-type', win.type);
+      set('pick-result-price', win.pricing);
+      set('pick-runner', run ? `${run.name} (${runScore} pts vs ${winScore})` : '—');
+      set(
+        'pick-runner-why',
+        run
+          ? `${run.name} is the fallback: ${String(run.bestFor || run.tag).toLowerCase()}. ` +
+            `If your answers change — more privacy, less budget — that is the one to try second.`
+          : ''
+      );
+
+      const list = document.getElementById('pick-why');
+      if (list) {
+        list.innerHTML = '';
+        for (const line of whyBullets(winId)) {
+          const li = document.createElement('li');
+          li.textContent = line;
+          list.appendChild(li);
+        }
+      }
+
+      const link = document.getElementById('pick-result-link') as HTMLAnchorElement | null;
+      if (link) {
+        link.setAttribute('href', win.link || '/cheatsheet');
+        link.textContent = win.internal ? `read the ${win.name} profile →` : `${win.name} upstream →`;
+        if (win.internal) link.removeAttribute('rel');
+        else link.setAttribute('rel', 'noopener');
+      }
+
+      const alt = document.getElementById('pick-result-alt') as HTMLAnchorElement | null;
+      if (alt) alt.textContent = 'compare all agents';
+
+      if (form) form.hidden = true;
+      if (progress) progress.hidden = true;
+      if (result) {
+        result.hidden = false;
+        result.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      done = true;
+    }
+
+    function reset() {
+      form?.reset();
+      steps.forEach((s) => s.classList.remove('is-done'));
+      done = false;
+      if (result) result.hidden = true;
+      if (form) form.hidden = false;
+      if (progress) progress.hidden = false;
+      show(0);
+    }
+
+    form?.addEventListener('change', (e) => {
+      const t = e.target as HTMLInputElement;
+      if (t && t.type === 'radio') {
+        const step = steps.find((s) => s.contains(t));
+        if (step) {
+          steps.forEach((s) => s.classList.remove('is-done'));
+          step.classList.add('is-done');
+        }
+        syncNav();
+      }
+    });
+
+    nextBtn?.addEventListener('click', () => {
+      if (!answerFor(QUESTIONS[current]?.id)) return;
+      if (current === total - 1) render();
+      else show(current + 1);
+    });
+
+    backBtn?.addEventListener('click', () => {
+      if (done) return;
+      show(current - 1);
+    });
+
+    restart?.addEventListener('click', reset);
+
+    document.addEventListener('keydown', (e) => {
+      if (done) return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' && (e.key === 'Enter' || e.key === 'ArrowRight')) {
+        if (nextBtn && !nextBtn.disabled) {
+          e.preventDefault();
+          nextBtn.click();
+        }
+      }
+    });
+
+    if (form) form.classList.add('is-live');
+    show(0);
+  </script>
+
+  <style is:global>
+    .picker { max-width: 760px; margin: 0 auto; padding: 2rem 1rem 3rem; }
+    .pick-window { border-radius: 10px; }
+    .pick-body { padding: 1.5rem; }
+
+    .pick-head { margin-bottom: 1.25rem; }
+    .pick-head h1 {
+      font-family: var(--font-mono);
+      font-size: 1.35rem;
+      color: var(--green);
+      margin: 0 0 0.5rem;
+      letter-spacing: -0.02em;
+    }
+    .pick-sub {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--fg-dim);
+      margin: 0;
+      line-height: 1.7;
+    }
+
+    .pick-progress { margin-bottom: 1.25rem; }
+    .pick-progress-row {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      margin-bottom: 0.35rem;
+    }
+    .pick-prompt { color: var(--green); }
+    .pick-step-label { color: var(--fg-dim); }
+    .pick-step-id { color: var(--amber); margin-left: auto; }
+    .pick-bar {
+      height: 3px;
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .pick-bar-fill {
+      height: 100%;
+      width: 16%;
+      background: var(--green);
+      transition: width 0.2s ease;
+    }
+
+    .pick-noscript {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--amber);
+      border: 1px solid var(--amber);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+    }
+
+    .pick-step {
+      border: 0;
+      padding: 0;
+      margin: 0 0 1.25rem;
+    }
+    /* Without JS every question stays visible; with JS only the current one. */
+    .pick-form.is-live .pick-step { display: none; }
+    .pick-form.is-live .pick-step.is-active { display: block; }
+    .pick-form:not(.is-live) .pick-nav { display: none; }
+
+    .pick-q {
+      display: flex;
+      gap: 0.6rem;
+      align-items: baseline;
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      color: var(--fg-bright);
+      margin-bottom: 0.75rem;
+      padding: 0;
+      line-height: 1.5;
+    }
+    .pick-qnum { color: var(--amber); font-size: 0.8rem; }
+    .pick-q small {
+      display: block;
+      font-size: 0.72rem;
+      color: var(--fg-dim);
+      font-weight: 400;
+      margin-top: 0.2rem;
+    }
+
+    .pick-options { display: grid; gap: 0.5rem; }
+    .pick-opt {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.7rem 0.85rem;
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .pick-opt:hover { border-color: var(--green-dim); background: var(--bg-hover); }
+    .pick-opt input { accent-color: var(--green); margin: 0; }
+    .pick-opt-body { display: flex; flex-direction: column; }
+    .pick-opt-label {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--fg);
+    }
+    .pick-opt-hint { font-size: 0.72rem; color: var(--fg-dim); }
+    .pick-opt-mark { margin-left: auto; color: var(--fg-dim); }
+    .pick-opt:has(input:checked) {
+      border-color: var(--green);
+      background: rgba(34, 197, 94, 0.08);
+    }
+    .pick-opt:has(input:checked) .pick-opt-label { color: var(--green); }
+    .pick-opt:has(input:checked) .pick-opt-mark { color: var(--green); }
+    .pick-step.is-done .pick-q { color: var(--fg-dim); }
+    .pick-step.is-done .pick-qnum { color: var(--green-dim); }
+
+    .pick-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid var(--border);
+    }
+    .pick-hint {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--fg-dim);
+      margin-left: auto;
+      text-align: right;
+    }
+    .pick-btn {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--fg);
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.45rem 0.85rem;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: all 0.15s;
+    }
+    .pick-btn:hover:not(:disabled) { border-color: var(--green); color: var(--green); text-decoration: none; }
+    .pick-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .pick-btn-primary {
+      background: var(--green);
+      color: #04120a;
+      border-color: var(--green);
+      font-weight: 600;
+    }
+    .pick-btn-primary:hover:not(:disabled) { background: #16a34a; color: #04120a; }
+
+    .pick-result-head { border-bottom: 1px solid var(--border); padding-bottom: 0.9rem; }
+    .pick-result-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--green);
+      display: block;
+      margin-bottom: 0.4rem;
+      word-break: break-all;
+    }
+    .pick-result-head h2 {
+      font-family: var(--font-mono);
+      font-size: 1.5rem;
+      color: var(--fg-bright);
+      margin: 0;
+    }
+    .pick-result-tag {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--amber);
+      margin: 0.25rem 0 0;
+    }
+
+    .pick-meta {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+      margin: 1rem 0;
+    }
+    .pick-meta-cell {
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.5rem 0.6rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+    .pick-meta-k {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--fg-dim);
+    }
+    .pick-meta-v { font-family: var(--font-mono); font-size: 0.78rem; color: var(--fg-bright); }
+
+    .pick-why-h {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--green);
+      margin: 1.2rem 0 0.5rem;
+    }
+    .pick-why { margin: 0; padding-left: 1.1rem; }
+    .pick-why li {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--fg);
+      margin-bottom: 0.4rem;
+      line-height: 1.6;
+    }
+    .pick-why li::marker { color: var(--green); }
+    .pick-runner-why {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--fg-dim);
+      margin: 0;
+      line-height: 1.7;
+    }
+
+    .pick-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .pick-cta {
+      border: 1px solid var(--amber);
+      background: rgba(245, 158, 11, 0.06);
+      border-radius: 8px;
+      padding: 1rem 1.1rem;
+    }
+    .pick-cta-label {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--amber);
+      border: 1px solid var(--amber);
+      border-radius: 3px;
+      padding: 0.05rem 0.35rem;
+      margin-bottom: 0.5rem;
+    }
+    .pick-cta-h {
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      color: var(--fg-bright);
+      margin: 0 0 0.4rem;
+    }
+    .pick-cta-p {
+      font-size: 0.85rem;
+      color: var(--fg-dim);
+      margin: 0 0 0.75rem;
+      line-height: 1.7;
+    }
+    .pick-cta-link {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--amber);
+      text-decoration: none;
+      border-bottom: 1px solid var(--amber);
+      padding-bottom: 1px;
+    }
+    .pick-cta-link:hover { color: #fbbf24; text-decoration: none; }
+    .pick-cta-note {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--fg-dim);
+      margin: 1rem 0 0;
+    }
+
+    .pick-foot {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--fg-dim);
+      text-align: center;
+      margin: 1.25rem 0 0;
+      line-height: 1.7;
+    }
+
+    @media (max-width: 600px) {
+      .picker { padding: 1rem 0.75rem 2rem; }
+      .pick-body { padding: 1rem; }
+      .pick-meta { grid-template-columns: 1fr; }
+      .pick-nav { flex-wrap: wrap; }
+      .pick-hint { margin-left: 0; width: 100%; text-align: left; }
+    }
+  </style>
+</Layout>
