@@ -1,0 +1,501 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { SITE_TITLE } from '../consts';
+
+/**
+ * Coding Agent Cost Calculator — /cost
+ *
+ * Pricing model (approximate 2026 sticker prices, verify with the vendor):
+ *   price    — flat monthly subscription, $0 for free tiers
+ *   included — tokens/month the plan realistically covers before limits bite
+ *   overflow — 'none'   the plan simply blocks past `included` (free tiers)
+ *              'upgrade' the flat answer is the next tier up
+ *              'meter'   pay-as-you-go per-token on top of `price`
+ *   rate     — blended $/1M tokens for 'meter' plans
+ *   upgrade  — next-tier flat price used when overflow === 'upgrade'
+ */
+type Plan = {
+  id: string;
+  name: string;
+  vendor: string;
+  kind: 'Flat subscription' | 'Free tier' | 'Metered';
+  price: number;
+  included: number;
+  overflow: 'none' | 'upgrade' | 'meter';
+  rate?: number;
+  upgrade?: number;
+  limits: string;
+  best: string;
+};
+
+const PLANS: Plan[] = [
+  {
+    id: 'claude-pro',
+    name: 'Claude Pro',
+    vendor: 'Anthropic',
+    kind: 'Flat subscription',
+    price: 20,
+    included: 25,
+    overflow: 'upgrade',
+    rate: 4,
+    upgrade: 100,
+    limits: '~45 messages / 5h rolling window · weekly cap ~10-40 sessions · resets on a 7d cycle',
+    best: 'Intermittent refactors, a few big sessions a day',
+  },
+  {
+    id: 'claude-max',
+    name: 'Claude Max',
+    vendor: 'Anthropic',
+    kind: 'Flat subscription',
+    price: 100,
+    included: 220,
+    overflow: 'upgrade',
+    rate: 4,
+    upgrade: 200,
+    limits: '~5× Pro limits · ~225 messages / 5h · built for all-day agent runs',
+    best: 'Full-time agent work, long unattended sessions',
+  },
+  {
+    id: 'codex-plus',
+    name: 'Codex (ChatGPT Plus)',
+    vendor: 'OpenAI',
+    kind: 'Flat subscription',
+    price: 20,
+    included: 30,
+    overflow: 'upgrade',
+    rate: 3,
+    upgrade: 200,
+    limits: '5h window + weekly cap · parallel cloud tasks · limits were reset with the GPT-5.6 pricing drop',
+    best: 'Batch work, CI-style tasks, cloud sandboxes',
+  },
+  {
+    id: 'gemini-free',
+    name: 'Gemini free tier',
+    vendor: 'Google',
+    kind: 'Free tier',
+    price: 0,
+    included: 3,
+    overflow: 'none',
+    limits: '~1,500 requests/day · 1M context · prompts may be used for product tuning',
+    best: 'Scratch work, throwaway prototypes',
+  },
+  {
+    id: 'opencode-free',
+    name: 'OpenCode + free OpenRouter models',
+    vendor: 'OpenCode / OpenRouter',
+    kind: 'Free tier',
+    price: 0,
+    included: 1.5,
+    overflow: 'none',
+    limits: ':free models only · ~20 req/min · small daily cap · 429s are routine, quality varies',
+    best: 'Trying routing setups before paying anyone',
+  },
+  {
+    id: 'ollama',
+    name: 'Ollama local',
+    vendor: 'Self-hosted',
+    kind: 'Free tier',
+    price: 0,
+    included: 500,
+    overflow: 'none',
+    limits: 'No rate limit · ceiling is your GPU, not your plan · $0 if the hardware is already paid for',
+    best: 'Privacy, offline work, code that cannot leave the box',
+  },
+  {
+    id: 'api-sonnet',
+    name: 'BYO API — Claude Sonnet',
+    vendor: 'Anthropic API',
+    kind: 'Metered',
+    price: 0,
+    included: 0,
+    overflow: 'meter',
+    rate: 4,
+    limits: 'No session cap · $3/M input, $15/M output · blended here at 80/20 with partial cache hits',
+    best: 'Unpredictable volume where a flat plan would just clip',
+  },
+];
+
+const DEFAULT_TOKENS = 20;
+
+function money(n: number): string {
+  if (n === 0) return '$0';
+  if (n < 1) return '$' + n.toFixed(2);
+  if (n < 100) return '$' + (Math.round(n * 100) / 100).toFixed(2);
+  return '$' + Math.round(n).toLocaleString('en-US');
+}
+
+type Row = { amount: number; fits: boolean; note: string; over: boolean };
+
+function costFor(plan: Plan, tokensM: number): Row {
+  if (tokensM <= plan.included) {
+    return {
+      amount: plan.price,
+      fits: true,
+      over: false,
+      note: `covers ~${plan.included}M tokens — inside the plan`,
+    };
+  }
+  if (plan.overflow === 'upgrade') {
+    return {
+      amount: plan.upgrade ?? plan.price,
+      fits: true,
+      over: true,
+      note: `over ~${plan.included}M — flat answer is the $${plan.upgrade} tier`,
+    };
+  }
+  if (plan.overflow === 'meter') {
+    return {
+      amount: plan.price + tokensM * (plan.rate ?? 0),
+      fits: true,
+      over: false,
+      note: 'billed per token, no session cap',
+    };
+  }
+  return {
+    amount: plan.price,
+    fits: false,
+    over: true,
+    note: `over ~${plan.included}M — the plan blocks, it does not bill`,
+  };
+}
+
+const initialRows = PLANS.map((plan) => ({ plan, row: costFor(plan, DEFAULT_TOKENS) }));
+const initialBest = initialRows
+  .filter((r) => r.row.fits)
+  .reduce<{ plan: Plan; row: Row } | null>((best, cur) => {
+    if (!best) return cur;
+    return cur.row.amount < best.row.amount ? cur : best;
+  }, null);
+const initialWorst = initialRows
+  .filter((r) => r.row.fits)
+  .reduce<{ plan: Plan; row: Row } | null>((best, cur) => {
+    if (!best) return cur;
+    return cur.row.amount > best.row.amount ? cur : best;
+  }, null);
+
+const PRESETS = [2, 10, 40, 150, 500];
+/** Slider is log-scaled, so seed its position from the default volume. */
+const DEFAULT_POS = Math.round((Math.log(DEFAULT_TOKENS) / Math.log(500)) * 100);
+---
+
+<Layout
+  title={`Coding Agent Cost Calculator — ${SITE_TITLE}`}
+  description="Estimate what AI coding agents cost per month at your token volume: Claude Pro/Max, Codex, Gemini free, free OpenRouter models and local Ollama — side by side, with rate limits."
+>
+
+<div style="max-width:1200px;margin:0 auto;padding:2rem 1rem 3rem;">
+
+  <div style="text-align:center;margin-bottom:2rem;">
+    <h1 style="font-family:var(--font-mono);font-size:1.5rem;color:var(--green);margin-bottom:0.5rem;">
+      Coding Agent Cost Calculator
+    </h1>
+    <p style="font-family:var(--font-mono);font-size:0.8rem;color:var(--fg-dim);max-width:660px;margin:0 auto;">
+      Drag the slider to your monthly token volume. Every plan re-prices side by side, the cheapest
+      option that <em style="color:var(--fg);font-style:normal;">actually fits</em> gets flagged, and you
+      see the rate limit that bites first.
+    </p>
+    <p style="font-family:var(--font-mono);font-size:0.75rem;margin-top:0.75rem;">
+      <a href="/blog/coding-agent-pricing-guide-2026/" style="color:var(--fg-dim);">Pricing guide</a>
+      <span style="color:var(--fg-dim);"> · </span>
+      <a href="/blog/what-8-coding-agents-cost-per-month/" style="color:var(--fg-dim);">Real monthly costs</a>
+      <span style="color:var(--fg-dim);"> · </span>
+      <a href="/leaderboard/" style="color:var(--fg-dim);">Leaderboard</a>
+    </p>
+  </div>
+
+  {/* Controls */}
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:1.25rem 1.5rem;margin-bottom:1.25rem;">
+    <div style="display:flex;flex-wrap:wrap;gap:1.5rem;align-items:flex-end;justify-content:space-between;">
+      <div style="flex:1 1 320px;min-width:260px;">
+        <label for="cost-tokens" style="display:block;font-family:var(--font-mono);font-size:0.7rem;color:var(--fg-dim);margin-bottom:0.5rem;">
+          tokens / month
+        </label>
+        <input
+          id="cost-tokens"
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          value={DEFAULT_POS}
+          aria-describedby="cost-tokens-readout"
+          style="width:100%;accent-color:var(--green);"
+        />
+        <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:0.6rem;color:var(--fg-dim);margin-top:0.25rem;">
+          <span>1M</span><span>500M</span>
+        </div>
+      </div>
+      <div style="font-family:var(--font-mono);text-align:right;">
+        <div style="font-size:0.7rem;color:var(--fg-dim);">your volume</div>
+        <div style="display:flex;align-items:center;gap:0.4rem;justify-content:flex-end;">
+          <input
+            id="cost-tokens-num"
+            type="number"
+            min="1"
+            max="500"
+            step="1"
+            value={DEFAULT_TOKENS}
+            aria-label="Tokens per month in millions"
+            style="width:6.5rem;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--green);font-family:var(--font-mono);font-size:1.15rem;font-weight:700;padding:0.25rem 0.5rem;text-align:right;"
+          />
+          <span style="font-size:0.8rem;color:var(--fg-dim);">M tok</span>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:1rem;align-items:center;">
+      <span style="font-family:var(--font-mono);font-size:0.6rem;color:var(--fg-dim);margin-right:0.25rem;">presets</span>
+      {PRESETS.map((p) => (
+        <button
+          type="button"
+          class="cost-preset"
+          data-tokens={p}
+          style="background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--fg-dim);font-family:var(--font-mono);font-size:0.65rem;padding:0.25rem 0.55rem;cursor:pointer;"
+        >{p}M</button>
+      ))}
+    </div>
+  </div>
+
+  {/* Verdict */}
+  <div id="cost-verdict" style="background:var(--bg-card);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:8px;padding:0.9rem 1.1rem;margin-bottom:1.25rem;font-family:var(--font-mono);font-size:0.75rem;line-height:1.7;">
+    {initialBest && (
+      <span>
+        at <strong style="color:var(--green);">{DEFAULT_TOKENS}M tokens/mo</strong> the cheapest plan that
+        fits is <strong style="color:var(--green);">{initialBest.plan.name}</strong> at
+        {' '}<strong style="color:var(--green);">{money(initialBest.row.amount)}</strong>/mo
+        {initialWorst && initialWorst.plan.id !== initialBest.plan.id && (
+          <span style="color:var(--fg-dim);">
+            — against {money(initialWorst.row.amount)}/mo for {initialWorst.plan.name}
+          </span>
+        )}
+      </span>
+    )}
+  </div>
+
+  {/* Table */}
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:0.72rem;">
+      <thead>
+        <tr style="background:var(--bg);border-bottom:1px solid var(--border);">
+          <th style="padding:0.65rem 0.5rem;text-align:left;color:var(--fg-dim);">Plan</th>
+          <th style="padding:0.65rem 0.5rem;text-align:right;color:var(--fg-dim);">Est. / month</th>
+          <th style="padding:0.65rem 0.5rem;text-align:right;color:var(--fg-dim);" title="Spread over your volume">Per 1M tok</th>
+          <th style="padding:0.65rem 0.5rem;text-align:left;color:var(--fg-dim);">At this volume</th>
+          <th style="padding:0.65rem 0.5rem;text-align:left;color:var(--fg-dim);">Rate limits &amp; notes</th>
+        </tr>
+      </thead>
+      <tbody id="cost-rows">
+        {initialRows.map(({ plan, row }) => {
+          const isBest = initialBest?.plan.id === plan.id;
+          return (
+            <tr
+              id={`cost-row-${plan.id}`}
+              class="cost-row"
+              data-plan={plan.id}
+              style={`border-bottom:1px solid var(--border);${isBest ? 'background:#22c55e14;' : ''}`}
+            >
+              <td style="padding:0.6rem 0.5rem;">
+                <div style="color:var(--fg);font-weight:600;">
+                  {plan.name}
+                  <span
+                    class="cost-flag"
+                    style={`display:${isBest ? 'inline-block' : 'none'};margin-left:0.4rem;font-size:0.55rem;color:#0b0b0f;background:var(--green);border-radius:3px;padding:0.05rem 0.3rem;font-weight:700;`}
+                  >CHEAPEST</span>
+                </div>
+                <div style="font-size:0.58rem;color:var(--fg-dim);margin-top:0.15rem;">
+                  {plan.vendor} · {plan.kind}
+                </div>
+              </td>
+              <td data-f="cost" style="padding:0.6rem 0.5rem;text-align:right;color:var(--amber);font-weight:700;white-space:nowrap;">
+                {money(row.amount)}
+              </td>
+              <td data-f="unit" style="padding:0.6rem 0.5rem;text-align:right;color:var(--fg-dim);white-space:nowrap;">
+                {money(row.amount / DEFAULT_TOKENS)}
+              </td>
+              <td data-f="state" style="padding:0.6rem 0.5rem;color:var(--fg-dim);">{row.note}</td>
+              <td style="padding:0.6rem 0.5rem;color:var(--fg-dim);font-size:0.65rem;line-height:1.6;min-width:260px;">
+                {plan.limits}
+                <div style="margin-top:0.2rem;color:var(--fg);">best for: {plan.best}</div>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+
+  <div style="margin-top:1rem;padding:0.85rem 1rem;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;font-family:var(--font-mono);font-size:0.65rem;color:var(--fg-dim);line-height:1.8;">
+    <strong style="color:var(--amber);">How to read this.</strong>
+    Flat plans do not scale — the price is the price until the limit hits, then the honest answer is the next
+    tier or a per-token bill. Free tiers are priced at $0 because they block instead of billing, so their
+    "per 1M token" column goes to zero while the row stays unusable. The metered API row is the baseline that
+    keeps the comparison honest when your volume is spiky.
+    <span style="display:block;margin-top:0.4rem;">
+      Numbers are <strong style="color:var(--amber);">approximate 2026 pricing — verify with the vendor</strong>
+      before you budget. Blended metered rate assumes $3/M input and $15/M output at an 80/20 mix with partial
+      prompt-cache hits. Token allowances are back-calculated from published rate limits, not from vendor quotas.
+    </span>
+  </div>
+
+  {/* Money rule */}
+  <div style="margin-top:1rem;padding:1rem 1.1rem;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;">
+    <h2 style="font-family:var(--font-mono);font-size:0.85rem;color:var(--amber);margin:0 0 0.5rem;">The money rule</h2>
+    <ol style="margin:0;padding-left:1.2rem;font-family:var(--font-mono);font-size:0.7rem;color:var(--fg-dim);line-height:1.8;">
+      <li>Measure your real burn first — a usage CLI beats a guess, and context overhead differs per harness.</li>
+      <li>Buy the cheapest tier that covers your <em style="color:var(--fg);font-style:normal;">weekly peak</em>, not your average.</li>
+      <li>Keep one metered path open for spikes instead of overpaying for headroom you never use.</li>
+      <li>Re-run this page monthly — sticker prices on this page go stale, and 2026 has already reset them twice.</li>
+    </ol>
+  </div>
+
+  {/* CTA */}
+  <div style="margin-top:1.5rem;padding:1.1rem 1.25rem;background:var(--bg-card);border:1px solid var(--green-dim);border-radius:8px;text-align:center;">
+    <p style="font-family:var(--font-mono);font-size:0.9rem;color:var(--fg-bright);margin:0 0 0.6rem;">
+      Paying too much? Compare AI tool deals
+    </p>
+    <a
+      href="/api/go/aifiesta"
+      rel="sponsored nofollow"
+      target="_blank"
+      style="display:inline-block;font-family:var(--font-mono);font-size:0.8rem;font-weight:600;color:#0b0b0f;background:var(--green);border-radius:4px;padding:0.5rem 1.1rem;text-decoration:none;"
+    >Compare deals →</a>
+    <p style="font-family:var(--font-mono);font-size:0.6rem;color:var(--fg-dim);margin:0.6rem 0 0;">
+      sponsored · multi-model access plans compared in one place
+    </p>
+  </div>
+
+  <p style="font-family:var(--font-mono);font-size:0.6rem;color:var(--fg-dim);text-align:center;margin-top:1.5rem;line-height:1.8;">
+    More cost reporting: <a href="/blog/pricing-problem-ai-coding-tools/">the pricing problem</a> ·
+    <a href="/blog/real-cost-of-ai-coding-agents/">real cost of AI coding agents</a> ·
+    <a href="/blog/best-coding-agents-2026-decision-guide/">decision guide</a>
+  </p>
+</div>
+
+<script type="application/json" id="cost-plans" set:html={JSON.stringify(PLANS)}></script>
+
+<script is:inline>
+  (function () {
+    var plans;
+    try {
+      plans = JSON.parse(document.getElementById('cost-plans').textContent);
+    } catch (e) {
+      return;
+    }
+
+    var slider = document.getElementById('cost-tokens');
+    var num = document.getElementById('cost-tokens-num');
+    var verdict = document.getElementById('cost-verdict');
+    var MAX_TOKENS = 500;
+
+    /* slider position -> tokens, log scale so 1-10M is as draggable as 100-500M */
+    function posToTokens(pos) {
+      return Math.pow(MAX_TOKENS, pos / 100);
+    }
+    function tokensToPos(tokens) {
+      return (Math.log(tokens) / Math.log(MAX_TOKENS)) * 100;
+    }
+    function clampTokens(v) {
+      if (!isFinite(v)) return 1;
+      return Math.min(MAX_TOKENS, Math.max(1, v));
+    }
+    function roundTokens(v) {
+      return v < 10 ? Math.round(v * 10) / 10 : Math.round(v);
+    }
+    function money(n) {
+      if (n === 0) return '$0';
+      if (n < 1) return '$' + n.toFixed(2);
+      if (n < 100) return '$' + (Math.round(n * 100) / 100).toFixed(2);
+      return '$' + Math.round(n).toLocaleString('en-US');
+    }
+
+    function costFor(plan, tokensM) {
+      if (tokensM <= plan.included) {
+        return { amount: plan.price, fits: true, note: 'covers ~' + plan.included + 'M tokens — inside the plan' };
+      }
+      if (plan.overflow === 'upgrade') {
+        return {
+          amount: plan.upgrade != null ? plan.upgrade : plan.price,
+          fits: true,
+          note: 'over ~' + plan.included + 'M — flat answer is the $' + plan.upgrade + ' tier',
+        };
+      }
+      if (plan.overflow === 'meter') {
+        return { amount: plan.price + tokensM * (plan.rate || 0), fits: true, note: 'billed per token, no session cap' };
+      }
+      return { amount: plan.price, fits: false, note: 'over ~' + plan.included + 'M — the plan blocks, it does not bill' };
+    }
+
+    function render() {
+      var raw = clampTokens(parseFloat(slider.value) || 1);
+      var tokensM = roundTokens(raw);
+      num.value = tokensM;
+
+      var results = plans.map(function (p) {
+        return { plan: p, row: costFor(p, tokensM) };
+      });
+      var fitting = results.filter(function (r) { return r.row.fits; });
+      var best = null;
+      var worst = null;
+      fitting.forEach(function (r) {
+        if (!best || r.row.amount < best.row.amount) best = r;
+        if (!worst || r.row.amount > worst.row.amount) worst = r;
+      });
+
+      results.forEach(function (r) {
+        var tr = document.getElementById('cost-row-' + r.plan.id);
+        if (!tr) return;
+        var isBest = !!best && best.plan.id === r.plan.id;
+        var color = !r.row.fits ? 'var(--fg-dim)' : isBest ? 'var(--green)' : 'var(--amber)';
+        tr.style.background = isBest ? 'rgba(34,197,94,0.08)' : '';
+        tr.querySelector('[data-f="cost"]').textContent = money(r.row.amount);
+        tr.querySelector('[data-f="cost"]').style.color = color;
+        tr.querySelector('[data-f="cost"]').style.textDecoration = !r.row.fits ? 'line-through' : 'none';
+        tr.querySelector('[data-f="unit"]').textContent = money(r.row.amount / tokensM);
+        tr.querySelector('[data-f="state"]').textContent = r.row.note;
+        var flag = tr.querySelector('.cost-flag');
+        if (flag) flag.style.display = isBest ? 'inline-block' : 'none';
+      });
+
+      document.querySelectorAll('.cost-preset').forEach(function (b) {
+        b.style.color = parseFloat(b.dataset.tokens) === tokensM ? 'var(--green)' : 'var(--fg-dim)';
+        b.style.borderColor = parseFloat(b.dataset.tokens) === tokensM ? 'var(--green-dim)' : 'var(--border)';
+      });
+
+      if (!best) {
+        verdict.innerHTML = 'No plan covers ' + tokensM + 'M tokens/mo without limits. You need a metered API or a local GPU.';
+        return;
+      }
+      var html = 'at <strong style="color:var(--green);">' + tokensM + 'M tokens/mo</strong> the cheapest plan that fits is '
+        + '<strong style="color:var(--green);">' + best.plan.name + '</strong> at '
+        + '<strong style="color:var(--green);">' + money(best.row.amount) + '</strong>/mo';
+      if (worst && worst.plan.id !== best.plan.id) {
+        html += '<span style="color:var(--fg-dim);"> — against ' + money(worst.row.amount) + '/mo for '
+          + worst.plan.name + '</span>';
+      }
+      verdict.innerHTML = html;
+    }
+
+    slider.addEventListener('input', function () {
+      render();
+    });
+
+    num.addEventListener('input', function () {
+      var v = parseFloat(num.value);
+      if (!isFinite(v) || v <= 0) return;
+      v = clampTokens(v);
+      slider.value = tokensToPos(v);
+      render();
+    });
+
+    document.querySelectorAll('.cost-preset').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var v = clampTokens(parseFloat(b.dataset.tokens));
+        slider.value = tokensToPos(v);
+        render();
+      });
+    });
+
+    slider.value = tokensToPos(20);
+    render();
+  })();
+</script>
+
+</Layout>
