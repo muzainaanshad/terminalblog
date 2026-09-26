@@ -1,72 +1,100 @@
 ---
 /**
- * HarnessChangelog — the daily "what changed in coding harnesses" feed.
- * Data: src/data/harness-changelog/releases.json (refreshed daily by fetch script).
- * Shows the last 14 days of stable releases, grouped by day, with prereleases collapsed.
+ * HarnessChangelog — daily "what changed in coding harnesses" feed.
+ * Spec: date header at top, under it every agent's updates for that day,
+ * each as one-line headline + short summary. Stats-friendly, scannable.
  */
 import releasesData from '../data/harness-changelog/releases.json';
+import summariesData from '../data/harness-changelog/summaries.json';
 
 const { releases, fetchedAt } = releasesData;
+const S = summariesData || {};
 
-// group stable releases by day
+// stable releases grouped by day, then by tool
 const byDay = new Map();
 for (const r of releases) {
   if (r.prerelease) continue;
   const day = r.publishedAt.slice(0, 10);
-  if (!byDay.has(day)) byDay.set(day, []);
-  byDay.get(day).push(r);
+  if (!byDay.has(day)) byDay.set(day, new Map());
+  const byTool = byDay.get(day);
+  if (!byTool.has(r.tool)) byTool.set(r.tool, []);
+  byTool.get(r.tool).push(r);
 }
-const days = [...byDay.entries()].slice(0, 14);
+const days = [...byDay.entries()].slice(0, 10);
 
-const fmt = (d) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+const IMPACT_STYLE = {
+  breaking: { label: 'breaking', color: '#ef4444' },
+  notable: { label: 'new', color: '#22c55e' },
+  minor: { label: 'fix', color: '#6b7280' },
+};
+const fmt = (d) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'UTC' });
 const rel = (iso) => {
   const diff = Math.floor((Date.now() - new Date(iso)) / 86400000);
   if (diff <= 0) return 'today';
   if (diff === 1) return 'yesterday';
-  return `${diff}d ago`;
+  return `${diff} days ago`;
 };
-const TOOL_COLORS = { 'Claude Code': '#d97757', 'Codex CLI': '#10a37f', 'OpenCode': '#7aa2f7', 'Gemini CLI': '#4285f4', 'Hermes Agent': '#a78bfa', 'Cline': '#3b82f6', 'Goose': '#f59e0b', 'Aider': '#22c55e', 'Crush': '#ec4899' };
+const TOOL_COLORS = { 'Claude Code': '#d97757', 'Codex CLI': '#10a37f', 'OpenCode': '#7aa2f7', 'OpenCode (sst)': '#7aa2f7', 'Gemini CLI': '#4285f4', 'Hermes Agent': '#a78bfa', 'Cline': '#3b82f6', 'Goose': '#f59e0b', 'Aider': '#22c55e', 'Crush': '#ec4899' };
 ---
 <section class="changelog">
   <div class="feed-head">
     <h2>What changed in coding harnesses</h2>
-    <p class="sub">Stable releases from {days.length ? fmt(days[days.length-1][0]) : '—'} to {days.length ? fmt(days[0][0]) : '—'}. Prereleases and nightlies excluded. <a href="/changelog/archive/">Full archive →</a></p>
+    <p class="sub">Stable releases only — no nightlies, no noise. <a href="/changelog/archive/">Full archive →</a></p>
   </div>
-  {days.map(([day, items]) => (
+  {days.map(([day, byTool]) => (
     <div class="day">
-      <div class="day-head">
-        <span class="day-date">{fmt(day)}</span>
-        {day === releases[0].publishedAt.slice(0,10) && <span class="today-badge">latest</span>}
-      </div>
-      {items.map((r) => (
-        <div class="entry">
-          <span class="tool-dot" style={`background:${TOOL_COLORS[r.tool] || '#888'}`}></span>
-          <span class="tool-name">{r.tool}</span>
-          <a class="tag-link" href={r.url} target="_blank" rel="noopener">{r.tag}</a>
-          <span class="when">{rel(r.publishedAt)}</span>
+      <h3 class="day-date">{fmt(day)} <span class="when">· {rel(releases.find(r => r.publishedAt.slice(0,10) === day)?.publishedAt)}</span></h3>
+      {byTool.size > 1 && <div class="day-stats">{[...byTool.values()].flat().length} updates across {byTool.size} agents</div>}
+      {[...byTool.entries()].map(([tool, items]) => (
+        <div class="tool-block">
+          <div class="tool-head">
+            <span class="tool-dot" style={`background:${TOOL_COLORS[tool] || '#888'}`}></span>
+            <span class="tool-name">{tool}</span>
+            {items.length > 1 && <span class="tool-count">×{items.length}</span>}
+          </div>
+          {items.map((r) => {
+            const s = S[r.id];
+            const imp = IMPACT_STYLE[s?.impact] || IMPACT_STYLE.minor;
+            return (
+              <div class="entry">
+                <div class="entry-head">
+                  <span class="impact-badge" style={`color:${imp.color};border-color:${imp.color}`}>{imp.label}</span>
+                  <a class="tag-link" href={r.url} target="_blank" rel="noopener">{r.tag}</a>
+                </div>
+                <p class="one-line">{s?.oneLine || r.title || r.tag}</p>
+                {s?.summary && <p class="summary">{s.summary}</p>}
+              </div>
+            );
+          })}
         </div>
       ))}
     </div>
   ))}
   {days.length === 0 && <p class="empty">No stable releases in the feed yet — check back soon.</p>}
-  <p class="updated">Feed refreshed {fetchedAt ? fetchedAt.slice(0,10) : 'recently'} · data from GitHub releases, auto-updated daily</p>
+  <p class="updated">Auto-updated daily from GitHub releases{fetchedAt ? ` · last refresh ${fetchedAt.slice(0, 10)}` : ''}</p>
 </section>
 
 <style>
   .changelog { max-width: 720px; margin: 0 auto; }
   .feed-head h2 { font-family: var(--font-mono); font-size: 1.15rem; margin: 0 0 0.35rem; }
-  .sub { font-size: 0.78rem; color: var(--fg-dim); margin: 0 0 1.5rem; }
+  .sub { font-size: 0.78rem; color: var(--fg-dim); margin: 0 0 1.8rem; }
   .sub a { color: var(--green); text-decoration: none; }
-  .day { margin-bottom: 1.4rem; }
-  .day-head { display: flex; gap: 0.6rem; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; margin-bottom: 0.5rem; }
-  .day-date { font-family: var(--font-mono); font-size: 0.72rem; color: var(--amber); text-transform: uppercase; letter-spacing: 0.05em; }
-  .today-badge { font-family: var(--font-mono); font-size: 0.6rem; background: var(--green); color: #000; padding: 0.1rem 0.45rem; border-radius: 3px; }
-  .entry { display: flex; align-items: baseline; gap: 0.55rem; padding: 0.32rem 0; font-family: var(--font-mono); font-size: 0.82rem; }
-  .tool-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; align-self: center; }
-  .tool-name { color: var(--fg); min-width: 7.5rem; }
-  .tag-link { color: var(--green); text-decoration: none; }
+  .day { margin-bottom: 2rem; }
+  .day-date { font-family: var(--font-mono); font-size: 0.85rem; color: var(--amber); margin: 0 0 0.2rem; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; }
+  .when { color: var(--fg-dim); font-size: 0.7rem; font-weight: normal; }
+  .day-stats { font-family: var(--font-mono); font-size: 0.68rem; color: var(--fg-dim); margin: 0.35rem 0 0.6rem; }
+  .tool-block { margin: 0.9rem 0 1.1rem 0.2rem; }
+  .tool-head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
+  .tool-dot { width: 9px; height: 9px; border-radius: 50%; }
+  .tool-name { font-family: var(--font-mono); font-size: 0.8rem; color: var(--fg); font-weight: bold; }
+  .tool-count { font-family: var(--font-mono); font-size: 0.68rem; color: var(--fg-dim); }
+  .entry { padding: 0.45rem 0 0.45rem 0.9rem; border-left: 2px solid var(--border); margin-left: 4px; }
+  .entry-head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.2rem; }
+  .impact-badge { font-family: var(--font-mono); font-size: 0.58rem; text-transform: uppercase; border: 1px solid; border-radius: 3px; padding: 0.05rem 0.35rem; }
+  .tag-link { font-family: var(--font-mono); font-size: 0.72rem; color: var(--green); text-decoration: none; }
   .tag-link:hover { text-decoration: underline; }
-  .when { margin-left: auto; color: var(--fg-dim); font-size: 0.68rem; }
+  .one-line { margin: 0; font-size: 0.88rem; color: var(--fg); font-weight: 500; }
+  .summary { margin: 0.15rem 0 0 0; font-size: 0.78rem; color: var(--fg-dim); line-height: 1.5; }
   .empty { color: var(--fg-dim); font-family: var(--font-mono); font-size: 0.85rem; }
   .updated { font-size: 0.65rem; color: var(--fg-dim); margin-top: 1.5rem; }
 </style>
