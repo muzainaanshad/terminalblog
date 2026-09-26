@@ -1,0 +1,209 @@
+---
+title: "Cursor Just Became an Agent Fleet Manager — Projects, Rollouts, Security Review, and Self-Hosted Machines Land"
+description: "Cursor's September 2026 wave drops Projects (coordinator agents that manage thousands of subagents), Rollouts (deployment monitoring with auto-revert), Security Review (exploit detection on every PR), and self-hosted machines. The IDE just became an agent orchestration platform."
+pubDate: 2026-09-26T14:00:00Z
+tags: ["cursor", "release", "projects", "rollouts", "security-review", "self-hosted", "cloud-agents", "coding-agents", "beginner"]
+tool: "cursor"
+author: "sage"
+image: "/api/og?title=Cursor+Projects+Rollouts+Security+Review+September+2026&tool=cursor"
+---
+
+Cursor's September 2026 wave isn't a feature update. It's a **role change**.
+
+The editor that started as "VS Code with better autocomplete" just shipped **Projects** (coordinator agents that plan work and delegate to thousands of subagents), **Rollouts** (deployment monitoring that opens revert PRs when it detects regressions), **Security Review** (automated exploit detection on every pull request), and **self-hosted machines** (your code never leaves your network).
+
+If you've been treating Cursor as a coding assistant, the September wave makes it clear: **Cursor is now an agent orchestration platform.** The IDE is just one interface.
+
+---
+
+## 1. Cursor Projects — Coordinator Agents That Don't Sleep
+
+The headline feature. **Projects** (launched Sep 10, rolling out to all users) lets you define a body of work — a feature, a migration, a full app — and a **coordinator agent** plans it, delegates to subagents, and brings finished work back for your review.
+
+### How It Works
+
+- **One coordinator, thousands of subagents.** The coordinator doesn't write code. It breaks down the goal, spawns agents in parallel across cloud and local machines, and merges results.
+- **Shared context that grows.** Every agent in a Project contributes to a persistent context store — research, artifacts, learned patterns, testing strategies. If Agent #3 figures out how to test the payment service, Agent #47 inherits that knowledge automatically.
+- **Runs while your laptop is closed.** Projects execute on dedicated cloud compute. Close the lid; the fleet keeps working.
+- **Subscriptions = event-driven agents.** Tell the coordinator to watch a Slack channel, monitor all PRs, or run on a schedule. It wakes up, delegates, and reports back — no prompt needed.
+
+### Why This Changes Daily Work
+
+```
+Old workflow: You → prompt agent → review diff → merge → repeat
+New workflow: You → define Project goal → coordinator runs fleet → you review merged PRs
+```
+
+The coordinator handles the "how." You handle the "what" and "good enough."
+
+**Access it:** Left-hand nav → Projects. Beta rolling out now.
+
+---
+
+## 2. Rollouts — Deployment Monitoring That Opens Revert PRs
+
+Shipped **September 23** on Teams and Enterprise plans. **Rollouts** attaches a monitor to every pull request and watches the change through deployment, reporting health per environment: verified healthy, regression detected, or inconclusive.
+
+### What It Actually Does
+
+- **Writes a monitoring plan** as a PR comment when a PR opens — risks, intended effects, signals to check, instrumentation gaps. You edit it; Rollouts uses your version.
+- **Wakes on deploy events** and runs the plan against your logs, metrics, traces. Tracks each environment separately (staging can pass while production fails).
+- **Detects regressions** → names the suspect change → notifies the author → **opens a revert PR for review** (or hands to a cloud agent for a fix). It doesn't auto-merge or auto-rollback — human gate stays.
+- **Integrates with Origin/GitHub** (source), your CD system (deploy events), Datadog + others (signals). Feature flag integration coming.
+
+### The Practical Impact
+
+```
+Before: Deploy → wait → someone notices errors → investigate → revert manually
+After:  Deploy → Rollouts runs plan → regression detected → revert PR opened → you approve → done
+```
+
+For teams shipping daily, this removes the "who's watching production?" anxiety. The first 10 days include usage credits (~50 changes for Teams, ~500 for Enterprise).
+
+---
+
+## 3. Security Review — Exploit Detection on Every PR
+
+Also **September 23**, same plans. **Security Review** reads every pull request in full codebase context and posts **one review comment** reporting exploitable bugs. Style and quality stay with Bugbot — this is purely security.
+
+### What It Catches
+
+- **Injection** across SQL, command, and template surfaces
+- **AuthZ/AuthN bypasses** (including checks that a refactor stopped running)
+- **Secrets and credentials** committed to source
+- **SSRF and unvalidated redirects**
+- **Unsafe deserialization**
+- **Dependency changes** introducing known vulnerabilities
+- **Taint tracking** — where user input enters and what it passes through
+
+### Findings Are Actionable
+
+Each finding carries:
+- **Severity**
+- **Attack path** (not just "SQL injection" but "line 47 in user_service.py takes unsanitized `user_id` from request and interpolates into raw query on line 52")
+- **Proposed fix**
+
+Dismiss with a reason and it won't reappear on that PR.
+
+### Team Rules = Your Security Policy as Code
+
+Add rules like "external calls must go through `http-client` wrapper" or "orders table never queried from request handlers." Security Review enforces them on every PR. This is **policy-as-code for security** — the same pattern that made OPA/Gatekeeper standard for Kubernetes, now for application code.
+
+---
+
+## 4. Self-Hosted Machines — Your Code Never Leaves Your Network
+
+**September 2.** Cursor now supports **self-hosted machines** for cloud agent execution. Your codebase, build outputs, and secrets stay on internal infrastructure. The agent handles tool calls locally.
+
+### Two Models
+
+| Model | Use Case |
+|-------|----------|
+| **My Machines** | Single laptop/VM for personal workflows |
+| **Team Pools** | Named queues of workers that scale with demand — grow as requests arrive, shrink when idle. Not tied to one repo. Hibernate idle machines, restore within reconnect window on follow-up. |
+
+### Run on Infrastructure You Already Use
+
+Cloud agents can execute on **AWS Lambda, Coder, Cloudflare, Daytona, Modal, Namespace, Vercel, E2B** — your existing sandbox infrastructure becomes agent compute.
+
+### Computer Use on Linux/Mac
+
+Self-hosted workers now support **computer use** — click, type, screenshot, drive browser. Watch the desktop or take control from Cursor. This is the same capability that made Anthropic's Computer Use demo viral, now runnable on your own metal.
+
+---
+
+## 5. Start from Scratch — No Repo Required (Aug 27)
+
+**August 27** dropped a quiet but important UX shift: **Cloud Agents no longer require a connected GitHub/SCM provider.** Select "Start from scratch" in the repo picker, prompt the agent, and Cursor creates an Origin repo in the background. When you're happy, click "Create repo" to scaffold a real Origin repo with custom name and visibility.
+
+**Live preview** port-forwards the cloud agent's environment to your browser. **One-click Vercel publish** gets you a live URL. The friction from "idea → running app" just dropped significantly.
+
+---
+
+## The Bigger Picture: Cursor's Architecture Bet
+
+These features aren't random. They reveal a **coherent architecture**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    CURSOR ORCHESTRATION LAYER                 │
+├─────────────────────────────────────────────────────────────┤
+│  Projects (coordinator)     │  Rollouts (deployment guard)   │
+│  Security Review (code guard)│  Self-hosted (compute control) │
+│  Subscriptions (event bus)   │  Start from scratch (on-ramp)  │
+└─────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+        Cloud Agents    Local Agents    Self-Hosted
+        (Cursor infra)  (your laptop)   (your infra)
+```
+
+**The IDE is now just one client.** The real product is the orchestration layer that coordinates agents across any compute, enforces policy at deploy time, reviews code for exploits, and maintains persistent context across months.
+
+This is the same bet Google made with **Antigravity** (unified harness across CLI, desktop, cloud, SDK) and OpenHands is making with **Projects + Docker workspaces + profile secrets**. The category is converging on: **agent orchestration platform, not editor.**
+
+---
+
+## What This Means for You
+
+### If You're on Teams/Enterprise
+- **Enable Rollouts and Security Review** from the Automations tab today. Free credits for 10 days.
+- **Try Projects** on a real migration or feature — the coordinator + shared context is the killer combo.
+- **Evaluate self-hosted pools** if compliance requires data residency.
+
+### If You're on Pro/Individual
+- **Start from scratch** is available now — try a side project without GitHub setup.
+- **Projects beta** rolling out — you'll get access soon.
+- The orchestration features (Rollouts, Security Review) stay on Teams/Enterprise for now.
+
+### If You're Evaluating Cursor vs. Others
+| Factor | Cursor (Sep 2026) | Claude Code | OpenHands | AmpCode |
+|--------|-------------------|-------------|-----------|---------|
+| **Coordinator agents** | ✅ Projects | Subagents only | ✅ Agent Canvas | ✅ Multi-agent |
+| **Deployment monitoring** | ✅ Rollouts | ❌ | ❌ | ❌ |
+| **Security review on PR** | ✅ Security Review | ❌ | ❌ | ❌ |
+| **Self-hosted compute** | ✅ My Machines + Pools | ❌ | ✅ Docker | ❌ |
+| **Persistent cross-agent context** | ✅ Projects | Session-only | ✅ Shared context | ❌ |
+| **Model freedom** | Limited (Composer + partners) | Anthropic only | Any (BYOK) | Any (Dial) |
+
+**Cursor's moat:** Unified orchestration across the full lifecycle — plan → delegate → deploy → monitor → secure. No other tool covers all five.
+
+---
+
+## The Honest Gaps
+
+- **Rollouts and Security Review** are Teams/Enterprise only. Pro users wait.
+- **Projects** is beta — expect rough edges (the Agents Window in Cursor 3 Glass still has diff view issues).
+- **Self-hosted** requires infra ops — not plug-and-play for solo devs.
+- **Model lock-in** remains — Composer 2 is the default, partner models via marketplace. Not the BYOK freedom of OpenCode/Kilo/Aider.
+
+---
+
+## TL;DR
+
+**Cursor's September 2026 wave:**
+
+| Feature | Date | Plan | What It Does |
+|---------|------|------|--------------|
+| **Projects** | Sep 10 | All (beta) | Coordinator agents manage fleets of subagents with shared persistent context |
+| **Rollouts** | Sep 23 | Teams/Enterprise | Monitors deployments, detects regressions, opens revert PRs |
+| **Security Review** | Sep 23 | Teams/Enterprise | Scans every PR for exploitable bugs, enforces team security rules |
+| **Self-hosted Machines** | Sep 2 | Teams/Enterprise | Run agents on your infra; code/secrets never leave |
+| **Start from Scratch** | Aug 27 | All | Cloud agents without GitHub; live preview + Vercel publish |
+
+The IDE didn't just get features. **It became the control plane for an agent fleet.** Whether that's the future of software development or a bridge too far depends on whether the orchestration layer holds — but the bet is placed, and the pieces are shipping.
+
+---
+
+## Related Articles
+
+- [Cursor 3 Glass: Agents Window, Composer 2, Cloud Agents — Honest Review](/blog/cursor-3-glass-agents-window-review/)
+- [Cursor Background Agents Changed How I Think About Coding](/blog/cursor-background-agents-changed-coding/)
+- [OpenHands 1.14–1.21: Git Sync, Free Kimi K3, Docker Workspaces, Profile Secrets](/blog/openhands-1-14-git-sync-free-kimi-breakthrough/)
+- [Google Antigravity 2.0: Unified Harness Across CLI, Desktop, Cloud](/blog/google-antigravity-killed-gemini-cli-terminal-ai-war/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Running Cursor Projects on a real migration? Hit reply — collecting war stories for a follow-up on coordinator agent patterns that actually work.*
