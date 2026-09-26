@@ -32,9 +32,51 @@ Developers don't always launch tools from the repository root. You might be in `
 
 Zero's fix ensures that the session context is correct no matter where you launch from. This is the kind of attention to developer workflow that makes a tool feel polished.
 
+## Technical Details: How Git Repository Discovery Works
+
+The fix relies on Git's built-in repository discovery mechanism. When you run `git rev-parse --show-toplevel` from anywhere inside a worktree, Git walks up the directory tree until it finds a `.git` directory (or `.git` file for worktrees). This is the same mechanism Git itself uses for every command — `git status`, `git diff`, `git commit` all work from subdirectories because they use this discovery.
+
+Before the fix, Zero was doing a naive `fs.existsSync(path.join(cwd, '.git'))` check. This fails in three common scenarios:
+1. **Subdirectory launch** — `.git` is in parent directory, not current
+2. **Worktrees** — `.git` is a file pointing to the main repo's `.git/worktrees/name`
+3. **Submodules** — nested `.git` directories that belong to a different repository
+
+The corrected implementation:
+```go
+func findRepoRoot(startDir string) (string, error) {
+    // Use git's own discovery — handles worktrees, submodules, symlinks
+    out, err := exec.Command("git", "rev-parse", "--show-toplevel").
+        Dir(startDir).Output()
+    if err != nil {
+        return "", err // Not a git repo, or git not available
+    }
+    return strings.TrimSpace(string(out)), nil
+}
+```
+
+Then branch detection runs from the discovered root:
+```go
+func getCurrentBranch(repoRoot string) (string, error) {
+    out, err := exec.Command("git", "symbolic-ref", "--short", "HEAD").
+        Dir(repoRoot).Output()
+    if err != nil {
+        // Could be detached HEAD — try rev-parse
+        out, err = exec.Command("git", "rev-parse", "--short", "HEAD").
+            Dir(repoRoot).Output()
+    }
+    return strings.TrimSpace(string(out)), err
+}
+```
+
 ## What This Means
 
 Zero now works correctly from any directory in your repository. No more "detached HEAD" confusion. No more incorrect branch context. Just accurate information, wherever you are.
+
+This fix also enables better integration with other tools. When Zero spawns subprocesses (linters, formatters, test runners), they inherit the correct working directory and repository context. The session metadata stored in `~/.zero/sessions/` now accurately reflects the branch, making session resumption and cross-session correlation reliable.
+
+## Related Work
+
+This fix complements the [CLI flag parsing fix](/blog/gitlawb-zero-cli-flag-parsing-fix/) — both are about making Zero behave correctly when invoked from real-world developer workflows, not just the idealized "run from repo root" scenario. The [deep-dive on the gitlawb-zero agent](/blog/deep-dive-gitlawb-zero-agent/) covers the session architecture that makes these contextual improvements possible.
 
 ---
 

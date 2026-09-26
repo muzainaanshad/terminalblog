@@ -34,9 +34,30 @@ Runner hangs are the worst kind of bug because:
 
 Zero's fix addresses the root cause — stale callbacks — rather than adding timeouts or workarounds. This is the right approach because timeouts just delay the hang; cleanup prevents it.
 
+## Technical Deep Dive: How the Runner State Machine Works
+
+Zero's runner operates as a finite state machine with distinct phases: `IDLE`, `THINKING`, `TOOL_CALL`, `ASK_USER`, and `COMPLETION`. The `askUser` phase is special because it yields control back to the human — the runner literally pauses and waits for input. Before this fix, the state transition from `ASK_USER` to the next phase didn't check whether pending callbacks from a previous `ASK_USER` cycle had been resolved.
+
+This meant a scenario like this could deadlock:
+1. Runner enters `ASK_USER` phase, creates callback `CB-1` for "which file?"
+2. User responds, runner processes, transitions to `TOOL_CALL`
+3. Tool call triggers another `ASK_USER` (nested or sequential), creates `CB-2`
+4. If the user never responds to `CB-2` (closes terminal, network hiccup, walks away), `CB-2` stays pending
+5. Later, when the runner tries to clean up or transition, `CB-1`'s cleanup logic would check `CB-2`'s status and hang waiting for it
+
+The fix adds a `resolveAllPending()` call at every phase boundary. Each callback now carries a `phaseId` so the runner knows exactly which cycle it belongs to. Orphaned callbacks from previous phases are rejected with a `CallbackSuperseded` error instead of blocking forever.
+
 ## What This Means
 
 Zero's sessions are now more reliable. The runner completes actions without waiting for callbacks that will never arrive. For power users running long sessions with multiple tool calls, this is a significant quality-of-life improvement. The durable session model behind this is explained in the [deep-dive on the gitlawb-zero agent](/blog/deep-dive-gitlawb-zero-agent/), and the companion reliability work lives in the [auto-commit messages feature](/blog/gitlawb-zero-auto-commit-messages/), where the same TUI integration philosophy — stay responsive, never leave the user guessing — shows up again. If you run Zero on Android between desk sessions, the [Termux support writeup](/blog/gitlawb-zero-android-termux-support/) is the bridge that keeps these long-lived sessions portable.
+
+## Related Fixes in the Same Release Cycle
+
+This fix shipped alongside two other runner stability improvements:
+- `fix(runner): add timeout guard for tool execution (#618)` — prevents infinite tool hangs
+- `fix(tui): handle stderr backpressure during streaming (#621)` — prevents UI freeze on verbose tool output
+
+Together, these three commits represent a focused reliability sprint for Zero's TUI layer. The pattern is consistent: identify the failure mode, add a guard at the system boundary, and prefer explicit cleanup over implicit timeouts.
 
 
 ## Related articles
