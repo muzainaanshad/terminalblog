@@ -264,6 +264,23 @@ Some coding agents expect cloud-style streaming. Ollama supports streaming, but 
 **Tool calls / function calling not working:**
 Not all Ollama models support function calling well. Stick to models with explicit tool-use training: Qwen3-Coder, Mistral-Small, and DeepSeek-Coder are the safest choices. Check with `ollama show <model>` for supported features.
 
+## FAQ
+
+**Which coding agents work with Ollama out of the box?**
+OpenCode, Hermes Agent, Kilo Code CLI, Goose, and OpenClaw have native Ollama support. Claude Code requires a proxy like LiteLLM. Any agent that accepts a custom OpenAI-compatible endpoint can connect to Ollama at `http://localhost:11434/v1`.
+
+**What's the minimum GPU VRAM for running coding agents locally?**
+8GB VRAM is the practical minimum — this runs Qwen3-Coder-7B or similar 7B-class models. 16GB opens up 24B-30B models like Mistral-Small-24B or Qwen3-30B-A3B. Below 8GB, models spill to CPU and generation becomes 5-10x slower, which breaks the agent loop.
+
+**Do local models support function calling for agent tool use?**
+Only some do. Qwen3-Coder, Mistral-Small, and DeepSeek-Coder have strong tool-use training. Llama and general chat models often fail at function calling. Check `ollama show <model>` for supported features before relying on it for agent work.
+
+**Can I mix local and cloud models in the same agent session?**
+Yes. Most agents (Hermes, OpenCode, Kilo) support multi-provider routing. You can route routine tasks to a local model and complex refactors to a cloud model mid-session. This is the recommended pragmatic approach — local for 80% of tasks, cloud for the 20% that needs frontier reasoning.
+
+**How do I know if my local model is actually using the GPU?**
+Run `nvidia-smi` while generating. You should see the model process using significant VRAM and GPU compute. If VRAM stays flat and CPU spikes, the model is CPU-offloading — switch to a smaller quantization (q4_K_M) or a smaller model.
+
 ## Related articles
 
 - [Coding Agent Pricing in 2026](/blog/coding-agent-pricing-guide-2026/) — full cost breakdown across all 15 agents

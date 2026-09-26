@@ -170,6 +170,27 @@ The era of indirect prompt injection via developer tools has arrived. Your telem
 - **Cloud Security Alliance Research Note:** [Agentjacking: MCP Injection Hijacks AI Coding Agents](https://labs.cloudsecurityalliance.org/research/csa-research-note-agentjacking-mcp-sentry-injection-20260612/)
 
 
+## FAQ
+
+**What is Agentjacking and how is it different from prompt injection?**
+Agentjacking is a new attack class where malicious data enters through trusted telemetry systems (like Sentry error reports) rather than the chat interface. The agent reads what it believes is legitimate diagnostic guidance from an authorized tool (MCP server) and executes it. Unlike prompt injection, every step is authorized — no security layer fires because no rule was broken.
+
+**Which AI coding agents are vulnerable to Agentjacking?**
+Tenet Security confirmed the attack works against 4+ agent families: Claude Code, Cursor, Codex, and the OpenAI VS Code extension. Any agent that connects to Sentry (or similar telemetry platforms) via MCP and executes suggested commands is vulnerable. The vulnerability class is systemic — any MCP tool returning externally-influenced data creates the same risk.
+
+**Does Sentry plan to fix this at the root?**
+No. Sentry acknowledged the issue but declined to fix it, calling it "technically not defensible" at the source. They activated a global content filter for a specific payload string during the research period, which detects the activity without addressing the cause. Defense must happen at the agent's runtime layer.
+
+**How can I protect my agents today?**
+1. Apply Tenet's open-source hardening: `agent-jackstop` configs for Cursor and Claude Code
+2. Disable Sentry MCP (or any untrusted MCP) unless actively needed
+3. Run agents in minimal-privilege environments: no long-lived AWS keys, no SSH agent forwarding, no publish tokens in `.npmrc`
+4. Audit your MCP inventory — identify tools that ingest external data and return formatted content agents might interpret as instructions
+5. Use runtime guardrails that enforce read-only modes for telemetry queries or require explicit confirmation before executing commands suggested by tool output
+
+**What is the blast radius of a successful Agentjacking attack?**
+The attacker's code runs with the developer's full privileges — accessing AWS keys, GitHub tokens, SSH agents, Kubernetes configs, and any secrets in the environment. Tenet confirmed 100+ confirmed executions across 30+ countries, including a $250B Fortune 100 technology company. Works on macOS, Windows, WSL, containers, and CI/CD environments.
+
 ## Related articles
 
 - [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
