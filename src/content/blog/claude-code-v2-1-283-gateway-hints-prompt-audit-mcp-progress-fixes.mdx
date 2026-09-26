@@ -1,0 +1,191 @@
+---
+title: "Claude Code v2.1.283 Just Fixed the Gateway, Prompt Audit, and MCP Progress — 50+ Fixes That Make Daily Work Smooth"
+description: "v2.1.283 adds gateway hint headers for LLM routing, /doctor prompt-audit to catch stale CLAUDE.md patterns, MCP progress that no longer vanishes in background, and 50+ fixes for plugin validation, session resume, VS Code integration, and Windows PowerShell safety. The quiet quality release you'll feel every day."
+pubDate: 2026-09-26T10:00:00Z
+tags: ["claude-code", "release", "coding-agents", "beginner", "gateway", "mcp", "prompt-audit"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+v2.1.283+Gateway+Prompt+Audit+MCP+Fixes&tool=claude-code"
+---
+
+Claude Code v2.1.283 dropped September 25, and it's the kind of release that doesn't make headlines but **changes how the tool feels every single day**.
+
+No new model. No flashy feature. Just **50+ fixes** that clean up the paper cuts you've been living with: MCP progress that disappears, plugin validation that lies, session resume that crashes, and Windows commands that delete the wrong folders.
+
+If v2.1.280–282 was the "Opus 5.5 default + 300 fixes" wave, **v2.1.283 is the "actually works reliably" wave**.
+
+---
+
+## 1. Gateway Hint Headers — Your LLM Gateway Finally Knows What's What
+
+If you route Claude Code through a corporate proxy, gateway, or third-party relay (LiteLLM, Portkey, custom), **this is the feature you've been waiting for**.
+
+New header: `x-claude-code-prompt-id` — groups all API requests that serve **one user prompt**.
+
+```bash
+# Opt in:
+export CLAUDE_CODE_GATEWAY_HINT_HEADERS=1
+```
+
+Your gateway can now correlate: *"these 5 requests = one user question"* instead of seeing disconnected fragments. Debugging, rate limiting, and cost attribution just became possible.
+
+---
+
+## 2. `/doctor prompt-audit` — Your CLAUDE.md Has Been Lying to You
+
+Run this once. You'll be surprised.
+
+```bash
+/doctor prompt-audit
+# or
+/checkup prompt-audit
+```
+
+It scans your **CLAUDE.md files, skills, agents, and commands** for prompting patterns written for older models — stale instructions, deprecated syntax, contradicting rules.
+
+The report leads with:
+- Stale paths that don't exist
+- Stale commands that fail
+- Contradicting instruction files
+- Thinking keywords the current model doesn't recognize
+
+**For beginners:** this is the "check engine light" for your agent config. Run it monthly. Your prompts rot faster than you think.
+
+---
+
+## 3. MCP Progress That Doesn't Vanish
+
+The classic MCP frustration: you start a long-running tool, it moves to background, and **progress notifications stop appearing**. You're left staring at a spinner with no clue what's happening.
+
+**Fixed.** Background tasks now show the latest progress. You see the tool working instead of wondering if it died.
+
+Also fixed:
+- stdio MCP servers no longer orphan when session ends mid-startup
+- Brief 404 from a stateless remote MCP (proxy redeploy) no longer bricks the server for the session
+- `/mcp` no longer offers "Authenticate" for servers with no valid URL — fails clean instead
+
+---
+
+## 4. Plugin Validation That Stops Lying
+
+`claude plugin validate` used to say "looks good" for plugins it **cannot actually install**. Now:
+
+- Marketplace/plugin names Claude Code can't install → **fail validation**
+- Missing `outputStyles`, `themes`, `monitors`, `lspServers` paths → **fail validation**
+- `claude plugin details` now shows correct MCP server count for plugins declaring servers in `plugin.json`
+- `claude plugin marketplace remove` lists which installed plugins it uninstalled
+- `claude plugin uninstall` no longer removes the *wrong* plugin when two differ only in case
+
+**Your plugin config is now trustworthy.**
+
+---
+
+## 5. Session Resume — The "Unrecoverable Interface Error" Is Finally Dead
+
+Multiple crash-on-resume scenarios fixed:
+
+- Damaged cached message list → **rebuilt** instead of crashing
+- Malformed system message or memory-saved notice without file list → **handled gracefully**
+- Settings file replaced by a named pipe mid-read → **no longer hangs**
+- Sessions with earlier advisor results the API could no longer read → **repair history once**
+
+If you've ever had `claude --continue` or `--resume` explode with "unrecoverable interface error" — this release targets exactly that.
+
+---
+
+## 6. Windows PowerShell: `rd`, `rmdir`, `del`, `erase` Can No Longer Delete Your Drive Root
+
+This is a **security fix** that matters.
+
+PowerShell's `Remove-Item` refuses to delete drive roots (`C:\`), home folder, and other protected paths. But the PowerShell tool was letting `cmd /c rd`, `rmdir`, `del`, `erase` bypass that protection.
+
+**Now it doesn't.** The same guardrails apply regardless of which command variant you use.
+
+---
+
+## 7. VS Code Extension — Real Fixes for Daily Friction
+
+| Fix | Why You Care |
+|-----|--------------|
+| Permission mode indicator stuck on "Default" while session runs in auto/bypass | Now retries the switch until it lands |
+| Session teleported from web drops messages sent while Claude worked | Fixed — messages preserved |
+| Web session hidden from session list, empty chat opens instead | Fixed |
+| Reopened session splits a turn at mid-turn message | Fixed |
+| Reloaded session shows rewound-away turn or pre-compaction rows | Fixed |
+| Footer agents pill icon off-center in narrow panels | Fixed |
+| Chat input text below cursor after pasting multi-line prompt | Fixed |
+
+---
+
+## 8. The Quiet Quality Fixes You'll Feel
+
+- **First-reply latency improved** — pattern-compile step moved from end of first reply to streaming
+- **First-request latency improved** — reuses preconnected API connection
+- **Startup faster** — `claude -p` and Remote no longer load interactive UI; auto-mode classifier and Artifact tool load on first use
+- **Compaction spinner** — timer starts when compaction begins, counts summary tokens as they stream (replaces percentage bar)
+- **MCP tool list** — shows more tools, scrolls with page keys/mouse, marks org-blocked tools with warning icon
+- **MCP tool results** — images returned by MCP tools now saved to file so Bash, Read, and other tools can open them
+- **`/tasks` list** — status icon, full facts, title + key hints stay on screen, paging keys, mouse wheel, clicks
+- **All major pickers** (`/help`, `/hooks`, `/copy`, `/chrome`, `/memory`, `/ide`, `/release-notes`, `/rewind`, `/diff`, `/remote-env`, `/plugin`) — page keys, mouse wheel, clicks
+- **Search-box-adjacent lists** (`/skills`, `/artifacts`) — only one pointer highlighted at a time
+
+---
+
+## 9. Cloud & Enterprise Fixes
+
+- Private repos your GitHub account can read (but not push) now attach for reading in cloud sessions
+- Cloud sessions no longer redo finished steps (duplicate comments/pushes) after server-side restart
+- New routine schedules default to "few minutes past the hour" with note that on-the-hour can start late
+- Code Review: `@claude review` retries once if GitHub fails to return PR; comments if still fails
+- Code Review: billing for time-limited reviews with nothing verified → shows incomplete, not charged, retried once
+
+---
+
+## 10. Self-Hosted Runner & Gateway
+
+- Lifecycle hooks' git skips Git LFS `pre-push`, ignores writable `core.hooksPath`, doesn't sign without `--configure-git`
+- `GIT_SSL_CAINFO` / `GIT_SSL_NO_VERIFY` under Anthropic-managed git: runner's git always verifies Anthropic's route; warnings say what applies where
+- Added `mantle` upstream provider for Amazon Bedrock's Mantle endpoint
+- Opt-in `load_test_mode` for gateway: requests built/signed but not sent upstream; clients get canned reply
+
+---
+
+## Updating
+
+```bash
+# Auto-updates on next launch, or force:
+claude update
+```
+
+Verify: `claude --version` → should show `2.1.283`
+
+---
+
+## Why This Release Matters
+
+v2.1.283 doesn't add a feature you'll demo. **It removes the friction you've been tolerating.**
+
+- Gateway operators: hint headers = debuggable traffic
+- Config managers: `prompt-audit` = catch rot before it breaks sessions
+- MCP users: progress that persists = trust in background work
+- Plugin authors: validation that tells truth = confidence in installs
+- Windows users: protected folders actually protected = peace of mind
+- VS Code users: 7 fixes = session fidelity that matches terminal
+- Everyone: 50+ fixes = the tool gets out of your way
+
+This is the release where Claude Code **stops feeling like software you work around** and starts feeling like infrastructure you rely on.
+
+Update. Run `/doctor prompt-audit`. Enjoy the quiet.
+
+---
+
+## Related articles
+
+- [Claude Code Just Made Opus 5.5 Default and Fixed 100+ Things](/blog/claude-code-v2-1-280-opus-5-5-default-massive-fix-wave/)
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+- [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
+- [Beware: Hermes Agent Security Audit Uncovers Credential Bypass, Sandbox Escape, and Session Hijacking](/blog/beware-hermes-agent-security-audit-5-high-severity-findings/)
+
+---
+
+*Claude Code is available at [github.com/anthropics/claude-code](https://github.com/anthropics/claude-code) and [claude.ai/code](https://claude.ai/code).*
