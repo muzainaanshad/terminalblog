@@ -1,0 +1,318 @@
+---
+title: "Goose vs OpenClaw: Why Your AI Agent Choice Might Be Wrong"
+description: "Goose and OpenClaw both claim to be the best open-source coding agent. One runs in your terminal. The other lives on your desktop. The winner depends on how you actually code — not feature lists."
+pubDate: "2026-07-10T10:00:00Z"
+updatedDate: "2026-09-27"
+tags: ["comparison", "goose", "openclaw", "deep-dive"]
+tool: "goose"
+author: "rho"
+image: "/api/chart?type=features&agents=goose,openclaw"
+---
+
+Goose and OpenClaw get compared in feature matrices that miss the point entirely. This is a decision memo: **what each is actually for**, **what only one does well**, and **which should be your daily driver**.
+
+Goose is a **terminal-native coding agent** built for *extensibility, MCP integration, and local-first workflows* (Free, BYO keys). OpenClaw is a **cross-platform desktop AI assistant** built for *personal productivity, cron scheduling, and ACP protocol support* (Free, open source).
+
+## Quick Verdict
+
+**Default for terminal-first developers:** **Goose** — runs where you already work, MCP ecosystem, Rust speed, skills system for custom workflows. Keep **OpenClaw** as a specialist when you need desktop automation, scheduled tasks, or a GUI for non-coding tasks.
+
+| | Goose | OpenClaw |
+|---|---|---|
+| **Type** | Terminal coding agent | Desktop AI assistant |
+| **Pricing** | Free (BYO keys) | Free |
+| **Open source** | Yes (MIT) | Yes (MIT) |
+| **Best for** | Extensible coding in your terminal | Cross-platform personal AI with scheduling |
+| **GitHub Stars** | ~51K | ~382K |
+| **Latest Release** | v1.50 (Sep 2026) | v2026.9.6 (Sep 2026) |
+
+---
+
+## The Real Difference: Where You Work
+
+### Goose Lives in Your Terminal
+
+You're already in a terminal. Goose meets you there. No context switch. No Electron wrapper. Just a Rust binary that spins up in milliseconds.
+
+```bash
+# Install
+curl -fsSL https://get.goose.ai | bash
+
+# Run
+goose
+```
+
+**What this means practically:**
+- **SSH works**: Run Goose on a remote box, control it from your laptop
+- **CI/CD ready**: Drop into GitHub Actions, GitLab CI, any pipeline
+- **Tmux/screen friendly**: Detach, reattach, your session survives
+- **Composes with Unix**: Pipe output, grep logs, script it
+
+### OpenClaw Lives on Your Desktop
+
+OpenClaw is a Tauri app (Rust + WebView). It's a window on your screen. Beautiful, polished, but it's a *separate context*.
+
+**What this means practically:**
+- **GUI for everything**: Drag-drop files, click buttons, visual history
+- **Cron scheduling**: "Summarize my inbox every morning at 8 AM" — actually works
+- **ACP protocol**: Talks to other ACP-compatible agents (early but real)
+- **Cross-platform parity**: Windows, macOS, Linux all first-class
+
+---
+
+## Feature Matrix That Matters
+
+| Capability | Goose | OpenClaw |
+|---|---|---|
+| **Terminal-native** | ✅ Yes | ❌ No (GUI only) |
+| **SSH/Remote** | ✅ Native | ❌ No |
+| **CI/CD Integration** | ✅ Native | ❌ No |
+| **MCP Servers** | ✅ Full support | ⚠️ Partial |
+| **ACP Protocol** | ❌ No | ✅ Native |
+| **Cron/Scheduling** | ❌ No | ✅ Built-in |
+| **Vision/Screenshots** | ❌ No | ✅ Yes |
+| **Subagents** | ❌ No | ❌ No |
+| **Skills/Plugins** | ✅ Extensive | ⚠️ Growing |
+| **Voice Input** | ❌ No | ✅ Yes |
+| **Local-first** | ✅ Yes | ✅ Yes |
+| **Multi-provider** | ✅ BYOK any model | ✅ BYOK any model |
+
+---
+
+## Goose: The Terminal Operator's Choice
+
+### What Goose Does Uniquely Well
+
+**1. Skills System = Your Custom Workflows**
+Goose doesn't just run prompts. You write *skills* — reusable, versioned workflows in TypeScript or Python.
+
+```typescript
+// .goose/skills/refactor-react-component.ts
+export const skill = {
+  name: "refactor-react-component",
+  description: "Convert class component to hooks with tests",
+  async run({ goose, args }) {
+    const file = args.file;
+    const code = await goose.readFile(file);
+    const refactored = await goose.ask(`Convert to hooks: ${code}`);
+    await goose.writeFile(file, refactored);
+    await goose.run(`npm test ${file}`);
+  }
+};
+```
+
+Run it: `goose skill refactor-react-component --file Button.tsx`
+
+**2. MCP Integration Is First-Class**
+Goose was built *for* MCP. Every MCP server works out of the box — filesystem, GitHub, PostgreSQL, Slack, your internal tools.
+
+**3. Session Persistence That Survives Crashes**
+Goose writes every turn to SQLite. Kill the process, reboot, `goose --resume` — you're back with full context.
+
+**4. Cost Tracking Built In**
+`goose cost` shows exactly what you spent per session, per model, per provider. No surprises.
+
+### Where Goose Falls Short
+
+- **No subagents** — can't spawn parallel workers for "test this, refactor that, update docs" simultaneously
+- **No vision** — can't "look at this screenshot and fix the UI"
+- **No scheduling** — can't "run security audit every night at 2 AM"
+- **Desktop UX** — if you want a GUI, this isn't it
+
+---
+
+## OpenClaw: The Desktop Automation Choice
+
+### What OpenClaw Does Uniquely Well
+
+**1. Cron That Actually Works**
+Schedule anything. Not just coding tasks.
+
+```yaml
+# .openclaw/schedule.yaml
+jobs:
+  - name: "morning-brief"
+    cron: "0 8 * * *"
+    prompt: |
+      Check my GitHub notifications, summarize open PRs,
+      check CI status on main repos, email me the digest.
+  
+  - name: "dependency-audit"
+    cron: "0 2 * * 1"
+    prompt: |
+      Run npm audit on all package.json files in ~/projects,
+      create GitHub issues for high-severity findings.
+```
+
+**2. ACP Protocol = Agent Interoperability**
+OpenClaw speaks ACP (Agent Communication Protocol). In theory, you can chain OpenClaw → other ACP agents → back. Early days, but the architecture is there.
+
+**3. Vision + Desktop Context**
+"Look at this error in my browser" → screenshot → analysis → fix. Goose can't do this.
+
+**4. Voice Input Works**
+Hold a key, speak your prompt. Great for "walk me through this legacy codebase" while you navigate.
+
+### Where OpenClaw Falls Short
+
+- **No terminal-native mode** — can't `ssh server && openclaw`
+- **No CI/CD story** — not built for pipelines
+- **Heavier** — Tauri + WebView ~80MB vs Goose ~15MB binary
+- **MCP support incomplete** — some servers work, others don't
+- **No skills system** — prompt templates only, no code workflows
+
+---
+
+## Real User Scenarios: Who Should Pick What
+
+### Choose Goose If:
+
+| Your Situation | Why Goose Wins |
+|---|---|
+| **Daily driver is terminal** (vim, tmux, ssh) | Native environment, no context switch |
+| **Automate CI/CD pipelines** | Runs headless, exits with codes, scriptable |
+| **Work on remote servers** | SSH in, Goose runs there, you control locally |
+| **Build custom coding workflows** | Skills = TypeScript/Python, versioned, shareable |
+| **Need MCP servers** | Full support, community ecosystem |
+| **Cost tracking matters** | Per-session, per-model, per-provider breakdown |
+
+### Choose OpenClaw If:
+
+| Your Situation | Why OpenClaw Wins |
+|---|---|
+| **Want scheduled automation** | Cron is built-in, reliable, YAML config |
+| **Need vision/screenshots** | "Fix this UI from screenshot" works |
+| **Prefer GUI for AI chat** | History, branching conversations, drag-drop |
+| **Voice-driven workflow** | Hold-to-talk, hands-free prompting |
+| **Cross-platform desktop parity** | Windows/macOS/Linux identical experience |
+| **Agent-to-agent (ACP) experiments** | Native protocol support |
+
+### Use Both When:
+
+- **Goose for coding, OpenClaw for ops** — code in terminal, schedule backups/reports in OpenClaw
+- **Team uses both** — some devs terminal-first, others GUI-first
+- **Evaluating** — run both for a week, compare actual output quality
+
+---
+
+## Installation & First Run
+
+### Goose (30 seconds)
+
+```bash
+# macOS / Linux
+curl -fsSL https://get.goose.ai | bash
+
+# Windows (PowerShell)
+irm https://get.goose.ai | iex
+
+# Verify
+goose --version
+# Goose v1.50.0
+
+# First run — picks up your keys from env
+export ANTHROPIC_API_KEY=sk-ant-...
+export OPENAI_API_KEY=sk-...
+goose
+```
+
+### OpenClaw (2 minutes)
+
+```bash
+# macOS
+brew install --cask openclaw
+
+# Linux (AppImage)
+wget https://github.com/openclaw/openclaw/releases/latest/download/OpenClaw-linux.AppImage
+chmod +x OpenClaw-linux.AppImage
+./OpenClaw-linux.AppImage
+
+# Windows
+winget install OpenClaw.OpenClaw
+
+# First run — GUI onboarding for keys, providers, permissions
+```
+
+---
+
+## Three Tests Before You Commit
+
+### Test 1: Your Daily Coding Task (30 min each)
+
+Pick a real task you did this week: "Add authentication to the API, write tests, update README."
+
+1. **In Goose**: `goose skill add-auth --api-spec openapi.yaml`
+2. **In OpenClaw**: New chat → paste prompt → iterate
+
+**Measure**: Time to working code, how much babysitting, quality of tests.
+
+### Test 2: The "Run This Nightly" Task
+
+"I want a security summary of all my repos every morning."
+
+1. **Goose**: Write a script, cron it, maintain it
+2. **OpenClaw**: Add to `schedule.yaml`, done
+
+**Measure**: Setup time, reliability, flexibility to change.
+
+### Test 3: The "Show Me" Task
+
+"Look at this production error screenshot and tell me the fix."
+
+1. **Goose**: Can't do it. Need to copy-paste error text.
+2. **OpenClaw**: Drag screenshot → prompt → fix
+
+**Measure**: Does this workflow exist in your week?
+
+---
+
+## Migration Path: You Can Switch
+
+**Goose → OpenClaw**: Export skills as prompt templates. Lose automation, gain scheduling/vision.
+
+**OpenClaw → Goose**: Prompt templates → skills (manual rewrite). Gain terminal/CI, lose cron/vision.
+
+**No lock-in**: Both use your API keys directly. Both store history locally (SQLite/JSON). Switching costs ~1 hour.
+
+---
+
+## FAQ
+
+### Can Goose run OpenClaw's cron jobs?
+No native scheduler. You'd use systemd/cron + Goose CLI. Works but more setup.
+
+### Can OpenClaw run in CI/CD?
+Not designed for it. No headless mode, no exit codes, GUI dependency.
+
+### Which has better model support?
+Tie. Both support any OpenAI-compatible endpoint (OpenRouter, Ollama, local). Both support Anthropic, Google, OpenAI natively.
+
+### Is OpenClaw's 382K stars real?
+Yes, but includes the original Claw repository history. Goose's 51K is pure Goose. Stars ≠ active users.
+
+### Does Goose have a desktop app?
+No. Terminal-only by design. There's a community Electron wrapper but not official.
+
+---
+
+## Bottom Line
+
+**Start with Goose** if you live in a terminal, automate pipelines, or want custom skills. It's the coding agent built *for* your workflow.
+
+**Add OpenClaw** when you need scheduled automation, vision, or a GUI for non-coding AI tasks. It's the personal assistant that happens to code.
+
+**Most senior devs will end up with both** — Goose for the craft, OpenClaw for the chores.
+
+---
+
+## Related Articles
+
+- [Goose Just Became the Only AI Agent That Shows You Every Penny It Spends](/blog/goose-just-became-the-only-ai-agent-that-shows-you-every-penny-it-spends/)
+- [OpenClaw v2026.9.6: 2,614 PRs in One Release](/blog/openclaw-v2026-9-6-massive-release-2614-prs/)
+- [Claude Code vs Goose: Extensibility Showdown](/blog/claude-code-vs-goose-extensibility-showdown/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Open Source vs Commercial Coding Agents: Operator Fit, Not Ideology](/blog/open-source-vs-commercial-coding-agents-guide/)
+
+---
+
+*Comparing agents is half the work. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** can simplify multi-model access while you test workflows.*
