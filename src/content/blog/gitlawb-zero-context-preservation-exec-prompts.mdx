@@ -2,8 +2,9 @@
 title: "Gitlawb Zero Finally Remembers What You Said — Context Preservation Is Here"
 description: "Zero just shipped context preservation in exec prompts. Your conversations now survive across commands. The decentralized coding agent grows up."
 pubDate: "2026-07-04T01:00:00Z"
-updatedDate: "2026-07-04T01:00:00Z"
-tags: ["gitlawb-zero", "context-preservation", "sessions", "conversation", "viral"]
+updatedDate: "2026-09-27T14:30:00Z"
+updated: true
+tags: ["gitlawb-zero", "context-preservation", "sessions", "conversation", "deep-dive"]
 tool: "gitlawb-zero"
 author: "ada"
 ---
@@ -34,17 +35,87 @@ Zero's session store now maintains conversation history between turns. Each exec
 
 The implementation is intentionally lightweight. Zero doesn't have a memory system like Hermes's mem0 or a knowledge graph like pi.dev. But context preservation is the foundation that more advanced memory features will build on.
 
+### Technical Implementation Details
+
+Under the hood, Zero's session store (located at `~/.local/share/gitlawb-zero/sessions/`) now maintains a rolling conversation buffer per session. When you invoke `zero --exec "your prompt"`, the CLI:
+
+1. Loads the session file for the current working directory (or creates one)
+2. Extracts the last N conversation turns (default: 5, configurable via `context_window` in `~/.config/gitlawb-zero/config.json`)
+3. Prepends the extracted context to your new prompt before sending to the model
+4. Appends the new turn to the session after receiving the response
+
+The context window is token-aware — Zero estimates token counts and trims older turns to stay within the model's context limit. This is critical for local models (Ollama, LM Studio) with smaller context windows (4k-8k tokens) versus cloud models (128k-200k).
+
+```json
+// ~/.config/gitlawb-zero/config.json
+{
+  "context_window": 5,
+  "max_context_tokens": 4000,
+  "session_persist": true
+}
+```
+
+### Comparison: How Other Agents Handle Context
+
+| Agent | Context Mechanism | Persistence | Cross-Session |
+|-------|-------------------|-------------|---------------|
+| **Gitlawb Zero** | Rolling buffer in session store | Local file (JSON) | ✅ Yes |
+| **Claude Code** | Full conversation in context | In-memory only | ❌ No |
+| **Codex** | Thread-based, cloud-synced | Cloud (OpenAI) | ✅ Yes |
+| **Hermes** | mem0 semantic memory + session logs | Local (SQLite) | ✅ Yes |
+| **OpenCode** | Session files + optional mem0 | Local file | ⚠️ Plugin |
+| **Kilo** | Minimal (last turn only) | In-memory | ❌ No |
+
+Zero's approach is distinct: it's the only fully local-first agent with persistent cross-session context that doesn't require a cloud account or external memory service. The session files are portable — copy `~/.local/share/gitlawb-zero/` to another machine and your conversation history travels with you.
+
+## Practical Examples
+
+### Multi-Step Refactoring
+
+```bash
+# Step 1: Understand the codebase
+zero --exec "Analyze the authentication module in src/auth/ and explain the token refresh flow"
+
+# Step 2: Plan the change (context preserved)
+zero --exec "Now propose a refactor to extract the refresh logic into a reusable service"
+
+# Step 3: Implement (context preserved)
+zero --exec "Implement the AuthTokenService class with the interface we discussed"
+```
+
+Each step builds on the previous one without you copying context manually.
+
+### Debugging Across Turns
+
+```bash
+# First encounter the bug
+zero --exec "Why is the WebSocket connection dropping after 30 seconds in production?"
+
+# Follow up with logs
+zero --exec "Here are the server logs from the last incident: [paste logs]. What pattern do you see?"
+
+# Get a fix
+zero --exec "Implement the fix you suggested and write a test for it"
+```
+
 ## What's Next
 
 With context preservation in place, Zero can now support multi-turn workflows, gradual task decomposition, and actual conversations. The decentralized coding agent just became a lot more useful.
 
----
+The roadmap includes:
+- **Cross-session messaging** (merged to main August 2026) — live Zero sessions discover each other and exchange messages under an explicit accept/hold/refuse inbound policy
+- **Persistent session goals** — tell Zero "always keep dependencies pinned" and it stays active across sessions
+- **Summarization for long sessions** — automatic summarization when context window pressure builds
 
+---
 
 ## Related articles
 
 - [Gitlawb Zero Deep Dive: The Decentralized Coding Agent You Own](/blog/deep-dive-gitlawb-zero-agent/)
+- [Gitlawb Zero Can Now Write Your Commit Messages — And They're Actually Good](/blog/gitlawb-zero-auto-commit-messages/)
+- [Gitlawb Zero's New Provider Picker Is the Best UX I've Seen in an AI Terminal](/blog/gitlawb-zero-provider-picker-terminal-ux/)
 - [Beware: Your Coding Agents Sandbox Was Leaking Its Own Credentials to Spawned Commands](/blog/beware-coding-agent-sandbox-leaks-own-credentials/)
 - [Beware: Gitlawb Zero v0.4.0 Closed a Hole Where a Cloned Repo Could Re-Enable the MCP Servers You Disabled](/blog/beware-gitlawb-zero-mcp-trust-boundary-v0-4-0/)
+- [Context Engineering for Coding Agents: How to Make Every Token Count](/blog/context-engineering-for-coding-agents-2026/)
 ---
 *Built by Y Combinator alumni, **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you every major AI model in one chat for $12/mo. Compare answers side-by-side and pick the best one for your task.*
