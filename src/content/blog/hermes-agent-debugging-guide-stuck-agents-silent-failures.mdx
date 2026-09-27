@@ -1,0 +1,474 @@
+---
+title: "Your Hermes Agent Just Went Silent — Here's How to Bring It Back"
+description: "Hermes agents don't crash loudly — they stall, hang, or drift into silent failures. This guide walks through the real failure modes: stuck subagents, cron jobs that stop reporting, memory corruption, and MCP server disconnects. Debug with the Console REPL, not guesswork."
+pubDate: 2026-09-27T14:00:00Z
+tags: ["hermes", "debugging", "troubleshooting", "workflow", "cron", "subagents", "mcp", "guide"]
+tool: "hermes"
+author: "sage"
+image: "/api/og?title=Hermes+Agent+Debugging+Guide&tool=hermes"
+---
+
+You gave Hermes a task. It started. Then... nothing. No error. No completion. Just a blinking cursor or a dashboard that says "executing" for 45 minutes.
+
+This isn't a crash. It's a **stall** — the most common failure mode in autonomous agents. And unlike a crash, a stall doesn't leave a stack trace. It leaves you guessing.
+
+This guide covers the five real failure modes we see in production Hermes deployments, and how to diagnose each one using the Console REPL instead of hope.
+
+---
+
+## The Core Insight: Stalls ≠ Crashes
+
+A crash is loud. A stall is silent. Hermes agents stall for five reasons, in order of frequency:
+
+| Failure Mode | Symptom | Where to Look First |
+|--------------|---------|---------------------|
+| **Subagent hang** | Parent agent waits forever on `delegate_task` | Console → Active Sessions → child status |
+| **MCP server disconnect** | Tool calls time out silently | Console → Tool Calls → `mcp.*` latency |
+| **Cron job drift** | Scheduled job stops reporting, no error logged | `hermes cron list` + job's Bot Chat |
+| **Memory/context corruption** | Agent repeats itself, hallucinates file paths | Console REPL → `agent.memory.dump()` |
+| **Provider rate limit / quota** | Requests queue, then stall without error | Console → Model Status → queue depth |
+
+The pattern: **nothing throws**. The agent is *waiting* — for a child, for a tool, for a token, for a lock — and the wait has no timeout.
+
+---
+
+## 1. Subagent Hang: The "Fire and Pray" Trap
+
+You delegated a task. The parent agent shows "executing: waiting for subagent." The child shows "executing" but its tool call log hasn't updated in 20 minutes.
+
+### Diagnosis (Console REPL)
+
+```bash
+# List all active sessions
+> agents.list()
+=> ["main-refactor-7f2a", "sub-refactor-auth-3b1c", "sub-refactor-tests-9d4e"]
+
+# Check the stuck child
+> agents.get("sub-refactor-auth-3b1c").status
+=> "executing: applying changes to auth/middleware.ts"
+
+# See its recent tool calls
+> agents.get("sub-refactor-auth-3b1c").tools.recent(10)
+=> [
+  { tool: "edit_file", file: "auth/middleware.ts", duration: 1200, status: "pending" },
+  { tool: "search_files", pattern: "auth.*middleware", duration: 45, status: "ok" }
+]
+```
+
+The `edit_file` has been "pending" for 1200 seconds. That's the hang.
+
+### Why It Happens
+
+- **Large file edits** on slow filesystems (network drives, WSL cross-mount)
+- **Permission prompt** the agent can't see (happens in headless mode)
+- **Provider timeout** — the model call succeeded but the response stream stalled
+- **Tool schema validation** looping on a malformed argument
+
+### Fixes (in order)
+
+**A. Kill and resume with partial results**
+```bash
+> agents.get("sub-refactor-auth-3b1c").stop(keepPartial: true)
+=> { stopped: true, partialResult: "Edited auth/middleware.ts lines 1-47; remaining 3 hunks pending" }
+```
+The parent receives the partial result and can re-delegate the remainder.
+
+**B. Check for invisible approval prompts**
+```bash
+> agents.get("sub-refactor-auth-3b1c").approvals.pending()
+=> [{ id: "apt-7f2a", tool: "edit_file", reason: "Destructive write to auth middleware", timeout: 300 }]
+```
+If this returns prompts, the agent is waiting for *you*. Approve via Console or CLI:
+```bash
+hermes approve apt-7f2a --yes
+```
+
+**C. Increase tool timeout for this session**
+```bash
+> agents.get("sub-refactor-auth-3b1c").config.set("toolTimeouts.edit_file", 300000)
+```
+5 minutes instead of the default 2. Only do this for known-slow operations.
+
+**D. The nuclear option: fork from last good state**
+```bash
+> agents.get("main-refactor-7f2a").fork(fromMessage: "msg-3b1c-complete")
+=> "main-refactor-7f2a-fork-1"
+```
+Creates a new session from the last known-good message. You lose the stuck child's work but preserve everything before it.
+
+---
+
+## 2. MCP Server Disconnect: The Silent Tool Failure
+
+Your agent calls `mcp.search_code` or `mcp.query_db`. The call shows "executing" in the tool log. Ten minutes later, still executing. No error. No timeout.
+
+### Diagnosis
+
+```bash
+# Check MCP server health from Console REPL
+> mcp.servers.list()
+=> [
+  { name: "github", status: "connected", lastPing: "2m ago", tools: 12 },
+  { name: "postgres", status: "disconnected", lastPing: "47m ago", tools: 8 },
+  { name: "slack", status: "connected", lastPing: "1m ago", tools: 6 }
+]
+```
+
+Postgres shows "disconnected" with a 47-minute stale ping. That's your culprit.
+
+```bash
+# See which tool calls are stuck on that server
+> mcp.servers.get("postgres").calls.pending()
+=> [
+  { id: "call-9f2a", tool: "query", sql: "SELECT * FROM audit_log...", duration: 2840000, status: "pending" }
+]
+```
+
+2.84 million milliseconds = 47 minutes. The call never returned.
+
+### Why It Happens
+
+- **MCP server crashed** (OOM, unhandled exception, config drift)
+- **Network partition** between Hermes gateway and MCP server
+- **Auth token expired** mid-session (common with OAuth-based MCP servers)
+- **Server-side query hang** — the MCP tool itself is stuck
+
+### Fixes
+
+**A. Force-reconnect the server**
+```bash
+> mcp.servers.get("postgres").reconnect()
+=> { reconnected: true, newSessionId: "mcp-postgres-7f2a" }
+```
+This drops the stale connection and re-establishes it. Pending calls **fail fast** with a clear error — which is what you want.
+
+**B. Enable background health checks (preventive)**
+```yaml
+# In your hermes config
+mcp:
+  healthCheckInterval: 30000  # 30 seconds
+  healthCheckTimeout: 5000
+  autoReconnect: true
+```
+Hermes v0.21+ has this built into the MCP dashboard. Turn it on.
+
+**C. Add tool-level timeouts**
+```bash
+# Per-tool timeout so MCP calls can't hang forever
+> config.set("toolTimeouts.mcp.query", 120000)  # 2 minutes max
+> config.set("toolTimeouts.mcp.search_code", 60000)
+```
+Now a stuck MCP call fails at 2 minutes instead of 47.
+
+**D. If the MCP server itself is broken**
+```bash
+# Check server logs (if you run it locally)
+docker logs mcp-postgres --tail 100
+# Or check hosted provider status page
+```
+Fix the server, then `mcp.servers.get("postgres").reconnect()`.
+
+---
+
+## 3. Cron Job Drift: The Job That Stopped Reporting
+
+Your daily security audit ran at 6 AM. It's 2 PM. No report in Slack. No error in logs. The job just... didn't run, or ran and didn't deliver.
+
+### Diagnosis
+
+```bash
+# List all cron jobs with status
+> cron.jobs.list()
+=> [
+  { name: "daily-security-audit", schedule: "0 6 * * *", lastRun: "2026-09-27T06:00:00Z", status: "completed", nextRun: "2026-09-28T06:00:00Z" },
+  { name: "weekly-dep-check", schedule: "0 9 * * 1", lastRun: "2026-09-22T09:00:00Z", status: "running", nextRun: "2026-09-29T09:00:00Z" }
+]
+```
+
+`weekly-dep-check` shows "running" but `lastRun` was 5 days ago. It's a **zombie job** — marked running but actually dead.
+
+```bash
+# Check the job's session
+> cron.jobs.get("weekly-dep-check").session()
+=> { id: "cron-weekly-dep-check-3f2a", status: "executing", started: "2026-09-22T09:00:00Z", lastActivity: "2026-09-22T09:03:00Z" }
+```
+
+Session started, ran for 3 minutes, then went silent. Status never updated.
+
+### Why It Happens
+
+- **Delivery failure** — Slack/Discord/Telegram webhook failed, job marked "running" waiting for retry that never came
+- **Continuity mode confusion** — `continuity=true` jobs load previous memory; if that memory is corrupted, the agent stalls on startup
+- **Provider quota exhausted** — job starts, burns tokens, hits limit, stalls instead of failing
+- **Working directory gone** — repo moved/deleted, job can't `cd` into it
+
+### Fixes
+
+**A. Kill zombie and force re-run**
+```bash
+> cron.jobs.get("weekly-dep-check").kill()
+=> { killed: true, wasZombie: true }
+> cron.jobs.get("weekly-dep-check").runNow()
+=> { started: true, sessionId: "cron-weekly-dep-check-7b4c" }
+```
+
+**B. Check delivery channel health**
+```bash
+> cron.jobs.get("weekly-dep-check").delivery.test()
+=> { channel: "slack:#engineering", webhook: "https://hooks.slack.com/...", reachable: false, error: "404 Not Found" }
+```
+Webhook URL changed. Update it:
+```bash
+> cron.jobs.get("weekly-dep-check").config.set("deliver", "slack:#engineering")
+> cron.jobs.get("weekly-dep-check").config.set("webhookUrl", "https://hooks.slack.com/services/NEW/WEBHOOK")
+```
+
+**C. Disable continuity if memory is suspect**
+```bash
+> cron.jobs.get("weekly-dep-check").config.set("continuity", false)
+```
+Forces a fresh session each run. Loses cross-run memory but eliminates corruption stalls.
+
+**D. Add explicit timeout to cron jobs**
+```bash
+> cron.jobs.get("weekly-dep-check").config.set("maxRuntime", 1800000)  # 30 minutes
+```
+Job auto-kills at 30 minutes with a "timeout" status — visible, actionable, not silent.
+
+---
+
+## 4. Memory/Context Corruption: The Agent That Forgot How to Code
+
+Agent starts repeating itself. References files that don't exist. Claims it "already fixed" a bug that's still there. Context window isn't full — it's *wrong*.
+
+### Diagnosis
+
+```bash
+# Dump the agent's semantic memory
+> agent.memory.dump("main-refactor-7f2a")
+=> {
+  preferences: { indent: "tabs", testFramework: "jest" },
+  projectConventions: { "api routes": "src/routes/api/", "db models": "src/models/" },
+  corruptedEntries: [
+    { key: "auth middleware location", value: "src/middleware/auth.ts", reality: "src/auth/middleware.ts" },
+    { key: "test command", value: "npm run test:unit", reality: "npm test" }
+  ],
+  lastUpdated: "2026-09-25T14:00:00Z"
+}
+```
+
+The `corruptedEntries` field (Hermes v0.21+) shows memory that contradicts the actual filesystem.
+
+```bash
+# Check conversation for repetition
+> agents.get("main-refactor-7f2a").conversation.recent(20).map(m => m.content.substring(0, 100))
+=> [
+  "I'll update the auth middleware at src/middleware/auth.ts",
+  "Now I'll update the auth middleware at src/middleware/auth.ts",
+  "Let me update the auth middleware at src/middleware/auth.ts",
+  "I've already updated the auth middleware at src/middleware/auth.ts"
+]
+```
+Four identical turns. The agent is looping on a false belief.
+
+### Why It Happens
+
+- **Cross-session bleed** — old session memory loaded into new context (fixed in v0.21 but can persist in upgraded installs)
+- **Mem0 indexing error** — semantic memory stored wrong file paths
+- **Agent hallucinated a fact** → wrote it to memory → now treats hallucination as truth
+- **Skill instruction conflict** — two skills wrote contradictory "facts" to memory
+
+### Fixes
+
+**A. Surgical memory correction**
+```bash
+> agent.memory.delete("main-refactor-7f2a", "auth middleware location")
+> agent.memory.set("main-refactor-7f2a", "auth middleware location", "src/auth/middleware.ts")
+```
+Removes the false belief, writes the truth.
+
+**B. Full memory reset (nuclear)**
+```bash
+> agent.memory.clear("main-refactor-7f2a")
+=> { cleared: true, entriesRemoved: 47 }
+```
+Agent restarts with only `AGENTS.md` and skills as context. Clean slate.
+
+**C. Disable memory for this session**
+```bash
+> agents.get("main-refactor-7f2a").config.set("memory.enabled", false)
+```
+Run the task memory-free. Re-enable after.
+
+**D. Audit skills for conflicting instructions**
+```bash
+> skills.list()
+=> ["security-audit", "code-review", "release-manager", "db-migration"]
+> skills.inspect("security-audit").memoryWrites
+=> ["test command: npm run test:unit"]
+> skills.inspect("code-review").memoryWrites
+=> ["test command: npm test"]
+```
+Two skills wrote different "test command" facts. Fix the skill, or disable one:
+```bash
+> skills.disable("security-audit")
+```
+
+---
+
+## 5. Provider Rate Limit / Quota: The Invisible Ceiling
+
+Agent runs fine for 20 minutes. Then tool calls queue up. Model status shows "active" but `queue_depth` climbs. No errors — just... slowness that becomes permanent.
+
+### Diagnosis
+
+```bash
+# Check model status
+> models.status("claude-opus-5.5")
+=> {
+  active: true,
+  tokensUsed: 84721,
+  queueDepth: 47,
+  avgLatency: 1200,
+  rateLimit: { remaining: 0, reset: "2026-09-27T15:00:00Z", limit: 100000 }
+}
+```
+
+`rateLimit.remaining: 0`. You hit the ceiling. The agent doesn't error — it just queues requests that never complete.
+
+```bash
+# See queued calls
+> models.get("claude-opus-5.5").queue.pending()
+=> [
+  { id: "call-1", tool: "delegate_task", waitingSince: "2026-09-27T14:15:00Z" },
+  { id: "call-2", tool: "search_files", waitingSince: "2026-09-27T14:16:00Z" },
+  ...
+]
+```
+
+47 calls waiting. Oldest has been waiting 30 minutes.
+
+### Why It Happens
+
+- **Anthropic/ OpenAI tier limits** — you're on a lower tier than you think
+- **Shared key across agents** — cron job + interactive session + subagents all burning the same quota
+- **MOA explosion** — Mixture-of-Agents spawns 5 advisors + 1 aggregator = 6x token burn per complex task
+- **No fallback configured** — agent keeps retrying the same exhausted model
+
+### Fixes
+
+**A. Configure fallback models (preventive)**
+```yaml
+# hermes config
+routing:
+  fallbacks:
+    claude-opus-5.5: ["claude-sonnet-5", "gpt-6-astra", "nemotron-3-ultra"]
+    gpt-6-astra: ["claude-sonnet-5", "gpt-6-luna"]
+```
+When primary hits rate limit, Hermes silently routes to next available. No stall.
+
+**B. Isolate keys by workload**
+```bash
+# Separate keys for separate concerns
+export HERMES_CRON_ANTHROPIC_KEY="sk-ant-..."      # cron jobs only
+export HERMES_INTERACTIVE_ANTHROPIC_KEY="sk-ant-..." # your chat sessions
+export HERMES_MOA_ANTHROPIC_KEY="sk-ant-..."        # MOA runs only
+```
+Then in config:
+```yaml
+providers:
+  anthropic:
+    cron: ${HERMES_CRON_ANTHROPIC_KEY}
+    interactive: ${HERMES_INTERACTIVE_ANTHROPIC_KEY}
+    moa: ${HERMES_MOA_ANTHROPIC_KEY}
+```
+
+**C. Emergency: force model switch mid-session**
+```bash
+> agents.get("main-refactor-7f2a").model.switch("claude-sonnet-5")
+=> { switched: true, previousModel: "claude-opus-5.5", reason: "rate_limit" }
+```
+Current session continues on cheaper/faster model. Opus quota recovers in background.
+
+**D. Cap MOA usage**
+```bash
+> config.set("moa.maxAdvisors", 3)  # default is 5
+> config.set("moa.useForTasksUnder", "complex")  # only for genuinely ambiguous tasks
+```
+Cuts MOA token burn by 40-60%.
+
+---
+
+## The Debugging Workflow: Stop Guessing, Start Querying
+
+When an agent stalls, don't restart. **Inspect first.**
+
+```bash
+# 1. Is it a subagent hang?
+hermes console repl
+> agents.list().filter(a => a.status.includes("waiting")).map(a => a.id)
+
+# 2. Is it an MCP tool?
+> agents.get("<session-id>").tools.recent(5).filter(t => t.tool.startsWith("mcp."))
+
+# 3. Is it a cron zombie?
+> cron.jobs.list().filter(j => j.status === "running" && Date.now() - new Date(j.lastRun) > 3600000)
+
+# 4. Is it memory?
+> agent.memory.dump("<session-id>").corruptedEntries.length
+
+# 5. Is it quota?
+> models.status("<current-model>").rateLimit.remaining
+```
+
+Each check takes 2 seconds. The answer tells you *exactly* which fix to apply.
+
+---
+
+## Prevention Checklist (Run Weekly)
+
+```bash
+# 1. Verify all MCP servers respond
+hermes mcp health --all
+
+# 2. Check cron job last-run timestamps
+hermes cron list --stale-threshold 24h
+
+# 3. Scan for memory corruption
+hermes memory audit --all-sessions
+
+# 4. Review provider quota usage
+hermes models quota --all
+
+# 5. Update stuck-tool timeouts
+hermes config audit timeouts
+```
+
+Add this to a weekly cron job. It catches 90% of stalls before you notice them.
+
+---
+
+## The Bottom Line
+
+Hermes agents don't fail with errors. They fail with **silence**.
+
+- Subagent hangs → check child status, kill with partial results
+- MCP disconnects → health checks + tool timeouts + force reconnect
+- Cron zombies → explicit maxRuntime + delivery test + kill/restart
+- Memory corruption → `agent.memory.dump()` → surgical delete or full reset
+- Quota exhaustion → fallback chains + key isolation + MOA caps
+
+The Console REPL is your debugger. Use it. The agents that survive production aren't the ones that never stall — they're the ones whose operators know how to unstick them in 30 seconds.
+
+---
+
+## Related articles
+
+- [Hermes Console: The Visual Dashboard That Changes How You Monitor AI Agents](/blog/hermes-console-dashboard-changes-how-you-monitor-ai-agents/)
+- [Hermes Agent v0.21 Just Made Your Bots Talk to Each Other — Here's What Changed](/blog/hermes-agent-v0-21-pantheon-bots-that-talk-to-each-other/)
+- [Setting Up Autonomous Cron Jobs with Hermes Agent for Recurring Tasks](/blog/hermes-cron-jobs-scheduled-automation-tasks/)
+- [Hermes Agent Deep Dive: The Most Capable Open-Source Autonomous Coding Assistant](/blog/deep-dive-hermes-agent-autonomous-coding-assistant/)
+
+---
+
+*Hermes Agent is open-source (MIT) and available at [github.com/NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent).*
