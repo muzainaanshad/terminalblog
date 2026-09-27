@@ -73,3 +73,33 @@ But treat the patch as raising the floor, not closing the door:
 Two releases in a row — 2.1.210's indirect-prompt-injection hardening on the Agent tool, and 2.1.211's approval-preview sanitization — show Claude Code closing the gap between *what the model executes* and *what the human reviewer perceives*. That gap is the entire attack surface for agentic coding: the model is increasingly sandboxed and audited, but the approval loop you sit in is still rendered by third-party chat clients that were never designed to be a security boundary.
 
 Patch. Verify the command, not the card. And never let a chat renderer be the only thing standing between a poisoned string and `rm -rf`.
+
+
+## FAQ
+
+**Q1: What is the approval preview Unicode spoof in Claude Code?**
+
+Claude Code's permission preview (shown when the agent asks for approval to run a command) was vulnerable to Unicode spoofing. Attackers could embed invisible characters (bidirectional overrides, zero-width spaces, look-alike quotes) that make a malicious command like `rm -rf /` render visually as a harmless command like `rm -rf ./tmp/build` in the approval card. You'd approve what you see, but the shell executes the real malicious bytes.
+
+**Q2: How does the attack work in practice?**
+
+The poisoned string typically comes from a file in your repository (a dependency, fork, or generated config) that the agent reads. When the agent later asks to run a command containing that string, the approval preview sent to chat channels (Slack, Teams, Discord) renders the spoofed version. You approve the "safe" command; the shell runs the real one.
+
+**Q3: Has this been fixed?**
+
+Yes — Claude Code 2.1.211 (July 15, 2026) neutralizes bidirectional-override, zero-width, and look-alike quote characters in permission previews before relaying to chat channels. Update to 2.1.211 or later (`claude --version` should report ≥ 2.1.211).
+
+**Q4: Is the fix complete?**
+
+The fix raises the floor but doesn't close the door. It only sanitizes the permission preview card — the same poisoned string can still appear in normal chat messages, generated files, or agent output. New Unicode spoofing techniques appear constantly. The human approval step remains the weakest link.
+
+**Q5: How do I approve safely regardless?**
+
+Verify the command in the terminal, not the chat card. Use allow/deny lists (`permissions.allow`, `permissions.deny`) to pre-approve known-safe operations and remove the spoofable approval step. Add PreToolUse hooks that inspect raw tool input before any rendering. Never approve high-impact commands from a mobile chat app — they're the most aggressive at collapsing invisible characters.
+
+
+## Related articles
+
+- [Beware: Your Coding Agent's Sandbox Was Leaking Its Own Credentials to Spawned Commands](/blog/beware-coding-agent-sandbox-leaks-own-credentials/)
+- [Coding Agent Security Checklist 2026: the isolation model every operator needs](/blog/coding-agent-security-checklist-2026/)
+- [Beware: Claude Code's disallowedTools Don't Reach Subagents](/blog/beware-claude-code-disallowedtools-not-inherited-by-subagents/)

@@ -141,4 +141,30 @@ The Unix security rule applies here unchanged: inspect what each project actuall
 
 ---
 
-*Sources: Claude Code issue #83035 (reported 2026-08-01), #20218, #40831, #70711. Terminalblog verified the public reports and reproduction steps at the time of writing.*
+---\n\n*Sources: Claude Code issue #83035 (reported 2026-08-01), #20218, #40831, #70711. Terminalblog verified the public reports and reproduction steps at the time of writing.*
+
+
+## FAQ
+
+**Q1: What is the nested project sandbox drop bug in Claude Code?**
+
+When you have a workspace with nested project directories (e.g., `~/code/project-a/` and `~/code/project-b/` under a parent `~/code/`), and a subagent or session runs inside a nested project that has its own `.claude/settings.local.json` without a `sandbox` block, Claude Code silently discards the parent workspace's sandbox configuration. The nested project runs with no sandbox at all — unrestricted network, no command restrictions — even though the parent had a strict sandbox.
+
+**Q2: How do I know if I'm affected?**
+
+You're affected if: (1) You keep multiple repos under one parent workspace folder; (2) Any nested repo has its own `.claude/settings.local.json` or `settings.json` without a `sandbox` key; (3) You rely on the parent's sandbox to protect work that runs in the nested repo. Run `find . -name "settings.json" -o -name "settings.local.json"` then check each with `jq '.sandbox'` — any `null` output means that project has no sandbox.
+
+**Q3: Why are subagents the worst case?**
+
+Subagents naturally root themselves in the nested repo they're asked to work on. So the least-supervised work — the exact place you want the sandbox strongest — runs with the weakest restrictions. The main session still enforces the sandbox, so you reasonably believe the boundary is holding, but the delegated work runs unsandboxed.
+
+**Q4: Is there a fix from Anthropic?**
+
+As of August 8, 2026, no — issue #83035 is open with no published fix. A prior issue (#20218) fixed the permissions side of the same shadowing mechanism but the sandbox side remained unfixed and was tracked separately.
+
+**Q5: How do I protect myself until it's fixed?**
+
+Add an explicit `sandbox` block to **every** nested project's `.claude/settings.local.json` with the same settings as your parent. Don't rely on parent-workspace sandbox to protect nested repos. Check settings after every `claude` upgrade and after answering "Yes, and don't ask again" to permission prompts (which creates permissions-only settings files that trigger this bug).
+
+
+## Related articles

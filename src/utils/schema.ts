@@ -42,6 +42,19 @@ export function buildHomeGraph() {
 /** Default OG image for articles without a custom image. */
 const DEFAULT_ARTICLE_IMAGE = `${SITE_URL}/api/og`;
 
+/** Build FAQPage JSON-LD from array of {q, a} pairs. */
+export function buildFaqSchema(faq: { q: string; a: string }[]) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faq.map(({ q, a }) => ({
+      '@type': 'Question',
+      name: q,
+      acceptedAnswer: { '@type': 'Answer', text: a },
+    })),
+  };
+}
+
 /** Build JSON-LD graph for a blog post. */
 export function buildPostGraph(opts: {
   url: string;
@@ -51,8 +64,9 @@ export function buildPostGraph(opts: {
   updateDate?: Date;
   tags?: string[];
   image?: string;
+  faq?: { q: string; a: string }[];
 }) {
-  const { url, title, description, publishDate, updateDate, tags, image } = opts;
+  const { url, title, description, publishDate, updateDate, tags, image, faq } = opts;
 
   const articleImage = image || `${DEFAULT_ARTICLE_IMAGE}?title=${encodeURIComponent(title)}`;
 
@@ -85,19 +99,26 @@ export function buildPostGraph(opts: {
   );
 
   const breadcrumb = buildBreadcrumbList(
-    {
-      url,
-      items: [
-        { name: 'Home', url: SITE_URL },
-        { name: 'Articles', url: `${SITE_URL}/blog/` },
-        { name: title, url },
-      ],
-    },
-    ids,
-  );
+      {
+        url,
+        items: [
+          { name: 'Home', url: SITE_URL },
+          { name: 'Articles', url: `${SITE_URL}/blog/` },
+          { name: title, url },
+        ],
+      },
+      ids,
+    );
 
-  return {
-    '@context': 'https://schema.org',
-    '@graph': [webPage, article, breadcrumb, buildPersonEntity()],
-  };
+    const graph: any = {
+      '@context': 'https://schema.org',
+      '@graph': [webPage, article, breadcrumb, buildPersonEntity()],
+    };
+
+    // Add FAQ schema if provided
+    if (faq && faq.length > 0) {
+      graph['@graph'].push(buildFaqSchema(faq));
+    }
+
+    return graph;
 }

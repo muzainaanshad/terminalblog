@@ -1,12 +1,19 @@
+# Medium Cross-Post: Cognitive Debt from Agentic Coding
+
+## Canonical URL
+https://terminalblog.com/blog/what-developers-think-about-cognitive-debt-from-agentic-coding-hn/
+
 ---
-title: "What Developers Actually Think About Cognitive Debt From Agentic Coding — From 130+ HN Comments"
-description: "A deep dive into the Hacker News discussion on Whiteboard (YC W26), where developers reveal the real cost of letting AI agents write code unchecked: cognitive debt, review paralysis, and the tools emerging to fix it."
-pubDate: 2026-09-26
-updatedDate: 2026-09-26
-heroImage: "/api/og?title=What%20Developers%20Think%20About%20Cognitive%20Debt&tool=industry"
-tags: ["ai-coding-agents", "developer-experience", "code-review", "cognitive-debt", "hacker-news"]
-tool: "claude-code"
+
+## Title
+**What Developers Actually Think About Cognitive Debt From Agentic Coding — From 130+ HN Comments**
+
+## Tags
+ai-coding-agents, developer-experience, code-review, cognitive-debt, hacker-news, software-engineering
+
 ---
+
+## Body
 
 You've felt it. That nagging sensation after merging a PR your AI agent wrote. You approved it. The tests pass. But you *don't actually know* what it does.
 
@@ -149,8 +156,6 @@ But the developers in that thread? They're not waiting. They're building workflo
 
 *Discussion source: [HN #49833867](https://news.ycombinator.com/item?id=49833867) — "Show HN: Whiteboard (YC W26) — An open-source IDE for thoughtful software design"*
 
-## Related articles
+---
 
-- [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
-- [What Developers Actually Think About AI Coding Agents — From 300+ HN Comments](/blog/what-developers-think-ai-coding-agents-hn/)
-- [Claude Code v2.1.224: Self-Hosted Runners, Cross-Session Messaging, and Tighter Secret Handling](/blog/claude-code-v2-1-224-self-hosted-runners-cross-session-messaging/)
+*Originally published at [terminalblog.com](https://terminalblog.com/blog/what-developers-think-about-cognitive-debt-from-agentic-coding-hn/)*

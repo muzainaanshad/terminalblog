@@ -87,6 +87,29 @@ If you run an agent in CI, in a shared dev container, or against a repo that tou
 If you hardened Claude Code against credential reads using a single-leading-slash absolute path in `permissions.deny`, your guard is almost certainly a no-op and Claude Code said nothing. Switch to `//` or `~`, test the rule in a throwaway session, and don't assume `sandbox.credentials` covers the Read tool. For a standing, repeatable hardening routine across every agent you run, see our [AI Coding Agent Security Checklist for 2026](/blog/coding-agent-security-checklist-2026/).
 
 
+## FAQ
+
+**Q1: What is the permissions.deny absolute path bug in Claude Code?**
+
+When you write a `permissions.deny` rule with a single leading slash (e.g., `Read(/Users/me/.ssh/**)`), Claude Code interprets it as project-relative rather than absolute. The rule resolves to something like `/your/project/Users/me/.ssh/**` which matches nothing — so the deny rule silently does nothing. No error, no warning.
+
+**Q2: How do I write a correct absolute path deny rule?**
+
+Use double leading slashes for absolute paths: `Read(//Users/me/.ssh/**)` — or use tilde for home-relative: `Read(~/.ssh/**)`. Both resolve correctly.
+
+**Q3: Does `sandbox.credentials` protect me from this?**
+
+No. `sandbox.credentials` guards the Bash sandbox surface only, not the Read/Edit/Write tools. A project can have both guards present and the Read tool still returns the credential file.
+
+**Q4: How do I test if my deny rule actually works?**
+
+In a throwaway session, ask the agent to read a file you believe is denied. If it returns contents, your rule is a no-op. Make this a standing check before trusting any deny list.
+
+**Q5: Is this unique to Claude Code?**
+
+No — every agent permission system that layers a matcher over POSIX-style paths inherits the same trap: a deny rule that fails to parse correctly silently becomes allow. Gitlawb Zero and GitHub Copilot CLI have similar documented gaps.
+
+
 ## Related articles
 
 - [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)

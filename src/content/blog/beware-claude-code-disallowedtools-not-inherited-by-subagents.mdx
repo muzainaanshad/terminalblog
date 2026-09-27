@@ -79,6 +79,29 @@ A denied tool is only denied where it is actually applied. Right now, for subage
 *Ever wonder if Claude gives a better answer than GPT for a specific coding problem? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** lets you compare 9+ premium models side-by-side in one chat. No more juggling tabs.*
 
 
+## FAQ
+
+**Q1: What is the disallowedTools inheritance bug in Claude Code?**
+
+When you set `disallowedTools` (or `permissions.deny`) in your main Claude Code session, those restrictions are NOT automatically inherited by subagents spawned via the Agent tool. The subagent starts with its own default tool policy, meaning tools you explicitly banned at the parent level can run freely inside the subagent.
+
+**Q2: Why is this more dangerous than a normal bug?**
+
+Most developers assume a deny list applies globally across all agent processes. When subagents bypass it silently — no warning, no log entry — your safety model is broken without you knowing. This affects every workflow that uses the Agent tool to parallelize work (research, refactoring, test runs).
+
+**Q3: How do I fix this in my current setup?**
+
+Stop relying on top-down inheritance. Instead: (1) Pass an explicit `allowedTools` list when spawning subagents — give only what they need; (2) Add external guardrails outside the agent (Git hooks, CI gates, read-only cloud credentials); (3) Keep dangerous credentials out of the agent's environment entirely; (4) Test your deny rules by spawning a subagent and asking it to perform the blocked operation — if it succeeds, your guard is a no-op.
+
+**Q4: Does this affect me if I don't use subagents?**
+
+If you only run the main session and never spawn subagents via the Agent tool, your deny list works as expected for that session. The gap is specifically the parent-to-subagent handoff.
+
+**Q5: Has Anthropic acknowledged this?**
+
+Yes — the GitHub issue has `has repro` and `area:permissions` labels from maintainers, confirming it's a real reproducible behavior, not a theoretical concern.
+
+
 ## Related articles
 
 - [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
