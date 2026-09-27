@@ -2,8 +2,9 @@
 title: "Gitlawb Zero's New Provider Picker Is the Best UX I've Seen in an AI Terminal"
 description: "Zero's setup wizard now has a searchable, filterable provider picker. 20+ providers, live search, clear categories — terminal UX done right."
 pubDate: "2026-07-04T00:30:00Z"
-updatedDate: "2026-07-04T00:30:00Z"
-tags: ["gitlawb-zero", "provider-picker", "ux", "terminal-design", "viral"]
+updatedDate: "2026-09-27T14:45:00Z"
+updated: true
+tags: ["gitlawb-zero", "provider-picker", "ux", "terminal-design", "deep-dive"]
 tool: "gitlawb-zero"
 author: "dev"
 ---
@@ -39,13 +40,100 @@ This is the kind of attention to onboarding that separates tools people try from
 
 Zero's provider picker sets a new bar.
 
----
+## Technical Implementation
 
+The picker is built with `ink` (React for terminal) and uses a fuzzy search algorithm (Fuse.js) for instant filtering. It's not a simple `select` — it's a full TUI component with:
+
+- **Live search** — filters as you type, <16ms latency
+- **Category tabs** — Cloud / Local / Community / Custom (Tab to switch)
+- **Keyboard shortcuts** — `j`/`k` or arrows, `/` to focus search, `Enter` to select, `Esc` to cancel
+- **Visual indicators** — ✓ for configured, ○ for available, ⚠ for missing API key
+- **Endpoint preview** — shows the base URL when highlighted
+
+```typescript
+// Simplified from zero/src/tui/components/ProviderPicker.tsx
+const ProviderPicker = ({ providers, onSelect }) => {
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState<'all' | 'cloud' | 'local' | 'community' | 'custom'>('all');
+  
+  const filtered = useMemo(() => 
+    fuse.search(query).map(r => r.item)
+      .filter(p => category === 'all' || p.category === category),
+  [query, category]);
+
+  return (
+    <Box flexDirection="column">
+      <SearchInput value={query} onChange={setQuery} placeholder="Search providers..." />
+      <CategoryTabs active={category} onChange={setCategory} />
+      <VirtualList items={filtered} renderItem={renderProviderRow} />
+    </Box>
+  );
+};
+```
+
+The component is fully testable (unit tests in `ProviderPicker.test.tsx`) and decoupled from the rest of the setup flow — it just receives a provider list and calls `onSelect(provider)`.
+
+## Comparison: Provider Setup Across Agents
+
+| Agent | Setup Method | Search/Filter | Categories | Visual Feedback | Time to First Model |
+|-------|--------------|---------------|------------|-----------------|---------------------|
+| **Gitlawb Zero** | Interactive TUI picker | ✅ Live fuzzy | ✅ 4 tabs | ✅ Configured/missing | ~15 seconds |
+| **Claude Code** | `claude config` + manual edit | ❌ | ❌ | ❌ | ~2 min |
+| **Codex** | Web dashboard → CLI auth | ❌ | ❌ | ⚠️ Limited | ~3 min |
+| **Hermes** | Interactive setup wizard | ✅ Basic | ✅ Groups | ✅ Status icons | ~30 sec |
+| **OpenCode** | `opencode config` edit YAML | ❌ | ❌ | ❌ | ~2 min |
+| **Kilo** | Environment variables | ❌ | ❌ | ❌ | ~1 min |
+| **Mimo** | Inherits OpenCode | ❌ | ❌ | ❌ | ~2 min |
+| **Oh My Pi** | Config file (TOML) | ❌ | ❌ | ❌ | ~2 min |
+
+Zero is the only agent where you can go from "I've never heard of this" to "I'm chatting with Qwen on OpenRouter" in under 20 seconds without leaving the terminal.
+
+## Provider Configuration Flow
+
+After selecting a provider, Zero guides you through configuration:
+
+1. **API Key** — Pasted securely (not echoed), stored in OS keychain (Windows Credential Manager, macOS Keychain, libsecret on Linux)
+2. **Base URL** — Pre-filled for known providers, editable for custom endpoints
+3. **Model Selection** — Shows available models for that provider (fetched live from `/v1/models` endpoint)
+4. **Default Model** — Sets your primary model for the session
+
+For local providers (Ollama, LM Studio), Zero auto-detects running instances:
+```bash
+# Zero detects these automatically
+ollama serve                    # → "Ollama (running on localhost:11434)" ✓
+lms server start               # → "LM Studio (running on localhost:1234)" ✓
+```
+
+No manual config needed if the server is running.
+
+## Switching Providers Mid-Session
+
+The picker isn't just for first-time setup. Press `Ctrl+P` (or run `zero --model`) anytime to switch providers without restarting:
+
+```
+zero --model
+# Opens the same picker, pre-highlights current provider
+# Select new provider → Zero hot-swaps, preserves session context
+```
+
+This is unique — other agents require restart or new session for model switches.
+
+## What This Means for Daily Use
+
+The provider picker is a small feature that compounds. It means:
+- **Experimentation is free** — try a new model in 10 seconds, not 5 minutes
+- **No config debt** — you don't accumulate broken YAML files
+- **Team onboarding** — new contributors run `zero` and are productive immediately
+- **Multi-provider workflows** — swap from GPT-5 (reasoning) to Groq (speed) to Ollama (privacy) per task
+
+---
 
 ## Related articles
 
 - [Gitlawb Zero Deep Dive: The Decentralized Coding Agent You Own](/blog/deep-dive-gitlawb-zero-agent/)
+- [Gitlawb Zero Finally Remembers What You Said — Context Preservation Is Here](/blog/gitlawb-zero-context-preservation-exec-prompts/)
+- [Gitlawb Zero Can Now Write Your Commit Messages — And They're Actually Good](/blog/gitlawb-zero-auto-commit-messages/)
 - [Beware: Your Coding Agents Sandbox Was Leaking Its Own Credentials to Spawned Commands](/blog/beware-coding-agent-sandbox-leaks-own-credentials/)
-- [Beware: Gitlawb Zero v0.4.0 Closed a Hole Where a Cloned Repo Could Re-Enable the MCP Servers You Disabled](/blog/beware-gitlawb-zero-mcp-trust-boundary-v0-4-0/)
+- [Hermes Agent Deep Dive: The Most Capable Open-Source Autonomous Coding Assistant](/blog/deep-dive-hermes-agent-autonomous-coding-assistant/)
 ---
 *You already use AI agents for coding. Why limit yourself to one model? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** ($12/mo) gives you every premium model in one dashboard — Claude, GPT, Gemini, Grok and more.*
