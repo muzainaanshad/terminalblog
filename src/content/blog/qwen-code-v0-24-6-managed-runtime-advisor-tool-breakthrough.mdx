@@ -1,0 +1,139 @@
+---
+title: "Qwen Code v0.24.6 Just Shipped a Managed Runtime and an Advisor Tool — The Open Source Agent Is Growing Up"
+description: "Qwen Code v0.24.6 drops a complete managed runtime foundation (hosted harness, durable sessions, failover, batch API workflows), a native advisor tool for code consultation, Java SDK bindings, and 60% faster startup. The open-source agent is building enterprise-grade infrastructure."
+pubDate: 2026-09-27T10:00:00Z
+tags: ["qwen-code", "release", "managed-runtime", "advisor", "java-sdk", "coding-agent", "beginner", "open-source"]
+tool: "qwen-code"
+author: "sage"
+image: "/api/og?title=Qwen+Code+v0.24.6+Managed+Runtime+Advisor&tool=qwen-code"
+---
+
+Qwen Code **v0.24.6** landed September 26, and it's not the usual feature drop. This release lays **enterprise-grade infrastructure** — a managed runtime with hosted harness, durable sessions with failover, batch API workflows, a native advisor tool, and a Java SDK — alongside a **60% faster cold start**.
+
+If you've been watching Qwen Code evolve from a CLI experiment into a serious contender, this is the release that signals: **the open-source agent is building the plumbing that production teams need**.
+
+---
+
+## 1. The Big Story: Managed Runtime Foundations Are Here
+
+The headline isn't a single feature — it's an entire **managed runtime stack** shipped in one release:
+
+| Component | What It Does |
+|-----------|--------------|
+| **Hosted Harness private client** | Run agents on managed infrastructure without exposing your code |
+| **Durable Managed Session journal + failover** | Sessions survive worker restarts — your long-running task doesn't die when infrastructure hiccups |
+| **Managed-context/1 envelope contract** | Standardized context passing between client and managed workers |
+| **v2 execute/status/cancel Managed Runtime contract** | Full lifecycle control for managed agent runs |
+| **Spring control plane + dual-path WebShell** | Two ways to interact: classic WebShell or the new managed path |
+| **Agent-prepared Batch API workflow (`/batch-api`)** | Queue up work, let the managed runtime chew through it asynchronously |
+
+**Why this matters for beginners:** Previously, "running Qwen Code" meant running it on *your* machine, with *your* tokens, in *your* terminal. Now you can offload long-running autonomous work to a managed environment that handles retries, checkpointing, and failover — the same infrastructure commercial agents charge thousands for.
+
+---
+
+## 2. The Advisor Tool — Your Code Gets a Second Opinion, Built In
+
+**New native `advisor` tool** (PR [#9636](https://github.com/QwenLM/qwen-code/pull/9636)) lets the agent **consult a second model** before committing risky changes.
+
+Think of it as a built-in code review buddy:
+- Agent proposes a change
+- Advisor tool spins up a consultation with a different model (or same model, different prompt)
+- You get a second opinion *before* the edit lands
+- Usage limits prevent runaway consultation loops
+
+This is the first open-source agent to ship **structured self-review as a first-class tool** rather than a prompt hack. Our [coding agent security checklist](/blog/coding-agent-security-checklist-2026/) has advocated for this pattern — Qwen just made it native.
+
+---
+
+## 3. Java SDK — Enterprise Integration Just Got Real
+
+The **Java SDK** got a massive wave:
+- Hosted Harness private client
+- Restored Runtime bindings
+- v2 tool operations on the runtime transport
+- W0a Managed Workspace binding contract
+- Runtime-broker guards pinned in tests
+
+**Translation:** If your team runs on the JVM (Spring Boot, Quarkus, Android, data pipelines), you can now embed Qwen Code's agent capabilities *inside your Java application* with proper typed contracts — not shell-out hacks.
+
+---
+
+## 4. 60% Faster Startup, Half the Memory
+
+Cold start matters when you're spinning up agents in CI, serverless functions, or quick debugging sessions:
+
+- **Fresh startup time to typeable: halved**
+- **RSS memory: cut by 60%**
+- **Env files holding only model credentials no longer trigger full reload**
+
+Perf PR [#12622](https://github.com/QwenLM/qwen-code/pull/12622) and [#12680](https://github.com/QwenLM/qwen-code/pull/12680) are the kind of unsexy work that makes an agent feel *snappy* instead of *sluggish* in daily use.
+
+---
+
+## 5. The Quiet Fixes You'll Feel Daily
+
+| Fix | Why You'll Notice |
+|-----|-------------------|
+| **Preserve Claude thinking across tool turns** (PR [#12621](https://github.com/QwenLM/qwen-code/pull/12621)) | No more lost reasoning context when tools interrupt |
+| **Rank PreToolUse permissionDecision most-restrictive** (PR [#12689](https://github.com/QwenLM/qwen-code/pull/12689)) | Security: a single `deny` overrides all `allow` — fail-closed by default |
+| **Deduplicate system prompt guidance** (PR [#12546](https://github.com/QwenLM/qwen-code/pull/12546)) | Less token waste on repeated instructions |
+| **Allow deleting current session from sidebar/picker** (PR [#12636](https://github.com/QwenLM/qwen-code/pull/12636)) | UX: no more "wait, how do I delete this?" |
+| **Keep one-shot system-reminder prefixes out of shell mode** (PR [#12605](https://github.com/QwenLM/qwen-code/pull/12605)) | Cleaner shell experience |
+| **Resolve npm global config when npm refuses to print it** (PR [#12675](https://github.com/QwenLM/qwen-code/pull/12675)) | Windows/CI edge case fixed |
+
+---
+
+## 6. What This Means for You
+
+| If you're... | What to do |
+|--------------|------------|
+| **New to coding agents** | Qwen Code v0.24.6 is the most "batteries included" open-source option. Free, local-first, now with managed runtime option. Start here. |
+| **Running agents in CI/production** | The managed runtime + durable sessions + failover = you can finally run autonomous agents in pipelines without babysitting. |
+| **Java/JVM shop** | The Java SDK means you can embed agentic workflows *inside your services* — not as a sidecar, as a library. |
+| **Evaluating open vs. commercial** | This release narrows the infrastructure gap significantly. Commercial agents still lead on polish; Qwen leads on *open, inspectable plumbing*. |
+
+---
+
+## 7. How to Update
+
+```bash
+# npm (recommended)
+npm i -g @qwen-code/qwen-code@latest
+
+# Verify
+qwen-code --version
+# Should show 0.24.6
+
+# Desktop app (v0.3.0 stable, separate channel)
+# Download from GitHub Releases or check desktop updater feed
+```
+
+---
+
+## 8. The Pattern: Brakes → Bridges → Infrastructure
+
+Qwen Code's last three release waves tell a clear story:
+
+| Wave | Theme | Key Ships |
+|------|-------|-----------|
+| **v0.23.1–3** (Sep 8–10) | **Brakes** | Self-pausing goals, spend windows, worktree isolation, session fencing, ACP delegation to Claude Code, bounded self-review |
+| **v0.23.2** (Sep 9) | **Bridges** | Built-in web search, reasoning-effort controls, remote start, checkpoint retry |
+| **v0.24.6** (Sep 26) | **Infrastructure** | Managed runtime, advisor tool, Java SDK, 60% faster startup, durable sessions with failover |
+
+First the agent learned to **stop when stuck**. Then it learned to **call for backup and reach outside**. Now it's building the **runtime that makes it reliable at scale**.
+
+That's the maturation arc every serious agent project is racing toward. Qwen Code is the first open-source one to ship the full stack in the open.
+
+---
+
+## Related articles
+
+- [Qwen Code Finally Knows When to Give Up — Now It Calls Claude Code for Help](/blog/qwen-code-v0-23-1-goals-pause-stuck-worktree-tasks/)
+- [Qwen Code v0.21.8 Fixed a Trust Boundary and Shared Prompt Caches](/blog/qwen-code-v0-21-8-trust-cache-fork-autofix/)
+- [Best Coding Agents 2026 — Decision Guide (Not Another Hype List)](/blog/best-coding-agents-2026-decision-guide/)
+- [Coding Agent Security Checklist 2026 — The Operators Hardening Guide](/blog/coding-agent-security-checklist-2026/)
+- [OpenHands Agent Canvas 1.10.0: Persistent Memory & Automations](/blog/openhands-agent-canvas-1-10-0-persistent-memory-automations/)
+
+---
+
+*Qwen Code is open-source (Apache-2.0) and available at [github.com/QwenLM/qwen-code](https://github.com/QwenLM/qwen-code). Full changelog: [v0.24.6 release notes](https://github.com/QwenLM/qwen-code/releases/tag/v0.24.6).*
