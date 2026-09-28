@@ -1,0 +1,146 @@
+---
+title: "Codex 0.158 Just Made Copy-Paste Work the Way You Expect — Plus MCP OAuth and Windows Sandbox Fixes"
+description: "Codex 0.158.0 lands copy-on-select with Markdown preservation, MCP OAuth client secret support, hardened Windows sandbox, and exec-server WebSocket auth. The quality-of-life release that removes daily friction."
+pubDate: 2026-09-28T12:00:00Z
+tags: ["codex", "release", "coding-agent", "beginner", "mcp", "windows", "tui"]
+tool: "codex"
+author: "sage"
+image: "/api/og?title=Codex+0.158+Copy+On+Select+MCP+OAuth+Windows+Fixes&tool=codex"
+---
+
+Codex **0.158.0** dropped September 28, and it's the release that fixes the small things you do a hundred times a day — plus the big things that kept teams from trusting it on Windows.
+
+The headliners: **copy-on-select now preserves Markdown formatting**, **MCP servers with pre-registered OAuth client secrets finally work**, and **Windows sandbox failures on ordinary paths are fixed**. No new model. No flashy feature. Just the tool getting out of your way.
+
+---
+
+## 1. Copy-on-Select That Actually Preserves Your Code
+
+You know the frustration: you highlight a code block in the transcript, paste it somewhere, and all the formatting is gone. Indentation flattened. Fences stripped. Mermaid diagrams turned to plain text.
+
+**Fixed.** Copy-on-select now preserves **Markdown formatting** — fenced code blocks, indentation, tables, Mermaid diagrams, everything. Right-click paste is also configurable.
+
+For beginners: this means when the agent gives you a fix, you copy it, paste it, and it *works*. No reformatting dance.
+
+---
+
+## 2. MCP OAuth Client Secrets — Enterprise Gateways Finally Connect
+
+If your company routes MCP through a gateway that requires pre-registered OAuth client secrets (common in enterprise setups), Codex 0.158 adds native support:
+
+```bash
+codex mcp add --oauth-client-secret <your-secret>
+```
+
+This was a hard blocker for teams using managed MCP infrastructure. The gateway auth is now handled at the WebSocket layer, including connections configured through app-server.
+
+---
+
+## 3. Windows Sandbox: Ordinary Paths No Longer Fail
+
+The Windows sandbox had a nasty habit of rejecting **perfectly normal Windows 10 paths** — your Documents folder, your project directory, paths with spaces — with cryptic "permission denied" errors.
+
+**Fixed in three separate PRs (#47672, #47695, #47919).** The sandbox now:
+- Handles ordinary Windows 10 paths correctly
+- Stops rejecting stored credentials that are perfectly valid
+- Processes large permission policies without choking
+
+If you're on Windows and Codex felt flaky, **this is the version to update to**.
+
+---
+
+## 4. Linux/macOS Sandbox Hardening
+
+Not just Windows. The sandbox got comprehensive fixes:
+- **Linux**: Nested writable roots now start cleanly; Git metadata protections preserved across writable roots
+- **macOS**: Patch operations recognize system path aliases covered by existing permissions — no more unnecessary approval prompts for paths you already approved
+
+---
+
+## 5. Exec-Server WebSocket Authentication (Opt-In)
+
+For teams running Codex at scale with an exec-server, WebSocket connections can now be secured with **bearer tokens**. This is opt-in and covers connections configured through app-server.
+
+```bash
+# Configuration example
+CODEX_EXEC_SERVER_WS_AUTH=1
+CODEX_EXEC_SERVER_BEARER_TOKEN=<token>
+```
+
+---
+
+## 6. Terminal Input Approval Enabled by Default
+
+Commands running with elevated permissions now **require terminal input approval by default**. Runtime-only grants no longer trigger unnecessary reviews — the system distinguishes between "this needs your attention" and "this is routine."
+
+---
+
+## 7. Approval Reviews That Don't Abort on Status Questions
+
+Previously, if a status question arrived while an approval was pending, the review would auto-abort. Now **approval reviews retry when new user input arrives** — your pending action survives a clarifying question.
+
+---
+
+## 8. Mermaid Rendering That Explains Itself
+
+Mermaid flowcharts now:
+- Render **quoted labels and ampersands** correctly
+- **Explain why they fall back to source** when a diagram isn't supported — instead of silently showing raw text
+
+---
+
+## 9. Command Completion Events Include Early Output
+
+When a command launches, you now get **early output and process-launch failures reported to clients** immediately. No more staring at a blank transcript wondering if the command even started.
+
+---
+
+## 10. What This Means for Beginners
+
+If you're new to Codex (the OpenAI coding agent that runs in your terminal, free with ChatGPT Plus/Pro):
+
+| Before 0.158 | After 0.158 |
+|--------------|-------------|
+| Copy code → reformat manually | Copy → paste → works |
+| Windows sandbox breaks on normal folders | Windows sandbox just works |
+| Enterprise MCP = manual workarounds | `codex mcp add --oauth-client-secret` |
+| Mermaid breaks silently | Mermaid tells you why |
+| Approval aborts on questions | Approval survives questions |
+
+**The practical takeaway:** 0.158 is the release where Codex stops feeling like a "terminal experiment" and starts feeling like a daily driver you trust with real work — especially on Windows.
+
+---
+
+## How to Update
+
+```bash
+# Codex updates automatically on next launch, or force it:
+codex update
+
+# Verify:
+codex --version
+# Should show 0.158.0
+```
+
+---
+
+## The Bottom Line
+
+**0.157 gave you fullscreen transcripts, background server auto-start, and GPT-6 Sol/Luna. 0.158 makes them reliable.**
+
+Copy that preserves formatting. Windows sandbox that doesn't lie. MCP OAuth for enterprise. Approvals that don't abort. Mermaid that explains itself. This is the quality-of-life release where the paper cuts you've been tolerating — the ones that add up to "I'll just use something else" — finally heal.
+
+---
+
+## Related Articles
+
+- [Codex 0.157: GPT-6 Sol/Luna, Fullscreen Transcripts, Background Server](/blog/codex-0-157-gpt6-sol-luna-fullscreen-transcripts/)
+- [Codex 0.156: TUI, Voice, Worktrees, and GPT-6 Arrive](/blog/codex-0-156-tui-voice-worktrees-gpt6/)
+- [Codex vs Claude Code: The Terminal Battle Nobody Expected](/blog/claude-code-vs-codex-terminal-battle/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Release: [Codex 0.158.0](https://github.com/openai/codex/releases/tag/rust-v0.158.0) · [Install](https://github.com/openai/codex#installation)*
+
+*Comparing agents is half the work. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** can simplify multi-model access while you test workflows.*
