@@ -1,0 +1,123 @@
+---
+title: "Hermes Agent Ships 5 Notable Fixes This Week — Symlink Containment, Git Hardening, Cron Visibility, and More"
+description: "A rundown of the most operator-visible Hermes agent fixes merged this week, from symlink safety in project context reads to cron scheduler UX and ACP tool-status completion."
+publishDate: 2026-09-28T12:00:00Z
+updatedDate: 2026-09-28T12:00:00Z
+heroImage: "/api/og?title=Hermes%20Agent%20Weekly%20Fixes%20Sep%202026&tool=Hermes%20Agent"
+tags: ["hermes-agent", "weekly-roundup", "fixes", "security"]
+category: "just-shipped"
+---
+
+Hermes Agent merged a cluster of operator-facing fixes this week. None are earth-shattering on their own, but together they clean up sharp edges that show up in daily use — symlink safety, cron visibility, ACP tool-status honesty, atomic ack writes, and JSON receipt hardening.
+
+Here's what changed and why it matters.
+
+---
+
+## 1. Project Context Files Now Respect Symlink Containment (Security Fix)
+
+**PR:** [#114443](https://github.com/NousResearch/hermes-agent/pull/114443) · Label: `type/security`, `comp/agent`, `P2`
+
+**The problem:** Hermes reads project context files (`AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.hermes.md`) to prime the agent. Until now, those reads followed symlinks without the containment check that subdirectory hints already use. A malicious symlink in a repo could point outside the project root and leak arbitrary files into the agent's context.
+
+**The fix:** Context-file reads now go through the same containment validator that hint resolution uses. Symlinks pointing outside the project root are rejected.
+
+**Why it matters:** This closes a path where a cloned repo could exfiltrate files from your filesystem into the agent transcript. If you `hermes init` in untrusted directories, this is the guard that keeps your home directory out of the conversation.
+
+---
+
+## 2. Four Git Call Sites Now Use the Hardened Git Environment (Security Fix)
+
+**PR:** [#114454](https://github.com/NousResearch/hermes-agent/pull/114454) · Labels: `type/security`, `comp/cli`, `comp/tui`, `comp/cron`, `tool/delegate`, `P1`, `sweeper:risk-security-boundary`
+
+**The problem:** Hermes has a hardened git execution wrapper (`git_with_hardened_env`) that strips dangerous config (`GIT_CONFIG_GLOBAL`, `GIT_CONFIG_SYSTEM`, etc.) and locks down `HOME`/`XDG_CONFIG_HOME` to prevent config injection. Four call sites — in CLI, TUI, cron, and the delegate tool — were bypassing it and calling `git` raw.
+
+**The fix:** All four sites now route through the hardened wrapper.
+
+**Why it matters:** Git config injection is a real supply-chain vector. A malicious repo with a crafted `.git/config` can execute arbitrary commands when Hermes runs `git status`, `git diff`, or `git log` during delegation. This fix ensures the same hardened environment protects every git invocation.
+
+---
+
+## 3. Cron Scheduler Finally Shows Overdue Jobs as Overdue
+
+**PR:** [#114444](https://github.com/NousResearch/hermes-agent/pull/114444) · Labels: `type/bug`, `comp/cli`, `comp/cron`, `P3`, `comp/dashboard`
+
+**The problem:** When the Hermes gateway goes down, recurring jobs' `next_run_at` timestamps freeze in the past. `hermes cron status`, `hermes cron list`, and the dashboard Cron page all rendered those past-due timestamps as ordinary "Next run" values — hiding the outage. The `doctor` command already flagged them as overdue (15-minute grace), but the main status surfaces disagreed.
+
+**The fix:**
+- Past-due slots now show an **overdue** label on CLI and dashboard
+- Earliest-slot selection compares actual UTC instants (not ISO-string lexicographic min)
+- Gateway-down path reports when the ticker last wrote a heartbeat
+- Display-only — no auto catch-up firing (that's a separate design in #114310)
+
+**Why it matters:** If your gateway restarts after a crash, you'll now see immediately which jobs fell behind instead of wondering why "Next run: 3 hours ago" looks normal.
+
+---
+
+## 4. External Worker Ack Published Atomically — No More Empty-File Races
+
+**PR:** [#114455](https://github.com/NousResearch/hermes-agent/pull/114455) · Labels: `type/bug`, `comp/cron`, `P2`, `sweeper:risk-automation`
+
+**The problem:** The scheduler wrote the external-worker ready-ack file with `O_CREAT` *before* writing content. The gateway's worker launcher polls `exists()` on that path — an unlucky poll reads a 0-byte file, logs a scary ERROR with traceback, and marks a healthy handoff as "ownership uncertain." This surfaced as misleading "Interrupted by shutdown" status on runs that actually completed.
+
+**The fix:** Write complete payload (with `flush()` + `fsync()`) to a private temp file, then `os.link()` it into place. `link()` raises `FileExistsError` if the ack already exists, preserving the original duplicate-worker guard — but the ack path is never observable in a half-written state.
+
+**Why it matters:** Eliminates a race that produced noisy logs and misleading job statuses on every cron run that uses external workers.
+
+---
+
+## 5. ACP Tool Calls Now Show Honest Terminal Status (Completed / Failed)
+
+**PR:** [#114453](https://github.com/NousResearch/hermes-agent/pull/114453) · Labels: `type/bug`, `comp/acp`, `P2`
+
+**The problem:** ACP clients (like Paseo) showed finished turns' tool calls as permanently `in_progress`. Blocked/denied calls projected no `tool.completed` event at all, and a double-pop race could close the wrong call when two same-name tools ran in one step.
+
+**The fix:**
+- `make_tool_progress_cb` handles `tool.completed`, closing the call with its own result
+- `make_step_cb` skips its close once a completion is seen for the turn (shared `turn_state`)
+- `flush_open_tool_calls` + `build_tool_abandoned` mark anything still open at turn end as `failed` — the honest state for a denied call
+- Per-turn maps flushed after the turn on both normal and executor-error paths
+
+**Why it matters:** ACP consumers (continuation features, dashboards, loggers) now see `read: completed / edit: failed` instead of `read: running / edit: running` forever. Downstream features that key off tool status as evidence of work stop misbehaving.
+
+---
+
+## Bonus: JSON Receipt/State Scans Hardened Against Non-Object Files
+
+**PR:** [#114451](https://github.com/NousResearch/hermes-agent/pull/114451) · Labels: `type/bug`, `duplicate`, `P1`, `sweeper:risk-session-state`, `sweeper:risk-message-delivery`
+
+**The problem:** `json.loads()` accepts any JSON value (scalars, arrays, strings). Scans treated parse success as "this is an object," then crashed on `.get()` / `["sequence"]` access. A single `json.dumps(42)` in a receipt file wedged the entire Bot Chat deferred queue on every scheduler tick until manually removed.
+
+**The fix:** New `parse_json_object()` / `read_json_object_file()` helpers in `utils.py` that require `isinstance(data, dict)` and raise `ValueError` otherwise. All audited scan/read sites wired through them. Existing `except (OSError, ValueError)` skip paths apply — healthy siblings continue, exact-id reads fail closed instead of overwriting.
+
+**Why it matters:** One corrupt/truncated/foreign JSON file can no longer stall cron Bot Chat delivery or abort directory sweeps across the codebase.
+
+---
+
+## How to Update
+
+```bash
+# If you installed via the installer
+hermes self-update
+
+# Or from source
+cd /path/to/hermes-agent
+git pull
+pip install -e .[all]
+```
+
+Run `hermes doctor` after updating — it validates config, gateway health, and now cron overdue status consistently across all surfaces.
+
+---
+
+## What's Still Open
+
+- **Catch-up firing on scheduler restart** — designed in #114310, not yet implemented
+- **Desktop GPU crash on NVIDIA 615 + Wayland** — needs repro (#114442)
+- **Windows browser_* blocks silently for 420s after profile lock** — no log, no spawn (#114443)
+
+Track them in the [Hermes Agent repo](https://github.com/NousResearch/hermes-agent/issues).
+
+---
+
+*This roundup covers PRs merged 2026-09-17 through 2026-09-28. For the raw firehose, watch the repo's merged PRs feed.*
