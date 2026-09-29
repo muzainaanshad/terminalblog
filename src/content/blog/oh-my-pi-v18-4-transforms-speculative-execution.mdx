@@ -1,0 +1,92 @@
+---
+title: "Oh My Pi Just Made Speculative Execution Actually Work — And Your Agent Got Faster"
+description: "Oh My Pi v18.4.3 (Sep 29) adds transformAssistantMessagePreservesToolCalls so stream speculation and direct speculative candidates run without rewriting tool calls, plus authorizeLaunch for speculative execution host. The daily-release agent keeps shipping control-plane upgrades that make agents feel like teammates."
+pubDate: "2026-09-29T14:00:00Z"
+tags: ["oh-my-pi", "release", "v18.4", "speculative-execution", "streaming", "coding-agent", "beginner"]
+tool: "oh-my-pi"
+author: "sage"
+image: "/api/og?title=Oh+My+Pi+v18.4+Speculative+Execution&tool=oh-my-pi"
+---
+
+Oh My Pi **v18.4.3** dropped September 29 — the third release in two days (v18.4.1 Sep 28, v18.4.2 Sep 28, v18.4.3 Sep 29). While other agents batch features into monthly drops, Oh My Pi ships control-plane upgrades within 24 hours.
+
+The headline this wave: **speculative execution that actually preserves your tool calls.**
+
+## 1. `transformAssistantMessagePreservesToolCalls` — Speculation Without the Corruption
+
+This is the architectural fix that makes speculative execution *usable* instead of *theoretical*.
+
+**The problem:** When an agent speculates (starts generating before the full context is ready), the streaming layer would rewrite tool calls in the assistant message. That meant your carefully crafted function calls got mangled mid-stream — breaking the very thing speculation was supposed to accelerate.
+
+**The fix:** `transformAssistantMessagePreservesToolCalls` lets stream speculation and direct speculative candidates run under a `transformAssistantMessage` that **never rewrites streamed tool calls**.
+
+**Why beginners care:** Your agent thinks faster *and* its tool calls arrive intact. No more "the agent started writing code but the function call got corrupted."
+
+## 2. `authorizeLaunch` — Speculative Execution Host Gets a Gate
+
+The speculative execution host now has `authorizeLaunch` — a gate that controls when speculative candidates are allowed to spawn. This prevents runaway speculation from consuming resources on tasks that don't benefit from it.
+
+**Practical impact:** Speculation fires when it helps (complex multi-step tasks), stays quiet when it doesn't (simple Q&A). Your token budget thanks you.
+
+## 3. Tool Execution End Events — Live UI That's Actually Live
+
+v18.4.2 added `tool_execution_end` events that fire as each tool call settles. This means your UI updates *as tools complete*, not in batches.
+
+- Emitted tool result messages in the order of tool calls, preserving call order regardless of completion order
+- Reduced repeated token-counting work with a shared cache
+
+For you: the agent's progress bar, token counter, and tool timeline all update in real time — not after the fact.
+
+## 4. Fitted Output Caps Fixed — No More 400s on Strict Hosts
+
+v18.4.1 fixed a subtle but painful bug: fitted output caps were overshooting the context window by a few tokens on strict Chat Completions hosts (e.g., llama.cpp), causing 400 errors. Also fixed native remote compaction sending requests already estimated past the model's context window.
+
+**Translation:** Local models (Ollama, llama.cpp, LM Studio) stop erroring out on long contexts. The agent compacts *before* it hits the limit.
+
+## 5. The Daily Cadence Is the Real Feature
+
+Oh My Pi releases **every single day**. Three releases in 48 hours. While other agents batch features into monthly drops, Oh My Pi ships fixes and improvements within 24 hours.
+
+| If you... | What this means |
+|-----------|-----------------|
+| Found a bug yesterday | Fixed in tonight's build |
+| New model drops | Provider support often lands same week |
+| Provider API breaks | Patched before you hit it |
+
+The tradeoff: you update frequently (`npm update -g @oh-my-pi/pi-agent` or let the desktop auto-updater handle it). The payoff: the tool evolves *with* the ecosystem instead of lagging behind.
+
+## What This Looks Like in Practice
+
+**Scenario:** You ask Oh My Pi to refactor a React component using the new compiler API.
+
+1. Agent starts writing the old pattern
+2. You notice and type: "use the new compiler API, not the legacy one" (live steering from v18.3)
+3. Agent pivots mid-response, rewrites using the new API
+4. Speculative execution kicks in — the next tool call starts before the current one finishes
+5. Tool calls arrive intact (v18.4.3 fix), UI updates live (v18.4.2)
+6. You get the right code on the first try — no iteration loop
+
+## How to Get It
+
+```bash
+npm update -g @oh-my-pi/pi-agent
+# or if you use the desktop app, it auto-updates
+```
+
+Confirm with `pi --version` — you want `18.4.3` or later.
+
+## The Bottom Line
+
+Oh My Pi v18.4 isn't a feature parade — it's a **control-plane upgrade**. Speculative execution that preserves tool calls. Live tool events. Context-window safety on local models. And the daily cadence means the tool you use tomorrow is already better than the one you used today.
+
+If you've been frustrated by agents that run away with the wrong assumption, corrupt tool calls during streaming, or choke on local model context limits — this wave fixes that.
+
+---
+
+*Oh My Pi is open-source and available at [github.com/can1357/oh-my-pi](https://github.com/can1357/oh-my-pi).*
+
+## Related articles
+
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+- [Goose Just Got a Voice — And It's Changing How We Talk to AI Agents](/blog/goose-just-got-a-voice-and-its-changing-everything/)
+- [Cline Desktop Just Put Your PR Card Right in the Composer — Windows Users Finally Get Working Updates](/blog/cline-desktop-free-coding-models-zero-api-keys/)
