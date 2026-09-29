@@ -1,0 +1,180 @@
+---
+title: "Claude Code Just Made Sonnet 5.5 Default and Added Gateway Spend Tracking — Here's What Changed"
+description: "Claude Code v2.1.284 drops Sonnet 5.5 as the new default (1M context, cheaper pricing), adds dollar-amount spend tracking in /usage and the status line, gateway hint headers for LLM proxies, and 80+ fixes across MCP, sessions, VS Code, Windows, and cloud. The quiet quality release that makes daily work smoother."
+pubDate: 2026-09-29T10:00:00Z
+tags: ["claude-code", "release", "coding-agents", "beginner", "sonnet-5-5", "gateway", "mcp", "windows"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+v2.1.284+Sonnet+5.5+Default+Gateway+Fixes&tool=claude-code"
+---
+
+Claude Code v2.1.284 dropped September 28, and it's the kind of release that **changes the model you use by default** and **finally shows you real dollar amounts** instead of token counts.
+
+Sonnet 5.5 is now the default Sonnet model on the Anthropic API — 1M context, $2/$10 per Mtok with $0.20/Mtok cache reads. If you've been pinning Opus for context or paying for Max plan to avoid limits, this shifts the economics.
+
+Plus: gateway hint headers for corporate proxies, dollar-amount spend limits in `/usage` and the status line, `/mcp reconnect all`, and **80+ fixes** that clean up the daily friction.
+
+---
+
+## 1. Sonnet 5.5 Is Now the Default — 1M Context, Cheaper Than Opus
+
+```bash
+# What this means for you:
+# - 1M context window (vs 200K on Sonnet 4)
+# - $2/Mtok input, $10/Mtok output (vs $3/$15 on Sonnet 4)
+# - $0.20/Mtok cache reads
+# - Available on Anthropic API, Vertex AI, AWS Bedrock
+```
+
+If you're on the Anthropic API, **you just got a massive context upgrade for less money**. No config change needed — `claude --version` and you're on it.
+
+For teams on the Max plan: Sonnet 5.5's 1M context means fewer compactions, fewer "prompt too long" errors, and longer uninterrupted sessions.
+
+---
+
+## 2. Dollar-Amount Spend Tracking — Finally, Real Money in `/usage`
+
+```bash
+/usage
+# Now shows: "$271.40 / $500.00 spent this month"
+# Status line shows: "rate_limits.spend_limit" with used_usd, limit_usd, period
+```
+
+**No more mental math converting tokens to dollars.** The gateway spend limit now displays actual USD amounts in:
+- `/usage` command output
+- The status line (bottom of terminal)
+- `/rate-limit-options` (new command added to `/help` and command menu for claude.ai subscribers)
+
+If you run a team or manage budgets, this is the visibility you've been asking for.
+
+---
+
+## 3. Gateway Hint Headers — Your LLM Proxy Finally Knows What's Happening
+
+If you route Claude Code through LiteLLM, Portkey, a corporate gateway, or any third-party relay:
+
+```bash
+export CLAUDE_CODE_GATEWAY_HINT_HEADERS=1
+```
+
+New header: `x-claude-code-prompt-id` — **groups all API requests that serve one user prompt**.
+
+Your gateway can now correlate: *"these 5 requests = one user question"* instead of seeing disconnected fragments. Debugging, rate limiting, and cost attribution just became possible.
+
+---
+
+## 4. `/mcp reconnect all` — One Command to Fix All Failed MCP Servers
+
+```bash
+/mcp reconnect all
+```
+
+Retries **every MCP server that failed to connect or needs authentication at once**. No more clicking through each one manually when your proxy redeploys or auth expires.
+
+---
+
+## 5. The 80+ Fixes You'll Feel Every Day
+
+### MCP & Sessions
+- **MCP tool calls in resumed sessions** now wait up to 10 seconds for the server to connect (fixes "No such tool available" on resume)
+- **stdio MCP servers** no longer orphan when session ends mid-startup
+- **Brief 404 from stateless remote MCP** (proxy redeploy) no longer bricks the server for the session
+- **Damaged cached message list** on resume → rebuilt instead of crashing
+- **Malformed system message** or memory-saved notice without file list → handled gracefully
+
+### Windows — Critical Security Fix
+PowerShell's `Remove-Item` refuses to delete drive roots (`C:\`), home folder, and protected paths. But the PowerShell tool was letting `cmd /c rd`, `rmdir`, `del`, `erase` **bypass that protection**.
+
+**Now it doesn't.** The same guardrails apply regardless of which command variant you use.
+
+### VS Code Extension — 15+ Fixes
+| Fix | Why You Care |
+|-----|--------------|
+| Permission mode indicator stuck on "Default" while session runs in auto/bypass | Now retries the switch until it lands |
+| Session teleported from web drops messages sent while Claude worked | Fixed — messages preserved |
+| Web session hidden from session list, empty chat opens instead | Fixed |
+| Reopened session splits a turn at mid-turn message | Fixed |
+| Reloaded session shows rewound-away turn or pre-compaction rows | Fixed |
+| Footer agents pill icon off-center in narrow panels | Fixed |
+| Chat input text below cursor after pasting multi-line prompt | Fixed |
+| `CLAUDE_CONFIG_DIR` in settings now only applies when absolute path | Prevents config bleed |
+| Sign-in waiting up to a minute for Python extension after reload | Fixed |
+| Tabs that stopped responding after Restart Extensions | Now reopen on their conversation |
+
+### Cloud & Enterprise
+- Private repos your GitHub account can read (but not push) now attach for reading in cloud sessions
+- Cloud sessions no longer redo finished steps (duplicate comments/pushes) after server-side restart
+- Code Review: `@claude review` retries once if GitHub fails to return PR
+- New routine schedules default to "few minutes past the hour" (on-the-hour can start late)
+
+### Self-Hosted Runner & Gateway
+- Lifecycle hooks' git skips Git LFS `pre-push`, ignores writable `core.hooksPath`
+- Added `mantle` upstream provider for Amazon Bedrock's Mantle endpoint
+- Opt-in `load_test_mode` for gateway: requests built/signed but not sent upstream; clients get canned reply
+- Gateway now accepts request headers up to 256 KiB (fixes 431 errors from identity providers with many groups)
+
+### Quality of Life
+- **First-reply latency improved** — pattern-compile step moved from end of first reply to streaming
+- **First-request latency improved** — reuses preconnected API connection
+- **Startup faster** — `claude -p` and Remote no longer load interactive UI; auto-mode classifier and Artifact tool load on first use
+- **Compaction spinner** — timer starts when compaction begins, counts summary tokens as they stream (replaces percentage bar)
+- **MCP tool list** — shows more tools, scrolls with page keys/mouse, marks org-blocked tools with warning icon
+- **MCP tool results** — images returned by MCP tools now saved to file so Bash, Read, and other tools can open them
+- **All major pickers** (`/help`, `/hooks`, `/copy`, `/chrome`, `/memory`, `/ide`, `/release-notes`, `/rewind`, `/diff`, `/remote-env`, `/plugin`) — page keys, mouse wheel, clicks
+
+---
+
+## 6. Auto Mode Is Now Default for New Sessions
+
+Interactive terminal and VS Code sessions now **start in auto mode when no permission mode is configured**, on every plan and provider. `permissions.defaultMode` still overrides it.
+
+This means new users get the "just works" experience immediately — no permission prompt flood on first run.
+
+---
+
+## 7. Ultracode Is Now Its Own Toggle
+
+Ultracode moved to its own toggle in `/effort` (Tab, or `/effort ultracode [on|off]`). It **no longer forces xhigh effort** and **stays on at any effort level**. The model pill shows "· Ultracode" at any effort level.
+
+---
+
+## Updating
+
+```bash
+# Auto-updates on next launch, or force:
+claude update
+```
+
+Verify: `claude --version` → should show `2.1.284`
+
+---
+
+## Why This Release Matters
+
+v2.1.284 doesn't add a feature you'll demo. **It shifts the economics (Sonnet 5.5 default), gives you real money visibility (dollar spend tracking), makes your gateway debuggable (hint headers), and removes 80+ paper cuts.**
+
+- **Budget owners**: dollar spend tracking = no more token math
+- **Gateway operators**: hint headers = debuggable traffic
+- **MCP users**: `/mcp reconnect all` + resume fixes = trust in background work
+- **Windows users**: protected folders actually protected = peace of mind
+- **VS Code users**: 15+ fixes = session fidelity that matches terminal
+- **Teams on Max plan**: Sonnet 5.5 1M context = fewer compactions, longer sessions
+- **Everyone**: 80+ fixes = the tool gets out of your way
+
+This is the release where Claude Code **stops feeling like software you work around** and starts feeling like infrastructure you rely on.
+
+Update. Run `/usage` and see real dollars. Enjoy the quiet.
+
+---
+
+## Related articles
+
+- [Claude Code v2.1.283 Just Fixed the Gateway, Prompt Audit, and MCP Progress](/blog/claude-code-v2-1-283-gateway-hints-prompt-audit-mcp-progress-fixes/)
+- [Claude Code Just Made Opus 5.5 Default and Fixed 100+ Things](/blog/claude-code-v2-1-280-opus-5-5-default-massive-fix-wave/)
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+- [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
+- [Beware: Hermes Agent Security Audit Uncovers Credential Bypass, Sandbox Escape, and Session Hijacking](/blog/beware-hermes-agent-security-audit-5-high-severity-findings/)
+
+---
+
+*Claude Code is available at [github.com/anthropics/claude-code](https://github.com/anthropics/claude-code) and [claude.ai/code](https://claude.ai/code).*
