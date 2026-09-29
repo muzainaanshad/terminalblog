@@ -1,6 +1,6 @@
 ---
 title: "Mimo Code: When Vision Meets Coding Agents"
-description: "The first coding agent that can see your screen and understand your code visually."
+description: "The first coding agent that can see your screen and understand your code visually — a fork of OpenCode with vision capabilities for frontend development."
 pubDate: "2026-07-08T12:00:00Z"
 updatedDate: "2026-07-08T12:00:00Z"
 tags: ["opinion", "mimo", "vision", "ui"]
@@ -19,13 +19,117 @@ For developers building UIs, this is the first coding agent that truly understan
 
 Mimo Code is an OpenCode fork with vision capabilities added. The foundation is solid, the extension is meaningful. For developers who work on visual products, Mimo is worth watching.
 
----
+## How Vision Changes the Agent Loop
 
+Traditional coding agent loop:
+```
+User describes bug → Agent reads code → Agent suggests fix → User applies → Test
+```
+
+Mimo's vision-augmented loop:
+```
+User shows screen → Agent sees bug visually → Agent reads relevant code → Agent suggests fix with visual context → User applies → Test
+```
+
+The difference: **context compression**. Instead of describing "the dropdown overlaps the header on mobile Safari," you screenshot it. Mimo sees the overlap, identifies the CSS conflict, and suggests the exact fix.
+
+## What Mimo Can Actually See
+
+| Visual Input | What Mimo Extracts |
+|--------------|-------------------|
+| **Browser screenshot** | Layout issues, overflow, z-index conflicts, responsive breakpoints |
+| **Terminal output** | Error stacks, test failures, build logs, lint warnings |
+| **IDE screenshot** | Current file, cursor position, inline errors, git diff highlights |
+| **Mobile simulator** | Touch target sizes, safe area violations, orientation bugs |
+
+## Technical Architecture
+
+Mimo builds on OpenCode's skill system:
+
+```
+OpenCode Core (slash commands, skills, multi-provider)
+    ↓
+Vision Module (screenshot capture → VLM → structured output)
+    ↓
+Skill Extensions (vision-aware skills for frontend, mobile, debugging)
+```
+
+The vision module uses a vision-language model (VLM) — currently GPT-4V or Claude 3.5 Sonnet via API — to convert screenshots into structured observations:
+
+```json
+{
+  "type": "layout_issue",
+  "severity": "high",
+  "description": "Fixed header overlaps dropdown menu on viewport < 768px",
+  "affected_elements": ["header#main", "nav.dropdown"],
+  "suggested_fix": "Add z-index: 1000 to header; dropdown needs z-index: 999"
+}
+```
+
+## Use Cases Where Vision Wins
+
+### 1. CSS Debugging Without DevTools
+```
+User: [screenshot of broken layout]
+Mimo: "The .card grid has no gap, causing cards to touch. Add gap: 1rem to .card-grid"
+```
+
+### 2. Terminal Error Triage
+```
+User: [screenshot of red test output]
+Mimo: "Test fails at line 47: expect(received).toBe(expected). Received: undefined. 
+       Check if async data loads before assertion — add await waitFor()."
+```
+
+### 3. Mobile Responsive Issues
+```
+User: [screenshot from iPhone simulator]
+Mimo: "Button touches screen edge — violates 44pt touch target. Add padding: 12px 24px."
+```
+
+### 4. Design System Compliance
+```
+User: [screenshot of new feature]
+Mimo: "Primary button uses #3B82F6 but design system specifies #2563EB. 
+       Border radius 8px vs spec 6px. Icon missing aria-label."
+```
+
+## Limitations
+
+- **No code execution from vision** — Mimo sees and suggests; you apply
+- **VLM latency** — 2-5s per screenshot analysis
+- **API cost** — Vision models are expensive; local VLM support planned
+- **Not a replacement for deep code understanding** — Still needs to read your codebase
+
+## The Fork Advantage
+
+Being an OpenCode fork means Mimo inherits:
+- **Skill system** — Write vision-aware skills as markdown
+- **Multi-provider** — Route vision to GPT-4V, Claude, or local VLMs
+- **Slash commands** — `/vision-analyze`, `/vision-debug`, `/vision-audit`
+- **Local-first** — Works with Ollama for text, API for vision
+
+## Who Should Watch Mimo
+
+- **Frontend teams** doing heavy UI work
+- **Mobile developers** debugging simulator issues
+- **Design system maintainers** auditing compliance
+- **Full-stack devs** who context-switch between terminal and browser
+
+## The Bigger Picture
+
+Vision is the next frontier for coding agents. Cursor has experimental vision. Cline has browser automation. Goose is adding it. But Mimo is the **first to make vision a first-class citizen in the agent loop**, not a side feature.
+
+If you build visual products, the agent that sees what you see will eventually replace the one that only reads what you write.
+
+---
 
 ## Related articles
 
 - [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)
 - [What Developers Think About Coding Agents — The Skill Atrophy Crisis, Interface Wars, and Trust Divide From 500 HN Comments](/blog/hn-developer-divide-coding-agents-interface-skill-atrophy/)
 - [Model Musical Chairs: What 500 Hacker News Comments Reveal About the Death of AI Model Loyalty](/blog/model-musical-chairs-hn-developers-death-of-ai-loyalty/)
+
 ---
+
 *Sometimes Claude writes better code. Sometimes GPT does. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** lets you compare both instantly in one chat for $12/mo — plus 7 more premium models.*

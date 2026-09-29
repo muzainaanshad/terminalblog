@@ -23,13 +23,70 @@ The trade-off is depth. OpenClaw can't match Claude Code's codebase understandin
 
 But generalists win long-term. As AI assistants mature, the ones that work everywhere will replace the ones that work in one place. OpenClaw is already there.
 
----
+## The Technical Architecture
 
+OpenClaw's cross-platform capability isn't magic — it's deliberate architecture:
+
+| Layer | Technology | Why It Matters |
+|-------|------------|----------------|
+| **Core runtime** | Rust + WebAssembly | Same binary runs everywhere; WASM for sandboxed tools |
+| **UI layer** | Tauri (WebView) | Native OS windows, no Electron bloat |
+| **Sync protocol** | ACP (Agent Communication Protocol) | End-to-end encrypted state sync across devices |
+| **Model access** | Local + remote | Uses Ollama locally, falls back to API providers remotely |
+
+The key insight: **the agent core is a library, not an app**. OpenClaw embeds the same `openclaw-core` crate in the desktop app, the CLI, the mobile app, and the server daemon. Platform-specific code only touches UI and system integration (file watchers, notifications, keychain).
+
+## ACP: The Protocol That Makes It Work
+
+ACP (Agent Communication Protocol) is OpenClaw's secret weapon. It's not just sync — it's **agent-to-agent communication**:
+
+```json
+{
+  "type": "task.handoff",
+  "from": "mobile-agent",
+  "to": "desktop-agent",
+  "payload": {
+    "context": "researching React Server Components patterns",
+    "artifacts": ["urls", "code-snippets", "notes"],
+    "intent": "continue-on-desktop"
+  }
+}
+```
+
+Your mobile agent doesn't just "sync files" — it briefs your desktop agent. The desktop agent knows *what you were doing* and *what you want next*. This is fundamentally different from iCloud/Dropbox sync.
+
+## Real Workflows That Change
+
+| Workflow | Before (Single-Platform) | After (OpenClaw) |
+|----------|--------------------------|------------------|
+| **Code review on the go** | Can't do it on phone | Phone agent fetches PR, summarizes diffs, you approve |
+| **Incident response** | Need laptop + VPN | Phone agent alerts, you acknowledge, desktop agent runs runbook |
+| **Learning new framework** | Bookmarks lost between devices | Research session persists; agent builds knowledge graph |
+| **Pair programming remote** | Screen share + one agent | Each dev has local agent; agents sync context via ACP |
+
+## The Specialist vs Generalist Trade-off
+
+OpenClaw admits it: **it's not the best at any single thing**.
+
+- **Code intelligence**: Claude Code > OpenClaw
+- **Inline editing**: Cursor > OpenClaw
+- **GitHub integration**: Copilot CLI > OpenClaw
+- **Terminal UX**: Goose/Hermes > OpenClaw
+
+But OpenClaw is **the only one that does all of them, everywhere**.
+
+The industry pattern is clear: **generalist platforms absorb specialists**. The web browser replaced dedicated FTP clients, email clients, RSS readers. The smartphone replaced GPS units, cameras, MP3 players. The cross-platform AI assistant will replace the terminal-only, IDE-only, browser-only agents.
+
+OpenClaw is 2 years ahead on this. The 382K GitHub stars aren't for its code intelligence — they're for the vision.
+
+---
 
 ## Related articles
 
 - [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)
 - [What Developers Think About Coding Agents — The Skill Atrophy Crisis, Interface Wars, and Trust Divide From 500 HN Comments](/blog/hn-developer-divide-coding-agents-interface-skill-atrophy/)
 - [Model Musical Chairs: What 500 Hacker News Comments Reveal About the Death of AI Model Loyalty](/blog/model-musical-chairs-hn-developers-death-of-ai-loyalty/)
+
 ---
+
 *Ever wonder if Claude gives a better answer than GPT for a specific coding problem? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** lets you compare 9+ premium models side-by-side in one chat. No more juggling tabs.*
