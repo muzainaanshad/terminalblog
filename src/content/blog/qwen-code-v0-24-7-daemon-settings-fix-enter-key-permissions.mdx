@@ -1,0 +1,118 @@
+---
+title: "Qwen Code 0.24.7 Just Fixed the Daemon Settings Leak That Broke Your Config"
+description: "Qwen Code v0.24.7 patches a daemon settings isolation bug, stops swallowing Enter during completions, honors cross-directory permission approvals, and aligns Code Mode text with lazy tool discovery. The quiet patch that makes the managed runtime actually reliable."
+pubDate: 2026-09-29T12:00:00Z
+tags: ["qwen-code", "release", "coding-agents", "beginner", "managed-runtime", "daemon", "permissions", "open-source"]
+tool: "qwen-code"
+author: "sage"
+image: "/api/og?title=Qwen+Code+0.24.7+Daemon+Fix+Permissions+Enter+Key&tool=qwen-code"
+---
+
+Qwen Code **v0.24.7** dropped September 29, just three days after the massive v0.24.6 managed runtime release. This isn't a feature drop — it's **the stabilization patch that makes the managed runtime work in the real world**.
+
+The headline fix: **daemon extension settings were leaking across processes**, corrupting shared state. If you ran multiple Qwen sessions or had the daemon running alongside CLI invocations, settings from one bled into another. v0.24.7 isolates those loads.
+
+Plus: Enter key no longer gets swallowed while completions load, cross-directory tool approvals are finally honored, and Code Mode text aligns with lazy tool discovery. The "it works on my machine" managed runtime just became "it works on your machine too."
+
+---
+
+## 1. Daemon Settings Isolation — The Bug That Made Config Unreliable
+
+**PR [#13022](https://github.com/QwenLM/qwen-code/pull/13022)** fixes the root cause of "why does my config work sometimes but not others?"
+
+**The problem:** The daemon loads extension settings into shared process state. When multiple CLI instances or the daemon itself accessed settings concurrently, they stomped on each other. Your `qwen-code` in terminal A would mysteriously inherit settings from terminal B's session.
+
+**The fix:** Daemon extension settings loads are now isolated from shared process state. Each invocation gets its own clean settings snapshot.
+
+**Why this matters for you:** If you run Qwen Code in multiple terminals, in CI, or have the daemon running for managed runtime — **your config is finally deterministic**. No more "it worked yesterday" debugging sessions.
+
+---
+
+## 2. Enter Key No Longer Swallowed During Completions
+
+**PR [#13015/#13021](https://github.com/QwenLM/qwen-code/pull/13015)** fixes one of the most frustrating UX papercuts: **typing Enter while completion suggestions are loading would silently drop the keystroke.**
+
+You'd type a command, hit Enter to execute, and... nothing. The completion loader was eating the key event. Now Enter is properly handled regardless of completion state.
+
+**For beginners:** This was the "is it lag or is it broken?" moment that made the CLI feel unpolished. Fixed.
+
+---
+
+## 3. Cross-Directory Permission Approvals Finally Work
+
+**PR [#12987](https://github.com/QwenLM/qwen-code/pull/12987)** honors approved cross-directory tool calls.
+
+Previously, if you approved a tool call that accessed files outside the current working directory, the approval wasn't persisted correctly. Next time, you'd get prompted again. Now the approval sticks — the permission model respects your "yes, I meant that" across directory boundaries.
+
+---
+
+## 4. Code Mode Text Aligns With Lazy Tool Discovery
+
+**PR [#12990](https://github.com/QwenLM/qwen-code/pull/12990)** aligns the Code Mode display text with the new lazy tool discovery system.
+
+**What this means:** The UI now accurately reflects which tools are *actually* available vs. which are *discoverable*. No more seeing a tool listed that isn't loaded yet, or missing one that is. The mental model matches reality.
+
+---
+
+## 5. The Rest of the Patch Wave (Quick Hits)
+
+| Fix | PR | Why You'll Notice |
+|-----|-----|-------------------|
+| **Runtime-broker: Close deferred W0c-2 findings** | [#12975](https://github.com/QwenLM/qwen-code/pull/12975) | Hardened broker guards — fewer silent failures in managed runs |
+| **Run safe Code Mode calls concurrently** | [#12931](https://github.com/QwenLM/qwen-code/pull/12931) | Parallel execution for independent safe calls — faster batch work |
+| **Runtime-broker: Read ready/seed/request as integers exactly** | [#12972](https://github.com/QwenLM/qwen-code/pull/12972) | Type correctness in broker protocol — eliminates a class of deserialization bugs |
+| **Recover Workspace holders after trusted local reboot (W0e-3)** | [#12869](https://github.com/QwenLM/qwen-code/pull/12869) | Managed workspaces survive machine reboot — critical for long-running autonomous tasks |
+
+---
+
+## What This Means for You
+
+| If you're... | Do this |
+|--------------|---------|
+| **On v0.24.6** | **Update immediately.** The daemon settings leak and Enter key bug affect daily usability. The cross-dir permission fix matters if you work across directories. |
+| **Evaluating managed runtime** | v0.24.7 is the version where the managed runtime is *actually* usable. The broker fixes + settings isolation + workspace recovery = the infrastructure holds. |
+| **Running in CI/production** | The integer parsing fix (#12972) and workspace recovery (#12869) are the ones that prevent "works locally, fails in CI" surprises. |
+| **New to Qwen Code** | Start at v0.24.7. You skip the settings leak bug entirely. The managed runtime + advisor tool + Java SDK stack is now battle-tested. |
+
+---
+
+## How to Update
+
+```bash
+# npm (recommended)
+npm i -g @qwen-code/qwen-code@latest
+
+# Verify
+qwen-code --version
+# Should show 0.24.7
+
+# Desktop app (separate channel — check GitHub Releases for v0.3.0+)
+# Download from https://github.com/QwenLM/qwen-code/releases
+```
+
+---
+
+## The Pattern: v0.24.6 Built It, v0.24.7 Hardened It
+
+Qwen Code's last two releases tell a clear story:
+
+| Release | Theme | What Shipped |
+|---------|-------|--------------|
+| **v0.24.6** (Sep 26) | **Infrastructure** | Managed runtime, durable sessions, failover, advisor tool, Java SDK, 60% faster startup |
+| **v0.24.7** (Sep 29) | **Hardening** | Daemon settings isolation, Enter key fix, cross-dir permissions, Code Mode text alignment, broker integer correctness, workspace reboot recovery |
+
+This is the **healthy open-source cadence**: ship the ambitious infrastructure, then *immediately* patch the integration bugs that only show up at scale. v0.24.6 was the "it works in the lab" release. v0.24.7 is the "it works on your machine" release.
+
+---
+
+## Related articles
+
+- [Qwen Code v0.24.6 — Managed Runtime, Advisor Tool, Java SDK, 60% Faster Startup](/blog/qwen-code-v0-24-6-managed-runtime-advisor-tool-breakthrough/)
+- [Qwen Code Finally Knows When to Give Up — Now It Calls Claude Code for Help](/blog/qwen-code-v0-23-1-goals-pause-stuck-worktree-tasks/)
+- [Qwen Code v0.21.8 Fixed a Trust Boundary and Shared Prompt Caches](/blog/qwen-code-v0-21-8-trust-cache-fork-autofix/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [OpenHands Agent Canvas 1.10.0: Persistent Memory & Automations](/blog/openhands-agent-canvas-1-10-0-persistent-memory-automations/)
+
+---
+
+*Qwen Code is open-source (Apache-2.0) and available at [github.com/QwenLM/qwen-code](https://github.com/QwenLM/qwen-code). Full changelog: [v0.24.7 release notes](https://github.com/QwenLM/qwen-code/releases/tag/v0.24.7).*
