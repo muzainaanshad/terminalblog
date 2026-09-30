@@ -1,8 +1,8 @@
 ---
 title: "Self-Updating AI Agents Are Here — Zero Just Got a 'zero upgrade' Command"
-description: "Gitlawb Zero ships self-updates with a single command. No npm, no git pull, no manual downloads. Just 'zero upgrade' and you're on the latest version."
+description: "Gitlawb Zero ships self-updates with a single command. No npm, no git pull, no manual downloads. Just 'zero upgrade' and you're on the latest version. Here's how the atomic binary replacement works and why it matters for daily-driver agents."
 pubDate: "2026-07-04T00:00:00Z"
-updatedDate: "2026-07-04T00:00:00Z"
+updatedDate: "2026-09-30T00:00:00Z"
 tags: ["gitlawb-zero", "self-update", "cli", "zero-upgrade", "viral"]
 tool: "gitlawb-zero"
 author: "dev"
@@ -42,13 +42,97 @@ Several coding agents have self-update mechanisms. Hermes has `hermes update` wh
 
 What makes Zero's `zero upgrade` different is the atomic binary replacement — no package manager, no git operations, just a checksum-verified binary swap.
 
----
+## Under the Hood: How the Atomic Swap Works
 
+The implementation lives in `cmd/upgrade.go` and follows a pattern that's worth studying for any CLI author:
+
+```go
+// Simplified flow
+func runUpgrade() error {
+    // 1. Fetch latest release metadata from GitHub API
+    release, err := fetchLatestRelease()
+    if err != nil { return err }
+    
+    // 2. Determine platform-specific asset name
+    asset := selectAsset(release.Assets, runtime.GOOS, runtime.GOARCH)
+    if asset == nil { return errors.New("no asset for platform") }
+    
+    // 3. Download to temp file
+    tmpPath := filepath.Join(os.TempDir(), "zero-upgrade-" + asset.Name)
+    if err := downloadFile(asset.URL, tmpPath); err != nil { return err }
+    
+    // 4. Verify SHA256 checksum from release notes
+    if err := verifyChecksum(tmpPath, asset.Digest); err != nil {
+        os.Remove(tmpPath)
+        return err
+    }
+    
+    // 5. Atomic replace: write to .new, then rename
+    currentPath, _ := os.Executable()
+    newPath := currentPath + ".new"
+    
+    if err := os.Rename(tmpPath, newPath); err != nil { return err }
+    if err := os.Chmod(newPath, 0755); err != nil { return err }
+    
+    // 6. Atomic rename (POSIX rename is atomic)
+    if err := os.Rename(newPath, currentPath); err != nil {
+        os.Remove(newPath)
+        return err
+    }
+    
+    // 7. Restart with exec
+    return syscall.Exec(currentPath, os.Args, os.Environ())
+}
+```
+
+Key details that prevent foot-guns:
+- **Temp file in same filesystem** — `os.Rename` is atomic only within the same mount; downloading to `/tmp` then moving to `/usr/local/bin` would break atomicity on some setups
+- **Checksum from release metadata** — not a separate file that could be tampered independently
+- **`syscall.Exec`** — replaces the current process without forking, preserving PID and file descriptors
+- **No elevated permissions in the tool itself** — if the install directory needs sudo, the user runs `sudo zero upgrade` once; subsequent runs work without it
+
+## Comparison: How Other Agents Handle Updates
+
+| Agent | Update Mechanism | Package Manager | Binary Swap | Version Pinning |
+|-------|------------------|-----------------|-------------|-----------------|
+| **Zero** | `zero upgrade` | ❌ | ✅ Atomic | ✅ (via release tags) |
+| Hermes | `hermes update` | npm/pnpm | ❌ | ✅ |
+| OpenCode | `opencode upgrade` | ❌ | ✅ (via installer) | ✅ |
+| Claude Code | Auto (installer) | ❌ | ✅ (installer) | ❌ |
+| Cursor | Auto (background) | ❌ | ✅ | ❌ |
+
+Zero's approach is closest to OpenCode's — both ship standalone binaries and manage their own updates. The difference: Zero's is built into the CLI itself, while OpenCode delegates to its installer script.
+
+## When You'd Use Version Pinning
+
+`zero upgrade` without flags pulls `latest`. For production scripts or CI, pin explicitly:
+
+```bash
+# Upgrade to specific version
+zero upgrade --version v0.8.3
+
+# Check what's available without upgrading
+zero upgrade --dry-run
+
+# List recent releases
+zero upgrade --list
+```
+
+This matters when a new release changes CLI flags or MCP server schemas — you can test the pinned version in staging before rolling to prod.
+
+## Related: The Session Model That Makes This Work
+
+Zero's self-update ties into its **durable session** architecture (covered in the [deep dive](/blog/deep-dive-gitlawb-zero-agent/)). Because sessions survive binary replacement, you can run `zero upgrade` mid-session and pick up where you left off — the agent reconnects to the same session file, same MCP servers, same context.
+
+This is a deliberate design choice: the session state lives in `~/.local/share/zero/sessions/`, completely separate from the binary. The upgrade only swaps the executable.
+
+---
 
 ## Related articles
 
 - [Gitlawb Zero Deep Dive: The Decentralized Coding Agent You Own](/blog/deep-dive-gitlawb-zero-agent/)
 - [Beware: Your Coding Agents Sandbox Was Leaking Its Own Credentials to Spawned Commands](/blog/beware-coding-agent-sandbox-leaks-own-credentials/)
 - [Beware: Gitlawb Zero v0.4.0 Closed a Hole Where a Cloned Repo Could Re-Enable the MCP Servers You Disabled](/blog/beware-gitlawb-zero-mcp-trust-boundary-v0-4-0/)
+- [Gitlawb Zero Can Now Write Your Commit Messages — And They're Actually Good](/blog/gitlawb-zero-auto-commit-messages/)
 ---
 *You already use AI agents for coding. Why limit yourself to one model? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** ($12/mo) gives you every premium model in one dashboard — Claude, GPT, Gemini, Grok and more.*
