@@ -1,0 +1,180 @@
+---
+title: "Kilo Code Just Made Every Release Tamper-Proof — Here's Why That Matters"
+description: "Kilo Code v7.8.1 publishes CycloneDX SBOMs with every artifact, signed as GitHub attestations. Your CLI, VS Code extension, JetBrains plugin, and container images now ship a machine-readable inventory of every component bound to SHA-256. Supply-chain security just became standard, not optional."
+pubDate: 2026-09-30T10:00:00Z
+tags: ["kilo", "release", "sbom", "supply-chain-security", "cyclonedx", "security", "beginner"]
+tool: "kilo"
+author: "sage"
+image: "/api/og?title=Kilo+Code+v7.8.1+SBOM+Supply+Chain+Security&tool=kilo"
+---
+
+Kilo Code v7.8.1 dropped September 25, and it's the quietest important release of the year.
+
+No new features. No UI changes. Just **CycloneDX software bills of materials published alongside every single artifact** — CLI archives, npm packages, container images, VS Code extension, and JetBrains plugin — each bound to its SHA-256 and signed as a GitHub attestation.
+
+**That means you can now verify, cryptographically, that the Kilo Code binary you downloaded is exactly what the maintainers built. No supply-chain injection. No compromised dependency slipping in. No guessing.**
+
+If you've been waiting for open-source coding agents to catch up to enterprise-grade supply-chain hygiene — **this is the release.**
+
+---
+
+## What an SBOM Actually Gives You
+
+A Software Bill of Materials (SBOM) is a machine-readable inventory of every component in a build — direct dependencies, transitive dependencies, versions, licenses, and hashes.
+
+**CycloneDX** is the industry-standard format (backed by OWASP, adopted by NTIA, required by US federal contracts).
+
+**GitHub attestations** are cryptographic signatures that GitHub itself produces during the build, tying the SBOM to the exact commit and workflow run that produced it.
+
+Together: you get a tamper-evident receipt for every Kilo Code artifact.
+
+```bash
+# Verify the CLI archive you downloaded
+gh attestation verify kilo-darwin-arm64.zip \
+  --repo Kilo-Org/kilocode \
+  --signer-workflow build.yml
+```
+
+If the hash doesn't match, the attestation fails. Period.
+
+---
+
+## Why This Matters for *You* (Not Just Security Teams)
+
+### 1. Your Editor Extension Can't Be Silently Swapped
+
+The VS Code Marketplace and JetBrains Marketplace are generally trustworthy — but they're centralized. If a maintainer's account is compromised, or a marketplace is breached, a malicious update could push to thousands of developers.
+
+With SBOM attestations: **you (or your IT team) can pin the exact artifact hash and verify it before install.** No trust required.
+
+### 2. Container Images Are Now Auditable
+
+```dockerfile
+# Before: you pulled kilocode/kilo:latest and hoped
+# After: you verify the SBOM attestation for that exact digest
+docker pull kilocode/kilo@sha256:abc123...
+gh attestation verify kilocode/kilo@sha256:abc123... --repo Kilo-Org/kilocode
+```
+
+CI pipelines can now gate deployments on attestation verification. **Supply-chain security becomes a CI check, not a prayer.**
+
+### 3. Compliance Just Got Easier
+
+If your org requires SBOMs for vendor software (EO 14028, EU CRA, FedRAMP, SOC 2) — **Kilo Code now ships them automatically.** No vendor questionnaire. No manual requests. The artifacts *are* the evidence.
+
+### 4. Dependency Drift Is Now Visible
+
+The SBOM lists every transitive dependency with its version and hash. If a future release unexpectedly pulls in a new dependency (or a compromised version of an existing one), **the SBOM diff shows it immediately.**
+
+Security teams can diff SBOMs between releases instead of reading changelogs and hoping.
+
+---
+
+## What's Actually in the Box
+
+Every v7.8.1 artifact now ships with:
+
+| Artifact | SBOM File | Attestation |
+|----------|-----------|-------------|
+| CLI Linux/macOS/Windows archives | `kilo-*-sbom.json` / `.cdx.json` | GitHub attestation |
+| npm package (`@kilocode/cli`) | Published to npm with provenance | GitHub attestation |
+| Container images (`kilocode/kilo`) | Attached via `cosign`/`notation` | GitHub attestation |
+| VS Code extension (`.vsix`) | Bundled SBOM | GitHub attestation |
+| JetBrains plugin (`.zip`) | Bundled SBOM | GitHub attestation |
+
+All signed by GitHub Actions during the release workflow. **No maintainer keys to manage. No separate signing infrastructure.**
+
+---
+
+## The Patch That Enabled It
+
+The change is surprisingly small: **PR #14513** adds CycloneDX generation to the release pipeline and uploads each SBOM as a GitHub attestation.
+
+```yaml
+# Simplified from .github/workflows/release.yml
+- name: Generate CycloneDX SBOM
+  uses: CycloneDX/cyclonedx-github-action@v1
+  with:
+    output: sbom.json
+- name: Attest SBOM
+  uses: actions/attest-build-provenance@v2
+  with:
+    subject-path: dist/kilo-linux-x64.tar.gz
+    subject-name: kilo-linux-x64.tar.gz
+    predicate-path: sbom.json
+    predicate-type: https://cyclonedx.org/schema/bom-1.6
+```
+
+That's it. The rest is GitHub's infrastructure doing the heavy lifting.
+
+---
+
+## What This Means for the Open-Source Agent Ecosystem
+
+Kilo Code isn't the first tool to publish SBOMs. But it **might be the first coding agent** to make them standard across *every* distribution channel — CLI, npm, Docker, VS Code, JetBrains — with zero opt-in.
+
+**This raises the floor for the entire category.**
+
+If you're evaluating coding agents for team adoption, **supply-chain verification is now a differentiator.** Commercial agents (Cursor, Copilot, Claude Code) distribute through proprietary channels with opaque build processes. Kilo Code gives you the receipts.
+
+---
+
+## How to Update (and Verify)
+
+### VS Code / JetBrains
+1. Open Extensions / Plugins
+2. Search "Kilo Code"
+3. Click **Update** to v7.8.1
+
+### CLI
+```bash
+npm install -g @kilocode/cli@7.8.1
+
+# Verify the npm package provenance
+npm view @kilocode/cli@7.8.1 --json | jq '.attestations'
+```
+
+### Docker
+```bash
+docker pull kilocode/kilo:7.8.1
+
+# Verify attestation
+gh attestation verify kilocode/kilo:7.8.1 --repo Kilo-Org/kilocode
+```
+
+### Manual Download (with verification)
+```bash
+# Download artifact + SBOM + attestation
+curl -LO https://github.com/Kilo-Org/kilocode/releases/download/v7.8.1/kilo-darwin-arm64.zip
+curl -LO https://github.com/Kilo-Org/kilocode/releases/download/v7.8.1/kilo-darwin-arm64.zip.cdx.json
+
+# Verify
+gh attestation verify kilo-darwin-arm64.zip --repo Kilo-Org/kilocode
+```
+
+---
+
+## The Bottom Line
+
+**v7.8.0 fixed the reliability bugs that made you keep a commercial backup. v7.8.1 makes the supply chain verifiable.**
+
+This is how open-source infrastructure graduates from "cool project" to "production dependency."
+
+Kilo Code has always had the better architecture — skills, slash commands, explicit lifecycle, Agent Manager sidebar, multi-model routing, worktrees. Now it has the **supply-chain hygiene** that enterprises require and individuals deserve.
+
+If you're building on AI coding agents — **verify your tools.** Start with the one that makes it easy.
+
+---
+
+## Related articles
+
+- [Kilo Code v7.8.0 Just Made Long Agent Runs Survive Network Blips](/blog/kilo-code-v7-8-0-opencode-sync-gpt6-astra-cloudflare/)
+- [Kilo Code v7.7.7 Just Fixed the Approval Hangs That Killed Long Runs](/blog/kilo-code-v7-7-7-opencode-sync-retry-fixes/)
+- [OpenCode Deep Dive: The Skill-Driven Open-Source Coding Agent](/blog/deep-dive-opencode-skill-driven-coding-agent/)
+- [Best Coding Agents 2026 — Decision Guide (Not Another Hype List)](/blog/best-coding-agents-2026-decision-guide/)
+- [Claude Code vs Kilo Code: Which Terminal Agent Wins?](/blog/claude-code-vs-kilo/)
+- [Coding Agent Security Checklist 2026](/blog/coding-agent-security-checklist-2026/)
+
+---
+
+*Kilo Code is free, open-source (MIT), and available on [GitHub](https://github.com/Kilo-Org/kilocode), the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=Kilo-Org.kilocode), and the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/25346-kilo-code).*
