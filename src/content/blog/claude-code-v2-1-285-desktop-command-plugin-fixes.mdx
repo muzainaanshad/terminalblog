@@ -1,0 +1,182 @@
+---
+title: "Claude Code Just Got a Desktop Command — And 100+ Fixes You'll Actually Notice"
+description: "Claude Code v2.1.285 drops `claude --desktop`, plugin configure/install improvements, WebFetch toggle, subagent fixes, and a massive bug-fix wave. Here's what matters for your daily workflow."
+pubDate: 2026-09-30
+updatedDate: 2026-09-30
+image: /blog-placeholder.jpg
+tags: ["claude-code", "release", "anthropic", "ai-coding-agents", "beginner-friendly", "desktop", "plugins", "mcp"]
+category: "news"
+author: "Anshad"
+readingTime: 10
+featured: true
+---
+
+You've been using Claude Code in the terminal. It works. But there's always been a small friction: **you want to open the Claude Desktop app on the exact folder you're in, with the exact session you just left.**
+
+Now you can.
+
+`claude --desktop` does exactly that. Point it at a directory, add `--continue` or `--resume <session-id>`, and the desktop app opens right there. No copy-pasting paths. No "wait, which session was that?"
+
+That's the headline feature in v2.1.285 (released September 29). But the real story is the **100+ fixes** — the kind that eliminate daily paper cuts you've been living with.
+
+---
+
+## The Features You'll Actually Use
+
+### 1. `claude --desktop` — Open Desktop App from Terminal
+
+```bash
+# Open desktop app on current directory
+claude --desktop
+
+# Resume a specific session in the desktop app
+claude --desktop --resume abc-123
+
+# Continue the most recent session
+claude --desktop --continue
+```
+
+This bridges the terminal and desktop workflows. You live in the terminal. The desktop app gives you visual history, artifact previews, and a proper UI. Now they connect seamlessly.
+
+### 2. `CLAUDE_CODE_DISABLE_WEB_FETCH=1` — Turn Off WebFetch Entirely
+
+Enterprise teams, air-gapped environments, and anyone who doesn't want the agent fetching URLs can now disable WebFetch at the environment-variable level. No more "but how do I stop it from calling home?"
+
+```bash
+export CLAUDE_CODE_DISABLE_WEB_FETCH=1
+claude
+```
+
+### 3. Plugin Configuration Got Way Better
+
+- **`claude plugin configure <plugin>`** — Shows a plugin's options, which are unset, and lets you save new values via `--values-stdin`
+- **`claude plugin install --config <server>.<key>=<value>`** — Set bundled `.mcpb` MCP server settings *at install time*. The server starts configured, no `/plugin → Configure` dance required.
+
+If you've ever installed an MCP server and forgotten to configure it — this fixes that workflow entirely.
+
+### 4. `allowedProviders` Managed Setting
+
+Admins can now lock down which API providers a machine may use: Anthropic API, custom endpoints, Bedrock, Mantle, Vertex AI, Foundry, Claude Platform on AWS, or Cloud gateway. One setting. Enterprise control.
+
+---
+
+## The Fixes That Eliminate Daily Annoyances
+
+### Subagent & Fork Fixes
+
+- **Fork subagents now inherit the parent's permission mode** — They can't exit plan mode, they respect `dontAsk`, and their `agent()` calls run in the foreground so the subagent actually gets the child's result.
+- **Background subagents in auto mode no longer prompt a second redundant reply** after each report.
+- **`claude -p --permission-prompt-tool`** — Background subagent permission requests now go to the prompt tool instead of being auto-denied.
+
+### MCP & Plugin Fixes
+
+- **`claude mcp list` now includes WebSocket (`ws`) MCP servers** with URL and health status.
+- **`claude mcp get` shows Type, Command, Args, and Environment** for stdio servers even when config omits the `type` field.
+- **Plugin installs over SSH now respect `GIT_SSH` and `core.sshCommand`** — No more "why is it using HTTPS when I configured SSH?"
+- **Plugin ID collision protection** — Installing a plugin whose ID differs only in `.`, `-`, `@`, or (macOS/Windows) capitals from an existing plugin is now refused. No more silent cache corruption.
+
+### Artifact & File Handling Fixes
+
+- **Publishing an artifact after a rewind (Esc Esc) now refuses until you re-read the file** — Prevents overwriting newer content you only saw in rewound turns.
+- **Artifact allow rules ("don't ask again") no longer let you publish outside working directories** — Add the folder with `--add-dir` for the rule to cover it.
+- **Dismissing an artifact row (x) no longer unlinks the file** — Re-publishing updates the same artifact instead of creating a duplicate.
+- **`/cost` and SDK `modelUsage` now report turns under the correct model** — Fixed misattribution when the server answered a refusal with a different fallback model.
+
+### Session & Cloud Fixes
+
+- **`claude --resume` on a background session now opens that session instead of refusing** — And a prompt given with `claude --resume <id> "prompt"` is sent as its next turn.
+- **Cloud sessions that restarted after compaction now accept the next artifact update** — Fixed the "refusing the next update to an artifact the session had already read" bug.
+- **Remote Control now marks messages read when Claude *starts* on them, not when they arrive** — And queued messages survive terminal quit, arriving on next resume.
+- **Cloud session creation and `/remote-env` now read all environments, not just the newest 20**.
+
+### WebFetch & Network Fixes
+
+- **WebFetch rate-limited domain safety checks no longer masquerade as network/enterprise policy blocks** — You'll see the actual "rate limited" message.
+- **Redacted logs/transcripts no longer leak parts of URL passwords containing `@`** — Or the whole password when written as `%40`.
+
+### Terminal & UX Fixes
+
+- **SSH passphrase and new-host prompts from worktree and `/teleport` fetches now fail fast** — No more terminal takeover.
+- **`claude mcp list/get` and not-found errors for `mcp remove`, `login`, `logout` now print cleanly** — No more line breaks and terminal escape sequences in output.
+- **Vim mode: `x` or `r` in NORMAL mode after Ctrl+G no longer breaks pasted-text placeholders**.
+- **`&nbsp;` in replies no longer shows as literal text** — Indentation in markdown tables renders correctly.
+- **Brief freeze (up to 1s) in long sessions outside fullscreen mode fixed** — Was triggered by a timer; cleared by `/clear` or `/compact`.
+
+### Hooks & SDK Fixes
+
+- **Synchronous hooks no longer hang while a background process (`some-daemon &`) keeps output open** — Hook finishes shortly after its own process exits.
+- **Hooks and SDK permission callbacks now see the correct plan on ExitPlanMode** — Even when the plan was written in the same response.
+- **Failed `agent()`, `parallel()`, `pipeline()` calls awaited later (or not at all) no longer cause unhandled promise rejections** that could end background sessions.
+
+### Authentication & Enterprise
+
+- **Sessions using `ANTHROPIC_AUTH_TOKEN` against Anthropic API now load the organization's policy** — Was silently skipped before.
+- **Claude Code no longer refuses to start when OS denies reading the managed settings file** — Warns and starts without it. Other read errors still stop every session.
+- **Sign-in that could wait forever after browser showed success** — Now times out properly.
+
+### VS Code Extension Fixes (20+ fixes)
+
+Highlights:
+- Restored tabs no longer re-run interrupted turns when `CLAUDE_CODE_RESUME_INTERRUPTED_TURN` is set
+- Escape closes command menu instead of stopping the running turn
+- Opening a conversation already open elsewhere asks first instead of starting a second copy
+- Agent map labels sub-agents with the model they *actually ran on* (not the session's model)
+- Manage plugins dialog: failed actions open a popup explaining the fix
+- Every file Read/Write/Edit no longer stalls 10 minutes when editor stops responding to auto-save
+
+---
+
+## What This Means for You
+
+**If you're a daily terminal user:** The subagent fixes alone are worth the update. Fork subagents behaving correctly, background subagents not double-prompting, permission tools working for subagents — these compound into a noticeably smoother experience.
+
+**If you use the desktop app:** `claude --desktop` is the bridge you've been waiting for. Terminal for speed, desktop for context — now one command switches between them.
+
+**If you manage a team:** `allowedProviders` + `CLAUDE_CODE_DISABLE_WEB_FETCH` + managed settings that don't block startup = enterprise-ready defaults.
+
+**If you build with MCP:** WebSocket server visibility, stdio server metadata, plugin install-time configuration — the ecosystem tooling just got professional.
+
+---
+
+## How to Update
+
+```bash
+# If installed via npm
+npm update -g @anthropic-ai/claude-code
+
+# If installed via installer
+claude update
+
+# Or re-run the install one-liner
+curl -fsSL https://claude.ai/install.sh | bash
+```
+
+Check your version:
+```bash
+claude --version
+# Should show 2.1.285
+```
+
+---
+
+## The Big Picture
+
+Claude Code v2.1.285 isn't a flashy feature release. It's a **reliability release** — the kind that separates tools you tolerate from tools you trust.
+
+100+ fixes. Most you'll never notice because they *prevent* the bugs you used to hit. The ones you will notice (`--desktop`, plugin configure, WebFetch toggle, subagent fixes) make daily workflows genuinely smoother.
+
+This is what compounding quality looks like. Anthropic shipped 2.1.280 (Opus 5.5 default), 2.1.283 (gateway hints), 2.1.284 (Sonnet 5.5 default + gateway spend fixes), and now 2.1.285 — all in September. The cadence is real. The quality is compounding.
+
+---
+
+## Related Reading
+
+- [Claude Code v2.1.280 — Opus 5.5 Default, Massive Fix Wave](/blog/claude-code-v2-1-280-opus-5-5-default-massive-fix-wave/)
+- [Claude Code v2.1.283 — Gateway Hints, Prompt Audit, MCP Progress](/blog/claude-code-v2-1-283-gateway-hints-prompt-audit-mcp-progress-fixes/)
+- [Claude Code v2.1.284 — Sonnet 5.5 Default, Gateway Spend Fixes](/blog/claude-code-v2-1-284-sonnet-5-5-default-gateway-spend-fixes/)
+- [Claude Code vs Cursor 2026 Comparison](/blog/claude-code-vs-cursor-2026-comparison/)
+- [Best Free AI Coding Agents 2026 — No Credit Card Required](/blog/best-free-ai-coding-agents-2026-no-credit-card/)
+
+---
+
+*Using Claude Code daily? What's the one fix in this release that saves you the most friction? [Let me know on X](https://x.com/terminalblog) — I read every reply.*
