@@ -1,0 +1,159 @@
+---
+title: "Cline Just Made Your Coding Sessions Bulletproof — v4.1.22 Adds New Providers and Fixes You'll Actually Feel"
+description: "Cline v4.1.22 (Sep 30) ships Bee and Pareto providers, Anthropic refusal fallback so models fail over instead of erroring, content-filter messaging that tells you what happened, and a refreshed model catalog with GPT-6.1 Sol as default for 10+ providers. Plus fixes for queued prompts, token refresh, and Bedrock routing. The reliability update that makes daily work smoother."
+pubDate: "2026-09-30T10:00:00Z"
+tags: ["cline", "release", "coding-agent", "reliability", "beginner", "providers", "anthropic"]
+tool: "cline"
+author: "sage"
+image: "/api/og?title=Cline+v4.1.22+Bulletproof+Sessions+New+Providers&tool=cline"
+canonical: "https://terminalblog.com/blog/cline-v4-1-22-bulletproof-sessions-new-providers/"
+---
+
+Cline v4.1.22 dropped September 30, and it's the kind of release that doesn't make headlines — it **makes your daily workflow stop breaking**.
+
+Two new providers. Anthropic models that fail over instead of dying. Content filter messages that actually explain what happened. A model catalog refresh that swapped defaults for ten major providers. And fixes for the papercuts that make you lose prompts, fail token refreshes, or hit wrong API paths on Bedrock.
+
+If you've been running v4.1.21, this update is pure quality-of-life. Here's what changed and why it matters.
+
+---
+
+## The Features You'll Actually Notice
+
+### 1. Two New Providers: Bee and Pareto Inference
+
+**Bee** (by HEOSSI) and **Pareto Inference** (`PARETO_API_KEY`) are now first-class providers. No more custom OpenAI-compatible config — they just work out of the box.
+
+For beginners: this means more model options without config wrestling. If you've been curious about Pareto's pricing or Bee's routing, add the API key and they appear in the model picker.
+
+### 2. Anthropic Refusal Fallback — Models That Don't Die on Filter Hits
+
+This is the big one for reliability. **Direct Anthropic requests now use Anthropic's server-side refusal fallback.** When a response gets blocked by a content filter, Cline (and OpenRouter) can now fail over to another upstream provider instead of erroring out.
+
+Before: content filter → "Model returned empty response" → you're stuck.
+Now: content filter → automatic failover → your turn completes.
+
+For teams running production workloads, this removes a whole class of silent failures.
+
+### 3. Content Filter Messages That Actually Help
+
+When a response *is* blocked and can't fail over, Cline now **says so and suggests rephrasing** instead of the useless "Model returned empty response."
+
+You see: "This response was blocked by a content filter. Try rephrasing your request."
+Not: "Model returned empty response" (what does that even mean?).
+
+### 4. Model Catalog Refresh — GPT-6.1 Sol Is the New Default for 10+ Providers
+
+The catalog got a major reshuffle. **GPT-6.1 Sol becomes the default model** for:
+- OpenAI
+- OpenRouter
+- GitHub Copilot
+- Cortecs
+- Eden AI
+- Kilo Gateway
+- Both LLM Gateway providers
+- NanoGPT
+- OpenCode Zen
+- Requesty
+
+Other shifts:
+- **Vercel AI Gateway** → Ling 3.1 Flash
+- **Tempr Gateway** → MiMo V2.6 Flash
+- **CrossModel & Ofox** → Claude Sonnet 5.5
+- **Pioneer** → GLiNER 2.5 Decide
+- **Scaleway** → Qwen 3.8 27B
+
+**Cline's recommended list** adds Claude Sonnet 5.5 and Claude Opus 5.5.
+
+**If you use any of these providers without pinning a model, expect a different default.** Check your model picker after updating.
+
+---
+
+## The Fixes That Eliminate Daily Annoyances
+
+### Queued Prompts Survive API Errors
+After an API error, you can now **type and send a new message instead of only using Retry**. A `/compact` (or `/smol`, `/newtask`) typed during recovery stays in the composer instead of being sent to the model as text.
+
+### Token Refresh Works After Failed Sign-In
+If a new task fails Cline sign-in, **signing in and submitting a revised prompt now starts the task with that prompt**. Before, nothing happened — you'd sign in and your prompt was gone.
+
+### Reset Code Button Behaves Correctly
+**Reset Code** is now disabled when a message has no checkpoint, and no longer stays disabled for a message whose checkpoint exists (a slow-disk bug). Changing the Checkpoints setting now applies to the active task, and follow-up messages typed while it applies are kept in order.
+
+### Cancel Actually Stops the Task
+Canceling right after sending a message now stops the task. A cancel that landed while the turn was still being set up was ignored, and the task kept running.
+
+### Reasoning Tokens Counted Once (Not Twice)
+Reasoning tokens are no longer counted twice in token usage. Cost is unchanged — your usage numbers are just accurate now.
+
+### Bedrock Routing Fixes (If You Use AWS)
+- GPT-6 and GPT-5.6 route through inference profiles
+- India regions (`ap-south-1`, `ap-south-2`) resolve the `in.` profile
+- OpenAI models behind inference profiles get the reasoning effort setting they support
+- Nova 2 Lite with high reasoning, application inference-profile ARNs, and Nova Micro no longer get requests Bedrock rejects
+- Legacy AWS profile setting saved without the "use profile" flag now carries over as profile authentication instead of being dropped
+
+### Gateway Models Keep Their Own Protocol
+Gateway models on providers that mix endpoints now **keep their own API protocol instead of falling back to the provider-wide default**. Cleaner, fewer surprises.
+
+---
+
+## What This Means for You
+
+| If you're... | This release means... |
+|--------------|----------------------|
+| **New to Cline** | v4.1.22 is the most polished version yet. New providers work out of the box. Content filter errors explain themselves. Model defaults are current. |
+| **Running production workloads** | Anthropic refusal fallback + content filter messaging = fewer silent failures. Bedrock fixes = AWS deployments just work. |
+| **Using OpenRouter, Copilot, or Vercel AI Gateway** | Your default model changed to GPT-6.1 Sol (or the provider-specific default). Pin your model if you need consistency. |
+| **On Vertex, Bedrock, or custom gateways** | Protocol handling and profile auth fixes mean fewer "why is this failing?" debugging sessions. |
+
+---
+
+## How to Update
+
+**VS Code Extension:** Extensions panel → Cline → Update (or wait for auto-update)
+
+**CLI:**
+```bash
+npm update -g cline
+```
+
+**Desktop App (macOS):** Download latest DMG from [Cline GitHub Releases](https://github.com/cline/cline/releases) — single universal build for all Macs. Drag to Applications. Future updates arrive automatically.
+
+**Verify:**
+```bash
+cline --version
+# Should show v4.1.22
+```
+
+---
+
+## The Bigger Picture
+
+Cline has been on a reliability tear since v4.1.7 (August). v4.1.22 continues the pattern: **less flash, more trust**.
+
+- v4.1.7–8: Queued prompts survive, sessions survive hub restarts, MCP won't block startup
+- v4.1.9: Token refresh works after long idle, token accounting fixed (5x inflation gone), Vertex catalog per-region
+- v4.1.20: Parallel sub-agents, larger output budgets, 6 new providers
+- v4.1.21: Local model output limit recovery, ai& provider, 11 providers now default to Opus 5.5
+- **v4.1.22: Anthropic refusal fallback, content filter messaging, Bee + Pareto, catalog refresh**
+
+The agents that win aren't the ones with the most features. They're the ones you can trust with real work. Cline is systematically becoming that agent.
+
+---
+
+## Related Reading
+
+- [Cline Just Fixed What Broke Your Trust — v4.1.7 Through v4.1.21](/blog/cline-just-fixed-what-broke-your-trust-v4-1-8/)
+- [Cline v4.1.0: Five Critical Agent Fixes and the SDK Migration](/blog/cline-v4-1-sdk-migration-five-critical-agent-fixes/)
+- [Cline v3.25: Deep Planning, Focus Chain, and Auto-Compact](/blog/cline-v325-deep-planning-focus-chain-auto-compact/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Full Changelog
+
+[github.com/cline/cline/compare/v4.1.21...v4.1.22](https://github.com/cline/cline/compare/v4.1.21...v4.1.22)
+
+---
+
+*Cline is open-source (Apache-2.0) with 65,000+ GitHub stars. Available as VS Code extension, CLI, and macOS desktop app. [github.com/cline/cline](https://github.com/cline/cline)*
