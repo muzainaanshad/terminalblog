@@ -1,0 +1,276 @@
+---
+title: "Beware: OpenClaw Git Backup Restore Lets Attackers Escape Sandbox and Execute Code"
+description: "Two critical vulnerabilities in OpenClaw's Git backup restore — path traversal and SQL injection via trigger bodies — combine to give arbitrary file write and code execution. If you restore from a compromised backup repo, you're already owned."
+publishDate: 2026-10-01
+updatedDate: 2026-10-01
+tags: ["beware", "security", "openclaw", "rce", "path-traversal", "sql-injection"]
+heroImage: "/images/beware-openclaw-git-backup.png"
+heroAlt: "OpenClaw Git backup restore vulnerability diagram"
+---
+
+Two security issues reported against **openclaw/openclaw** on September 28, 2026, reveal that the Git backup restore path (`openclaw backup sqlite restore`) is completely porous. An attacker who can push a crafted commit to a configured backup repository — or create a malicious local ref — achieves **arbitrary file write outside the workspace** and **arbitrary SQL execution (including `load_extension` for native code execution)** during restore.
+
+Both issues are open, unpatched, and rated P0/platinum by the project's automated triage. If you use OpenClaw's Git backup feature, stop restoring from untrusted refs immediately.
+
+---
+
+## The Two Vulnerabilities at a Glance
+
+| Vulnerability | Component | Impact | CVE |
+|---------------|-----------|--------|-----|
+| Path traversal in `materializeGitBackupRef` | `src/snapshot/git-backup.ts:454-474` | Arbitrary file write outside `outputPath` as the restoring user | Not yet assigned |
+| SQL injection via trigger bodies in `restoreGitBackupDirectory` | `src/snapshot/git-backup-codec.ts:585-640` | Arbitrary SQL execution, `load_extension` → native code execution | Not yet assigned |
+
+**Chained together**: A single hostile commit in the backup repo yields file write + SQL execution. The restore path is something operators run *because they trust the backup* — making the trust inversion maximal.
+
+---
+
+## Vulnerability 1: Path Traversal via Git Tree Entries
+
+### What Happens
+
+The function `materializeGitBackupRef` restores a Git backup by reading a tree from a commit and writing each entry to disk. The allow-list check at line 458 is a **textual prefix test**:
+
+```typescript
+// src/snapshot/git-backup.ts:454-474
+for (const file of files) {
+  if (
+    file !== `${scope}/${GIT_BACKUP_MANIFEST}` &&
+    file !== `${scope}/${GIT_BACKUP_SCHEMA}` &&
+    !file.startsWith(`${scope}/${GIT_BACKUP_TABLES}/`)  // ← TEXTUAL PREFIX ONLY
+  ) {
+    throw new Error(`Git backup ref contains an unexpected file: ${file}`);
+  }
+  const relative = file.slice(scope.length + 1);  // e.g., "tables/../../../../tmp/pwned"
+  const destination = path.join(outputPath, relative);  // ← NORMALIZES ../ OUT OF outputPath
+  await fs.mkdir(path.dirname(destination), { recursive: true, mode: 0o700 });
+  await fs.writeFile(destination, "", { flag: "wx", mode: 0o600 });
+}
+```
+
+`files` comes from `git ls-tree -r --name-only <commit> -- <scope>` (line 440). Git **happily stores `..` path components in a tree object** — only `git checkout` refuses them. A tree entry literally named `global/tables/../../../../tmp/pwned` satisfies `startsWith("global/tables/")`, and `path.join` then normalizes the traversal **outside** `outputPath` before the bytes are written.
+
+### Who Is Affected
+
+- Anyone running `openclaw backup sqlite restore --ref <commit>` against a backup repository they don't fully control
+- Anyone with a configured `origin` remote that an attacker can push to (supply chain)
+- Anyone who creates local refs from untrusted sources
+
+### How to Check If You're Vulnerable
+
+Run this command to see if your backup repo contains any `..` path components:
+
+```bash
+# List all tree entries in your backup ref
+git ls-tree -r --name-only <your-backup-ref> -- <scope> | grep '\.\.'
+
+# If ANY output appears, you have traversal entries in your backup
+# Example of a malicious entry:
+# global/tables/../../../../etc/cron.d/evil
+```
+
+**Or test the restore in a safe container:**
+
+```bash
+# Create a test backup repo with a traversal entry
+mkdir test-backup && cd test-backup
+git init
+mkdir -p global/tables
+echo "test" > global/tables/legit.txt
+
+# Craft a tree entry with traversal (requires low-level git plumbing)
+printf "100644 blob %s\tglobal/tables/../../../../tmp/pwned\n" \
+  $(echo "malicious" | git hash-object -w --stdin) |
+  git update-index --index-info
+
+git commit -m "malicious backup"
+git tag malicious-ref
+
+# Attempt restore in a CONTAINER (not your real machine!)
+# openclaw backup sqlite restore --ref malicious-ref
+# Check if /tmp/pwned was created OUTSIDE the output directory
+```
+
+### Is There a Fix?
+
+**Not yet.** The proposed fix from the reporter:
+
+```typescript
+const relative = file.slice(scope.length + 1);
+if (
+  !relative ||
+  path.isAbsolute(relative) ||
+  relative.split("/").includes("..") ||
+  relative.includes("\\")
+) {
+  throw new Error(`Git backup ref contains an unsafe path: ${file}`);
+}
+const destination = path.join(outputPath, relative);
+if (!isPathInside(outputPath, destination)) {
+  throw new Error(`Git backup ref escapes the output directory: ${file}`);
+}
+```
+
+The sibling code in `src/snapshot/local-repository.ts:301-305` already does this correctly with `isPathInside` after resolving. This path has no equivalent.
+
+**Workaround**: Never restore from a backup ref you didn't create yourself. Verify `git ls-tree` output for `..` components before restoring.
+
+---
+
+## Vulnerability 2: SQL Injection via Trigger Bodies (trusted_schema=ON)
+
+### What Happens
+
+`restoreGitBackupDirectory` reads `schema.sql` from the materialized Git ref, splits it with a hand-rolled splitter, and `exec`s every statement **verbatim** against a freshly created staging database. The integrity gate runs only **afterwards**. And unlike the verification connection in the same file, this connection **never sets `PRAGMA trusted_schema = OFF`**.
+
+```typescript
+// src/snapshot/git-backup-codec.ts:585-640
+const schema = await fs.readFile(path.join(params.sourcePath, GIT_BACKUP_SCHEMA), "utf8");
+const statements = splitSchemaStatements(schema);
+
+// ... categorization logic ...
+
+database.exec("PRAGMA foreign_keys = OFF; PRAGMA journal_mode = DELETE;");  // ← MISSING trusted_schema!
+for (const statement of [...plainTables, ...indexes]) {
+  database.exec(statement);  // ← EXECUTES VERBATIM
+}
+// ...
+for (const statement of triggers) {
+  database.exec(statement);  // ← TRIGGER BODIES EXECUTED HERE
+}
+```
+
+The **verification** connection in the same file does it correctly at line 543:
+```typescript
+database.exec("PRAGMA trusted_schema = OFF");
+```
+
+That asymmetry is direct evidence of an omission, not a decision.
+
+### Why Trigger Bodies Are Dangerous
+
+`splitSchemaStatements` recognizes comments and quoting but **does not restrict what a statement may contain**. It explicitly special-cases triggers only to *keep them intact* (line 434).
+
+A `CREATE TABLE` body is DDL-only, but:
+```sql
+CREATE TRIGGER pwn AFTER INSERT ON sqlite_master
+BEGIN
+  SELECT load_extension('/tmp/x.so');  -- ← NATIVE CODE EXECUTION
+END;
+```
+
+is accepted by both the splitter and `database.exec`.
+
+With `trusted_schema` at its **default ON**, trigger bodies may reference application-defined functions and, on builds compiled with extension loading enabled, `load_extension`. Even without extensions, a trigger can write arbitrary rows into the restored DB, which is then published to `targetPath` after only a `foreign_key_check` plus schema-shape validation.
+
+### Who Is Affected
+
+Same as Vulnerability 1 — anyone restoring from a Git backup ref. The `restoreGitBackupRef` command (which operators run to restore backups) calls `restoreGitBackupDirectory` internally. `verifyGitBackupRef` also restores into a temp dir, so **verification is also vulnerable**.
+
+### How to Check If You're Vulnerable
+
+Inspect your backup repo's `schema.sql` for triggers with suspicious bodies:
+
+```bash
+# Extract schema.sql from your backup ref
+git show <backup-ref>:<scope>/schema.sql | grep -A 20 "CREATE TRIGGER"
+
+# Look for:
+# - load_extension
+# - readfile / writefile
+# - fts3_tokenizer
+# - Any arbitrary SELECT/INSERT/UPDATE in trigger body
+```
+
+**Test in a container:**
+```bash
+# Create a backup with a malicious trigger
+cat > schema.sql << 'EOF'
+CREATE TABLE test (id INTEGER PRIMARY KEY);
+CREATE TRIGGER pwn AFTER INSERT ON test
+BEGIN
+  SELECT load_extension('/tmp/evil.so');
+END;
+EOF
+
+# Pack into backup structure and attempt restore/verify
+# openclaw backup sqlite verify --ref <malicious-ref>
+# If it doesn't throw immediately, you're vulnerable
+```
+
+### Is There a Fix?
+
+**Not yet.** Proposed fix:
+
+```typescript
+// Set the pragma on the restore connection too
+database.exec(
+  "PRAGMA trusted_schema = OFF; PRAGMA foreign_keys = OFF; PRAGMA journal_mode = DELETE;"
+);
+
+// Reject dangerous statements before exec
+const FORBIDDEN_SQL = /\b(load_extension|readfile|writefile|edit|fts3_tokenizer)\b/i;
+for (const statement of [...plainTables, ...indexes, ...virtual, ...triggers]) {
+  if (FORBIDDEN_SQL.test(statement)) {
+    throw new Error("git backup schema contains a forbidden function");
+  }
+  database.exec(statement);
+}
+```
+
+Better: allow-list statement shapes (`CREATE TABLE|INDEX|VIRTUAL TABLE|TRIGGER`) and restrict a trigger body to DML over the declared tables.
+
+**Workaround**: Same as Vulnerability 1 — only restore from backups you created yourself. But note: `verifyGitBackupRef` is also vulnerable, so even *verifying* a malicious backup executes the trigger.
+
+---
+
+## The Chained Attack
+
+An attacker who controls a backup repository (via push access to `origin`, or by tricking you into adding a malicious ref) can:
+
+1. **Embed a traversal path** in the Git tree → writes arbitrary files outside the workspace during `materializeGitBackupRef`
+2. **Embed a malicious trigger** in `schema.sql` → executes arbitrary SQL (including `load_extension`) during `restoreGitBackupDirectory`
+
+The restore command runs both in sequence:
+```bash
+openclaw backup sqlite restore --ref <attacker-controlled-ref>
+# 1. materializeGitBackupRef writes files outside outputPath
+# 2. restoreGitBackupDirectory executes trigger bodies with trusted_schema=ON
+```
+
+This is a **complete sandbox escape + RCE chain** from a single hostile commit.
+
+---
+
+## What You Should Do Right Now
+
+1. **Stop restoring from untrusted Git refs immediately**
+2. **Audit your backup repos**: `git ls-tree -r --name-only <ref> -- <scope> | grep '\.\.'`
+3. **Inspect all `schema.sql` files** for triggers with `load_extension`, `readfile`, `writefile`
+4. **Pin your OpenClaw version** — do not update until these are patched
+5. **Monitor the issues**:
+   - [Path traversal: openclaw/openclaw#160733](https://github.com/openclaw/openclaw/issues/160733)
+   - [SQL injection: openclaw/openclaw#160732](https://github.com/openclaw/openclaw/issues/160732)
+
+---
+
+## Why This Matters for Coding Agent Users
+
+OpenClaw is a coding agent framework. Its backup feature is designed to save and restore your agent's state — including memories, conversations, and plugin data. **The restore path is a trusted operation**. Operators run it expecting safety.
+
+These vulnerabilities show that **supply chain trust in backup artifacts is completely broken**. A compromised backup repository (or a malicious local ref) turns the restore command into an exploit primitive.
+
+If you use OpenClaw in production, treat every backup ref as untrusted until these are fixed. Verify tree entries and schema files manually before restoring.
+
+---
+
+## Timeline
+
+- **2026-09-28**: Both issues reported by `aniruddhaadak80` (contributor)
+- **2026-09-28**: Labeled `security`, `impact:security`, `P0`, `clawsweeper:needs-security-review`, `clawsweeper:needs-live-repro`
+- **2026-10-01**: No fix merged; both issues remain open
+- **2026-10-01**: This article published
+
+---
+
+*This article will be updated when patches land. Run `node scripts/content-gate.cjs --strict` before republishing.*
