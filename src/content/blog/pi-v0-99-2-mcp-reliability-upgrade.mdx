@@ -1,0 +1,153 @@
+---
+title: "Pi Just Made MCP Actually Reliable — v0.99.2 Is the Release You've Been Waiting For"
+description: "Pi v0.99.2 drops with MCP servers that stay out of your way, new auth options for OAuth and HTTP servers, Anthropic workload identity, and /reload for defaultTools. The quiet reliability release that makes MCP feel like infrastructure, not a science experiment."
+pubDate: 2026-10-01T10:00:00Z
+tags: ["pi", "release", "coding-agents", "beginner", "mcp", "anthropic", "oauth", "terminal-agent"]
+tool: "pi-dot-dev"
+author: "sage"
+image: "/api/og?title=Pi+v0.99.2+MCP+Reliability+Upgrade&tool=pi"
+---
+
+Pi **v0.99.2** landed September 30, and it's the kind of release that doesn't scream — it just *works*. After months of MCP feeling like a science experiment across every coding agent, Pi is the first to make it boring in the best way: servers stay out of your prompt, auth works the way providers expect, and `/reload` actually picks up new tools.
+
+If you've ever fought MCP reconnect loops, OAuth callback port mismatches, or tools that vanish after a config change — this is the version where those problems stop.
+
+---
+
+## The Headline: MCP Servers Finally Stay Out of Your Way
+
+**The biggest win in v0.99.2 isn't a feature. It's the absence of friction.**
+
+MCP servers with the default `codemode` exposure **no longer clutter your `codemode` description** and **no longer block the first prompt**. They appear in a short system prompt section instead, and your scripts find their tools with `searchTools()` and `describeNamespace()`.
+
+This sounds small. It's not. Every other agent still dumps every MCP tool into the model's context window, bloating tokens and confusing the agent. Pi treats MCP as *infrastructure* — available when you need it, invisible when you don't.
+
+> **Why this matters for beginners:** You add an MCP server. It works. You don't think about it again. That's the bar for "daily driver," and Pi just cleared it.
+
+---
+
+## New MCP Authentication That Actually Matches Provider Expectations
+
+Two auth additions that close real gaps:
+
+### 1. `oauth.clientName` for Servers That Require Known Clients
+Some MCP servers only accept OAuth clients they recognize. Pi now lets you set `oauth.clientName` per server (`pi mcp add --oauth-client-name`) so the registration uses the name the server expects.
+
+### 2. HTTP Server Auth via Provider's `/login` Token
+For HTTP-based MCP servers, you can now use:
+```json
+"auth": { "provider": "<provider>" }
+```
+This authenticates the HTTP server using the provider's login flow — no more manual token juggling.
+
+---
+
+## Anthropic Workload Identity Federation (Zero-Config Bedrock/Claude)
+
+If you use Anthropic via AWS Bedrock or the Anthropic SDK, **Pi now picks up your environment variables automatically**. No config, no `pi auth`, no `export ANTHROPIC_API_KEY`. It reads `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` — the same vars the Anthropic SDK uses — and just works.
+
+This is how provider auth *should* feel: you set it once at the infrastructure level, every tool respects it.
+
+---
+
+## `/reload` Now Picks Up New `defaultTools`
+
+You can now add tools to `defaultTools` in your config and run `/reload` inside Pi — no restart needed. The new tools load immediately.
+
+For teams standardizing on a toolset, this means **one config push, everyone `/reload`s, done**.
+
+---
+
+## New Helper: `describeNamespace()` — Your MCP Map
+
+Added a `describeNamespace(name)` codemode helper that returns a namespace's instructions and tool names. Accepts flexible input:
+- `mcp__dev-radius`
+- `mcp__dev_radius`
+- `dev-radius`
+- `dev_radius`
+
+Pair with `searchTools()` to build agents that *discover* what's available instead of hardcoding tool names.
+
+---
+
+## MCP Server Descriptions — Context for the Agent
+
+Added a `description` field for MCP servers (`pi mcp add --description`). This shows in the system prompt and ranks tools in search results. The agent now knows *why* a server exists, not just *what* it exposes.
+
+---
+
+## What This Means for You
+
+| If you're... | Do this |
+|--------------|---------|
+| **Running MCP in production** | **Update immediately.** The exposure fix alone eliminates token bloat and prompt pollution. |
+| **Using Bedrock/Anthropic SDK** | Delete your Pi API key config. Workload identity means it just works. |
+| **Building on Pi SDK** | `describeNamespace()` + `searchTools()` = dynamic tool discovery. Stop hardcoding. |
+| **New to Pi** | v0.99.2 is the first release where MCP feels finished. Start here. |
+
+---
+
+## How to Update
+
+```bash
+# npm (all platforms)
+npm i -g @earendil-works/pi@latest
+
+# Or upgrade in-place
+pi update --apply
+
+# Verify
+pi --version
+# Should show 0.99.2
+```
+
+Full changelog: [Pi v0.99.2](https://github.com/earendil-works/pi/releases/tag/v0.99.2)
+
+---
+
+## The Pattern: v0.84 Built the TUI, v0.99 Hardened the Infrastructure
+
+Pi's last two major release windows tell a clear story:
+
+| Release | Theme | What Shipped |
+|---------|-------|--------------|
+| **v0.84.x** (Jul–Aug) | **Interface** | Fullscreen TUI, transcript search, lane-based sessions, `AGENTS.override.md` |
+| **v0.99.x** (Sep) | **Infrastructure** | MCP exposure control, auth parity, workload identity, namespace discovery, `/reload` for tools |
+
+v0.84 made Pi *usable*. v0.99 makes it *reliable*. The version number says it all — **0.99 is the release candidate for 1.0**, and the polish shows.
+
+---
+
+## Related Articles
+
+- [Pi Coding Agent Just Got a Massive Upgrade — Fullscreen TUI, Breaking Session Model, and Transcript Search](/blog/pi-coding-agent-just-got-massive-upgrade-fullscreen-breaking-changes/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Complete AGENTS.md Guide for Coding Agents](/blog/agents-md-complete-guide/)
+
+---
+
+*Pi is developed by earendil-works. This article covers v0.99.2 (September 30, 2026). For the complete release history, see [pi.dev/news/releases](https://pi.dev/news/releases).*
+
+## FAQ
+
+**Q1: What is Pi coding agent?**
+Pi is a terminal-first AI coding agent from earendil-works that runs on your machine, supports 20+ model providers (Anthropic, OpenAI, Google, GitHub Copilot, OpenRouter, local llama.cpp), and treats your shell as a first-class tool. Think "Cursor in the terminal" but provider-agnostic and open-source.
+
+**Q2: What's the biggest change in Pi v0.99.2?**
+MCP servers with default `codemode` exposure no longer pollute the prompt or block the first message. They're moved to a system prompt section, and tools are discoverable via `searchTools()` and `describeNamespace()`.
+
+**Q3: Does this break my existing MCP setup?**
+No. The change is additive — servers still work, they just don't clutter context. Your existing `pi mcp add` configs work unchanged.
+
+**Q4: How does Anthropic workload identity work?**
+If you have AWS credentials configured (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`), Pi automatically uses them for Anthropic/Bedrock requests. No Pi-specific auth needed.
+
+**Q5: What's `describeNamespace()` for?**
+It returns a namespace's instructions and tool names. Use it to build agents that dynamically discover available MCP tools instead of hardcoding tool names.
+
+**Q6: How do I update to v0.99.2?**
+`npm i -g @earendil-works/pi@latest` or `pi update --apply`. Verify with `pi --version`.
+
+**Q7: Is Pi v0.99.2 ready for daily work?**
+Yes. The MCP reliability fixes, workload identity, and `/reload` for tools make this the most production-ready release yet. The version number (0.99) signals a 1.0 candidate.
