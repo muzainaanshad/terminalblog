@@ -1,0 +1,109 @@
+---
+title: "GitHub Copilot CLI 1.0.91 Just Fixed the Windows Sandbox Nightmare — CA Trust, Network Bypass, and Safer Shutdown"
+description: "Copilot CLI 1.0.91 overhauls sandbox CA management with new `ca check/create/trust/rotate/remove` commands, adds Windows network bypass for npm EACCES denials, makes sandboxed commands work on older Windows versions, and flushes telemetry on clean shutdown. The release that finally makes Windows sandboxing reliable."
+pubDate: 2026-10-01T10:00:00Z
+tags: ["copilot-cli", "github", "release", "terminal", "beginner", "sandbox", "windows", "ca-trust", "network"]
+tool: "copilot-cli"
+author: "sage"
+image: "/api/og?title=GitHub+Copilot+CLI+1.0.91+Sandbox+CA+Network+Fixes&tool=copilot-cli"
+---
+
+GitHub Copilot CLI **1.0.91** dropped October 1, and if you've ever fought with sandbox certificates, Windows network permissions, or wondered why your telemetry never sent — this is the release you've been waiting for.
+
+The headline: **complete sandbox CA overhaul**, **Windows npm EACCES bypass**, **legacy Windows sandbox support**, and **guaranteed telemetry flush on exit**. No flashy models. Just the plumbing that makes daily terminal work *reliable*.
+
+---
+
+## 1. Sandbox CA Management — Finally a Real CLI
+
+The old `/sandbox ca install` was a black box. You ran it, hoped it worked, and prayed when it didn't.
+
+**1.0.91 replaces it with five explicit commands:**
+
+| Command | What It Does |
+|---------|--------------|
+| `copilot sandbox ca check` | Verifies current CA trust status |
+| `copilot sandbox ca create` | Generates a new proxy CA |
+| `copilot sandbox ca trust` | Installs CA into system trust store |
+| `copilot sandbox ca rotate` | Rotates CA (create + trust in one step) |
+| `copilot sandbox ca remove` | Removes CA from trust store |
+
+**Windows gets unattended setup** — `rotate` works non-interactively for automation/CI. No more manual certificate dialog clicks.
+
+**Why this matters:** Sandboxed commands (running `gh`, `git`, `npm` inside Copilot's isolated environment) need a trusted CA to intercept HTTPS. If the CA isn't trusted, every outbound request fails with certificate errors. Now you can diagnose (`check`), fix (`rotate`), and clean up (`remove`) without guessing.
+
+---
+
+## 2. Windows npm EACCES — The Socket Denial Fix
+
+You're in a sandboxed terminal. You run `npm install`. **EACCES: permission denied on socket.**
+
+This happened because Windows sandbox denied raw socket creation for npm's internal communication. 1.0.91 adds a **network bypass option** specifically for this:
+
+```bash
+# Enable socket bypass for Node/npm in sandbox
+copilot sandbox network bypass --enable
+```
+
+The bypass lets npm's internal sockets through while keeping the rest of the sandbox intact. It's targeted, not a "disable all security" switch.
+
+---
+
+## 3. Legacy Windows Sandbox Support (With a Warning)
+
+Sandboxed commands now run on **Windows versions without filesystem enumeration support** (older LTSC builds, some Server editions).
+
+**The catch:** PowerShell's current location (`Get-Location`) may report wrong paths in this mode. Copilot warns you upfront. If you're on modern Windows 10/11, you won't notice — but if you're on a locked-down enterprise build, sandbox finally *works* instead of hard-failing.
+
+---
+
+## 4. Clean Shutdown = Guaranteed Telemetry Flush
+
+Ever kill Copilot CLI and wonder if your usage data sent? **1.0.91 flushes pending telemetry before exit** with a bounded delay during initialization.
+
+No more lost sessions. No more "why isn't this showing in my dashboard?" The CLI waits (briefly) for the telemetry pipeline to drain, then exits cleanly.
+
+---
+
+## 5. Smarter Pipeline Execution Evidence Review
+
+**Read-only, statically analyzable shell pipelines** (like `cat file | grep pattern | head -10`) can now enter **execution-evidence review** automatically — no explicit approval needed.
+
+**Incomplete or unbound pipelines** (anything with variables, subshells, or dynamic commands) still require explicit approval. The line is clear: if Copilot can prove the pipeline is safe at parse time, it flows; if not, you approve.
+
+---
+
+## 6. Quality-of-Life Polish
+
+- **Session timelines** clear busy status after interrupted turns finish — no more stuck "thinking" indicators
+- **Footer text selection** stays on the same visible line when footer grows/shrinks — tiny but felt daily
+- **Sandboxed `gh`/`git` commands** stability fixes
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Use sandboxed commands on Windows | **Yes** — CA rotation + network bypass fix real blockers |
+| Run Copilot in CI/automation | **Yes** — unattended `ca rotate` enables headless trust |
+| Care about telemetry completeness | **Yes** — guaranteed flush on shutdown |
+| Just want the latest model | **No** — no model changes in this release |
+
+---
+
+## The Bottom Line
+
+Copilot CLI 1.0.91 doesn't add a new model. It **removes the reasons you stop using sandbox mode**.
+
+Windows developers: the CA overhaul + npm bypass alone make this mandatory. Everyone else: cleaner shutdown, smarter pipeline approvals, and a sandbox that works on more Windows versions.
+
+```bash
+copilot update
+# Then verify your sandbox CA:
+copilot sandbox ca check
+```
+
+---
+
+*Using Copilot CLI daily? The sandbox CA commands just turned a "hope it works" workflow into "check → rotate → done." That's the kind of release that compounds.*
