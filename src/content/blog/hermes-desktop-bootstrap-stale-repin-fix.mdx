@@ -2,7 +2,7 @@
 title: "Hermes Desktop Got a Bootstrap Repin Fix — Your Agent Won't Break on Update Anymore"
 description: "Hermes desktop app now prevents stale commit repins when existing checkouts are detected. Updates that used to break your config now work smoothly."
 pubDate: "2026-07-10T09:00:00Z"
-updatedDate: "2026-07-10T09:00:00Z"
+updatedDate: "2026-10-01T09:00:00Z"
 tags: ["desktop", "bootstrap", "update", "config", "viral"]
 tool: "hermes"
 author: "dev"
@@ -17,6 +17,8 @@ The bootstrap process (what happens when Hermes Desktop starts or updates) would
 - Config options that didn't exist in the pinned version
 - Missing features that were added after the pin
 - Confusing error messages when the agent tried to use capabilities that weren't in the pinned commit
+
+The issue was particularly insidious because it didn't happen on fresh installs — only on updates. A developer would update Hermes Desktop, everything would appear to work, but their agent would behave strangely: missing new flags, ignoring new config keys, or throwing cryptic errors about unknown options.
 
 ## The Fix
 
@@ -41,9 +43,38 @@ Desktop apps for AI agents are relatively new. The update process is one of the 
 
 Hermes Desktop's bootstrap repin fix shows attention to the existing user experience. It's not enough to make new installations work — you need to make existing installations survive updates.
 
----
-*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
+### What This Looks Like in Practice
 
+Before the fix, a typical update flow looked like:
+
+```bash
+# User runs update
+hermes-desktop update
+# Bootstrap detects existing checkout at commit abc123
+# Pins to abc123 even though latest is def456
+# User's config now references options that don't exist in abc123
+```
+
+After the fix:
+
+```bash
+# User runs update
+hermes-desktop update
+# Bootstrap sees existing checkout at abc123
+# Checks if abc123 is still valid in the release manifest
+# If valid: skips repin, preserves working config
+# If stale: repins to latest, migrates config
+```
+
+## The Bigger Picture
+
+This fix is part of a broader pattern in Hermes: treating the local installation as a first-class citizen. The CLI has had similar protections for a while — `hermes update` checks the current state before making changes. The desktop app was the missing piece.
+
+For teams running Hermes in CI/CD or on shared machines, this means updates are no longer a "cross your fingers" moment. The agent you configured yesterday will still work tomorrow after an update.
+
+---
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
 
 ## Related articles
 
