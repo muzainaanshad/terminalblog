@@ -1,13 +1,13 @@
 ---
 title: "Claude Code Just Got a Desktop Command — And 100+ Fixes You'll Actually Notice"
-description: "Claude Code v2.1.285 drops `claude --desktop`, plugin configure/install improvements, WebFetch toggle, subagent fixes, and a massive bug-fix wave. Here's what matters for your daily workflow."
+description: "Claude Code v2.1.285 drops `claude --desktop`, plugin configure/install improvements, WebFetch toggle, subagent fixes, and a massive bug-fix wave. v2.1.286 adds permission prompt counters, mouse support, cloud session hardening, and 50+ more fixes. Here's what matters for your daily workflow."
 pubDate: 2026-09-30
-updatedDate: 2026-09-30
+updatedDate: 2026-10-01
 image: /blog-placeholder.jpg
 tags: ["claude-code", "release", "anthropic", "ai-coding-agents", "beginner-friendly", "desktop", "plugins", "mcp"]
 category: "news"
 author: "Anshad"
-readingTime: 10
+readingTime: 12
 featured: true
 ---
 
@@ -123,6 +123,131 @@ Highlights:
 - Agent map labels sub-agents with the model they *actually ran on* (not the session's model)
 - Manage plugins dialog: failed actions open a popup explaining the fix
 - Every file Read/Write/Edit no longer stalls 10 minutes when editor stops responding to auto-save
+
+---
+
+## v2.1.286 (September 30) — Permission Prompt Counters, Mouse Support, Cloud Session Hardening, 50+ Fixes
+
+Just hours after v2.1.285, Anthropic shipped v2.1.286 with another 50+ fixes. The visible improvements:
+
+### Permission Prompt Counter — Finally Know Where You Are
+When multiple permission requests stack up, the prompt now shows a count like "2 of 5" so you know exactly how many are pending. No more guessing.
+
+### Mouse Support in Fullscreen Lists
+Click the "N more" rows in fullscreen mode to jump to that end of the list, with hover and pressed states. Much faster than keyboard-only navigation.
+
+### Cloud Session Hardening
+- Sessions with very large histories that never woke up (container stopped while transcript loaded) — **fixed**
+- Every turn failing when API refuses your model — now **retries once on previous model of same tier**
+- Remote Control sessions staying connected after org policy turns it off — now **disconnect with notice**
+- Refusal and fallback model retries failing when fallback can't run fast — now **run at standard speed**
+- Headless sessions repeating MCP auth reminder after successful re-auth — **fixed**
+
+### Login & Credential Fixes
+- macOS sessions showing "Not logged in" after `/login` succeeds in another window (leftover `~/.claude/.credentials.json`) — **fixed**
+- `claude auth status` misreporting Console sign-in's API key as `claude.ai` — now **reports `api_key`**
+- `/status` listing Anthropic profile beside API key as if both active — profile now **marked not in use**
+
+### Security & Redaction
+- MCP error messages showing credential value when "Bearer" or "Basic" prefix present — **fixed**
+- Percent-encoded Bearer tokens only partly masked in error messages — **fixed**
+- Redacted logs showing secrets with invisible characters (zero-width space) in key name — **fixed**
+- Logs showing part of URL passwords with punctuation like `)`, quotes, `]`, `&`, second `@`, or bracketed hosts — **fixed**
+- Session transcript in `/feedback` zip containing invalid JSON after secret redaction — **fixed**
+
+### MCP & Plugin Fixes
+- MCP connectors listing no tools for up to a day after server dropped older handshake — **fixed**
+- Repeat MCP sign-in request replacing pending link — **fixed**
+- `/usage` not crediting MCP server for tool calls during connect/restart — **fixed**
+- Plugins enabled on claude.ai occasionally going missing after transient server error — **fixed**
+
+### UX & Terminal Polish
+- Subagent hand-back messages showing raw task id instead of agent name — **fixed**
+- Foreground subagents missing task-tracking tools (TaskCreate/Get/Update/List, TodoWrite) — **fixed**
+- Worktree-isolated subagents loading CLAUDE.md twice — **fixed**
+- Workflow subagents restarting from original prompt on connection stall — **fixed**
+- `/compact`, `/clear`, `/rewind` in background agent view silently acting on main conversation — **now asks first**
+- Background jobs showing done while waiting for approval — **fixed**
+- Commit attribution reminder re-sent inside tool output on single-turn fallback — **fixed**
+- Click on space between words of collapsed row highlighting without expanding — **fixed**
+- Row with no details pushing other rows' details right — **fixed**
+- Files with very long names not reaching cloud session — **fixed**
+- Plugin marketplace errors now say why and how to fix instead of "not found" — **fixed**
+- `/plugin` Discover tab showing marketplace name unquoted — **fixed**
+- Improved commit guidance: runs `verify` skill before commit (except docs-only/tests-only)
+- Improved send-now (ctrl+enter) in subagent view — moves subagent command to background
+- Improved background agent replies — no longer open with recap of what you said
+- Improved claude.ai artifact link reads — WebFetch matches Artifact tool behavior
+- Improved permission prompts for fetch, skill, file read, sandbox network, Chrome, workflow, notebook edit — match file edit prompt look
+- Improved Bash/PowerShell/Monitor prompts — show command between dashed lines
+- Improved list scrollbars in fullscreen — bar doesn't shift with "N more" rows, has ↑/↓ arrows
+- Improved external editor (Ctrl+G) — opens on cursor line when editor takes line number
+- Improved slash command suggestion responsiveness — descriptions match by word prefix
+- Improved output style picker — opens on current style, descriptions shown, number keys don't pick
+- Improved `/hooks` — detail screen says "this hook" not "it"
+- Improved model fallback notice — says when fallback drops context from 1M to 200K
+- Improved SDK/`-p` responsiveness when host re-sends MCP enable for connected server
+- Improved gateway protocol page — says not to reject unknown input
+- Changed prompt colors — show normal text color immediately when nothing running/queued
+- Changed failed API retry — one limit covers whole model call (max 14 requests default)
+- Changed `--bare` — connects only named MCP servers, no system reminders, no background tasks
+- Changed send-now key — moves skill's shell command to background instead of ending it
+- Changed WebFetch rate-limit error — tells Claude not to retry in loop
+- Changed plugin installs — refuse npm sources that are git repos/folders, install deps only from registry
+- Changed list screens — always line up row details in one column
+- Changed overflow rows — read "↑ N more" / "↓ N more" instead of "N more above/below"
+- Changed `/hooks` — opens on one list grouped by event, one Enter to view hook
+- Changed theme picker — scrolling list fits terminal, number keys don't pick
+- Changed `/exit` Remove worktree — runs after stopping servers/shells (fixes Windows folder deletion)
+- Changed `claude-api` skill examples — create environments with limited networking
+- Removed browser link from `/ultrareview` and `claude ultrareview` output
+- Windows: `--bg` and agents view refusing folder trusted with different letter case — **fixed**
+
+### VS Code Extension (More)
+- Added bookmarks: save responses, keep in view in Bookmarks side panel
+- Added questions/answers to conversation — shows each question with your picks
+- Added option previews to question cards — mockup/snippet shows beside options
+- Added rows under message opening terminal output, browser tab, instructions, selected code
+- Fixed second copy of conversation opening in tab when already open in sidebar
+- Fixed settings dialogs reporting failed save without re-checking on >1MB output
+- Fixed endless "Teleporting session…" spinner when extension host stops responding
+- Improved Manage plugins dialog — says when turned-off plugin still on, explains folder clash
+- Changed Stop and Escape — end only current turn; background agents keep running
+- Changed status bar item — shows in every window, open Claude when no file open
+
+### Cloud Sessions
+- Answered question card or approved tool call getting no reply when session went idle — **fixed**
+- Clearing org environment's setup script leaving new sessions running old script — **fixed**
+- Runner actions menu closing on its own — **fixed**
+- Routine runs with cloud session never started showing Succeeded — now **show Failed**
+- Clicking audio/video file in Outputs opening empty search — **fixed**
+- Routine page reading "Due" with scheduled time instead of past next-run time when late — **fixed**
+- Routines page and Scheduled list load faster for accounts with many reminders
+- Fast mode switch added to composer's model menu (when plan includes fast mode)
+- Settings shortcut on GitHub setup tip and "Troubleshoot GitHub connection" link
+- Routines with GitHub trigger for PR converted to draft now fire — **fixed**
+- Cloud sessions on non-GitHub repo hiding broken Create PR button — **fixed**
+- GitHub setup tip no longer covers repository picker — steps aside until picker closes
+- File card says whether file missing or permission blocks reading — **fixed**
+
+### Claude Tag (Slack)
+- Slack's native Working indicator, Stop button, thread title added to threads
+- Short notice when guest joining/leaving changes Claude response under Restrict/Channel-only
+- Scheduled routines silently failing in Slack workspaces connected before Enterprise Grid join — **fixed**
+- Claude asking to re-upload Slack file when brief scanning outage — now retries scan
+- Bullet starting with +, -, * rendering as empty bullet — **fixed**
+- Failed cloud environment setup script notice names script — **fixed**
+- Very long threads: Claude withholding reply after judging against weeks-old messages — **fixed**
+- Claude answering every mention with "Couldn't check this channel" in moved channel — **fixed**
+- Very large Grid workspaces getting "Couldn't check channel" after quiet hour — **fixed**
+- Slack request blocked by org's inference hook — shows hook's deny message, no retry
+- Claude offering models org can't use — now lists only models switch will accept
+- DynamoDB/Kinesis account-based endpoints failing auth through AWS — **fixed**
+- Plugins sections in admin settings failing to load — now load and show plugin names
+- Routine list in Slack thread shows that thread's tasks by default — **fixed**
+
+### Code Review
+- PR getting no review when reviewed commit force-pushed away during failed review retry — **fixed**
 
 ---
 
