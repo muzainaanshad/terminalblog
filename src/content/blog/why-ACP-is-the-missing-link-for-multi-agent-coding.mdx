@@ -1,0 +1,255 @@
+---
+title: "Your Coding Agents Are Islands. This Protocol Finally Connects Them."
+description: "Models have converged. The new bottleneck isn't model quality — it's that your agents can't talk to each other. Agent Communication Protocol (ACP) is the emerging standard fixing this, and every major open-source agent just adopted it."
+pubDate: 2026-09-30
+updatedDate: 2026-09-30
+tags: ["acp", "agent-communication-protocol", "multi-agent", "orchestration", "open-source", "beginner", "guide"]
+tool: "industry"
+author: "Anshad"
+image: "/api/og?title=Why+ACP+Is+The+Missing+Link+For+Multi-Agent+Coding&tool=acp"
+canonical: "https://terminalblog.com/blog/why-ACP-is-the-missing-link-for-multi-agent-coding/"
+
+---
+
+You've got Claude Code for reasoning. Codex for parallel throughput. Goose for extensibility. Kilo Code for skills. Qwen Code for managed runtime. Each one capable. Each one living in its own terminal window, its own context, its own universe.
+
+You manually copy-paste context between them. You manually coordinate workflows. You manually sync state.
+
+**This isn't a model problem anymore. It's a coordination problem.**
+
+And for the first time, there's a protocol actually solving it.
+
+---
+
+## The Convergence Nobody Talks About
+
+Here's the uncomfortable truth: **models have converged.**
+
+Claude Opus 4.7, GPT-5.4, Gemini 2.5 Pro, DeepSeek V4 Pro — they all score within single-digit percentage points on SWE-bench Verified. The gap between the "best" model and the "good enough" model is smaller than the gap between a well-orchestrated multi-agent setup and a single agent.
+
+We proved this in our [orchestration topology deep dive](/blog/agentic-orchestration-topology-2026/): **topology-aware orchestration achieves 12–23% improvement over static single-topology baselines, even with identical models.** That's a larger performance gap than most model upgrades deliver.
+
+The bottleneck shifted. It's no longer "which model?" It's "how do I coordinate multiple agents?"
+
+---
+
+## Worktrees Give You Isolation. They Don't Give You Coordination.
+
+Git worktrees (a 2015 feature) solved the collision problem. Each agent gets its own working directory backed by the same `.git` object store. Agent A's uncommitted changes never touch Agent B's files.
+
+**But isolation ≠ coordination.**
+
+An agent in worktree A can still reach your Git hooks, your git config, even another worktree's stash. Prompt injection through issues or dependency READMEs could drop a malicious file in the shared `.git` directory — code that runs on your machine the next time you commit. We covered this in [our HN analysis](/blog/hn-developer-divide-coding-agents-interface-skill-atrophy/): *Git worktrees alone are not enough. An agent that can write to your shared Git directory can potentially inject code that runs on every future commit.*
+
+Worktrees give you **code isolation**. They don't give you **behavior isolation** or **context sharing**.
+
+You need agents that can:
+- Share context without manual copy-paste
+- Hand off tasks with full state
+- Negotiate capabilities ("Can you edit code? Can you search the web?")
+- Maintain persistent sessions across devices and restarts
+- Report progress in a structured way other agents can consume
+
+**That's exactly what ACP does.**
+
+---
+
+## What Is ACP (Agent Communication Protocol)?
+
+**Agent Communication Protocol (ACP)** is an open standard for autonomous agents to discover each other, negotiate capabilities, exchange structured context, and coordinate multi-step workflows — all without human glue code.
+
+Think of it as **HTTP for agents**. But instead of request/response between services, it handles:
+
+| Layer | What It Solves |
+|-------|----------------|
+| **Discovery** | "Which agents on my network can edit code?" |
+| **Capability Negotiation** | "I need `code.edit` + `code.test` — who has both?" |
+| **Task Handoff** | "Here's the full context, the plan, and the acceptance criteria — you take it from here" |
+| **Context Exchange** | "Give me the summary + artifacts + decisions from session X" |
+| **Progress Reporting** | Structured status updates: `accepted` → `in_progress` → `completed`/`failed` |
+| **Session Persistence** | Same session ID, five devices, six agents, zero manual context management |
+
+It's not theoretical. **It's running in production today.**
+
+---
+
+## Who's Already Speaking ACP (September 2026)
+
+| Agent / Platform | ACP Status | What It Enables |
+|------------------|------------|-----------------|
+| **OpenClaw** | Native v0.3 | Control plane, multi-agent orchestration, cross-device sessions |
+| **Gitlawb Zero** | v0.9.0+ | Standard session list/resume, structured file changes, safe browser metadata |
+| **Block Berd** | v0.6.2 | Desktop shell unifying Claude Code, Codex, Goose, Copilot via ACP |
+| **Hermes Agent** | v0.21+ | Bot Mode: agents talk to each other in group chats with identities |
+| **Qwen Code** | v0.23.1+ | Delegate subagent turns to external agents (Claude Code first) |
+| **GitKraken Kepler** | Preview | Drives any ACP-compliant agent from issue tracker |
+| **Goose** | v1.46+ | ACP session persistence, TLS, hidden sessions for background agents |
+
+**This isn't a proposal. It's a converging standard.**
+
+---
+
+## A Real Workflow: Feature Development Pipeline (Zero Manual Context)
+
+```text
+┌──────────────┐    handoff     ┌──────────────┐    handoff     ┌──────────────┐
+│  Planner     │ ─────────────▶ │   Coder      │ ─────────────▶ │   Tester     │
+│  Agent       │  spec + context│   Agent      │  code + tests  │   Agent      │
+│              │                │              │                │              │
+│ Capability:  │                │ Capability:  │                │ Capability:  │
+│ code.plan    │                │ code.edit    │                │ code.test    │
+│ web.search   │                │ code.refactor│                │ deploy.preview│
+└──────────────┘                └──────────────┘                └──────────────┘
+       │                             │                             │
+       └──────────────┬──────────────┴──────────────┬──────────────┘
+                      ▼                             ▼
+            ┌─────────────────────────────────────────────┐
+            │           Shared ACP Session                │
+            │  • Requirements doc                         │
+            │  • Architecture decisions                   │
+            │  • Code changes (diff history)              │
+            │  • Test results                             │
+            │  • Deployment status                        │
+            └─────────────────────────────────────────────┘
+```
+
+**One session ID. Three agents. Zero manual context management.**
+
+The Planner researches, creates a spec, pushes context to the session. The Coder pulls that context, executes, pushes diffs and test results. The Tester pulls everything, runs integration tests, pushes deployment status. You watch it happen in a dashboard — or walk away and get a notification when it's done.
+
+---
+
+## Cross-Device Continuity: The "Killer Feature"
+
+This is where it gets personal.
+
+```text
+Time    Device          Agent                    ACP Action
+──────────────────────────────────────────────────────────────────
+09:00   Phone           Research Agent          context.push(session="auth-refactor", findings)
+09:30   Laptop          Planning Agent          context.pull(session="auth-refactor") → plan
+10:00   Desktop         Coding Agent            task.handoff(to=coder, context=plan)
+12:00   Desktop         Test Agent              task.handoff(to=tester, context=code+tests)
+14:00   Tablet          Review Agent            context.pull(session="auth-refactor") → review
+16:00   Phone           Deploy Agent            task.handoff(to=deploy, context=approved)
+```
+
+**One session ID. Five devices. Six agents. Zero manual context management.**
+
+You start research on your phone during coffee. The context auto-syncs. You open your laptop — the planning agent already has the research. You move to your desktop — the coding agent picks up the plan. Your tablet shows the review. Your phone triggers the deploy.
+
+**This is what "persistent context" actually means.** Not "saved to disk." Portable across devices, across agents, across time.
+
+---
+
+## Why Now? Three Forces Converged
+
+### 1. Models Converged (The Push)
+When every model can solve the problem, **coordination becomes the differentiator**. The 12–23% orchestration advantage is real — and it compounds across your entire workflow.
+
+### 2. Agents Got Capable Enough (The Readiness)
+Six months ago, agents couldn't reliably execute multi-step tasks without hand-holding. Today: Claude Code subagents inherit full context. Codex parallel agents run in isolated worktrees. Hermes bots talk to each other in group chats. Goose runs background agents via hidden ACP sessions. **The primitives work.**
+
+### 3. The Protocol Stabilized (The Standard)
+ACP v0.3 (stabilizing) defines:
+- Standard capability taxonomy (`code.*`, `terminal.*`, `web.*`, `git.*`, `deploy.*`, `context.*`)
+- Structured message envelopes with correlation IDs for tracing
+- Transport options: WebSocket (local/cloud), HTTP/2 (serverless), stdio (subprocess), gRPC (high-throughput)
+- Auth: JWT/mTLS for production, none for local development
+
+**OpenClaw's control plane runs it. Gitlawb Zero's sessions use it. Berd's desktop shell speaks it. Hermes Bot Mode is built on it.**
+
+The infrastructure is there. The agents are there. The standard is there.
+
+---
+
+## What This Means for You (Today)
+
+### If You Use One Agent
+**Start experimenting with a second.** Run Codex in a worktree for bulk refactors while Claude Code handles architecture in the main branch. Use Hermes for scheduled automations. The learning curve is the decomposition instinct — knowing *how* to split work.
+
+### If You Already Juggle Multiple Agents
+**Stop copy-pasting context.** Look at Berd (desktop) or OpenClaw (control plane) as a unified shell. They speak ACP to your existing agents — no migration, just connection.
+
+### If You're Evaluating Agents for Your Team
+**ACP support is now a differentiator.** Commercial agents (Cursor, Copilot, Claude Code) distribute through proprietary channels with opaque build processes. Open-source agents (OpenClaw, Gitlawb Zero, Kilo Code, Qwen Code, Hermes, Goose) give you **interoperability receipts** — the same way Kilo Code now gives you [SBOM attestations](/blog/kilo-code-v7-8-1-sbom-supply-chain-security/).
+
+---
+
+## The Honest Take: It's Early But Real
+
+ACP v0.3 is "stabilizing" — not "stable." The capability taxonomy will grow. Transport implementations will mature. Auth patterns will solidify. Block explicitly says Berd is "how we work, not a finished product for everyone."
+
+But the **direction is unambiguous**.
+
+The industry spent two years optimizing models. The next two years will be spent on **orchestration, context, and human-agent interface**. ACP is the first serious attempt at the interoperability layer — from multiple companies that actually use it.
+
+> **Start alone, then go multiplayer.**
+
+That's the arc. The protocol is free, open, and available today. Your agents don't have to be islands anymore.
+
+---
+
+## How to Start (15 Minutes)
+
+### Option 1: Berd (Desktop, Easiest)
+```bash
+# Download from GitHub Releases (macOS, Windows, Linux)
+# Or build:
+git clone https://github.com/block/berd
+cd berd
+just bundle  # stages Goose backend, builds Tauri app
+```
+Connect your API keys. Point at a project. Add Claude Code, Codex, Goose to the roster. They're now ACP-connected.
+
+### Option 2: OpenClaw Control Plane (Self-Hosted, Full Control)
+```yaml
+# docker-compose.acp.yml
+version: '3.8'
+services:
+  acp-broker:
+    image: openclaw/acp-broker:v0.3
+    ports:
+      - "8080:8080"  # WebSocket
+      - "8081:8081"  # HTTP
+    environment:
+      - ACP_AUTH_MODE=jwt
+      - JWT_SECRET=${JWT_SECRET}
+      - PERSISTENCE=redis
+    depends_on: [redis]
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - acp-data:/data
+volumes:
+  acp-data:
+```
+Deploy. Register your agents. Build workflows.
+
+### Option 3: Gitlawb Zero (CLI-First, Session Portability)
+```bash
+npm install -g @gitlawb/zero
+zero upgrade  # v0.9.0+ for ACP session list/resume
+```
+Run `zero session list` — see portable sessions. Resume on another machine. Hand off to another ACP agent.
+
+---
+
+## Related Reading
+
+- [OpenClaw ACP: The Protocol Building Agent Ecosystems (Technical Deep Dive)](/blog/openclaw-acp-future-agent-communication/)
+- [Gitlawb Zero v0.9.0: ACP Session Resume Is Real Now](/blog/gitlawb-zero-v0-7-0-vision-readonly-plan-mode/)
+- [Block Berd: The Open-Source Desktop That Unifies Every Agent](/blog/block-berd-open-source-agent-desktop-unifies-claude-codex-goose/)
+- [Hermes Agent v0.21 Pantheon: Bots That Talk to Each Other](/blog/hermes-agent-v0-21-pantheon-bots-that-talk-to-each-other/)
+- [Agentic Orchestration Topology 2026: Why Coordination Beats Model Choice](/blog/agentic-orchestration-topology-2026/)
+- [Kilo Code v7.8.1: SBOM Supply-Chain Security for Every Artifact](/blog/kilo-code-v7-8-1-sbom-supply-chain-security/)
+
+
+## Related articles
+
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+- [Cline Desktop Just Put Your PR Card Right in the Composer — Windows Users Finally Get Working Updates](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+---
+
+*terminalblog.com is an independent publication. No affiliate relationships with mentioned projects. ACP is an open standard under the Agentic AI Foundation (Linux Foundation).*
