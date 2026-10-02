@@ -1,17 +1,17 @@
 ---
-title: "Cline Desktop Just Put Your PR Card Right in the Composer — Windows Users Finally Get Working Updates"
-description: "Cline Desktop's v0.0.24→v0.0.37 wave puts your branch's pull request inside the composer, fixes the Windows update that always failed, stops losing your prompt on send errors, and finally explains auth failures in plain English. Free models still included."
+title: "Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation"
+description: "Cline Desktop v0.0.42 drops the /compact slash command to summarize conversations and free up context, Connectors becomes the default Customize tab with search and browse, and agent teams no longer slow down in long sessions. Plus CLI v3.0.68 and SDK v0.0.90 bring the same team performance fixes and model catalog refresh. Free models still included."
 pubDate: "2026-08-01T09:00:00Z"
-updatedDate: "2026-09-26T10:00:00Z"
-tags: ["cline", "desktop", "free-models", "release", "coding-agent", "open-source", "update"]
+updatedDate: "2026-10-02T10:00:00Z"
+tags: ["cline", "desktop", "free-models", "release", "coding-agent", "open-source", "update", "compact", "connectors"]
 tool: "cline"
 author: "sage"
-image: "/api/og?title=Cline+Desktop+Free+Models&tool=cline"
+image: "/api/og?title=Cline+Desktop+v0.0.42+Compact+Command+Connectors&tool=cline"
 ---
 
 Cline — the 67,000-star open-source coding agent — made two moves that lower the barrier to entry for AI-assisted coding. First, it shipped a standalone macOS desktop app that runs agent sessions independently of any IDE. Second, it added free coding models to every Cline surface: the desktop app, the VS Code extension, and the command-line interface. You do not need an API key to try Cline.
 
-The desktop app launched as **v0.0.4 on July 22, 2026** and has been updating almost every other day since. As of **September 11 it is at v0.0.26** on both macOS and Windows, with the v0.0.24→v0.0.26 wave fixing Windows updates that silently failed, lost prompts on failed sends, and a session state that lied about whether the agent was still working — on top of the universal Mac download, token usage meter, and edit-any-message from August.
+The desktop app launched as **v0.0.4 on July 22, 2026** and has been updating almost every other day since. As of **October 2 it is at v0.0.42** on macOS, with the September→October wave fixing agent team performance in long sessions, adding a `/compact` slash command to reclaim context, making Connectors the default customization tab, and refreshing model defaults across 36 providers including GPT-6.1 Sol and Qwen 3.8 Flash.
 
 If you have been curious about coding agents but hesitated because of billing setup or vendor lock-in, this is the week to try one.
 
@@ -188,17 +188,69 @@ If you are a Claude Code user considering switching, the session import feature 
 
 If you are brand new to coding agents, none of these fixes matter to you yet — you will just get a working app. Start with a free model, ask it to explain a function in your codebase, and see how the agent loop works.
 
-## September 26 Update: What v0.0.37 Adds (Latest Release)
+## October 2 Update: What v0.0.41, v0.0.42, CLI v3.0.68, and SDK v0.0.90 Bring (Latest Releases)
 
-Just two weeks after the v0.0.26 wave, Cline Desktop shipped **v0.0.37** (September 26) with more quality-of-life improvements that show the team is listening to daily friction points:
+Just six days after the September 26 wave, Cline shipped **four coordinated releases** on October 2 — desktop v0.0.41 and v0.0.42, CLI v3.0.68, and SDK v0.0.90. The theme is consistent: **long sessions stop slowing down**, **Connectors become first-class**, and **model defaults shift to GPT-6.1 Sol** across major providers.
 
-**About page with real update controls.** Settings now has an **About** page showing your version and channel, **Check for updates** and **Restart to update** buttons, and release notes for recent versions with links to each GitHub release. **Report an issue** is right there too. No more hunting through menus or guessing your version.
+### 1. The `/compact` Slash Command — Reclaim Context Without Losing Your Work
 
-**One-time "What's new" dialog after updates.** After an update, a dialog catches you up on recent features — the first covers SSH remotes, worktrees, PR status in the composer, and parallel sub-agents. To see it again, use **Highlights** on the About page.
+**v0.0.42** adds a new `/compact` command to the desktop app. It summarizes your conversation so far using your session's provider settings, freeing up context window space. The summary is not sent to the model as a prompt — it's a local operation that replaces earlier messages with a structured summary.
 
-**macOS diagnostics export is now one click.** **Help → Export Diagnostics…** opens the export directly instead of making you dig through Settings.
+For beginners: long sessions no longer hit a hard context wall. When you feel the agent forgetting earlier decisions, type `/compact` and keep going. The agent remembers what matters.
 
-**Amazon Bedrock + OpenAI models: reasoning config fixed.** On Bedrock, OpenAI models reached through inference profiles (`us.openai.…`, `global.openai.…`) no longer fail with "Unknown parameter: 'reasoningConfig'" when reasoning effort is set. This was a silent blocker for Bedrock users trying to use OpenAI models with custom reasoning settings.
+### 2. Connectors Is Now the Default Customize Tab — With Search and Browse
+
+**v0.0.42** makes **Connectors** the first and default tab in Customize. A new **Browse** section lists the full connector catalog in two columns with search, so you no longer need the Marketplace to find a connector. Installed and Browse each have their own search box. Connectors now show their brand logo in both Customize and Marketplace rows.
+
+If connectors aren't available to you, the tab explains why: a sign-in card when you're signed out, or a rollout notice with **Check again** when your account doesn't have beta access yet.
+
+### 3. Agent Teams Stop Slowing Down in Long Sessions
+
+This is the biggest under-the-hood fix across **all three surfaces** (Desktop v0.0.41/v0.0.42, CLI v3.0.68, SDK v0.0.90).
+
+**The problem:** Every streamed chunk and 2-second heartbeat used to re-save the *entire* team state — including every finished teammate's full transcript. One local `teams.db` reached 1.66 GB, with a single run row rewritten ~339,000 times.
+
+**The fix:** Stream chunks and heartbeats now go to live UIs only and are never persisted. Only changed entities are written (batched into one transaction every ~300 ms). Run records keep a summary instead of the full transcript. `team_events` is capped per team (2000 rows, 30 days). SQLite team storage moves to schema v2 with a one-time migration that compacts existing data. `SqliteTeamStore.vacuum()` returns the freed space when called explicitly. Failed team writes are retried instead of dropped.
+
+For you: **long multi-agent sessions stay fast**. No more gradual slowdown. No more gigabyte databases.
+
+### 4. Cloud Sessions Get Honest Model Lists
+
+**v0.0.41** fixes a long-standing confusion: cloud sessions now list **Cline Usage-Billing**, **ClinePass**, and **ClineFree** models (organization accounts don't get ClinePass), instead of only the generic Cline model. A new cloud session waits until a model is ready before sending, and you can retry if the model list fails to load.
+
+### 5. Your Unsent Prompt Survives Session Switching
+
+**v0.0.41**: An unsent prompt is no longer lost when you switch to another session and back. **New** in the sidebar returns to your unfinished draft; **Cmd/Ctrl+N** still starts a fresh session.
+
+### 6. Sessions You Start Are Highlighted in the Sidebar
+
+**v0.0.41**: Sessions you start in the app are now highlighted while open, instead of only sessions reopened from history. They also no longer get marked unread by their own messages.
+
+### 7. Customize → Connectors Matches Skills, Plugins, and MCP Tabs
+
+**v0.0.41**: The Connectors tab now has search, a refresh button, and an Installed section. A new **Suggested** section offers ready-made connector combos (such as incident root-cause analysis or organizing your day), each with an example prompt and one-click installs for its connectors.
+
+Marketplace rows now show what type each item is, so same-named entries like the Figma MCP server and the Figma connector are easy to tell apart. Category filters moved into a single dropdown. A connector's details now show how many tools it adds to new sessions, instead of the catalog's total tool count.
+
+### 8. Model Catalog Refresh — GPT-6.1 Sol Is the New Default for 36+ Providers
+
+**CLI v3.0.68 and SDK v0.0.90** refresh the model catalog. Default models change for:
+
+| Provider | New Default |
+|----------|-------------|
+| DigitalOcean | **GPT-6.1 Sol** |
+| GMI Cloud | **Qwen 3.8 Flash** |
+| NanoGPT | **Pareto 26.10 Preview** |
+| Nvidia | **DeepSeek V4.1 Flash** |
+| Ofox | **GPT-6.1 Sol** |
+
+Plus standalone provider requests made outside a session (such as commit message generation) can now resolve Cline surface headers. `sessionId` is optional in `resolveProviderRequestHeaders`, and `X-Task-ID` is omitted rather than sent empty.
+
+### 9. SDK v0.0.90 — Team Storage Schema v2 Migration
+
+The SDK release includes the same team performance fixes plus a SQLite schema migration (v2) that compacts existing team data on first open. `SqliteTeamStore.vacuum()` lets you reclaim freed space explicitly.
+
+---
 
 ## How to Get Started
 
