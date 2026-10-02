@@ -1,0 +1,129 @@
+---
+title: "Claude Code Just Got a Plugin System That Watches Your Back — Mods Change Everything"
+description: "Claude Code v2.1.287 drops 'Claude Mods' — plugins can now modify deeper agent behavior. The built-in 'You Should Know' mod runs a side agent that flags things you or Claude might miss. Plus new agent view filters. The release that finally makes extensibility real."
+pubDate: 2026-10-02T10:00:00Z
+tags: ["claude-code", "release", "anthropic", "ai-coding-agents", "beginner", "mods", "plugins", "extensibility"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+Mods+Plugin+System+Watchdog&tool=claude-code"
+---
+
+Claude Code **v2.1.287** dropped October 1, and it's the first release where **plugins stop being cosmetic and start changing how the agent thinks**.
+
+The headline: **Claude Mods** — a plugin architecture that lets extensions modify *deeper agent behavior*, not just add slash commands. And it ships with a built-in mod called **"You Should Know"** that runs a silent side agent watching your session and flagging things you or Claude might miss.
+
+If you've ever thought "Claude Code is great but I wish it could..." — this release is the answer.
+
+---
+
+## 1. Claude Mods — Plugins That Actually Change Behavior
+
+Until now, plugins were mostly slash commands and UI tweaks. Mods are different.
+
+**Mods hook into the agent's decision loop.** They can:
+- Intercept and modify tool calls before execution
+- Inject context the agent wouldn't see otherwise
+- Run parallel "watchdog" agents that review the main agent's work in real-time
+- Alter how the agent plans, reasons, or responds
+
+This isn't "add a command." This is "change how the agent thinks."
+
+### How to Enable Mods
+
+```bash
+# Enable the built-in watchdog mod
+/plugin enable cc-plugin-you-should-know@builtin
+
+# List available mods
+/plugin list
+
+# Install community mods (when they exist)
+/plugin install <mod-name>
+```
+
+**Requires first-party session with telemetry on** — the watchdog mod needs telemetry to function. This is a deliberate design choice: the side agent needs visibility to be useful.
+
+---
+
+## 2. "You Should Know" — The Side Agent That Has Your Back
+
+This is the killer feature. You enable it, and a **second agent runs silently alongside your main session**. Its only job: *watch for things going wrong*.
+
+What it catches:
+- **Security issues** — hardcoded secrets, unsafe patterns, permission overreach
+- **Architecture drift** — you said "don't touch auth" but the agent is editing auth files
+- **Missed context** — you mentioned a constraint three turns ago; the agent forgot; the watchdog didn't
+- **Token waste** — the agent is about to burn 50k tokens on a rabbit hole
+- **Silent failures** — a tool succeeded but did the wrong thing
+
+It surfaces flags as **non-blocking notifications** — you see them, decide if they matter, keep going. No interruption unless you want it.
+
+### Why This Matters for Beginners
+
+You're learning. You don't know all the failure modes. The watchdog *does* (it's trained on millions of sessions). It's like having a senior dev looking over your shoulder — except it's always there, never tired, and doesn't judge.
+
+---
+
+## 3. New Agent View Filters — Finally Find That Session
+
+The agents view (your session dashboard) gets two filters that should've existed years ago:
+
+| Filter | Syntax | What It Does |
+|--------|--------|--------------|
+| **Name/Task filter** | `n:<text>` | Matches session names AND task descriptions |
+| **Prompt text filter** | `prompt_text:<text>` | Searches inside the actual prompts you sent |
+
+**Behavior:** Filter shows matches in collapsed sections. Press `Enter` on a match → opens that session directly.
+
+No more scrolling through 50 sessions trying to remember which one had the "fix the webhook bug" conversation.
+
+---
+
+## 4. `prompt_text` Field — Your Prompts Are Now Queryable
+
+Related to the filter above: every session now stores `prompt_text` as a first-class field. This means:
+- Programmatic access to your prompt history
+- Better session search/resume
+- Future mods can analyze your prompting patterns
+
+---
+
+## 5. What This Means for You
+
+| If You... | Verdict |
+|-----------|---------|
+| Want agents that catch your blind spots | **Yes** — "You Should Know" is exactly this |
+| Build custom workflows on Claude Code | **Yes** — Mods API opens real extensibility |
+| Juggle many parallel sessions | **Yes** — `n:` and `prompt_text:` filters save hours |
+| Just want the latest model | **No** — no model changes in this release |
+| Run without telemetry | **No** — watchdog mod requires telemetry |
+
+---
+
+## The Bottom Line
+
+**Claude Code v2.1.287 isn't a feature release. It's an architecture release.**
+
+Mods turn Claude Code from a *tool you use* into a *platform you extend*. The built-in watchdog proves the concept: a side agent that watches, learns, and protects — without getting in your way.
+
+This is the release where "Claude Code plugins" stop being a buzzword and start being a superpower.
+
+```bash
+claude update
+# Then:
+/plugin enable cc-plugin-you-should-know@builtin
+# Watch the watchdog watch you
+```
+
+---
+
+## Related Reading
+
+- [Claude Code v2.1.285 — Desktop Command, Plugin Configure, 100+ Fixes](/blog/claude-code-v2-1-285-desktop-command-plugin-fixes/)
+- [Claude Code v2.1.284 — Sonnet 5.5 Default, Gateway Spend Fixes](/blog/claude-code-v2-1-284-sonnet-5-5-default-gateway-spend-fixes/)
+- [Claude Code vs Cursor 2026 Comparison](/blog/claude-code-vs-cursor-2026-comparison/)
+- [Best Free AI Coding Agents 2026 — No Credit Card Required](/blog/best-free-ai-coding-agents-2026-no-credit-card/)
+
+---
+
+*Using the watchdog mod? What's the first thing it caught that you missed? [Reply on X](https://x.com/terminalblog_en) — I read every response.*
