@@ -1,0 +1,279 @@
+---
+title: "Claude Code Just Fixed 100+ Things That Were Driving You Crazy"
+description: "Claude Code v2.1.288 isn't a feature drop — it's the biggest quality-of-life patch yet. Ctrl+C recovery, auto-compact that actually works, MCP re-auth prompts, session resume fixes, plugin LSP fixes, Windows keyboard fixes, and 90+ more. The release that makes daily usage feel smooth."
+pubDate: 2026-10-03T10:00:00Z
+tags: ["claude-code", "release", "quality-of-life", "beginner", "bug-fixes", "mcp", "plugins"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+v2.1.288+100+Fixes&tool=claude-code"
+---
+
+Claude Code v2.1.288 dropped October 2, and it's the kind of release that doesn't make headlines — it **makes your day better**.
+
+No new model. No flashy feature. Just **100+ fixes** for the paper cuts that made you sigh, swear, or restart your session. If you've ever lost a draft to Ctrl+C, watched auto-compact fail, fought MCP OAuth loops, or had your Windows keyboard die after a restart — **this is the version you've been waiting for**.
+
+---
+
+## The "Finally" Fixes (You'll Feel These Immediately)
+
+### 1. Ctrl+C Recovery — Your Draft Comes Back
+Press `Ctrl+C` by accident? **Press Up on the empty prompt** — your entire draft (including pasted text and images) returns. No more rewriting that 500-word context dump.
+
+### 2. Auto-Compact That Actually Compacts
+Long conversations used to fail with *"Prompt is too long"* instead of compacting. **Fixed.** When the last reply reports zero token usage, it now compacts properly instead of crashing.
+
+### 3. Session Resume — Actually Works Now
+- `--resume` dropping files that compaction just restored → **fixed**
+- Resumed session not saving the last response → **fixed**
+- Transcript cut short during load → **fixed**
+- Resuming pre-2.1.286 conversations dropping model thinking → **fixed**
+
+### 4. MCP Re-Auth Prompt — No More Silent Failures
+When an MCP server needs more OAuth scope during a tool call, **you now get a re-authenticate prompt**. No more wondering why the tool silently failed.
+
+### 5. `/code-review` — You Control the Noise
+Added `--max-findings <n>|all` to report more or fewer findings. Your choice persists until you pass `--max-findings default`.
+
+---
+
+## The "Oh Thank God" Fixes (Plugins, MCP, Cloud)
+
+### 6. Plugin LSP Servers — Placeholders Finally Substituted
+Plugins loaded with `--plugin-dir` now show **"Configure options"** in `/plugin`. LSP servers receive **actual substituted values** instead of literal `${user_config.*}` and `${CLAUDE_PLUGIN_ROOT}` placeholders.
+
+### 6. Plugin Pane — Diffs That Don't Parse Won't Blank the UI
+One `Code` element holding an unparseable diff used to make the whole pane show nothing. **Now it draws as plain code.**
+
+### 7. `git-subdir` Plugin Installs — Works on Old Git (Ubuntu 22.04)
+Fixed installs failing or caching incomplete plugins on git before 2.39.
+
+### 8. Background Sessions — Survive Plugin Reload/Disable
+Timers and reads no longer kill the session when a plugin reloads or disables mid-operation.
+
+### 9. Sandboxed Heredocs — Auto-Allow Works
+`python3 <<EOF` (unquoted delimiter) no longer asks for approval on every run under sandbox auto-allow when the body holds only plain text and simple `$VAR` references.
+
+### 10. Bash Permission Check — Catches `BASHPID` Arithmetic
+Prompts before a `BASHPID` assignment whose value the shell would evaluate as arithmetic, instead of allowing it silently.
+
+---
+
+## The "Windows Users, We See You" Fixes
+
+### 11. Keyboard Works After Self-Restart
+First sign-in to a Claude apps gateway, provider setup, or `/tui` — **the keyboard now works** after Claude Code restarts itself.
+
+### 12. Windows Crash on Credential Read — Fixed
+Crash when reading a stored credential that has no username → **fixed**.
+
+### 13. `rm /` Protection — Even in `bash -c`
+A dangerous `rm` (like `/` or home directory) inside `bash -c` or `sh -c` **now prompts** even in `bypassPermissions` mode or under a shell allow rule.
+
+---
+
+## The "Cloud & Cowork" Fixes
+
+### 14. Cloud Sessions — New Conversation Doesn't Wait for Idle MCP
+First turn no longer waits for a stdio MCP server with `alwaysLoad: false`.
+
+### 15. Cowork Cloud — Phone Join Shows Prompt Suggestions
+Fixed prompt suggestions not appearing on a phone joining a session started on another device.
+
+### 16. Self-Hosted Runner — `gh api` Built-In Works
+Refused `gh` command prints its `gh api` equivalent, `--paginate` follows every page, nested `claude` no longer removes it.
+
+### 17. Remote Control — Survives Credential Renewal
+Sessions stay connected during renewal and are kept if it gives up after a server outage.
+
+---
+
+## The "Screen Reader / Accessibility" Fixes
+
+### 18. Screen Reader Mode — Short Announcements Stay Visible
+Short announcements (like a deleted word) now stay on screen until your next key press or until something above them changes.
+
+### 19. Answered Questions Say "Answered"
+In question dialogs, answered questions now show "answered" beside their box.
+
+### 20. `/permissions` — Typing a Rule Number Picks It
+In screen reader mode, typing a rule's number now selects it instead of opening the search box.
+
+---
+
+## The "Agent & Subagent" Fixes
+
+### 21. Subagents Get Their Own Tools (Not Defaults)
+A plugin-defined agent spawned by name now runs with **its own prompt, tools, disallowedTools, and effort** instead of inheriting defaults.
+
+### 22. Agent Teams — `tools:` with Many `Agent(...)` Entries No Longer Stalls
+Fixed stall when launching an agent whose `tools:` lists very many `Agent(...)` entries.
+
+### 23. Subagents in Claude Desktop Code Tab — Get MCP `memory` Tools
+Fixed subagents getting **none of the tools** of a user-configured MCP server named `memory`.
+
+### 24. Headless Sessions — Respect SIGTERM with SIGCONT
+Fixed `-p` / SDK sessions occasionally ignoring SIGTERM when a supervisor sends SIGCONT alongside it.
+
+---
+
+## The "Model & Provider" Fixes
+
+### 25. Full Model Output Limit for Claude Sonnet/Opus/Aliases
+Prevents responses ending early during long reasoning. Uses the **full model output limit**.
+
+### 26. Provider Context-Limit Errors → Auto-Compact + Retry
+When the provider reports the request exceeded the model's context length, it now compacts and retries.
+
+### 27. Custom OpenAI-Compatible Providers — No More `prompt_cache_breakpoint` 400s
+Stopped sending `prompt_cache_breakpoint` to custom providers and first-party IDs rerouted through custom endpoints — both reject it with HTTP 400.
+
+### 28. Kilo Gateway Models Without Supported Parameters — Now Visible
+Models like Jev Router that don't report supported parameters now show up.
+
+### 29. Auto Mode — Compacts Instead of Prompting/Failing Every Tool Call
+When a conversation grows too long for the client-side safety classifier, it **compacts** instead of prompting for or failing every tool call.
+
+### 30. Auto Mode Classifier — Ignores `ANTHROPIC_DEFAULT_SONNET_MODEL` Pin
+If the pin names Sonnet 5.5 or Opus 5.5, it uses Sonnet 5 instead.
+
+---
+
+## The "MCP & Tool Call" Fixes
+
+### 31. MCP Tool Calls Over 16 MB — No Longer Run Twice
+Fixed remote server results over 16 MB or unparsable results causing duplicate execution.
+
+### 32. MCP URL Prompts — Wait for "I'm Done, Continue"
+Servers that can't report when you're done now wait for explicit confirmation before continuing the tool call.
+
+### 33. `sandbox.credentials.files` on Git Config — Works with Block Reads
+Entries on git config files now take effect while `permissions.blockReadsOutsideWorkingDirectories` is on.
+
+### 34. LSP Tool Calls — 60s Timeout (Per-Server `requestTimeout`)
+Fixed hanging indefinitely when a language server uses dynamic capability registration or stops responding.
+
+### 35. PreToolUse / PermissionRequest Hooks — Blocked on Serialization Failure
+When matching fails or input can't serialize to JSON, the call is **now blocked** (was skipped).
+
+---
+
+## The "VS Code Extension" Fixes
+
+### 36. claude.ai Connector — "Needs Authentication" Fixed
+MCP servers dialog now offers **Check connection** after you authorize.
+
+### 37. New Conversation Shortcut (Cmd/Ctrl+N) — Only Starts in Active View
+Fixed starting a conversation in **every visible Claude view** instead of just the one you're in.
+
+### 38. Chat View — Archives Current Session → Starts New (Not Resume Next)
+Fixed resuming the next saved session after archiving the current one.
+
+---
+
+## The "Small But Mighty" Fixes
+
+| Fix | What It Means |
+|-----|---------------|
+| `Ctrl+F` finds session by name, `Alt+↑/↓` jumps groups in agents view | Rebindable in `keybindings.json` |
+| `$.ui.selection()` for mods | Returns last selected text in fullscreen; if within one transcript row, that row |
+| Built-in `gh api` in cloud sessions | Works even when image has no GitHub CLI; fixed control chars from filenames/jq/errors |
+| Session title shows `scheduled` with wake time | For sessions asleep on pending wakeup/cron |
+| CLI shows suggested next steps with clickable buttons | Shows whether each was accepted/dismissed |
+| Preserve prompt cache prefixes | Across goal turns, compaction, completion; working timer runs through turn boundaries |
+| Stop single sub-agent from task card | Background agents of current run shown next to working status; click opens/stops/clears |
+| Revert failures reported | Failed revert/redo shows error toast; snapshot steps log git exit code + stderr |
+| Background agent avatar animation | Stays smooth above prompt input |
+| `CLAUDE_CODE_DISABLE_STRUCTURED_OUTPUTS` | Turns off structured outputs for Mantle/gateways that reject them |
+| Auto mode denials — point at correct tool | Fixed pointing at Bash permission rule when blocked tool was not Bash |
+| Auto mode on Bedrock/Mantle — no classifier switch | Fixed switching to local classifier after request to older model |
+| Cloud sessions — no model reply after server refusal | Fixed replying with newly picked model after server refused it |
+| Cowork — no stuck "waiting for input" | Fixed 5-min unanswered WebFetch permission prompt |
+| Mod button — runs correct action | Fixed running different button's action on view drawn before restart |
+| OpenTelemetry spans — correct source/decision | Fixed `unknown` in `-p`/SDK and PreToolUse hook approvals |
+| Permission asks unanswered — emit `tool_decision` | Fixed emitting nothing in `-p` or interrupted turn |
+| Cowork Edit/Retry — works after `/compact` | Fixed refusing message sent before `/compact` even with history saved |
+| Unattended sessions — 3 timeouts then give up | Fixed retrying for hours after very long response stream failed |
+| `/login` — shows failure when credentials can't save | Offers retry when new login didn't take effect |
+| Bedrock credential lookup — Stop ends request | Fixed moving to fallback model instead of ending |
+| Second `gcpAuthRefresh`/`awsAuthRefresh` — no duplicate | Fixed opening when laptop wakes during another sign-in |
+| Restarted cloud sessions — respect org model list | Fixed restoring a model the org's enforced list refuses |
+| Artifact tool — includes org design systems | Fixed leaving them out when starting slides/design on Team/Enterprise |
+| NPM auto-updater — reports actual failure | Fixed reporting success when platform-native binary failed |
+| Remote Control — doesn't archive connected session | Fixed cleanup archiving session still connected or just re-attached |
+| Plugin marketplace — shows both SSH/HTTPS errors | Fixed showing only second attempt's error |
+| Path-scoped `.claude/rules` + nested CLAUDE.md — load on Write/Edit | Previously only Read loaded them |
+| Idle prompt hooks — don't fire while background agents run | Fixed firing during background agent execution |
+| First request in fresh env — uses server limits | Fixed using built-in output limit/auto-compact window; may wait up to 1.5s |
+| "What should Claude do instead?" hint — gone on Interrupted row | Fixed showing after sending queued messages with ctrl+enter |
+| `/login` in `--bare` — says which credentials work | Fixed running sign-in the session never reads |
+| InstructionsLoaded hook — includes agent_id/type on subagent file access | Rules/nested CLAUDE.md loaded on file access now report effort |
+| Agent tool in `claude mcp serve` — works | Fixed reporting no available agents and rejecting every subagent_type |
+| Terminal cursor — follows typed text | Fixed in fullscreen transcript viewer search and `/theme` custom color search |
+| `/autocompact` — saves window per model | Each model keeps its own setting when you switch |
+| `claude project purge` → `claude purge` | Old name still works with notice |
+| Agents view `n:` filter + Ctrl+F — Enter opens best match | Fixed opening top row instead |
+| `/usage-credits` — improved message | For Team/Enterprise with usage credit requests turned off |
+| "You should know" notes — say "we"/"main agent"/"you" | Depending on who was responsible for a decision |
+| Artifact DB write error — states limit + what frees space | Improved error at size limit |
+| Bash permission prompts — shorter reason | When part of command can't be checked before running |
+| Cloud sessions switch — unlocked | Fixed staying locked off while unrelated security setting loaded/failed |
+| Stop during runner start — cancels queued message | Fixed queued message running once runner up |
+| Claude Tag — no "Remove this scope" on auto-created channels | Fixed always-failing option |
+| Claude Tag — follows related Slack thread in another channel | Updates reach the conversation that depends on them |
+| Claude Tag Configure page — better save errors | Too-long instructions say to shorten; lost access doesn't say "try again" |
+| `claude plugin test` — accurate mod status | Fixed reporting mods as turned off remotely from out-of-date saved setting |
+
+---
+
+## What This Means for You
+
+| If you're... | This release means... |
+|--------------|------------------------|
+| **Daily CLI user** | Ctrl+C recovery, auto-compact, session resume, MCP re-auth — the daily friction is gone |
+| **Plugin developer** | LSP placeholders substituted, `--plugin-dir` shows Configure, git-subdir works on old git |
+| **Windows user** | Keyboard survives restart, credential crash fixed, `rm /` protected |
+| **Cloud/Cowork user** | First turn faster, phone joins work, runner recovery improved |
+| **Accessibility user** | Screen reader announcements stay, answered questions marked, permissions navigable |
+| **Team/Enterprise** | Org design systems in artifacts, usage credits message clear, model enforcement respected |
+
+---
+
+## How to Update
+
+```bash
+# Auto-updater (npm)
+npm update -g @anthropic-ai/claude-code
+
+# Or re-run the installer
+curl -fsSL https://claude.ai/install | bash
+
+# Verify
+claude --version
+# Should show 2.1.288
+```
+
+---
+
+## The Bottom Line
+
+**v2.1.288 is the "maintenance release that feels like a major upgrade."**
+
+100+ fixes. Zero new features. But the *experience* changes: sessions resume cleanly, drafts survive Ctrl+C, plugins work on old git, Windows keyboard survives restart, MCP re-auth prompts appear, auto-compact compacts, screen reader mode is usable.
+
+This is the release where Claude Code stops feeling like "powerful but rough" and starts feeling like **a tool you trust with production work**.
+
+---
+
+## Related Articles
+
+- [Claude Code v2.1.287 — Mods Plugin System Watchdog](/blog/claude-code-v2-1-287-mods-plugin-system-watchdog/)
+- [Claude Code v2.1.285 — Desktop Command Plugin Fixes](/blog/claude-code-v2-1-285-desktop-command-plugin-fixes/)
+- [Claude Code v2.1.284 — Sonnet 5.5 Default Gateway Spend Fixes](/blog/claude-code-v2-1-284-sonnet-5-5-default-gateway-spend-fixes/)
+- [Claude Code v2.1.283 — Gateway Hints, Prompt Audit, MCP Progress Fixes](/blog/claude-code-v2-1-283-gateway-hints-prompt-audit-mcp-progress-fixes/)
+- [Claude Code v2.1.280 — Opus 5.5 Default Massive Fix Wave](/blog/claude-code-v2-1-280-opus-5-5-default-massive-fix-wave/)
+- [Beware: Claude Code Auto-Mode Overrides Hook Ask](/blog/beware-claude-code-auto-mode-overrides-hook-ask/)
+- [Beware: Claude Code Permission Prompt Flood](/blog/claude-code-permission-prompt-flood/)
+
+---
+
+*Claude Code is developed by Anthropic. Changelog source: [github.com/anthropics/claude-code/releases/tag/v2.1.288](https://github.com/anthropics/claude-code/releases/tag/v2.1.288).*
