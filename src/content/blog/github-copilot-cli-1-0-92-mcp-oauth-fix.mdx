@@ -1,0 +1,107 @@
+---
+title: "GitHub Copilot CLI 1.0.92 Just Fixed the MCP OAuth Reauth Loop — Your Tools Finally Stay Connected"
+description: "Copilot CLI 1.0.92 fixes the frustrating bug where MCP tools stopped working after OAuth reauthentication. One small patch, huge relief for anyone using MCP servers in daily workflows."
+pubDate: 2026-10-02T10:00:00Z
+tags: ["copilot-cli", "github", "release", "terminal", "beginner", "mcp", "oauth", "bug-fix"]
+tool: "copilot-cli"
+author: "sage"
+image: "/api/og?title=GitHub+Copilot+CLI+1.0.92+MCP+OAuth+Fix&tool=copilot-cli"
+---
+
+GitHub Copilot CLI **1.0.92** dropped yesterday (October 1), and it fixes the single most annoying MCP bug in the 1.0.9x series: **MCP tools that stopped working after you reauthenticated with OAuth.**
+
+If you've ever connected an MCP server, worked happily for a while, then had to reauthenticate (token expiry, password change, new device) and watched all your MCP tools go silent — this release is for you.
+
+---
+
+## The Bug: OAuth Reauth Killed Your MCP Tools
+
+Here's what happened before 1.0.92:
+
+1. You set up an MCP server (database, filesystem, GitHub, whatever)
+2. You authenticate with OAuth — tools work great
+3. Time passes. Your OAuth token expires or you sign in from a new machine
+4. You reauthenticate successfully
+5. **MCP tools stop working** — they show in the list but every call fails silently
+
+The root cause: when OAuth reauth happened, Copilot refreshed the token but **didn't refresh the MCP tool definitions**. The tools were still registered against the old token's permissions. Calls went out with stale auth and the MCP server rejected them.
+
+You had to restart Copilot CLI entirely to get tools back. In a long coding session, that's a flow-killer.
+
+---
+
+## The Fix: Tool Definitions Now Survive Reauth
+
+**1.0.92 changes one thing:** when OAuth reauthentication completes and the tool definitions haven't changed, Copilot **keeps the existing MCP tool registrations active.**
+
+No restart needed. No tool list refresh. You reauth, you keep working.
+
+```bash
+# Before 1.0.92: reauth → tools break → restart CLI → tools work
+# After 1.0.92: reauth → tools keep working
+```
+
+That's it. One line in the release notes, massive quality-of-life improvement.
+
+---
+
+## Why This Matters for Beginners
+
+If you're new to coding agents, MCP (Model Context Protocol) is how agents connect to external tools — databases, APIs, file systems, GitHub, Jira, you name it. It's the bridge between "AI that only sees your code" and "AI that can actually *do* things."
+
+The problem: **OAuth tokens expire.** It's not a bug, it's security. But every expiry meant your agent lost its tools until you restarted.
+
+This fix means:
+- Your MCP-connected workflow survives token rotation
+- You don't need to understand the auth plumbing to keep working
+- Long-running sessions (overnight monitors, CI pipelines, all-day coding) stay stable
+
+---
+
+## The Other Fix in 1.0.91 (Last Week)
+
+Since we're here, 1.0.91 (October 1, earlier) was actually the bigger release — it overhauled **sandbox CA management** and **Windows npm EACCES bypass**. If you missed it:
+
+- **`copilot sandbox ca check/create/trust/rotate/remove`** — real CLI for certificate management
+- **`copilot sandbox network bypass --enable`** — fixes `npm install` socket permission denied in Windows sandbox
+- **Legacy Windows support** — sandbox now works on older LTSC/Server builds
+- **Guaranteed telemetry flush on clean shutdown** — no more lost usage data
+
+[Read the full 1.0.91 breakdown](/blog/github-copilot-cli-1-0-91-sandbox-ca-network-fixes/) if you use sandbox mode on Windows.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| Use MCP servers with OAuth | **Yes** — fixes the reauth tool-breakage |
+| Run long sessions (overnight, CI) | **Yes** — stability improvement |
+| Just want the latest model | **No** — no model changes |
+
+```bash
+copilot update
+# Verify MCP tools still listed after any reauth
+copilot mcp list
+```
+
+---
+
+## The Bottom Line
+
+Copilot CLI 1.0.92 doesn't add features. It **removes a paper cut that hit every MCP user eventually.**
+
+The best agent releases aren't always the flashy ones. Sometimes they're the ones that let you keep working when the auth token rotates — and you don't even notice it happened.
+
+That's 1.0.92. Update and forget about it.
+
+---
+
+*Using Copilot CLI daily? The MCP OAuth fix just turned "reauth → restart → ugh" into "reauth → keep coding." That's the kind of release that compounds.*
+
+## Related articles
+
+- [GitHub Copilot CLI 1.0.91 Just Fixed the Windows Sandbox Nightmare — CA Trust, Network Bypass, and Safer Shutdown](/blog/github-copilot-cli-1-0-91-sandbox-ca-network-fixes/)
+- [Copilot CLI Terminal Agent: GitHub Repos at Your Fingertips](/blog/copilot-cli-terminal-agent-github-repos/)
+- [Why I Stopped Using Copilot and Went Full Terminal Agent](/blog/why-i-stopped-using-copilot-went-full-terminal-agent/)
+- [Claude Code vs Copilot CLI: GitHub Battle](/blog/claude-code-vs-copilot-cli-github-battle/)
