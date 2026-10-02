@@ -1,0 +1,129 @@
+---
+title: "Codex 0.160 Just Gave You Guardian Review — Your Agent Finally Remembers What You Told It Three Turns Ago"
+description: "Codex 0.160.0 drops Guardian review (opt-in conversation history retrieval), agent command center history pagination, TUI provider/verbosity persistence, Windows sandbox PowerShell fixes, and SQLite background reclamation. Beginner-friendly breakdown of what actually changes your daily workflow."
+pubDate: 2026-10-02T09:00:00Z
+tags: ["codex", "release", "v0.160", "guardian", "history", "windows", "tui", "coding-agent", "beginner"]
+tool: "codex"
+author: "sage"
+image: "/api/og?title=Codex+0.160+Guardian+Review+History+Persistence&tool=codex"
+---
+
+Codex **0.160.0** dropped October 1, and the headline feature has a name that sounds like sci-fi: **Guardian Review**.
+
+Here's the plain English: **your agent can now go back and read what you told it earlier in the conversation — even from previous sessions — and use that context to make better decisions.**
+
+If you've ever restarted a coding session and had to re-explain your architecture, your constraints, or why you chose that library — this release is for you.
+
+---
+
+## 1. Guardian Review — The Agent That Actually Listens
+
+Guardian is a new opt-in capability that lets the agent **retrieve earlier user instructions and context from agent handoffs**.
+
+In practice: you're in a session. You explain your project structure, your coding standards, your "don't touch this file" rules. The agent acknowledges. Three turns later, it forgets half of it. With Guardian enabled, it can pull that context back when it matters.
+
+**For beginners:** this is the first time a terminal agent treats conversation history as a *first-class retrieval target* — not just a scrolling log you have to read yourself.
+
+Enable it in settings → Guardian → "Retrieve conversation history." It's opt-in because it sends relevant history snippets to the model — you control when that happens.
+
+---
+
+## 2. Agent Command Center — Browse Older Tasks Without Scrolling Forever
+
+The TUI's agent command center (the dashboard you get with `Ctrl+A` or the sidebar) now has a **keyboard-accessible "Show more" action** for browsing older tasks.
+
+Before: you scrolled. And scrolled. And scrolled.
+Now: paginated history, keyboard navigation, and you can actually find that task from Tuesday without RSI.
+
+---
+
+## 3. TUI Finally Remembers Your Settings
+
+Three persistent annoyances, fixed in one release:
+
+| What Used to Happen | What Happens Now |
+|---------------------|------------------|
+| Provider reset to default on restart | **Server provider preserved** across sessions |
+| Reasoning summary lost | **Reasoning-summary setting persists** |
+| Verbosity reset every launch | **Verbosity setting persists** |
+| Resume/fork history showed wrong sessions | **Correct sessions shown** in resume and fork history |
+
+For beginners: you configure your workflow *once*. It sticks. This is table-stakes UX that terminal agents have been missing.
+
+---
+
+## 4. Windows Sandbox — PowerShell Fallbacks and No More Ghost Console Windows
+
+If you run Codex on Windows, 0.160.0 is the release that makes the sandbox **actually usable**:
+
+- **Compatible PowerShell fallback** for the MXC sandbox — no more "raw mode not supported" crashes when input is piped
+- **Long-path permission repairs** — Windows paths >260 chars no longer break sandbox operations
+- **Background console windows suppressed** — those annoying flash windows from helper processes are gone
+- **Windows sandbox ACL repair for long runtime paths** — the sandbox now understands actual Windows filesystem semantics
+
+The net effect: `codex` on Windows feels like a first-class citizen, not a port with paper cuts.
+
+---
+
+## 5. SQLite Background Reclamation — Your Disk Space Thanks You
+
+Codex's local log database (SQLite) now **reclaims unused space in the background** automatically.
+
+If you've been running Codex for months, your `~/.codex` directory probably grew silently. This release adds a background vacuum that shrinks the database without you doing anything.
+
+---
+
+## 6. Subagents Keep Their Environment (Even While Starting)
+
+Subagents now **retain environments that are still starting** and receive their configuration or preparation failure instead of silently inheriting a broken state.
+
+Translation: when you spawn a subagent for a parallel task, it won't start with a half-initialized environment and then fail mysteriously. It waits for readiness or tells you exactly why it couldn't start.
+
+---
+
+## 7. Quick Facts
+
+| Release | Date | Highlights |
+|---------|------|------------|
+| **0.160.0** | Oct 1, 2026 | Guardian review, history pagination, TUI persistence, Windows sandbox fixes, SQLite reclamation |
+| **0.159.0** | Sep 2026 | Instant interrupt, welcome screen, transcript scroll, copy-on-select, MCP OAuth, Windows sandbox fixes |
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Want agents that remember context across turns | **Yes** — Guardian review is the feature |
+| Use Codex TUI daily | **Yes** — settings persistence alone is worth it |
+| Run Codex on Windows | **Yes** — sandbox fixes are significant |
+| Care about disk hygiene | **Yes** — background SQLite reclamation |
+| Just want the latest model | **No** — no model changes in this release |
+
+---
+
+## The Bottom Line
+
+**Codex 0.160.0 doesn't add a new model. It adds *memory*.**
+
+Guardian review is the first step toward agents that don't goldfish every three turns. TUI persistence means your workflow survives restarts. Windows sandbox fixes mean the terminal agent works on the OS most developers actually use.
+
+This is the release where Codex stops feeling like a demo and starts feeling like a daily driver.
+
+```bash
+codex upgrade
+# Then enable Guardian in Settings → Guardian → Retrieve conversation history
+```
+
+---
+
+## Related Articles
+
+- [Codex 0.159: Instant Interrupt, Welcome Screen, Transcript Scroll — What Changed](/blog/codex-0-159-instant-interrupt-welcome-screen-transcript-scroll/)
+- [Codex vs Copilot CLI: Terminal Battle — Which Terminal Agent Actually Ships?](/blog/codex-vs-copilot-cli-terminal-battle/)
+- [Best Coding Agents 2026 — Decision Guide (Not Another Hype List)](/blog/best-coding-agents-2026-decision-guide/)
+- [Goose v1.50: GPT-6 Astra, Web Search, Security Wave](/blog/goose-v1-50-gpt6-astra-web-search-security-wave/)
+
+---
+
+*Codex is open-source (MIT) and available at [github.com/openai/codex](https://github.com/openai/codex).*
