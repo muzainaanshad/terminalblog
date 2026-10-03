@@ -1,0 +1,229 @@
+---
+title: "Goose v1.53 Just Got Live Voice Conversations and Resizable PiP — The Desktop App Is Finally Real"
+description: "Goose v1.53.0 (October 2) adds resizable Picture-in-Picture window for MCP apps, live model metadata from models.dev, quoting action for composer, lean ACP-only binary, GDK agent loop on WASM, and Opus 5.5/GPT-6 Sol/Luna support. The open-source Rust agent keeps closing the gap with commercial tools."
+pubDate: "2026-10-03T09:30:00Z"
+tags: ["goose", "release", "v1.53", "live-voice", "picture-in-picture", "mcp", "acp", "wasm", "coding-agent", "beginner"]
+tool: "goose"
+author: "sage"
+image: "/api/og?title=Goose+v1.53+Live+Voice+PiP&tool=goose"
+---
+
+Goose **v1.53.0 dropped October 2**, hot on the heels of v1.52 (Sep 23) and v1.51 (Sep 17). Three releases in two weeks. The pace is relentless, and the desktop app is finally becoming the daily driver the 20K-star Rust agent promised.
+
+If you've been watching Goose from the sidelines — **this is the version where the desktop app stops feeling like a demo.**
+
+---
+
+## 1. Resizable Picture-in-Picture for MCP Apps
+
+**The headline feature:** MCP apps (the little web tools Goose can spawn — browsers, dashboards, databases) now run in a **resizable Picture-in-Picture window** instead of taking over your screen or cramming into a fixed pane.
+
+- Drag to resize, position anywhere
+- Stays on top while you code
+- Multiple PiP windows supported
+- Works with any MCP app that exposes a web UI
+
+For beginners: this is how "agent uses tools" becomes "agent uses tools *while you watch*." You can have a browser MCP app open in a corner, a database admin panel in another, and your editor full-screen — all talking to the same Goose session.
+
+---
+
+## 2. Live Model Metadata from models.dev (With Bundled Fallback)
+
+Goose now **fetches model metadata live from [models.dev](https://models.dev)** — the community-maintained model catalog — with a bundled fallback so you're never blocked if the API is down.
+
+What this means:
+- New models appear in Goose's picker **automatically** when added to models.dev
+- Context windows, pricing, modalities (vision, audio, reasoning) always current
+- No waiting for Goose releases to get the latest model specs
+- Offline/air-gapped installs use the bundled catalog
+
+This is the "one tool, every model" philosophy executed at the metadata layer.
+
+---
+
+## 3. Quoting Action — Selected Text → Composer
+
+Highlight any text in the conversation (your previous prompt, an agent response, an error message) → **quote action** → it appends to your composer with context preserved.
+
+No more copy-paste-edit. The workflow:
+1. Agent gives you a plan
+2. You highlight the step you want to refine
+3. Quote → it's in your composer, ready to send back with your tweaks
+
+Small UX, compounds daily.
+
+---
+
+## 4. Lean ACP-Only Binary
+
+A new **`goose-acp` binary** (and npm package) that speaks *only* the Agent Communication Protocol — no TUI, no desktop, no CLI chat. Just ACP.
+
+Why this matters:
+- Embed Goose in your own tools/editors/CI without the full binary weight
+- Pair with external frontends (VS Code extensions, custom UIs, web apps)
+- Smaller attack surface, faster startup
+- The same agent core, stripped to the protocol layer
+
+If you're building on ACP, this is the distribution you've been waiting for.
+
+---
+
+## 5. GDK Agent Loop Runs on WASM (wasm32)
+
+The **Goose Development Kit (GDK)** — the library for building custom agents on Goose's core — now compiles its agent loop to **WebAssembly (wasm32)**.
+
+This unlocks:
+- Goose agents running in browsers (no server required)
+- Edge deployments (Cloudflare Workers, Fastly Compute, Vercel Edge)
+- Plugin architectures where the agent *is* the plugin
+- Sandboxed execution environments with deterministic behavior
+
+The GDK is how Goose becomes a platform, not just an app. WASM is the universal runtime.
+
+---
+
+## 6. Model Discovery API for GDK Provider
+
+Programmatic model discovery for custom GDK providers. Instead of hardcoding model lists, your provider can now implement a discovery endpoint and Goose will fetch available models dynamically.
+
+Combined with models.dev live metadata — **your custom provider's models get the same first-class treatment as first-party ones.**
+
+---
+
+## 7. Meta Muse Code Provider
+
+Native support for **Meta's Muse Code** models (the open-weight coding family). Added as a declarative provider — works out of the box, no config wrestling.
+
+---
+
+## 8. Opus 5.5, GPT-6 Sol, GPT-6 Luna Support
+
+Frontier model support lands within days of release:
+- **Claude Opus 5.5** — Anthropic's latest Opus
+- **GPT-6 Sol** — OpenAI's reasoning-optimized variant
+- **GPT-6 Luna** — OpenAI's speed-optimized variant
+
+Goose's provider system means these work the same way as every other model: pick from picker, go.
+
+---
+
+## 9. Session Rename Command in CLI
+
+`goose session rename <new-name>` — finally. Your session list stops being a wall of timestamps.
+
+---
+
+## 10. Show Working Directory in Session Remove
+
+`goose session remove` now shows the working directory so you know *which* project you're deleting. Small safety win.
+
+---
+
+## Bug Fixes That Matter
+
+| Fix | Why It Matters |
+|-----|----------------|
+| Session naming + "none" reasoning effort for GPT-6.1 Sol | GPT-6.1 Sol works correctly out of the box |
+| Preserve session context across reply lifecycle | Long conversations don't lose context on reply boundaries |
+| Report max_tokens truncation + flush tool calls for Bedrock | Bedrock users see when responses are cut off |
+| Require terminal for elicitation input in CLI | No more headless hangs waiting for input that can't arrive |
+| Keep tool results consecutive when OpenAI-compatible images emitted | Image tool results don't get interleaved/broken |
+| Guard MCP streamable-HTTP client redirects against SSRF | **Security** — MCP servers can't redirect to internal endpoints |
+| Resolve vision support from canonical catalog for all providers | Vision works consistently across providers |
+| Prevent Extension Manager from disabling itself | Extensions stay enabled across restarts |
+| Rename deepseek-v4-flash → deepseek-flash | Model naming consistency |
+| Auto-compact at tool boundaries in unrolled agent loop | Compaction doesn't cut mid-tool-call |
+| **Remediate GHSA-6mg9-3cvh-9939 security vulnerability** | **Critical security fix** — update immediately |
+
+---
+
+## Improvements
+
+- Suppress warning when ending on successful tool call (less noise)
+- Update `rmcp` to 3.4.1 (MCP SDK upgrade)
+- Remove MCP sampling code (cleanup)
+- Remove production code only reachable from tests (smaller binary)
+- Pin remaining GitHub Actions to commit SHAs (supply chain hardening)
+- Warn about keyring hang in unattended ACP environments (ops visibility)
+
+---
+
+## Quick Version Context
+
+| Version | Date | Highlights |
+|---------|------|------------|
+| **v1.53.0** | Oct 2, 2026 | Resizable PiP, models.dev live metadata, quoting, ACP-only binary, WASM agent loop, Muse Code, Opus 5.5/GPT-6 Sol/Luna, session rename, SSRF guard |
+| **v1.52.0** | Sep 23, 2026 | Live voice conversations, Decisions provider (OpenRouter/Jev), Z.AI Coding Plan, EUrouter stable |
+| **v1.51.0** | Sep 17, 2026 | EUrouter provider, GPT-live API, operator allowlist, desktop state-machine loop, terminal bell |
+| **v1.50.0** | Sep 8, 2026 | GPT-6 Astra, tool calling for goose-agent, HTTPS-only Snowflake |
+
+---
+
+## What This Means for Beginners
+
+If you're new to Goose (the open-source, Rust-based, local-first coding agent from Block/aaif-goose):
+
+1. **Desktop app is usable now** — PiP windows, live metadata, quoting, session management
+2. **Model support is unmatched** — every frontier model within days, live metadata from models.dev
+3. **Security is hardening** — SSRF guard, keyring warnings, pinned Actions, ACP-only binary for embedding
+4. **Platform play is real** — GDK on WASM means Goose agents run anywhere JavaScript runs
+
+The learning curve: install → `goose` → pick a model → start coding. No API keys required for local models (Ollama), or bring your own keys for cloud models.
+
+---
+
+## How to Update
+
+```bash
+# macOS/Linux (install script)
+curl -fsSL https://github.com/block/goose/releases/download/v1.53.0/goose_v1.53.0_darwin_arm64.tar.gz | tar -xz && sudo mv goose /usr/local/bin/
+
+# Or via Homebrew (when updated)
+brew upgrade goose
+
+# Windows (scoop)
+scoop update goose
+
+# Cargo (if you build from source)
+cargo install --git https://github.com/block/goose --tag v1.53.0 goose
+
+# Verify
+goose --version
+# Should show 1.53.0
+```
+
+For the ACP-only binary:
+```bash
+# npm
+npm install -g @block/goose-acp@1.53.0
+
+# Or download from releases
+```
+
+---
+
+## The Bottom Line
+
+**v1.52 gave you live voice. v1.53 gives you a desktop that respects your screen real estate.**
+
+The resizable PiP for MCP apps is the feature that changes how you *work with* the agent — tools become glances, not context switches. The live models.dev metadata means your model picker never goes stale. The ACP-only binary and WASM agent loop mean Goose is becoming infrastructure, not just an app.
+
+And the SSRF guard on MCP redirects? That's the kind of security fix that separates "cool project" from "production dependency."
+
+If you're evaluating open-source coding agents — **Goose v1.53 is the strongest daily-driver case yet.**
+
+---
+
+## Related Articles
+
+- [Goose v1.52: Live Voice, Decisions Provider, Z.AI Plan](/blog/goose-v1-50-gpt6-astra-web-search-security-wave/)
+- [Goose v1.50: GPT-6 Astra, Web Search, Security Wave](/blog/goose-v1-50-gpt6-astra-web-search-security-wave/)
+- [OpenCode Deep Dive: The Skill-Driven Open-Source Coding Agent](/blog/deep-dive-opencode-skill-driven-coding-agent/)
+- [Best Coding Agents 2026 — Decision Guide (Not Another Hype List)](/blog/best-coding-agents-2026-decision-guide/)
+- [Claude Code vs Goose: Plugins, Skills, and Extensibility](/blog/claude-code-vs-goose-extensibility-showdown/)
+
+---
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
+
+*Goose is open-source (Apache-2.0) and available at [github.com/block/goose](https://github.com/block/goose).*
