@@ -1,0 +1,399 @@
+---
+title: "Beware: Hermes Agent October 2026 Security Audit Finds 6 HIGH-Severity Vulnerabilities — Command Blocklist Bypass, Terminal Injection, XSS, and More"
+description: "A comprehensive security audit of NousResearch/hermes-agent (October 2026) revealed 6 HIGH-severity vulnerabilities including a hardline command blocklist bypass via git aliases and wrapper prefixes, OSC-8 terminal escape injection in three render sinks, a skill threat scanner that trusts the bundle's own ignore file, stored XSS via bot names, WSL command injection, and 403 total findings. All six HIGH issues have working reproductions. If you run Hermes Agent, update immediately."
+pubDate: 2026-10-03
+updatedDate: 2026-10-03
+tags: ["beware", "security", "hermes-agent", "rce", "xss", "command-injection", "terminal-injection", "audit"]
+heroImage: "/api/og?title=Hermes+Agent+Security+Audit+6+HIGH+Findings&tool=Hermes+Agent"
+heroAlt: "Hermes Agent security audit findings diagram"
+canonical: "https://terminalblog.com/blog/beware-hermes-agent-oct2026-security-audit-6-high-findings/"
+---
+
+On October 2, 2026, a full-tree security audit of **NousResearch/hermes-agent** (15,136 files, ~1.1M lines) was published as [issue #131566](https://github.com/NousResearch/hermes-agent/issues/131566). The audit uncovered **403 unique findings** — 6 HIGH, 43 medium, ~260 low, ~90 info. All six HIGH findings have **byte-for-byte verified reproductions** against the real code paths.
+
+This is not a theoretical exercise. The audit team ran 64 chunked deep-read passes plus pattern sweeps, cross-validated every finding against source, and shipped a 695-file local patch with a re-apply guard. The six HIGH findings are filed as separate issues (#131561–#131565) with runnable probes.
+
+**If you run Hermes Agent — personal, team, or production — you are affected.** The vulnerabilities span command execution, terminal rendering, skill installation, desktop app, and WSL integration. Several enable **zero-approval arbitrary command execution**.
+
+---
+
+## The Six HIGH Findings at a Glance
+
+| Issue | Component | Attack Vector | Impact |
+|-------|-----------|---------------|--------|
+| [#131563](https://github.com/NousResearch/hermes-agent/issues/131563) | `tools/approval_detection.py` | Git alias smuggling, wrapper prefixes, attached-quote flags | **Zero-approval command execution** — hardline blocklist fully bypassed |
+| [#131565](https://github.com/NousResearch/hermes-agent/issues/131565) | `ui-tui` markdown + ink render sinks | Model-influenced markdown link URLs with BEL bytes | **Terminal escape injection** — arbitrary escape sequences at render time, no click required |
+| [#131564](https://github.com/NousResearch/hermes-agent/issues/131564) | `tools/skills_guard.py` | Malicious `.skillignore` in skill bundle | **Threat scanner disabled** — bundle controls its own scan exclusions |
+| [#131562](https://github.com/NousResearch/hermes-agent/issues/131562) | `apps/desktop/src/plugins/hermes-bots/avatar.tsx` | Bot name with `\"` attribute breakout | **Stored XSS in Electron renderer** — bot names propagate via gateway |
+| [#131561](https://github.com/NousResearch/hermes-agent/issues/131561) | `apps/desktop/electron/external-open.ts` | WSL `cmd.exe /c start "" <url>` unquoted | **Command injection** — shell metacharacters in URLs execute via `cmd.exe` re-parse |
+| [#131566](https://github.com/NousResearch/hermes-agent/issues/131566) | Full codebase | 64-pass audit | **403 findings total** — 6 HIGH reproduced, 43 medium including TTS shell injection, path traversal, SSRF, open redirect, credential logging, plugin validation bypass |
+
+---
+
+## Finding #1: Hardline Command Blocklist Bypass — Zero-Approval Execution (#131563)
+
+### What Happens
+
+Hermes has a "hardline" command blocklist designed to catch dangerous commands **before** they reach the approval system. The blocklist checks `detect_hardline_command()` and `detect_dangerous_command()` in `tools/approval_detection.py`. The audit found **three independent bypass classes** that defeat all layers, returning `hardline=False, approved=True` — **zero approval prompts in every mode** (including default interactive).
+
+### Bypass Class 1: Git Alias Smuggling
+
+```bash
+git -c 'alias.x=!shutdown now' status
+```
+
+Git aliases with `!` prefix execute shell commands. The alias value sits in an argument position that `_CMDPOS` (the command-position tracker) never reaches. Also bypassed: `awk 'BEGIN{system("...")}'`, `find -exec`, `su -c '...'`.
+
+### Bypass Class 2: Attached-Quote Interpreter Flags
+
+```bash
+bash -c'payload'      # spaced form: bash -c 'payload' → BLOCKED
+bash -ec'...'         # same, merged token defeats `_bash_exec_payload`
+```
+
+`shlex` merges the flag and payload into one unrecognized token. The extractor sees nothing, so `hardline=False` where the spaced form correctly returns `True`.
+
+### Bypass Class 3: Wrapper Prefixes (Recursive Unwrapping Missing)
+
+```bash
+timeout 1 shutdown now
+nice malicious-command
+stdbuf -o0 evil
+prlimit --cpu=10 bad
+flock /tmp/lock -c 'rm -rf /'
+unbuffer sudo rm -rf /
+xargs -I{} sh -c '{}' <<< 'reboot'
+command eval 'malicious'
+builtin eval 'malicious'
+eval 'malicious'
+env -i PATH=/bin sh -c 'id'
+su -c 'malicious'
+sudo -u root malicious  # sudo prefix regex cannot consume option *values*
+screen -dm malicious
+tmux new -d -s x malicious
+```
+
+A single wrapper word defeats the `_CMDPOS` wrapper list. Zero approval, no yolo needed.
+
+### Who Is Affected
+
+**Everyone running Hermes Agent.** The approval detection runs on every tool invocation. If an attacker (or a prompt-injected model) can craft any of the above command forms, they execute with zero approval prompts.
+
+### How to Check If You're Vulnerable
+
+```bash
+# Test the bypasses locally (safe commands that should be blocked but aren't)
+# Run these in a Hermes session and observe: NO approval prompt appears
+
+# 1. Git alias smuggling
+git -c 'alias.x=!echo PWNED' status
+
+# 2. Attached quote
+bash -c'echo PWNED'
+
+# 3. Wrapper prefix
+timeout 1 echo PWNED
+```
+
+If any of these execute without an approval prompt, you are vulnerable.
+
+### Is There a Fix?
+
+**Yes, locally developed and tested.** The audit team shipped a local fix adding:
+- Payload extractors: `_git_alias_shell_payloads`, `_option_command_payloads`, `_system_call_string_payloads`, `_find_exec_command_payloads` — recursively feed discovered payloads through the full hardline pipeline
+- Attached-quote normalization: read both the in-token remainder and the next argv
+- Recursive wrapper unwrapping: re-cast every command word reachable through a wrapper as its own command-line variant for all anchoring rules
+
+**Results**: hardline battery 6/26 → 26/26, wrapper battery 3/15 → 15/15, end-to-end `check_all_command_guards` 7/7 BLOCKED; 35 benign commands unchanged (no false positives).
+
+**Upstream status**: Not yet merged. Track [#131563](https://github.com/NousResearch/hermes-agent/issues/131563).
+
+---
+
+## Finding #2: OSC-8 Hyperlink Terminal Escape Injection (#131565)
+
+### What Happens
+
+Model-influenced markdown link URLs are interpolated **raw** into OSC 8 hyperlink sequences:
+
+```
+ESC ] 8 ; ; <url> BEL ... ESC ] 8 ; ; BEL
+```
+
+A **BEL byte (0x07)** inside the URL terminates the sequence early. Every remaining byte becomes **arbitrary terminal escape input** — window title changes, fake hyperlinks, OSC 52 clipboard writes, cursor position reports, etc.
+
+**Rendered at display time; no click required.**
+
+```markdown
+[x](https://example.com/x<BEL><ESC>]2;PWNED<BEL><ESC>[31m...)
+```
+
+The terminal receives a complete OSC 2 title sequence ("PWNED") and red text escape. The same pattern exists in **three sinks**:
+1. `ui-tui/src/components/markdown.tsx` (`renderLink`)
+2. `ui-tui/packages/hermes-ink/src/ink/render-node-to-output.ts` (~L245, `wrapWithOsc8Link`)
+3. `ui-tui/packages/hermes-ink/src/ink/termio/osc.ts` (~L643, `link()`)
+
+Non-link markdown text nodes also carry raw control characters to the terminal.
+
+### Who Is Affected
+
+Anyone using Hermes TUI (terminal UI) where model output can contain markdown links. This includes all interactive chat sessions. An attacker who can influence model output (prompt injection, malicious context, compromised skill) injects terminal escapes that execute on **render**.
+
+### How to Check If You're Vulnerable
+
+```bash
+# In a Hermes TUI session, paste this markdown link and observe the terminal title:
+# [test](https://example.com/]2;PWNED)
+# (The  represents literal BEL byte 0x07)
+# If your terminal title changes to "PWNED", you are vulnerable.
+```
+
+**Do not test with real escape sequences in production.** Use a test terminal you can close.
+
+### Is There a Fix?
+
+**Yes, locally developed.** Shared `sanitizeOsc8Url()` stripping C0 + DEL + C1 (including C1 CSI U+009B) applied at **every sink** before embedding; sanitize display text as well (autolink `<url>` text branch renders the raw URL as a text node). Byte-level probes green with negative controls.
+
+**Upstream status**: Not yet merged. Track [#131565](https://github.com/NousResearch/hermes-agent/issues/131565).
+
+---
+
+## Finding #3: Skill Threat Scanner Trusts Bundle's Own `.skillignore` (#131564)
+
+### What Happens
+
+The threat scanner (`tools/skills_guard.py`, `scan_skill()`) builds its ignore matcher from **the scanned bundle's own** `.skillignore`/`.clawhubignore`. **Any bundle can exclude arbitrary files from both the threat-pattern scan and the structural checks.**
+
+```bash
+# Bundle with payload.sh (curl|sh + rm -rf /)              → dangerous (critical x2)
+# Same bundle + .skillignore "*"                           → safe, 0 findings
+```
+
+All entry points funnel through `scan_skill`/`scan_skill_cached` (hub install, quarantine, agent-created, project), so the **entire installation-time threat gate is affected**. A single `*` in `.skillignore` masks everything except `SKILL.md`.
+
+### Who Is Affected
+
+Anyone installing skills from untrusted sources — including hub installs, project-local skills, agent-created skills, and quarantine review. The scanner is the **only** automated defense against malicious skill bundles.
+
+### How to Check If You're Vulnerable
+
+```bash
+# Check if you have any skills with .skillignore files
+find ~/.config/hermes/skills -name ".skillignore" -o -name ".clawhubignore" 2>/dev/null
+
+# If any exist, inspect their contents:
+cat ~/.config/hermes/skills/*/.skillignore 2>/dev/null
+cat ~/.config/hermes/skills/*/.clawhubignore 2>/dev/null
+
+# A .skillignore containing "*" or broad patterns means that skill's scan was ineffective
+```
+
+### Is There a Fix?
+
+**Yes, locally developed.** Never honor bundle-supplied ignore files during scanning (every file takes both passes); report every ignore file found as a `skill_ignore_file` finding; bump `SCANNER_VERSION` so cached "safe" verdicts are invalidated and re-scanned.
+
+**Upstream status**: Not yet merged. Track [#131564](https://github.com/NousResearch/hermes-agent/issues/131564).
+
+---
+
+## Finding #4: Stored XSS via Bot Name — Attribute Breakout (#131562)
+
+### What Happens
+
+The bot name is interpolated into an HTML attribute via `JSON.stringify(name)` and rendered with `dangerouslySetInnerHTML` (`apps/desktop/src/plugins/hermes-bots/avatar.tsx` ~L212, ~L1026-1030).
+
+`JSON.stringify` escapes `"` as `\"`, which is **not** HTML attribute escaping — the backslash does not protect the quote in HTML parsing:
+
+```javascript
+name = 'x" onmouseover="alert(1)'
+// Renders as:
+<svg data-bot-face="x" onmouseover="alert(1)" ...>
+```
+
+`bot-row.tsx` (~L265-270) feeds unsanitized `bot.name` in. Bot names can propagate across connections via the gateway registry, so this is **stored XSS in the Electron renderer**.
+
+### Who Is Affected
+
+Anyone running Hermes Desktop app with bots configured. Bot names can come from gateway registry sync, so a compromised or malicious peer could inject a bot name that executes when rendered in your desktop app.
+
+### How to Check If You're Vulnerable
+
+```bash
+# Check your bot configurations for suspicious names
+find ~/.config/hermes -name "*.json" -o -name "*.yaml" 2>/dev/null | \
+  xargs grep -i "bot" 2>/dev/null | \
+  grep -E 'name.*["<>]' 2>/dev/null
+```
+
+If you see bot names containing `"`, `<`, `>`, `&`, `'`, they may have been sanitized incorrectly.
+
+### Is There a Fix?
+
+**Yes, locally developed.** `escapeHtmlAttr()` (escape `& < > " '` to entities) before attribute interpolation; regression tests with hostile names. Note: the same file's `profile-ops.ts` used `querySelector('svg[data-bot-face=' + JSON.stringify(name) + ']')` — a CSS-selector twin of this bug (fixed by attribute comparison).
+
+**Upstream status**: Not yet merged. Track [#131562](https://github.com/NousResearch/hermes-agent/issues/131562).
+
+---
+
+## Finding #5: WSL `openExternal` Unquoted URL Command Injection (#131561)
+
+### What Happens
+
+On WSL, URLs are opened via `cmd.exe /c start "" <url>` with the URL passed **unquoted** in the argv. `cmd.exe` re-parses the command line, so shell metacharacters in the URL enable command concatenation:
+
+```
+https://example.com/&calc.exe        →  calc.exe runs
+https://example.com/&calc.exe&rem    →  same, with cover
+```
+
+The `http/https/mailto` scheme allowlist does not filter metacharacters (`& | < > ^ ( ) , ; =`). `%var%` expansion happens before caret-escaping, so `%` cannot be neutralized either.
+
+### Who Is Affected
+
+Anyone running Hermes Desktop on **Windows with WSL** where `openExternal` is used (links in chat, markdown, bot messages, etc.). Clicking or auto-rendering a malicious link executes arbitrary commands.
+
+### How to Check If You're Vulnerable
+
+```bash
+# On Windows with WSL, test in a Hermes Desktop session:
+# Paste a link: https://example.com/&echo PWNED
+# Click it or let it auto-render
+# If a command executes, you are vulnerable
+```
+
+**Do not test with destructive commands.**
+
+### Is There a Fix?
+
+**Yes, locally developed.** Two-tier `buildCmdStartArgs(url)`:
+- Fail-closed reject for unescapable characters (`"`, `%`, `!`, whitespace/controls)
+- Caret-escape the remaining metacharacters
+- Keep the scheme allowlist
+
+20-case probe suite green (9 attack URLs fully escaped, 7 unescapable rejected, clean URLs unchanged).
+
+**Upstream status**: Not yet merged. Track [#131561](https://github.com/NousResearch/hermes-agent/issues/131561).
+
+---
+
+## Finding #6: Full-Tree Audit — 403 Findings Including 43 Medium (#131566)
+
+The audit covers the entire codebase. Representative **medium** findings (all reproduced):
+
+| File:Line | Issue |
+|-----------|-------|
+| `tools/tts_command_provider.py` `render_command_template` | Second-pass global `str.replace` lets placeholder values collide with sentinel tokens → **shell injection** (`Popen(shell=True)`) |
+| `tools/write_approval.py` `_pending_path` | Unvalidated `pending_id` → **path traversal**; `/memory approve <id>` reads/deletes arbitrary `.json` and self-approves memory writes |
+| `gateway/relay/media.py:70/112` | Substring host matching attaches signed upgrade bearer to attacker URLs; `download()` has no scheme/host validation (`file://`, `ftp://` fetched unauthenticated) |
+| `hermes_cli/dashboard_auth/request_utils.py:33/19` | `/\\evil.com` **open redirect** (WHATWG backslash semantics); `X-Forwarded-For` first-hop trust |
+| `apps/desktop/.../mcp-setup-tool.tsx:375` + `connector-tool.tsx:343` | Backend `connect_url` passed verbatim to `openExternal` (no scheme gate; `file:`/`smb:` handlers reachable) |
+| `gateway/platforms/bluebubbles.py:213` | Password interpolated into every REST URL (`?password=`) and httpx exception text carrying it lands in logs/error receipts |
+| `hermes_cli/plugin_validate_desktop.py:38` | Comment-stripping regex blind to string literals — the **only static admission lint for remotely sourced plugin.js is bypassable** (innerHTML payload passed) |
+| `apps/desktop/src/contrib/runtime-loader.ts:72` | Dynamic-import allowlist bypass via variable specifiers / SDK fragment concatenation |
+| `tui_gateway/session_transports.py:59` | Cross-user_id session attach only logs a warning (no ownership enforcement) |
+| `hermes_cli/proxy/cli.py:37` | Credential proxy with no client authentication, accepts `0.0.0.0` |
+| `hermes_cli/service_manager.py:451` | `extra_env` keys interpolated into root-run s6 scripts without validation |
+| `a2a security.py` SSRF filter | Decimal/octal IP forms bypass the blocklist |
+| `apps/desktop/.../execFileNoThrow.ts:110` | `child.stdin` without 'error' listener → EPIPE kills the whole TUI |
+| `tests/hermes_cli/test_xai_oauth_writethrough.py` | Token write-through contract has **zero assertions** |
+
+All findings above are fixed in the local deployment (695-file patch against `0a374d16`).
+
+---
+
+## What You Should Do Right Now
+
+### 1. Update Hermes Immediately When Fixes Land
+
+The audit team has local fixes for all six HIGH findings. Watch for merged PRs referencing issues **#131561–#131566** and **#131566** (the audit epic).
+
+```bash
+# Check current version
+hermes --version 2>/dev/null || echo "Check ~/.config/hermes/version"
+
+# Update when available
+pip install --upgrade hermes-agent 2>/dev/null
+# or
+hermes update 2>/dev/null
+```
+
+### 2. Restrict Network Exposure
+
+- Bind API server to `127.0.0.1` only (not `0.0.0.0`)
+- Put any network-accessible Hermes behind authentication
+- The run-ID authorization and cross-profile callback issues (#131566 medium findings) are only exploitable with network access
+
+```bash
+# Check your API server bind address
+grep -r "host\|bind\|listen\|0\.0\.0\.0" ~/.config/hermes/ 2>/dev/null
+# If you see 0.0.0.0, change to 127.0.0.1 immediately
+```
+
+### 3. Audit Installed Skills
+
+```bash
+# List all skills and check for .skillignore
+find ~/.config/hermes/skills -name ".skillignore" -o -name ".clawhubignore" 2>/dev/null
+# If any skill has a broad ignore pattern (*), re-scan or remove it
+```
+
+### 4. Avoid Clicking/Rendering Untrusted Links in Desktop App
+
+Until the OSC-8 and WSL fixes land, treat all rendered links as potentially malicious. The terminal escape injection triggers on **render**, not click.
+
+### 5. Review Bot Configurations
+
+```bash
+# Check for bot names with suspicious characters
+find ~/.config/hermes -type f \( -name "*.json" -o -name "*.yaml" \) 2>/dev/null | \
+  xargs grep -h "bot" 2>/dev/null | \
+  grep -E 'name.*["<>&\']' 2>/dev/null
+```
+
+### 6. Monitor the Issues
+
+All six HIGH findings are tracked here:
+- [#131563](https://github.com/NousResearch/hermes-agent/issues/131563) — Hardline blocklist bypass
+- [#131565](https://github.com/NousResearch/hermes-agent/issues/131565) — OSC-8 terminal injection
+- [#131564](https://github.com/NousResearch/hermes-agent/issues/131564) — Skill scanner bypass
+- [#131562](https://github.com/NousResearch/hermes-agent/issues/131562) — Stored XSS bot name
+- [#131561](https://github.com/NousResearch/hermes-agent/issues/131561) — WSL command injection
+- [#131566](https://github.com/NousResearch/hermes-agent/issues/131566) — Full audit (403 findings)
+
+---
+
+## Why This Matters for Coding Agent Users
+
+Hermes Agent is a **coding agent framework** with a large attack surface: terminal rendering, skill system, desktop app, gateway, plugin architecture, sandbox execution, and multi-profile session management. This audit shows that **security boundaries were implemented incrementally without cross-boundary analysis** — the same pattern seen in:
+
+- [Claude Code CVE-2026-55607](/blog/beware-cve-2026-55607-claude-code-worktree-sandbox-escape/) — sandbox escape, CVSS 8.8
+- [Cline supply chain attack via GitHub Actions](/blog/beware-clinejection-supply-chain-attack-github-actions/)
+- [OpenClaw Git backup RCE chain](/blog/beware-openclaw-git-backup-rce-path-traversal-sql-injection/) — published October 1
+
+The difference: Hermes is **showing its work**. Opening a public audit with 403 findings, 6 HIGH with reproductions, and a local patch set is unusual transparency. Most projects quietly patch and disclose later (or never). This means:
+- **Users can track fixes in real time** and verify remediation
+- **Attackers can read the same issues** — the clock is ticking
+
+Apply the mitigations above, restrict network exposure, audit your skills, and update the moment fixes land.
+
+---
+
+## Timeline
+
+- **2026-10-02**: Full audit published as [#131566](https://github.com/NousResearch/hermes-agent/issues/131566); six HIGH findings filed as #131561–#131565
+- **2026-10-02**: Local 695-file patch developed with re-apply guard against `0a374d16`
+- **2026-10-03**: This article published
+- **Ongoing**: Upstream PRs pending — watch the issue threads for merged fixes
+
+---
+
+## Related Articles
+
+- [Beware: OpenClaw Git Backup Restore Lets Attackers Escape Sandbox and Execute Code](/blog/beware-openclaw-git-backup-rce-path-traversal-sql-injection/)
+- [Beware: Hermes Agent Security Audit Uncovers 5 HIGH-Severity Findings (August 2026)](/blog/beware-hermes-agent-security-audit-5-high-severity-findings/)
+- [Beware: Cline Supply Chain Attack via GitHub Actions](/blog/beware-clinejection-supply-chain-attack-github-actions/)
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+
+---
+
+*This article will be updated when patches land. Run `node scripts/content-gate.cjs --strict` before republishing.*

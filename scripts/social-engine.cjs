@@ -143,10 +143,76 @@ const TWITTER_POSTS = [
     text: '3 mistakes junior devs always make:\n\n1. Not reading error messages fully\n2. Copying Stack Overflow without understanding\n3. Over-engineering a simple solution\n\nI did all three for 2 years straight.',
   },
   {
-    format: 'mistake_list',
-    text: 'The mistake every dev makes with AI tools:\n\nPrompting: "write me a function"\n\nInstead of:\n"Given this interface, write a function that handles X edge cases and follows this pattern from our codebase"\n\nSpecificity = quality.',
-  },
-];
+      format: 'mistake_list',
+      text: 'The mistake every dev makes with AI tools:\n\nPrompting: "write me a function"\n\nInstead of:\n"Given this interface, write a function that handles X edge cases and follows this pattern from our codebase"\n\nSpecificity = quality.',
+    },
+
+    // ── Fresh hot_take (Oct 2026) ──
+    {
+      format: 'hot_take',
+      text: 'Hot take: AI agents will not replace devs. They will replace the dev who refuses to use them.\n\nThe gap is not AI vs human.\nIt is AI-augmented vs unaugmented.\n\nSame as Excel vs calculator in 1990.',
+    },
+    {
+      format: 'hot_take',
+      text: 'Hot take: your .gitignore is your architecture document.\n\nIf node_modules, dist, .env, and *.log are not ignored, you are leaking.\n\nIf .DS_Store, *.swp, and .idea are not ignored, you are leaking context.\n\nClean repo = clean mind.',
+    },
+    {
+      format: 'hot_take',
+      text: 'Hot take: the best documentation is a failing test.\n\nIt documents the bug.\nIt proves the fix.\nIt prevents regression.\n\nNo wiki survives a refactor. Tests do.',
+    },
+
+    // ── Fresh stop_paying (Oct 2026) ──
+    {
+      format: 'stop_paying',
+      text: 'Stop paying for Linear.\n\nGitHub Projects + GitHub Issues = free.\n\n• Native integration\n• No context switch\n• Unlimited private repos\n• Same boards, same filters\n\n$0/mo. Already in your stack.',
+    },
+    {
+      format: 'stop_paying',
+      text: 'Stop paying for Vercel Pro.\n\nCloudflare Pages + Workers = free tier generous.\n\n• 500 builds/mo\n• 100k requests/day\n• Edge functions included\n• D1 database free\n\nDeploy from Git. Same DX. $0.',
+    },
+    {
+      format: 'stop_paying',
+      text: 'Stop paying for Raycast.\n\nAlfred (free) + Hammerspoon (free) = same power.\n\n• Window management\n• Clipboard history\n• App launching\n• Workflows\n\nmacOS automation is free. You just need to configure it.',
+    },
+
+    // ── Fresh cant_believe (Instagram-ready) ──
+    {
+      format: 'cant_believe',
+      text: 'I cannot believe this terminal setup is free:\n\n• Ghostty (GPU-accelerated)\n• zsh + starship prompt\n• zoxide (smart cd)\n• atuin (history sync)\n• yazi (file manager)\n\nAll open source. Better than iTerm2 + paid tools.',
+    },
+    {
+      format: 'cant_believe',
+      text: 'I cannot believe devs still pay for:\n\n• Database GUI ($50/mo)\n• API client ($30/mo)\n• SSH client ($20/mo)\n\nsqlite3, httpie, ssh are built in.\n\nYour terminal already has everything.',
+    },
+
+    // ── Fresh nobody_tells_you ──
+    {
+      format: 'nobody_tells_you',
+      text: 'Nobody tells you about Claude Code subagents:\n\n• Spawn parallel agents for independent tasks\n• Each has own context window\n• They coordinate via main agent\n• 5x throughput on complex refactors\n\nIt is not one agent. It is an army.',
+    },
+    {
+      format: 'nobody_tells_you',
+      text: 'Nobody tells you:\n\nThe best commit message format is:\n\n<type>: <what> — <why>\n\nfeat: add auth — needed for user dashboards\nfix: handle null — prevents crash on empty state\nrefactor: extract service — reused in 3 places\n\nThe "why" is what future-you searches for.',
+    },
+
+    // ── Fresh why_nobody ──
+    {
+      format: 'why_nobody',
+      text: 'Why nobody talks about agent memory files:\n\nAGENTS.md, CLAUDE.md, .cursor/rules — these are not config.\nThey are onboarding docs for your AI teammate.\n\nUpdate them like you update README. Every pattern you teach = compound returns.',
+    },
+
+    // ── Fresh git_history ──
+    {
+      format: 'git_history',
+      text: 'My git log this month:\n\n"add feature"\n"fix tests"\n"update deps"\n"remove dead code"\n"simplify logic"\n"delete 500 lines"\n\nThe best commits remove code.',
+    },
+
+    // ── Fresh mistake_list ──
+    {
+      format: 'mistake_list',
+      text: '3 mistakes with AI coding agents:\n\n1. One giant prompt instead of 5 small ones\n2. No context files — agent guesses your stack\n3. Accepting first output — never iterate\n\nTreat it like a junior dev. Guide, review, iterate.',
+    },
+  ];
 
 const LINKEDIN_POSTS = [
   {
