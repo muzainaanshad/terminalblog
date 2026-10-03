@@ -1,0 +1,202 @@
+---
+title: "Pi Just Hit 1.0 — Fullscreen by Default, 40% Leaner Codemode, and Image Generation in Your Terminal"
+description: "Pi v1.0.0 (Oct 1) graduates from release candidate to stable with fullscreen TUI by default, 40% fewer prompt tokens in codemode, image generation via models.generateImages(), Radius auth in /login, Anthropic copy-code login, MCP OAuth hardening, and header-only quiet startup. The terminal-first agent from earendil-works is finally production-ready."
+pubDate: 2026-10-03T14:00:00Z
+tags: ["pi", "release", "v1.0", "milestone", "coding-agents", "beginner", "terminal-agent", "fullscreen", "image-generation", "mcp"]
+tool: "pi-dot-dev"
+author: "sage"
+image: "/api/og?title=Pi+v1.0+Milestone+Fullscreen+Leaner+Codemode&tool=pi"
+---
+
+Pi **v1.0.0 dropped October 1**, and the version number tells the story: after months of rapid iteration (v0.84 → v0.99 → v1.0), the terminal-first coding agent from earendil-works has graduated to stable.
+
+This isn't just a number bump. v1.0.0 lands **fullscreen by default**, a **40% leaner codemode** that costs less and recovers from errors better, **image generation inside codemode**, and auth improvements that make MCP feel like infrastructure instead of a science experiment.
+
+If you've been watching Pi from the sidelines — **this is the version to start with.**
+
+---
+
+## 1. Fullscreen by Default — The TUI Finally Claims Your Screen
+
+**The headline change:** Pi's TUI now runs **fullscreen by default**. No more wasted terminal real estate, no more scrollback fighting with your agent's output.
+
+```bash
+# Want the old behavior? One config line:
+tuiMode: "regular"
+```
+
+But for most users, fullscreen is the right default. You get:
+- Full viewport for code, diffs, and agent reasoning
+- Transcript search that actually has room to breathe
+- Lane-based sessions (from v0.84) that make sense at full width
+
+> **For beginners:** This is what "Cursor in the terminal" was always supposed to feel like. The agent gets the whole screen. Your code gets the whole screen. No compromise.
+
+---
+
+## 2. Leaner Codemode — 40% Fewer Tokens, Errors That Teach
+
+Codemode (Pi's structured prompting system for coding tasks) got a **major efficiency pass**:
+
+| Before | After |
+|--------|-------|
+| Verbose prompt templates | **~40% fewer prompt tokens** |
+| Generic errors | **Errors that tell the model how to recover** |
+| Fixed tool descriptions | Dynamic, context-aware tool specs |
+
+What this means in practice:
+- **Lower API costs** on every coding task
+- **Faster responses** — less context to process
+- **Self-correcting agents** — when a tool call fails, the error includes recovery hints the model can actually use
+
+This is the kind of "invisible" improvement that compounds: every session, every turn, every model call is cheaper and smarter.
+
+---
+
+## 3. Image Generation in Codemode — Your Agent Can Now Draw
+
+**New in v1.0.0:** Scripts can call `models.generateImages()` with the session's credentials.
+
+```javascript
+// In your codemode script
+const image = await models.generateImages({
+  prompt: "Architecture diagram: microservices with API gateway, auth service, and message queue",
+  model: "gpt-image-1",
+  size: "1024x1024"
+});
+// image is now available to embed in docs, PRs, or show in the TUI
+```
+
+**Why this matters:** Coding agents have been text-only forever. Pi v1.0.0 breaks that ceiling. Your agent can now:
+- Generate architecture diagrams on the fly
+- Create UI mockups from descriptions
+- Visualize data structures and flows
+- Add images directly to documentation it writes
+
+The credentials flow through your existing provider setup — no new API keys to manage.
+
+---
+
+## 4. Radius in `/login` — One Command, Authenticated MCP Server
+
+Pi's `/login` flow now supports **Radius** — sign in with Radius and its MCP server gets configured in one step.
+
+```bash
+pi /login radius
+# Opens browser → you auth with Radius → MCP server auto-configured
+```
+
+No more manual MCP config after OAuth. The provider handles the handshake, Pi wires it up.
+
+---
+
+## 5. Anthropic Copy-Code Login — Browser on Another Machine? No Problem
+
+If your browser runs on a different machine than your terminal (remote dev, VM, container), **Anthropic's copy-code login now works with Pi**.
+
+```bash
+pi /login anthropic --copy-code
+# Prints a code → paste in browser on your local machine → done
+```
+
+This is the auth flow that should exist everywhere but rarely does. Pi has it.
+
+---
+
+## 6. MCP OAuth Hardening — The Security Details That Matter
+
+MCP OAuth got production-grade hardening:
+
+- **`oauth.authServerMetadataUrl`** — for servers that advertise the wrong auth server (or none)
+- **RFC 9207 `iss` checks** — validates the token issuer matches expectations
+- **Credentials per server** — no more shared token soup
+- **Step-up sign-in that keeps granted scopes** — reauth doesn't reset your permissions
+
+Combined with v0.99.2's MCP exposure control (servers stay out of codemode context unless summoned), **Pi now has the most mature MCP implementation of any coding agent.**
+
+---
+
+## 7. Header-Only Quiet Startup — Version + Hints, Nothing Else
+
+```json
+{
+  "quietStartup": "header"
+}
+```
+
+Keeps the version banner and key hints. Hides the rest. For daily users who open Pi dozens of times a day — this saves seconds that add up.
+
+---
+
+## What This Means for You
+
+| If you're... | Verdict |
+|--------------|---------|
+| **New to Pi** | **Start here.** v1.0.0 is the first release where everything works: fullscreen TUI, lean codemode, reliable MCP, image gen, modern auth. |
+| **On v0.99.x** | **Update.** Fullscreen default + 40% token savings + image gen = meaningful daily improvement. |
+| **On v0.84.x** | **Absolutely.** You're missing: fullscreen default, leaner codemode, image generation, Radius auth, copy-code login, MCP OAuth hardening, quiet startup, plus all v0.99 fixes (MCP exposure, workload identity, `/reload` for tools, `describeNamespace()`). |
+| **Evaluating coding agents** | **Best time to try.** Free tier via local models (Ollama), 20+ cloud providers supported, open-source (MIT), terminal-first UX that doesn't compromise. |
+
+---
+
+## How to Update
+
+```bash
+# npm (all platforms)
+npm i -g @earendil-works/pi@latest
+
+# Or upgrade in-place
+pi update --apply
+
+# Verify
+pi --version
+# Should show 1.0.0
+```
+
+---
+
+## The Pattern: v0.84 Built the Interface, v0.99 Hardened Infrastructure, v1.0 Polishes Both
+
+| Release | Theme | What Shipped |
+|---------|-------|--------------|
+| **v0.84.x** (Jul–Aug) | **Interface** | Fullscreen TUI, transcript search, lane-based sessions, `AGENTS.override.md` |
+| **v0.99.x** (Sep) | **Infrastructure** | MCP exposure control, auth parity, workload identity, namespace discovery, `/reload` for tools |
+| **v1.0.0** (Oct 1) | **Polish + Capability** | Fullscreen default, 40% leaner codemode, image generation, Radius auth, copy-code login, OAuth hardening, quiet startup |
+
+v0.84 made Pi **usable**. v0.99 made it **reliable**. v1.0.0 makes it **complete**.
+
+---
+
+## Related Articles
+
+- [Pi Just Made MCP Actually Reliable — v0.99.2 Is the Release You've Been Waiting For](/blog/pi-v0-99-2-mcp-reliability-upgrade/)
+- [Pi Coding Agent Just Got a Massive Upgrade — Fullscreen TUI, Breaking Session Model, and Transcript Search](/blog/pi-coding-agent-just-got-massive-upgrade-fullscreen-breaking-changes/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Pi is developed by earendil-works. This article covers v1.0.0 (October 1, 2026). For the complete release history, see [pi.dev/news/releases](https://pi.dev/news/releases).*
+
+## FAQ
+
+**Q1: What is Pi coding agent?**
+Pi is a terminal-first AI coding agent from earendil-works that runs on your machine, supports 20+ model providers (Anthropic, OpenAI, Google, GitHub Copilot, OpenRouter, local llama.cpp), and treats your shell as a first-class tool. Think "Cursor in the terminal" but provider-agnostic and open-source (MIT).
+
+**Q2: What's the biggest change in Pi v1.0.0?**
+Fullscreen TUI by default (set `tuiMode: "regular"` to disable), 40% fewer prompt tokens in codemode with self-recovering errors, and `models.generateImages()` for image generation inside codemode scripts.
+
+**Q3: Does fullscreen break my scrollback?**
+Set `tuiMode: "regular"` in your config to keep the terminal's normal scrollback behavior.
+
+**Q4: How does image generation work?**
+In codemode scripts, call `models.generateImages({ prompt, model, size })` — it uses the session's provider credentials. Supported models depend on your provider (OpenAI gpt-image-1, etc.).
+
+**Q5: What's the Anthropic copy-code login?**
+If your browser is on a different machine than your terminal, `pi /login anthropic --copy-code` prints a code you paste in the browser locally. The auth completes remotely.
+
+**Q6: How do I update to v1.0.0?**
+`npm i -g @earendil-works/pi@latest` or `pi update --apply`. Verify with `pi --version`.
+
+**Q7: Is Pi v1.0.0 ready for daily work?**
+Yes. The version number signals stability. Fullscreen TUI, lean codemode, reliable MCP, image generation, and modern auth make this the most production-ready release yet.
