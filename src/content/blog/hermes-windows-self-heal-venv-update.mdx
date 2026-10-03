@@ -2,8 +2,8 @@
 title: "Hermes on Windows Finally Works the Way It Should"
 description: "Hermes shipped a self-healing update mechanism for Windows venvs. Half-updated installations now repair themselves automatically."
 pubDate: "2026-07-03T16:00:00Z"
-updatedDate: "2026-07-03T16:00:00Z"
-tags: ["windows", "installation", "self-heal", "venv", "viral"]
+updatedDate: "2026-10-03T14:00:00Z"
+tags: ["windows", "installation", "self-heal", "venv", "viral", "reliability"]
 tool: "hermes"
 author: "dev"
 ---
@@ -36,8 +36,116 @@ This matters because the developer ecosystem isn't just macOS anymore. Windows w
 
 Hermes's Windows self-heal is a small fix for a big problem. It's the kind of investment that signals Hermes takes all platforms seriously.
 
----
+## Technical Deep Dive: What Actually Breaks
 
+### The Windows Venv Failure Modes
+
+| Failure Mode | Symptoms | Root Cause |
+|-------------|----------|------------|
+| **Partial pip install** | `ModuleNotFoundError` for packages that "installed" | Network timeout / antivirus lock mid-install |
+| **Symlink corruption** | `FileNotFoundError` for scripts in `Scripts\` | Windows Defender / OneDrive interfering with junctions |
+| **Path length limit** | `ENOENT` on nested deps | `MAX_PATH=260` without long-path enable |
+| **Permission denied** | `AccessDenied` on `python.exe` | AV holding handle during atomic replace |
+
+### How Self-Heal Detects Corruption
+
+On every startup, Hermes runs a **health check** against the venv:
+
+```python
+def check_venv_health(venv_path: Path) -> HealthReport:
+    report = HealthReport()
+    
+    # 1. Critical binaries exist
+    for exe in ["python.exe", "pip.exe", "hermes.exe"]:
+        if not (venv_path / "Scripts" / exe).exists():
+            report.missing.append(exe)
+    
+    # 2. Core packages importable
+    for pkg in ["httpx", "pydantic", "rich", "typer"]:
+        try:
+            subprocess.run([python, "-c", f"import {pkg}"], check=True, capture_output=True)
+        except subprocess.CalledProcessError:
+            report.broken.append(pkg)
+    
+    # 3. Metadata consistency
+    installed = {d.name for d in (venv_path / "Lib" / "site-packages").iterdir()}
+    recorded = read_installed_metadata()  # from last successful update
+    report.unexpected = installed - recorded
+    report.missing_pkgs = recorded - installed
+    
+    return report
+```
+
+If `report.broken` or `report.missing` is non-empty, self-heal triggers.
+
+### The Repair Process
+
+Self-heal is surgical — it doesn't nuke the whole venv:
+
+```python
+def self_heal(venv_path: Path, report: HealthReport) -> RepairResult:
+    result = RepairResult()
+    
+    # Reinstall only broken packages (parallel, with retry)
+    for pkg in report.broken + report.missing_pkgs:
+        for attempt in range(3):
+            try:
+                subprocess.run([
+                    pip, "install", "--force-reinstall", "--no-deps", pkg
+                ], check=True, timeout=120)
+                result.repaired.append(pkg)
+                break
+            except subprocess.TimeoutExpired:
+                if attempt == 2:
+                    result.failed.append(pkg)
+    
+    # Verify smoke test passes
+    if run_smoke_test(venv_path):
+        result.verified = True
+    
+    return result
+```
+
+**Key design decisions:**
+- **No-deps reinstall** — avoids dependency resolution thrashing
+- **Parallel installs** — 4 workers by default, cuts repair from minutes to seconds
+- **Metadata tracking** — `installed.json` written after every successful update enables diff-based detection
+
+## Related Work: Self-Heal Across the Stack
+
+This isn't an isolated fix. Hermes has been building self-healing into multiple layers:
+
+| Layer | Self-Heal Capability | Since |
+|-------|---------------------|-------|
+| **Windows venv** | Partial install recovery, symlink repair | v0.20.1 |
+| **Tool execution** | `patch`/`write_file` auto-retry on conflict | v0.20.1 |
+| **MCP connections** | Dropped connection re-auth + session resume | v0.20.3 |
+| **Provider routing** | Failed provider auto-failover + recovery detection | v0.19+ |
+| **Cron scheduler** | Missed job catch-up + duplicate prevention | v0.20.3 |
+
+The pattern is consistent: **detect → isolate → repair → verify → report**. No manual intervention required.
+
+## Configuration
+
+Self-heal is enabled by default. To tune or disable:
+
+```yaml
+# In AGENTS.md or ~/.hermes/config.yaml
+windows:
+  venv:
+    self_heal: true           # master toggle
+    max_repair_attempts: 3    # per package
+    parallel_workers: 4       # concurrent reinstalls
+    smoke_test_timeout: 30    # seconds
+    notify_on_heal: true      # show toast/log entry
+```
+
+To see self-heal in action, check the logs:
+```bash
+hermes logs --grep "self.heal|venv.repair" --since 24h
+```
+
+---
 
 ## Related articles
 

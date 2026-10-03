@@ -2,8 +2,8 @@
 title: "Your Coding Agent Can Now Talk Back — Hermes Text-to-Speech Is Here"
 description: "Hermes just shipped TTS with direct OpenAI model coercion on the managed audio gateway. Your agent can now speak its responses out loud."
 pubDate: "2026-07-03T22:00:00Z"
-updatedDate: "2026-07-03T22:00:00Z"
-tags: ["tts", "text-to-speech", "audio", "voice", "viral"]
+updatedDate: "2026-10-03T14:00:00Z"
+tags: ["tts", "text-to-speech", "audio", "voice", "viral", "accessibility"]
 tool: "hermes"
 author: "jax"
 ---
@@ -30,18 +30,68 @@ With TTS, Hermes can:
 
 The TTS route goes through Hermes's managed audio gateway, which handles:
 - Model selection (OpenAI TTS models are different from chat models)
-- Audio format conversion
+- Audio format conversion (MP3, WAV, Opus streaming)
 - Streaming vs. full-response modes
 - Provider fallback (if OpenAI TTS fails, fall back to a different provider)
 
 This is the same gateway that handles image generation and vision — a unified multimedia pipeline.
 
+## How It Works Under the Hood
+
+When you invoke TTS in Hermes (via the `tts` tool or voice-enabled plugins), the request flows through several layers:
+
+1. **Intent detection** — The gateway inspects the tool call and identifies it as a TTS request
+2. **Model coercion** — OpenAI's TTS models (`tts-1`, `tts-1-hd`) accept different parameters than chat models. The gateway coerces the request into the correct shape: `model`, `input` (text), `voice` (alloy, echo, fable, onyx, nova, shimmer), `response_format`, and `speed`
+3. **Streaming decision** — For long responses, the gateway chunks the text and streams audio back in real-time. Short responses get a single MP3 response
+4. **Provider abstraction** — The gateway normalizes responses across providers. If you configure a different TTS provider (ElevenLabs, Cartesia), the same interface works
+
+The audio gateway also handles **caching**: identical text requests return cached audio, reducing latency and API costs for repeated prompts (like reading the same error explanation twice).
+
+## Practical Use Cases
+
+### Debugging Without Context Switching
+```bash
+# Instead of: cat error.log | grep -A 5 "Error"
+# You say: "Hermes, read me the last error"
+# It speaks: "TypeError at line 42: Cannot read property 'map' of undefined"
+```
+
+### Code Reviews on the Go
+Walk through a PR while commuting. Hermes reads the diff summary, highlights breaking changes, and suggests review comments — all without you opening GitHub.
+
+### Accessibility First
+For developers with visual impairments or RSI, voice output isn't a nice-to-have. It's the primary interface. Hermes's TTS makes the entire agent pipeline accessible: planning → coding → testing → debugging, all with audio feedback.
+
+### Learning & Documentation
+Point Hermes at a complex library's docs. It reads the API reference, explains the pattern, and gives you a spoken summary — like a podcast generated on demand for exactly what you're working on.
+
+## Configuration
+
+Enable TTS in your `AGENTS.md` or project config:
+
+```yaml
+audio:
+  tts:
+    enabled: true
+    provider: "openai"  # or "elevenlabs", "cartesia"
+    voice: "nova"       # alloy, echo, fable, onyx, nova, shimmer
+    speed: 1.0
+    streaming: true
+```
+
+The gateway respects provider-specific options. For ElevenLabs, you'd add `voice_id` and `model_id` (e.g., `eleven_turbo_v2_5` for low latency).
+
 ## What's Next
 
 TTS is phase one. The audio gateway's architecture also supports speech-to-text for voice input, which would let you talk to your agent instead of typing. Voice-activated coding agents aren't far off.
 
----
+The roadmap includes:
+- **Voice commands** — "Hermes, create a new React component for the login form"
+- **Interruptible speech** — Stop TTS mid-sentence with a voice command or keystroke
+- **Multi-speaker conversations** — Simulate code review discussions with different voices
+- **Real-time translation** — Agent speaks in your preferred language regardless of codebase language
 
+---
 
 ## Related articles
 
