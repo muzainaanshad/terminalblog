@@ -1,34 +1,34 @@
 ---
-title: "Kilo Code Just Made Every Release Tamper-Proof — Here's Why That Matters"
-description: "Kilo Code v7.8.1 publishes CycloneDX SBOMs with every artifact, signed as GitHub attestations. Your CLI, VS Code extension, JetBrains plugin, and container images now ship a machine-readable inventory of every component bound to SHA-256. Supply-chain security just became standard, not optional."
-pubDate: 2026-09-30T10:00:00Z
-tags: ["kilo", "release", "sbom", "supply-chain-security", "cyclonedx", "security", "beginner"]
+title: "Kilo Code v7.8.3 Just Made Every Release Tamper-Proof — And Fixed the Copy Button in Documents Viewer"
+description: "Kilo Code v7.8.3 (Oct 1) publishes CycloneDX SBOMs with every artifact as GitHub attestations, adds copy content button to Documents viewer, manual Fetch Models button for custom providers, multi-root workspace @-mention support, Agent Manager selection persistence, browser preview resize fix, code snippet highlighting, and revert failure reporting. Supply-chain security + daily UX polish."
+pubDate: "2026-09-30T10:00:00Z"
+updatedDate: "2026-10-03T10:30:00Z"
+tags: ["kilo", "release", "sbom", "supply-chain-security", "cyclonedx", "documents-viewer", "custom-providers", "multi-root", "agent-manager", "coding-agent", "beginner"]
 tool: "kilo"
 author: "sage"
-image: "/api/og?title=Kilo+Code+v7.8.1+SBOM+Supply+Chain+Security&tool=kilo"
-canonical: "https://terminalblog.com/blog/kilo-code-v7-8-1-sbom-supply-chain-security/"
+image: "/api/og?title=Kilo+Code+v7.8.3+SBOM+Documents+Viewer&tool=kilo"
+canonical: "https://terminalblog.com/blog/kilo-code-v7-8-3-sbom-documents-viewer/"
+---
+
+Kilo Code **v7.8.3 dropped October 1** (release), right after v7.8.2 (pre-release, same day) and v7.8.1 (Sep 30). Three releases in three days. The theme: **supply-chain security as standard** plus the kind of daily UX polish that turns a good editor extension into a great one.
+
+If you're on v7.8.0 or earlier — **update today.** The SBOM attestations alone are worth it.
 
 ---
 
-Kilo Code v7.8.1 dropped September 25, and it's the quietest important release of the year.
+## The Headline: Every Artifact Now Ships a Tamper-Evident Receipt
 
-No new features. No UI changes. Just **CycloneDX software bills of materials published alongside every single artifact** — CLI archives, npm packages, container images, VS Code extension, and JetBrains plugin — each bound to its SHA-256 and signed as a GitHub attestation.
+**v7.8.1 (Sep 30)** made CycloneDX Software Bills of Materials (SBOMs) standard across **every distribution channel**:
 
-**That means you can now verify, cryptographically, that the Kilo Code binary you downloaded is exactly what the maintainers built. No supply-chain injection. No compromised dependency slipping in. No guessing.**
+| Artifact | SBOM | Attestation |
+|----------|------|-------------|
+| CLI Linux/macOS/Windows archives | `kilo-*-sbom.json` / `.cdx.json` | GitHub attestation |
+| npm package (`@kilocode/cli`) | Published with provenance | GitHub attestation |
+| Container images (`kilocode/kilo`) | Attached via `cosign`/`notation` | GitHub attestation |
+| VS Code extension (`.vsix`) | Bundled SBOM | GitHub attestation |
+| JetBrains plugin (`.zip`) | Bundled SBOM | GitHub attestation |
 
-If you've been waiting for open-source coding agents to catch up to enterprise-grade supply-chain hygiene — **this is the release.**
-
----
-
-## What an SBOM Actually Gives You
-
-A Software Bill of Materials (SBOM) is a machine-readable inventory of every component in a build — direct dependencies, transitive dependencies, versions, licenses, and hashes.
-
-**CycloneDX** is the industry-standard format (backed by OWASP, adopted by NTIA, required by US federal contracts).
-
-**GitHub attestations** are cryptographic signatures that GitHub itself produces during the build, tying the SBOM to the exact commit and workflow run that produced it.
-
-Together: you get a tamper-evident receipt for every Kilo Code artifact.
+**All signed by GitHub Actions during the release workflow. No maintainer keys to manage. No separate signing infrastructure.**
 
 ```bash
 # Verify the CLI archive you downloaded
@@ -44,111 +44,156 @@ If the hash doesn't match, the attestation fails. Period.
 ## Why This Matters for *You* (Not Just Security Teams)
 
 ### 1. Your Editor Extension Can't Be Silently Swapped
-
 The VS Code Marketplace and JetBrains Marketplace are generally trustworthy — but they're centralized. If a maintainer's account is compromised, or a marketplace is breached, a malicious update could push to thousands of developers.
 
 With SBOM attestations: **you (or your IT team) can pin the exact artifact hash and verify it before install.** No trust required.
 
 ### 2. Container Images Are Now Auditable
-
 ```dockerfile
 # Before: you pulled kilocode/kilo:latest and hoped
 # After: you verify the SBOM attestation for that exact digest
 docker pull kilocode/kilo@sha256:abc123...
 gh attestation verify kilocode/kilo@sha256:abc123... --repo Kilo-Org/kilocode
 ```
-
 CI pipelines can now gate deployments on attestation verification. **Supply-chain security becomes a CI check, not a prayer.**
 
 ### 3. Compliance Just Got Easier
-
 If your org requires SBOMs for vendor software (EO 14028, EU CRA, FedRAMP, SOC 2) — **Kilo Code now ships them automatically.** No vendor questionnaire. No manual requests. The artifacts *are* the evidence.
 
 ### 4. Dependency Drift Is Now Visible
-
-The SBOM lists every transitive dependency with its version and hash. If a future release unexpectedly pulls in a new dependency (or a compromised version of an existing one), **the SBOM diff shows it immediately.**
-
-Security teams can diff SBOMs between releases instead of reading changelogs and hoping.
+The SBOM lists every transitive dependency with its version and hash. If a future release unexpectedly pulls in a new dependency (or a compromised version of an existing one), **the SBOM diff shows it immediately.** Security teams can diff SBOMs between releases instead of reading changelogs and hoping.
 
 ---
 
-## What's Actually in the Box
+## v7.8.2/v7.8.3: The Daily UX Polish Wave
 
-Every v7.8.1 artifact now ships with:
+### Copy Content Button in Documents Viewer (v7.8.3)
+The Documents viewer toolbar now has a **copy content button**, and the document tab context menu expands with:
+- Copy Path
+- Copy Relative Path
+- Copy File Name
+- Open in Editor
 
-| Artifact | SBOM File | Attestation |
-|----------|-----------|-------------|
-| CLI Linux/macOS/Windows archives | `kilo-*-sbom.json` / `.cdx.json` | GitHub attestation |
-| npm package (`@kilocode/cli`) | Published to npm with provenance | GitHub attestation |
-| Container images (`kilocode/kilo`) | Attached via `cosign`/`notation` | GitHub attestation |
-| VS Code extension (`.vsix`) | Bundled SBOM | GitHub attestation |
-| JetBrains plugin (`.zip`) | Bundled SBOM | GitHub attestation |
+Small thing, used dozens of times a day.
 
-All signed by GitHub Actions during the release workflow. **No maintainer keys to manage. No separate signing infrastructure.**
+### Manual Fetch Models Button for Custom Providers (v7.8.3)
+Custom Provider settings dialog now has a **manual "Fetch Models" button**. No more waiting for auto-refresh or restarting VS Code to see new models from your custom endpoint.
+
+### Multi-Root Workspace @-Mention Support (v7.8.3)
+Typing `@` in a multi-root VS Code workspace now **suggests files from every folder** — including folders added through "Add Folder to Workspace..." — without reaching for the file picker. Files outside the session's project still require the usual approval.
+
+### Agent Manager Selection Persistence (v7.8.3)
+The **latest Agent Manager selection persists** when another project finishes loading. No more losing your place when switching contexts.
+
+### Browser Preview Resize Fix (v7.8.3)
+Agent Manager browser preview **stays visible when you resize its panel**. Previously it would vanish or clip.
+
+### Code Snippet Highlighting on Response Finish (v7.8.3)
+Code snippets **highlight when a response finishes** — without requiring a follow-up message. Visual confirmation that the agent produced code.
+
+### Revert Failure Reporting (v7.8.2/v7.8.3)
+**Failed reverts/redos now show an error toast** instead of failing silently. The snapshot steps behind it log the git exit code and stderr when they give up. You actually know when something went wrong.
+
+### Keep Latest Agent Manager Selection (v7.8.3)
+Selection persists across project loads.
+
+### Collapsed Pastes Preserved in Prompt History (v7.8.3)
+Browsing prompt history with arrow keys **keeps collapsed pastes collapsed**. No more accidental expansion.
+
+### View Details Action for Marketplace Suggestions (v7.8.3)
+Marketplace suggestion notifications get a **"View details" action** that opens the item in the Kilo Marketplace panel with search prefilled.
+
+### Background Agent Avatar Animation (v7.8.3)
+Avatar animation above the prompt input **stays smooth** even under load.
+
+### Prompt Cache Prefixes Preserved Across Goal Turns (v7.8.2/v7.8.3)
+Prompt cache prefixes survive **goal turns, compaction, and completion**, and the working timer runs through turn boundaries and rejected commands until the goal stops.
+
+### Stop Single Sub-Agent from Task Card (v7.8.3)
+You can now **stop a single sub-agent from its task card**, and follow background agents of the current run next to the working status and session actions. Click opens, stops, or clears them. The background agent bar above the chat is removed; sub-agent running animation is easier to see.
+
+### Apply Pending Autocomplete Edits from Quick-Fix Menu (v7.8.3)
+VS Code quick-fix menu now applies pending autocomplete edits.
+
+### CLI: Full Model Output Limit for Claude Sonnet/Opus (v7.8.2/v7.8.3)
+Uses the full model output limit for Claude Sonnet, Opus, and Claude-family aliases (e.g., Auto Frontier) to prevent responses from ending early during long reasoning.
+
+### CLI: Scheduled Session Reporting (v7.8.2/v7.8.3)
+Sessions asleep on pending wakeup or cron task report as `scheduled` with their wake time.
+
+### CLI: Suggested Next Steps with Clickable Actions (v7.8.2/v7.8.3)
+Shows suggested next steps in the CLI with **clickable action buttons**, and shows whether each suggestion was accepted or dismissed.
+
+### CLI: Context-Limit Error Recovery (v7.8.2/v7.8.3)
+Recovers from provider context-limit errors by **compacting and retrying** when the provider reports the request exceeded the model's context length.
+
+### CLI: Stop Sending `prompt_cache_breakpoint` to Custom Providers (v7.8.2/v7.8.3)
+Custom OpenAI-compatible providers and first-party provider IDs rerouted through custom endpoint overrides no longer receive the unsupported parameter (which caused HTTP 400).
+
+### CLI: Show Kilo Gateway Models Without Supported Parameters (v7.8.2/v7.8.3)
+Models like Jev Router that don't report supported parameters now appear in the model list.
+
+### CLI: File Storage Usable After Cancelled Operation (v7.8.2/v7.8.3)
+Wakeups, cron tasks, and session fork diffs no longer fail until Kilo restarts after a cancelled operation interrupts first access.
+
+### CLI: Restrict Session PR Linking to CLI Backends (v7.8.2/v7.8.3)
+VS Code, Agent Manager, JetBrains, and other clients keep existing PR integrations without running the separate session-link mechanism (including when controlled from mobile).
 
 ---
 
-## The Patch That Enabled It
+## Quick Version Summary
 
-The change is surprisingly small: **PR #14513** adds CycloneDX generation to the release pipeline and uploads each SBOM as a GitHub attestation.
-
-```yaml
-# Simplified from .github/workflows/release.yml
-- name: Generate CycloneDX SBOM
-  uses: CycloneDX/cyclonedx-github-action@v1
-  with:
-    output: sbom.json
-- name: Attest SBOM
-  uses: actions/attest-build-provenance@v2
-  with:
-    subject-path: dist/kilo-linux-x64.tar.gz
-    subject-name: kilo-linux-x64.tar.gz
-    predicate-path: sbom.json
-    predicate-type: https://cyclonedx.org/schema/bom-1.6
-```
-
-That's it. The rest is GitHub's infrastructure doing the heavy lifting.
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| **v7.8.3** | Oct 1, 2026 | **Release** | Documents viewer copy button, manual Fetch Models, multi-root @-mentions, Agent Manager persistence, browser preview resize, code highlighting, revert failure reporting, sub-agent stop from task card, autocomplete quick-fix |
+| **v7.8.2** | Oct 1, 2026 | Pre-release | Same as v7.8.3 (pre-release candidate) |
+| **v7.8.1** | Sep 30, 2026 | Pre-release | **CycloneDX SBOMs + GitHub attestations for ALL artifacts** |
+| **v7.8.0** | Sep 25, 2026 | Pre-release | OpenCode v1.18.19–32 sync: GPT-6 Astra visibility, 5-min timeouts, Cloudflare AI Gateway, MCP reliability, provider routing, desktop fixes, session ordering, subagent permissions, clickable refs |
+| **v7.7.7** | Sep 2026 | Pre-release | Approval retry fixes |
 
 ---
 
-## What This Means for the Open-Source Agent Ecosystem
+## What This Means for Beginners
 
-Kilo Code isn't the first tool to publish SBOMs. But it **might be the first coding agent** to make them standard across *every* distribution channel — CLI, npm, Docker, VS Code, JetBrains — with zero opt-in.
+If you're new to Kilo Code (the free, open-source VS Code extension that turns your editor into an agentic engineering platform):
 
-**This raises the floor for the entire category.**
+1. **Supply-chain security is now automatic** — every install is verifiable, no config needed
+2. **Daily UX keeps improving** — copy buttons, model fetching, @-mentions, revert reporting
+3. **Agent Manager is becoming a real dashboard** — selection persistence, browser preview, sub-agent control
+4. **CLI is growing up** — context-limit recovery, scheduled sessions, clickable suggestions
 
-If you're evaluating coding agents for team adoption, **supply-chain verification is now a differentiator.** Commercial agents (Cursor, Copilot, Claude Code) distribute through proprietary channels with opaque build processes. Kilo Code gives you the receipts.
+The learning curve: install from VS Code Marketplace → open Agent Manager sidebar → pick a model → start coding. Works with local models (Ollama) or cloud (bring your own keys).
 
 ---
 
-## How to Update (and Verify)
+## How to Update
 
 ### VS Code / JetBrains
 1. Open Extensions / Plugins
 2. Search "Kilo Code"
-3. Click **Update** to v7.8.1
+3. Click **Update** to v7.8.3
 
 ### CLI
 ```bash
-npm install -g @kilocode/cli@7.8.1
+npm install -g @kilocode/cli@7.8.3
 
-# Verify the npm package provenance
-npm view @kilocode/cli@7.8.1 --json | jq '.attestations'
+# Verify npm package provenance
+npm view @kilocode/cli@7.8.3 --json | jq '.attestations'
 ```
 
 ### Docker
 ```bash
-docker pull kilocode/kilo:7.8.1
+docker pull kilocode/kilo:7.8.3
 
 # Verify attestation
-gh attestation verify kilocode/kilo:7.8.1 --repo Kilo-Org/kilocode
+gh attestation verify kilocode/kilo:7.8.3 --repo Kilo-Org/kilocode
 ```
 
 ### Manual Download (with verification)
 ```bash
 # Download artifact + SBOM + attestation
-curl -LO https://github.com/Kilo-Org/kilocode/releases/download/v7.8.1/kilo-darwin-arm64.zip
-curl -LO https://github.com/Kilo-Org/kilocode/releases/download/v7.8.1/kilo-darwin-arm64.zip.cdx.json
+curl -LO https://github.com/Kilo-Org/kilocode/releases/download/v7.8.3/kilo-darwin-arm64.zip
+curl -LO https://github.com/Kilo-Org/kilocode/releases/download/v7.8.3/kilo-darwin-arm64.zip.cdx.json
 
 # Verify
 gh attestation verify kilo-darwin-arm64.zip --repo Kilo-Org/kilocode
@@ -158,25 +203,27 @@ gh attestation verify kilo-darwin-arm64.zip --repo Kilo-Org/kilocode
 
 ## The Bottom Line
 
-**v7.8.0 fixed the reliability bugs that made you keep a commercial backup. v7.8.1 makes the supply chain verifiable.**
+**v7.8.0 fixed the reliability bugs that made you keep a commercial backup. v7.8.1 made the supply chain verifiable. v7.8.2/7.8.3 polished the daily UX until it shines.**
 
 This is how open-source infrastructure graduates from "cool project" to "production dependency."
 
-Kilo Code has always had the better architecture — skills, slash commands, explicit lifecycle, Agent Manager sidebar, multi-model routing, worktrees. Now it has the **supply-chain hygiene** that enterprises require and individuals deserve.
+Kilo Code has always had the better architecture — skills, slash commands, explicit lifecycle, Agent Manager sidebar, multi-model routing, worktrees, JetBrains plugin. Now it has the **supply-chain hygiene** enterprises require and the **daily polish** individuals deserve.
 
 If you're building on AI coding agents — **verify your tools.** Start with the one that makes it easy.
 
 ---
 
-## Related articles
+## Related Articles
 
 - [Kilo Code v7.8.0 Just Made Long Agent Runs Survive Network Blips](/blog/kilo-code-v7-8-0-opencode-sync-gpt6-astra-cloudflare/)
 - [Kilo Code v7.7.7 Just Fixed the Approval Hangs That Killed Long Runs](/blog/kilo-code-v7-7-7-opencode-sync-retry-fixes/)
+- [Kilo Code v7.6.0 Just Made Long Agent Runs Manageable](/blog/kilocode-v7-4-22-clickable-refs-agent-manager-pr-actions-aws-gcp-auth/)
 - [OpenCode Deep Dive: The Skill-Driven Open-Source Coding Agent](/blog/deep-dive-opencode-skill-driven-coding-agent/)
 - [Best Coding Agents 2026 — Decision Guide (Not Another Hype List)](/blog/best-coding-agents-2026-decision-guide/)
 - [Claude Code vs Kilo Code: Which Terminal Agent Wins?](/blog/claude-code-vs-kilo/)
-- [Coding Agent Security Checklist 2026](/blog/coding-agent-security-checklist-2026/)
 
 ---
 
-*Kilo Code is free, open-source (MIT), and available on [GitHub](https://github.com/Kilo-Org/kilocode).*
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
+
+*Kilo Code is free, open-source (MIT), and available on [GitHub](https://github.com/Kilo-Org/kilocode). Updated October 3, 2026 — covers Kilo Code v7.8.1 through v7.8.3 (September 30 – October 1, 2026). Full changelog: [github.com/Kilo-Org/kilocode/releases](https://github.com/Kilo-Org/kilocode/releases)*
