@@ -1,0 +1,121 @@
+---
+title: "OpenClaw v2026.9.8 Just Dropped — The Tiny Release That Hardened the Entire Stack"
+description: "OpenClaw v2026.9.8 (Oct 3) ships 58 commits from 21 contributors with release-process hardening, Android APK version pinning, and Telegram E2E waivers. The follow-up to the production-ready v2026.9.7 that fixes how the last release escaped."
+pubDate: 2026-10-03T14:00:00Z
+tags: ["openclaw", "release", "coding-agents", "beginner", "open-source", "release-process", "security"]
+tool: "openclaw"
+author: "sage"
+image: "/api/og?title=OpenClaw+v2026.9.8+Release&tool=openclaw"
+---
+
+OpenClaw **v2026.9.8 landed October 3**, three days after the massive v2026.9.7 that made the stack production-ready.
+
+This isn't a feature drop. It's a **58-commit, 43-PR, 21-contributor hardening pass** — the kind of release that doesn't make headlines but makes the next six months of releases trustworthy.
+
+If you updated to v2026.9.7 and it worked — **this release is why the next one will too.**
+
+---
+
+## 1. Release Process Hardening — Fixing How Bugs Escape
+
+The v2026.9.6 macOS crash-on-launch bug escaped because the notarization pipeline didn't catch it. v2026.9.7 fixed the binary. **v2026.9.8 fixes the pipeline.**
+
+Every artifact now ships with:
+- **Notarization evidence** — Apple's stamp of approval, verified in CI
+- **Dependency evidence** — Full SBOM (Software Bill of Materials) for every binary
+- **Post-publish verification** — CI re-downloads the published npm package and validates integrity against the release SHA
+- **Release evidence manifest** — A complete audit trail at `github.com/openclaw/releases/blob/main/evidence/2026.9.8/release-evidence.md`
+
+This is rare in open source: **not just fixing a bug, but fixing how the bug escaped.** The project was burned by a production incident and hardened the root cause.
+
+---
+
+## 2. Android APK Version Pinning — No More Drift
+
+The Android app version (`apps/android/version.json`) was stuck at 2026.8.2 while the release train moved to 2026.9.8.
+
+**New rule:** Before the next tag, maintainers must run:
+```bash
+pnpm android:version:pin -- --from-gateway
+```
+
+This forces the Android version to match the gateway release train. No more "the app says 2026.8.2 but the server expects 2026.9.x."
+
+---
+
+## 3. Telegram Integration Checks — Waived With Accountability
+
+Telegram E2E tests (source QA, Package Acceptance, published-package E2E) were **waived by the release owner** for this version.
+
+Not skipped — **waived with a paper trail.** The release notes explicitly document:
+- Which checks were waived
+- Why (source QA + Package Acceptance + published-package E2E)
+- Who approved it (the release owner)
+
+This is how mature projects handle "we can't run this test right now" — with transparency, not silence.
+
+---
+
+## 4. Plugin Ecosystem — 89 Packages, Automated Validation
+
+The ClawHub plugin submission pipeline (shipped in v2026.9.7) processed **89 plugin packages** for this release.
+
+Every plugin goes through:
+1. **npm publication** with provenance
+2. **ClawHub submission** with automated compatibility checks
+3. **Public artifact verification** — only after the parent release passes
+
+If you install a plugin from the catalog today, it's been validated against this exact release.
+
+---
+
+## 5. What This Means for You
+
+| If you're... | This release means... |
+|--------------|----------------------|
+| **Running v2026.9.7** | The foundation you're on just got harder to break |
+| **Waiting for Android app parity** | Version pinning is now mandatory — next release will match |
+| **Building on OpenClaw** | Release artifacts have SBOMs and notarization evidence — compliance-ready |
+| **New to OpenClaw** | Start here. v2026.9.7 + v2026.9.8 = the most battle-tested baseline yet |
+
+---
+
+## The Bigger Picture
+
+OpenClaw releases follow a **dual-track cadence**:
+
+| Track | Purpose | Example |
+|-------|---------|---------|
+| **Mainline** (2026.9.x) | New features, rapid iteration | v2026.9.7, v2026.9.8 |
+| **Extended-Stable** (2026.8.x) | LTS-equivalent, security backports | v2026.8.33, v2026.8.34, v2026.8.35 |
+
+v2026.9.8 is mainline. If you need "don't touch it for six months," use **v2026.8.35** (also released Oct 2).
+
+---
+
+## Quick Start (If You're New)
+
+```bash
+# Global CLI (never affected by macOS DMG issues)
+npm i -g openclaw
+
+# Or use the gateway directly
+npx openclaw@2026.9.8 gateway
+```
+
+The npm package was never affected by the macOS launch crash — only the DMG artifacts.
+
+---
+
+## What's Next
+
+v2026.9.8 closes the v2026.9.x cycle. The next mainline (v2026.10.x) will likely bring:
+- Full release notes for the v2026.9.x window (deferred from v2026.9.7)
+- Android APK at version parity
+- Re-enabled Telegram E2E gates
+
+**Bottom line:** This is the release you don't notice until you realize nothing broke for three months. That's the goal.
+
+---
+
+*Release artifacts: [npm](https://www.npmjs.com/package/openclaw/v/2026.9.8) • [Registry tarball](https://registry.npmjs.org/openclaw/-/openclaw-2026.9.8.tgz) • [Release evidence](https://github.com/openclaw/releases/blob/main/evidence/2026.9.8/release-evidence.md) • [Changelog](https://raw.githubusercontent.com/openclaw/openclaw/main/CHANGELOG/2026.9.8.md)*
