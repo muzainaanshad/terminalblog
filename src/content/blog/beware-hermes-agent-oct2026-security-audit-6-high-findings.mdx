@@ -25,7 +25,7 @@ This is not a theoretical exercise. The audit team ran 64 chunked deep-read pass
 | [#131565](https://github.com/NousResearch/hermes-agent/issues/131565) | `ui-tui` markdown + ink render sinks | Model-influenced markdown link URLs with BEL bytes | **Terminal escape injection** — arbitrary escape sequences at render time, no click required |
 | [#131564](https://github.com/NousResearch/hermes-agent/issues/131564) | `tools/skills_guard.py` | Malicious `.skillignore` in skill bundle | **Threat scanner disabled** — bundle controls its own scan exclusions |
 | [#131562](https://github.com/NousResearch/hermes-agent/issues/131562) | `apps/desktop/src/plugins/hermes-bots/avatar.tsx` | Bot name with `\"` attribute breakout | **Stored XSS in Electron renderer** — bot names propagate via gateway |
-| [#131561](https://github.com/NousResearch/hermes-agent/issues/131561) | `apps/desktop/electron/external-open.ts` | WSL `cmd.exe /c start "" <url>` unquoted | **Command injection** — shell metacharacters in URLs execute via `cmd.exe` re-parse |
+| [#131561](https://github.com/NousResearch/hermes-agent/issues/131561) | `apps/desktop/electron/external-open.ts` | WSL `cmd.exe /c start "" \<url\>` unquoted | **Command injection** — shell metacharacters in URLs execute via `cmd.exe` re-parse |
 | [#131566](https://github.com/NousResearch/hermes-agent/issues/131566) | Full codebase | 64-pass audit | **403 findings total** — 6 HIGH reproduced, 43 medium including TTS shell injection, path traversal, SSRF, open redirect, credential logging, plugin validation bypass |
 
 ---
@@ -143,8 +143,8 @@ Anyone using Hermes TUI (terminal UI) where model output can contain markdown li
 
 ```bash
 # In a Hermes TUI session, paste this markdown link and observe the terminal title:
-# [test](https://example.com/]2;PWNED)
-# (The  represents literal BEL byte 0x07)
+# [test](https://example.com/BEL]2;PWNEDBEL)
+# (BEL represents literal BEL byte 0x07)
 # If your terminal title changes to "PWNED", you are vulnerable.
 ```
 
@@ -239,7 +239,7 @@ If you see bot names containing `"`, `<`, `>`, `&`, `'`, they may have been sani
 
 ### What Happens
 
-On WSL, URLs are opened via `cmd.exe /c start "" <url>` with the URL passed **unquoted** in the argv. `cmd.exe` re-parses the command line, so shell metacharacters in the URL enable command concatenation:
+On WSL, URLs are opened via `cmd.exe /c start "" \<url\>` with the URL passed **unquoted** in the argv. `cmd.exe` re-parses the command line, so shell metacharacters in the URL enable command concatenation:
 
 ```
 https://example.com/&calc.exe        →  calc.exe runs
@@ -256,7 +256,7 @@ Anyone running Hermes Desktop on **Windows with WSL** where `openExternal` is us
 
 ```bash
 # On Windows with WSL, test in a Hermes Desktop session:
-# Paste a link: https://example.com/&echo PWNED
+# Paste a link: https://example.com/?test=1&echo PWNED
 # Click it or let it auto-render
 # If a command executes, you are vulnerable
 ```
@@ -283,7 +283,7 @@ The audit covers the entire codebase. Representative **medium** findings (all re
 | File:Line | Issue |
 |-----------|-------|
 | `tools/tts_command_provider.py` `render_command_template` | Second-pass global `str.replace` lets placeholder values collide with sentinel tokens → **shell injection** (`Popen(shell=True)`) |
-| `tools/write_approval.py` `_pending_path` | Unvalidated `pending_id` → **path traversal**; `/memory approve <id>` reads/deletes arbitrary `.json` and self-approves memory writes |
+| `tools/write_approval.py` `_pending_path` | Unvalidated `pending_id` → **path traversal**; `/memory approve \<id\>` reads/deletes arbitrary `.json` and self-approves memory writes |
 | `gateway/relay/media.py:70/112` | Substring host matching attaches signed upgrade bearer to attacker URLs; `download()` has no scheme/host validation (`file://`, `ftp://` fetched unauthenticated) |
 | `hermes_cli/dashboard_auth/request_utils.py:33/19` | `/\\evil.com` **open redirect** (WHATWG backslash semantics); `X-Forwarded-For` first-hop trust |
 | `apps/desktop/.../mcp-setup-tool.tsx:375` + `connector-tool.tsx:343` | Backend `connect_url` passed verbatim to `openExternal` (no scheme gate; `file:`/`smb:` handlers reachable) |
