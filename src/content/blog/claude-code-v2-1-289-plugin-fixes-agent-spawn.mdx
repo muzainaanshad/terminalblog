@@ -1,0 +1,157 @@
+---
+title: "Claude Code v2.1.289 Just Fixed the Plugin Nightmares You've Been Living With"
+description: "Claude Code v2.1.289 (October 3) fixes plugin marketplace stale copies, symlink hot-reload, mod loading on upgrade, pane drawing crashes, MCP re-auth, and adds agent.spawn for teammates. The patch that makes plugins actually reliable."
+pubDate: 2026-10-04T10:00:00Z
+tags: ["claude-code", "release", "plugins", "mcp", "mods", "bug-fixes", "beginner"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+v2.1.289+Plugin+Fixes&tool=claude-code"
+---
+
+Claude Code **v2.1.289 dropped October 3**, one day after the massive v2.1.288 quality-of-life wave. This isn't a feature drop — it's the **plugin stability patch** that makes the plugin ecosystem actually usable.
+
+If you've ever had a plugin show a stale version, crash your pane with a bad diff, refuse to load after an upgrade, or silently fail MCP auth — **this is the version that fixes your daily friction.**
+
+---
+
+## The "My Plugin Was Broken" Fixes (You'll Feel These)
+
+### 1. Plugin Marketplace — No More Stale Copies
+**Fixed:** `plugin list`, `plugin eval`, and `plugin update` showing a **stale copy** of a plugin installed from a local folder marketplace.  
+**Fixed:** Hot reload for a symlinked `--plugin-dir` now works.  
+Before: you updated a plugin, but Claude kept running the old version. Now: changes reflect immediately.
+
+### 2. Mods Load on First Session After Upgrade
+**Fixed:** Installed mods not loading in the first session after an upgrade.  
+Before: you upgraded, restarted, and your custom mods were ghost. Now: they're there from session one.
+
+### 3. Plugin Panes — Bad Diffs Won't Blank Your UI
+**Fixed:** One `Code` element holding an unparseable diff used to make the **whole pane show nothing**.  
+Now: it draws as plain code. Your UI stays readable even when a tool returns garbage.
+
+### 4. Localhost/Uppercase/File: Links in Plugin Panes — Work Now
+**Fixed:** Plugin panes drawing nothing when a link used a localhost address, an `@` in its path, an uppercase host, or a `file:` path.  
+Your plugin's links just work.
+
+### 5. Organization-Managed MCP Servers — Your Plugin Can't Rewrite Their Sign-In Tools
+**Fixed:** A user-installed plugin being able to rewrite the descriptions of an organization-managed MCP server's sign-in tools.  
+Security boundary enforced.
+
+### 6. Plugin Validate — Stops Skipping Plugins with Marketplace Manifests
+**Fixed:** `claude plugin validate` skipping the plugin when the folder also holds a marketplace manifest.  
+Your CI/CD plugin checks run on *all* plugins now.
+
+---
+
+## The "My Session Crashed" Fixes
+
+### 7. Launch Freeze — Unknown Box Border Styles Handled
+**Fixed:** A freeze or forced quit at launch when a plugin drew a Box with a border style the terminal does not know.  
+Graceful fallback instead of hard crash.
+
+### 8. Background Sessions Survive Plugin Reload/Disable
+**Fixed:** Supervised and background sessions ending when a plugin's on-screen handler threw asynchronously.  
+**Fixed:** Sessions ending with an interface error when a plugin region with no height kept growing.  
+Your long-running background work survives plugin churn.
+
+### 9. Mod Failures Are Isolated
+**Fixed:** A mod's `Client` that fails while drawn taking down everything the mod drew around it.  
+Now: it fails alone and raises `ui.fault`. The rest of your UI stays up.
+
+### 10. Published Artifact Pages — No More Browser Tab Crashes
+**Fixed:** Published artifact pages freezing or crashing the reader's browser tab on short code blocks with many unclosed `<script>` tags.  
+Shared artifacts are safe to open.
+
+---
+
+## The "Sandbox & Permissions" Fixes
+
+### 11. Bash Deny/Ask Rules — Environment Variable Prefixes Work
+**Fixed:** Bash deny and ask rules missing a command behind an environment variable prefix with an expanded value (e.g. `TZ="$HOME" rm -rf build`) when the sandbox auto-allows commands.  
+**Fixed:** A Bash deny or ask rule being skipped under sandbox auto-allow when a bare variable assignment came before the command.  
+Your permission rules actually catch what they should.
+
+### 12. Nested Compound Commands — Deny Rules Hold Over Mod Approvals
+**Fixed:** A deny or ask rule on a nested part of a compound shell command not holding over a user-installed mod's approval on managed machines.  
+Permission logic is consistent.
+
+---
+
+## The "IDE & Symlink" Fix
+
+### 13. Read Deny Rules — Symlinks in IDE Now Respected
+**Fixed:** `Read` deny rules not applying to files @-mentioned, changed, or selected in the IDE through a symlink.  
+If you block a file, it stays blocked — even via symlink.
+
+---
+
+## The New Feature: `agent.spawn` for Teammates
+
+### 14. `agent.spawn` — Spawn Teammate Agents with Shared Identity
+**Added:** `agent.spawn` for teammates, one agent id across plugin hook events, and idle and waiting states in `$.agent.list()`.  
+
+This is the foundation for **multi-agent teams** inside Claude Code. You can now spawn subordinate agents that share a team identity, coordinate through hooks, and report status back. The `$.agent.list()` API lets you inspect the whole team — who's idle, who's waiting, who's working.
+
+For beginners: think of it as `git worktree` but for AI agents. One main agent, multiple specialists, all trackable.
+
+---
+
+## The VS Code Fix
+
+### 15. `claude auth status` — Sign-Out Frequency Reverted
+**Fixed:** Reverted a v2.1.288 change to `claude auth status` that may have made sign-outs more frequent.  
+If you were getting logged out more often after v2.1.288 — it's fixed.
+
+---
+
+## What This Means for You
+
+| If you're... | This release means... |
+|--------------|------------------------|
+| **Plugin user** | Marketplace plugins update live, symlinks hot-reload, mods load on upgrade, panes don't crash on bad diffs |
+| **Plugin developer** | `plugin validate` works on all plugins, localhost/file: links render, org MCP servers protected |
+| **Team/Enterprise** | MCP sign-in tools can't be hijacked by user plugins, symlink reads respect deny rules |
+| **Background/headless user** | Sessions survive plugin reloads, mod failures isolated, artifact pages safe |
+| **Sandbox user** | Bash permission rules catch env-var-prefixed commands and bare assignments |
+
+---
+
+## How to Update
+
+```bash
+# Auto-updater (npm)
+npm update -g @anthropic-ai/claude-code
+
+# Or re-run the installer
+curl -fsSL https://claude.ai/install | bash
+
+# Verify
+claude --version
+# Should show 2.1.289
+```
+
+---
+
+## The Bottom Line
+
+**v2.1.288 fixed 100+ paper cuts. v2.1.289 fixes the plugin ecosystem.**
+
+Plugins that showed stale versions? Fixed. Mods that vanished after upgrade? Fixed. Panes that crashed on bad diffs? Fixed. MCP auth that silently failed? Fixed (in v2.1.288). Sessions that died when a plugin hiccuped? Fixed.
+
+And `agent.spawn` drops the first primitive for **agent teams** — the next evolution of how you'll delegate work.
+
+This is the release where the plugin system graduates from "cool but fragile" to **production infrastructure**.
+
+---
+
+## Related Articles
+
+- [Claude Code Just Fixed 100+ Things That Were Driving You Crazy](/blog/claude-code-v2-1-288-100-fixes-you-actually-feel/)
+- [Claude Code v2.1.287 — Mods Plugin System Watchdog](/blog/claude-code-v2-1-287-mods-plugin-system-watchdog/)
+- [Claude Code v2.1.285 — Desktop Command Plugin Fixes](/blog/claude-code-v2-1-285-desktop-command-plugin-fixes/)
+- [Beware: Claude Code Auto-Mode Overrides Hook Ask](/blog/beware-claude-code-auto-mode-overrides-hook-ask/)
+- [Beware: Claude Code Permission Prompt Flood](/blog/claude-code-permission-prompt-flood/)
+
+---
+
+*Claude Code is developed by Anthropic. Changelog source: [github.com/anthropics/claude-code/releases/tag/v2.1.289](https://github.com/anthropics/claude-code/releases/tag/v2.1.289).*
