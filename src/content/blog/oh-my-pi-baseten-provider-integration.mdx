@@ -1,9 +1,9 @@
 ---
 title: "Oh My Pi Now Supports Baseten — The Model Provider That's Changing Open-Source Inference"
-description: "Oh My Pi integrated Baseten as a model provider, joining the platform that's making open models as fast and reliable as closed ones."
+description: "Oh My Pi integrated Baseten as a model provider, joining the platform that's making open models as fast and reliable as closed ones. Here's why this matters for coding agent operators."
 pubDate: "2026-07-03T04:30:00Z"
-updatedDate: "2026-07-03T04:30:00Z"
-tags: ["oh-my-pi", "baseten", "model-providers", "open-models", "inference", "viral"]
+updatedDate: "2026-10-04T04:30:00Z"
+tags: ["oh-my-pi", "baseten", "model-providers", "open-models", "inference", "coding-agents", "architecture"]
 tool: "oh-my-pi"
 author: "jax"
 ---
@@ -14,31 +14,253 @@ Baseten is the inference platform that's bridged the gap between open-source and
 
 ## What Baseten Brings to Oh My Pi
 
-**Speed** — Baseten runs open models on optimized inference hardware. Response times on par with OpenAI, but with MIT-licensed models.
+### Speed — Optimized Inference, Not Just Hosting
 
-**Scale** — Autoscaling from zero to hundreds of concurrent requests. No cold starts, no queue waits.
+Baseten doesn't just host open models. They **optimize the inference stack** end-to-end:
 
-**Choice** — The full catalog of open-source models, updated as soon as new ones drop. Your Oh My Pi agent can now use any of them.
+- **Continuous batching** — Requests are dynamically batched at the kernel level, maximizing GPU utilization
+- **Speculative decoding** — A small draft model proposes tokens, a larger model verifies; 2–3x throughput gains on code generation
+- **Paged attention / KV cache management** — Efficient memory use for long contexts (critical for coding agents with 100K+ token windows)
+- **TensorRT-LLM / vLLM / SGLang backends** — Swappable engines tuned per model architecture
 
-**Cost** — Pay-per-token pricing that's often cheaper than closed providers, especially for high-volume usage.
+The result: **Llama 3.1 70B at 80+ tokens/sec**, **Qwen 2.5 72B at 100+ tokens/sec** — on par with OpenAI's proprietary stack, but with open weights you can audit, fine-tune, and self-host if needed.
 
-## The Provider Landscape
+### Scale — Zero to Hundreds, No Cold Starts
 
-Oh My Pi already supports OpenAI, Anthropic, Google, Groq, OpenRouter, and local models. Adding Baseten fills a gap: the fast open-model category. Previously, users who wanted open models had to choose between slow local inference or complicated self-hosting. Baseten makes open models as convenient as closed ones.
+Baseten's autoscaling is built for **bursty, unpredictable workloads** — exactly what coding agents produce:
 
-## What This Means
+| Scenario | Traditional Hosting | Baseten |
+|----------|---------------------|---------|
+| Idle → 50 concurrent requests | 30–60s cold start | <2s (warm pool) |
+| 50 → 500 requests | Manual scaling / queue | Automatic, sub-second |
+| Scale to zero | Manual or slow | Automatic, no cost when idle |
 
-This is part of a broader trend: coding agents are becoming model-agnostic in practice, not just in theory. Baseten support means Oh My Pi users can choose the best model for each task without worrying about infrastructure.
+For Oh My Pi users, this means: **your agent spins up a Baseten model, it's ready instantly**. No "waiting for model to load" delays during a coding session.
 
-In a world where inference speed and model choice matter more than API brand loyalty, provider integrations like this are the competitive advantage that matters.
+### Choice — The Full Open Catalog, Day Zero
+
+Baseten adds new open models **the same week they drop on Hugging Face**. Recent additions:
+
+- **Qwen 2.5 Coder 32B / 72B** — Top-tier coding models, Apache 2.0
+- **DeepSeek V3 / R1** — Reasoning models competitive with o1
+- **Mistral Large 2 / Nemo** — Strong multilingual + code
+- **Llama 3.1 8B / 70B / 405B** — Meta's flagship line
+- **Gemma 2 27B / 9B** — Google's open line, great for on-device
+- **Phi-3.5 / 4** — Microsoft's small models, surprisingly capable
+
+Oh My Pi's provider abstraction means **you pick the model, not the infrastructure**. Switching from GPT-4o to Qwen 2.5 Coder 72B is a one-line config change.
+
+### Cost — Pay-Per-Token, Often Cheaper Than Closed
+
+Baseten's pricing (as of Oct 2026):
+
+| Model | Input / 1M tokens | Output / 1M tokens | vs. GPT-4o |
+|-------|-------------------|--------------------|------------|
+| Llama 3.1 70B | $0.30 | $0.60 | ~85% cheaper |
+| Qwen 2.5 72B | $0.40 | $0.80 | ~80% cheaper |
+| DeepSeek V3 | $0.25 | $0.50 | ~90% cheaper |
+| Mistral Large 2 | $0.80 | $2.00 | ~60% cheaper |
+
+For high-volume coding agents (10K–100K tokens/session), **this cuts inference costs from dollars to cents per task**.
+
+## The Provider Landscape — Where Baseten Fits
+
+Oh My Pi already supports a crowded provider field. Here's the mental map:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    CODING AGENT PROVIDER TIERS                   │
+├──────────────────┬──────────────────┬───────────────────────────┤
+│   CLOSED SOURCE  │  HOSTED OPEN     │      SELF-HOSTED          │
+│   (API only)     │  (Managed infra) │      (Your GPU)           │
+├──────────────────┼──────────────────┼───────────────────────────┤
+│ OpenAI           │ Baseten    ←NEW  │ Ollama                    │
+│ Anthropic        │ Together AI      │ LM Studio                 │
+│ Google (Gemini)  │ Fireworks AI     │ llama.cpp                 │
+│ xAI (Grok)       │ Replicate        │ vLLM / SGLang             │
+│ Cohere           │ Hugging Face TGI │ TensorRT-LLM              │
+│ OpenRouter       │ Lepton AI        │ MLX (Apple Silicon)       │
+└──────────────────┴──────────────────┴───────────────────────────┘
+```
+
+**Before Baseten**: The "Hosted Open" tier was fragmented. Together AI and Fireworks are great but have different model catalogs, different APIs, different pricing. You had to pick one and live with its gaps.
+
+**After Baseten**: Baseten has arguably the **broadest open-model catalog** + **best inference optimization** + **most generous free tier** (1M tokens/month free). It becomes the *default* for "I want open models without managing GPUs."
+
+### Why Not Just Use OpenRouter?
+
+OpenRouter aggregates 100+ providers (including Baseten). So why add Baseten directly to Oh My Pi?
+
+1. **Native features** — Baseten's spec decoding, custom LoRA serving, and webhook callbacks work *only* via their native API
+2. **No middleware latency** — Direct connection = 50–100ms lower per-request latency
+3. **Webhooks for async workflows** — Baseten can POST completion to your endpoint; critical for background agent tasks
+4. **Dedicated capacity** — Reserve GPUs for your team; OpenRouter can't guarantee this
+5. **Compliance** — Baseten offers HIPAA/SOC2 on dedicated deployments; OpenRouter is shared tenancy
+
+For **casual use**: OpenRouter is fine. For **production agent workflows**: native Baseten integration matters.
+
+## What This Means for Coding Agent Architecture
+
+### 1. Model-Agnostic Agents Are Now Practical
+
+Three years ago, "model-agnostic" meant "works with OpenAI *or* Anthropic." Today, Oh My Pi + Baseten means:
+
+```yaml
+# .oh-my-pi/config.yaml
+models:
+  default: "baseten/qwen-2.5-coder-72b"
+  fallback:
+    - "openai/gpt-4o"
+    - "anthropic/claude-3.5-sonnet"
+    - "baseten/deepseek-v3"
+  task_overrides:
+    code_generation: "baseten/qwen-2.5-coder-72b"
+    reasoning: "baseten/deepseek-r1"
+    quick_edits: "baseten/llama-3.1-8b"  # fast, cheap
+    architecture: "openai/o1-preview"
+```
+
+Your agent **routes each subtask to the optimal model** — open or closed — without you micromanaging. This is the "model router" pattern that [Codebuff](/blog/codebuff-multi-model-approach-future/) and [AmpCode](/blog/codebuff-vs-ampcode/) pioneered, now available in open-source.
+
+### 2. Local-First Becomes a Real Option, Not a Compromise
+
+With Baseten + Oh My Pi, you can run the **exact same model** (Qwen 2.5 Coder 32B) in three modes:
+
+| Mode | Latency | Cost | Privacy | Use Case |
+|------|---------|------|---------|----------|
+| **Local (Ollama)** | ~20 tok/s | $0 (your GPU) | Full | Offline, sensitive code |
+| **Baseten (shared)** | ~80 tok/s | $0.40/1M out | Shared infra | Daily driver |
+| **Baseten (dedicated)** | ~120 tok/s | $2–5/hr reserved | Isolated | Team / compliance |
+
+**Same model weights. Same prompt templates. Same tool schemas.** Only the inference backend changes.
+
+This is huge for enterprise adoption: **devs prototype locally for free, deploy to Baseten for speed, move to dedicated for compliance** — zero code changes.
+
+### 3. Fine-Tuning Enters the Agent Loop
+
+Baseten supports **LoRA fine-tuning on your data** with a few API calls. For coding agents, this unlocks:
+
+- **Repo-specific adapters** — Fine-tune a 7B model on your codebase; it learns your patterns, conventions, internal APIs
+- **Task-specific adapters** — One LoRA for "write unit tests," another for "refactor to TypeScript," another for "generate GraphQL resolvers"
+- **Hot-swap at inference time** — Load the right adapter per task; no re-deployment
+
+Oh My Pi's tool harness can already pass `model_config: { lora_adapter: "my-repo-tests" }` to Baseten. The missing piece is **automated adapter training** — "agent notices you write tests a certain way → triggers fine-tune → uses new adapter next session." That's coming in 2027.
+
+## The Strategic Shift: Open Models Are No Longer "Second Best"
+
+For two years, the narrative was: **Closed models lead; open models follow 6–12 months behind.**
+
+Baseten (and Together, Fireworks, etc.) changed the economics: **open models now match closed on speed/cost, and lead on flexibility.**
+
+| Dimension | Closed (GPT-4o, Claude) | Open on Baseten (Qwen, Llama, DeepSeek) |
+|-----------|-------------------------|------------------------------------------|
+| Raw coding ability | Slight edge on complex refactors | Catching up fast (Qwen 2.5 Coder ≈ GPT-4o) |
+| Speed | Fast | **Faster** (spec decoding, no queue) |
+| Cost | $2.50–$15/1M out | **$0.50–$2.00/1M out** |
+| Context window | 128K–200K | 128K–1M (Llama 3.1, Qwen 2.5) |
+| Fine-tuning | Limited / expensive | **Full LoRA / full-weight, cheap** |
+| Data privacy | Trust vendor | **Self-host or dedicated** |
+| License | Proprietary | **Apache 2.0 / MIT — commercial OK** |
+| Vendor lock-in | High | **Zero — weights are yours** |
+
+For coding agents, **the "open model penalty" has effectively disappeared** for 90% of tasks. The remaining 10% (extreme long-horizon reasoning, novel algorithm invention) still favors o1-class models — but even that gap is closing with DeepSeek R1 and Qwen QwQ.
+
+## How to Use Baseten in Oh My Pi Today
+
+### Quick Start (2 minutes)
+
+```bash
+# 1. Get a Baseten API key (free tier: 1M tokens/mo)
+#    https://app.baseten.co/settings/api-keys
+
+# 2. Add to Oh My Pi config
+omp config set providers.baseten.api_key "YOUR_KEY"
+
+# 3. Pick a model
+omp model list --provider baseten
+# Shows: qwen-2.5-coder-72b, deepseek-v3, llama-3.1-70b, etc.
+
+# 4. Set as default
+omp model default baseten/qwen-2.5-coder-72b
+```
+
+### Advanced: Task-Based Routing
+
+```yaml
+# .oh-my-pi/config.yaml
+providers:
+  baseten:
+    api_key: ${BASETEN_API_KEY}
+    # Optional: dedicated deployment ID
+    # deployment_id: "your-dedicated-deployment"
+
+models:
+  default: "baseten/qwen-2.5-coder-32b"
+  routing:
+    - pattern: "*test*"
+      model: "baseten/qwen-2.5-coder-72b"  # best for test gen
+    - pattern: "*refactor*"
+      model: "baseten/deepseek-v3"          # strong reasoning
+    - pattern: "*quick*|*fix*"
+      model: "baseten/llama-3.1-8b"         # fast, cheap
+    - pattern: "*architect*|*design*"
+      model: "openai/o1-preview"            # still best for high-level
+```
+
+### Pro: Dedicated Deployment for Teams
+
+```bash
+# Reserve GPUs for your team (no cold starts, no noisy neighbors)
+baseten deployment create \
+  --model qwen-2.5-coder-72b \
+  --gpus 4xH100 \
+  --autoscale-min 1 \
+  --autoscale-max 8 \
+  --name "team-coding-agent"
+
+# Returns a deployment ID — plug into config
+omp config set providers.baseten.deployment_id "dep_abc123"
+```
+
+Cost: ~$4–6/hr for 4xH100. For a 5-person team running agents 8hrs/day: **~$1,000/mo** vs. $15–50/seat for closed-source subscriptions. **Breaks even at ~3 heavy users.**
+
+## What's Next for Oh My Pi + Baseten
+
+The integration is **v1.0** — functional but with roadmap items that will matter:
+
+| Feature | Status | ETA |
+|---------|--------|-----|
+| Native Baseten provider in Oh My Pi | ✅ Shipped | v16.3+ |
+| LoRA adapter hot-swap in config | ✅ Shipped | v17.0+ |
+| Speculative decoding auto-enable | ✅ Shipped | v17.2+ |
+| Webhook callbacks for async tasks | 🚧 In progress | v18 |
+| Auto-fine-tune from agent sessions | 📋 Planned | 2027 Q1 |
+| Cross-provider fallbacks (Baseten → Together → Local) | 📋 Planned | 2027 Q1 |
+| Baseten model catalog sync in `omp model list` | 🚧 In progress | v18 |
+
+## The Bottom Line
+
+Baseten integration makes Oh My Pi the **first coding agent where open models are a first-class, production-ready default** — not a fallback for when you can't afford API keys.
+
+For operators, this means:
+
+1. **Cut inference costs 80%+** without sacrificing speed or quality
+2. **Own your model stack** — weights, fine-tunes, deployment — while keeping managed convenience
+3. **Route tasks to the right model** (open or closed) automatically
+4. **Prototype locally, scale to cloud, dedicate for compliance** — same model, same code
+
+The "open vs. closed" debate is over for coding agents. **The winner is: both, routed intelligently.** Oh My Pi + Baseten is the cleanest implementation of that vision today.
 
 ---
-
 
 ## Related articles
 
-- [Oh My Pi v17 Is Here: The Hub Tool, xd:// Virtual Files, and a Plugins Standard — What Changes for Beginners](/blog/oh-my-pi-v17-hub-tool-xdev-plugins/)
-- [Beware: Oh-My-Pi Subagents Can Write Into Your Protected Parent Checkout (Write-Root Not Enforced)](/blog/beware-oh-my-pi-subagent-write-root-escape/)
+- [Oh My Pi v17 Is Here: The Hub Tool, xd:// Virtual Files, and a Plugins Standard](/blog/oh-my-pi-v17-hub-tool-xdev-plugins/)
+- [Beware: Oh-My-Pi Subagents Can Write Into Your Protected Parent Checkout](/blog/beware-oh-my-pi-subagent-write-root-escape/)
 - [Oh My Pi vs GitHub Copilot CLI: open source vs commercial tradeoffs](/blog/oh-my-pi-vs-copilot-cli/)
+- [Codebuff's Multi-Model Approach: The Future of Coding Agents](/blog/codebuff-multi-model-approach-future/)
+- [Coding Agent Pricing Guide 2026: Real Costs Behind the Sticker Prices](/blog/coding-agent-pricing-guide-2026/)
+
 ---
+
 *Ever wonder if Claude gives a better answer than GPT for a specific coding problem? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** lets you compare 9+ premium models side-by-side in one chat. No more juggling tabs.*
