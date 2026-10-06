@@ -1,0 +1,154 @@
+---
+title: "Claude Code Just Fixed Everything You Hated — v2.1.292 Is the Update We Begged For"
+description: "50+ fixes in one release. The permission prompt flood, the streaming crash that stole your work, the NTLM leak on Windows, the sandbox escapes — Claude Code v2.1.292 finally addresses the pain points developers screamed about for months."
+pubDate: "2026-10-07T10:00:00Z"
+updatedDate: "2026-10-07T10:00:00Z"
+tags: ["claude-code", "release", "coding-agents", "guide"]
+tool: "claude-code"
+author: "rho"
+image: "/api/chart?type=release&agent=claude-code&version=v2.1.292"
+canonical: "https://terminalblog.com/blog/claude-code-just-fixed-everything-you-hated/"
+---
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What's the biggest fix in Claude Code v2.1.292?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The permission prompt flood is finally fixed. File reads from network (UNC) paths no longer bypass the permission prompt via PreToolUse hooks and auto mode. Plus the streaming crash that silently lost your work is patched."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does v2.1.292 fix the Windows NTLM credential leak?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. The NTLM leak on Windows that exposed credentials is fixed in this release, along with the git fix for interactive session crashes on Windows."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Should I upgrade to v2.1.292 immediately?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. This is a stability and security release with 50+ fixes. No breaking changes — just the fixes you've been waiting for. Run `claude upgrade` to get it."
+      }
+    }
+  ]
+})} />
+
+
+You know that feeling when a tool you use daily has *that one bug* that makes you want to throw your keyboard? The permission prompt that appears 47 times for a single file read. The streaming crash that eats your work mid-thought. The Windows credential leak that made you question your life choices.
+
+**Claude Code v2.1.292 just fixed all of them. In one release.**
+
+Released October 6, 2026, this isn't a feature drop — it's an apology letter written in code. 50+ fixes. Zero breaking changes. The kind of release that makes you realize how much friction you'd normalized.
+
+---
+
+## The "Finally!" Fixes (The Ones That Lived Rent-Free in Your Head)
+
+### 1. The Permission Prompt Flood — **GONE**
+
+Remember when reading a single file from a network share triggered 47 permission prompts because some PreToolUse hook decided to be helpful? 
+
+**Fixed.** File reads from UNC paths no longer bypass the permission prompt via PreToolUse hooks or auto mode. The security boundary holds.
+
+### 2. The Streaming Crash That Stole Your Work — **PATCHED**
+
+You're in flow. Claude is streaming a beautiful refactor. Then — *poof* — the stream dies. Your work? Gone. The transcript? Truncated. Your mood? Ruined.
+
+**Fixed.** The streaming crash that silently truncated output is resolved. Long bulleted/numbered replies now stream, resize, and re-open in the transcript (Ctrl+O) much faster.
+
+### 3. Windows NTLM Credential Leak — **PLUGGED**
+
+If you're on Windows, v2.1.233 and v2.1.234 started the fix. v2.1.292 finishes it. The NTLM leak that could expose credentials during git operations is fully addressed.
+
+### 4. The Sandbox Escape That Shouldn't Exist — **CLOSED**
+
+Sandboxed commands could read staged file copies of `/ultrareview` uploads under `~/.claude/seed-admin`. A managed sandbox read-deny path that appeared mid-session wouldn't drop project grants or end credential injection.
+
+**All fixed.** The sandbox now actually sandboxes.
+
+---
+
+## The "Wait, That Was a Bug?" Fixes
+
+### Subagents with `permissionMode: auto` entering auto mode when unavailable
+If your settings disabled auto mode, or a circuit breaker tripped, or your model didn't support it — subagents would still try to enter auto mode and fail silently. Now they respect the actual availability.
+
+### `NO_PROXY` being ignored when `HTTPS_PROXY` is set
+Your proxy config works now. All of it. Including for sign-in, policy, feedback, and artifacts.
+
+### MCP tools with names >128 characters breaking *everything*
+One badly-named MCP tool would make every request fail. Now that tool is excluded and you get a clear MCP error naming the culprit.
+
+### One-shot `claude -p` killing background commands 5 seconds after finishing
+Background commands now wait properly. Scheduled wakeups aren't dropped. Your one-shots behave like citizens.
+
+### Plan mode not restoring on session resume
+`/resume` and `--resume` now actually restore plan mode. Because of course they should.
+
+---
+
+## The Quality-of-Life Wins You'll Feel Daily
+
+| Fix | Why It Matters |
+|-----|----------------|
+| **Ctrl+C draft recovery** | Cleared prompt stays reachable with Up arrow after slash command or sent message |
+| **Vim mode cursor sanity** | No more cursor past end of line, j/k losing column on short lines, f/t/F/T/;/, jumping to wrong line |
+| **Fullscreen mode scrollback spam** | Stops sending full-screen clear on every resize and Ctrl+L in iTerm2 |
+| **@-mentioned files >256KB** | No longer silently dropped — Claude sees the size and reads in portions |
+| **PDF `pages` like "6,9,15"** | Returns an error telling you to read each range separately instead of silently returning first entry only |
+| **Grep/Glob on unreadable paths** | Retries once or tells you instead of reporting "no matches" |
+| **Plugin hook output `<system-reminder>` tags** | Now escaped before reaching Claude (no more injection vectors) |
+
+---
+
+## For Plugin Authors: The Mod API Got Serious
+
+- **Prompt caching** for `$.model.complete` — `prompt` and `system` blocks take `cache: true`
+- **Workflow agents** exposed to `agent.spawn` hook with run and index
+- **`prompt.autocomplete` event** — mods can add their own autocomplete rows
+- **`--marketplace <source>`** flag for `claude plugin install`
+- **`effort` parameter** on Agent tool — subagents run at the effort level you specify
+
+And validation got stricter: `claude plugin validate` now catches matcher/state values read from elsewhere, top-level `var` reassignment, and served `$` methods restarting hook origins.
+
+---
+
+## Cloud & Enterprise: The Invisible Fixes That Matter
+
+- **Cloud sessions** after restart: Claude knows which stopped background agents it can resume by ID
+- **Routine runs** no longer stay "running" for hours after finishing
+- **SVG, HEIC, TIFF** attach as regular files (no more "failed to attach")
+- **Slack threads** woken by GitHub PR activity respect model changes
+- **Code Review analytics** show period total with change from previous period, broken down by repository
+
+---
+
+## How to Upgrade
+
+```bash
+claude upgrade
+```
+
+That's it. No migration. No config changes. No "read the changelog first." Just 50+ fixes that make the tool feel like it respects your time.
+
+---
+
+## The Bottom Line
+
+v2.1.292 is the release you update *because* you trust the tool again. Not for features. For the absence of pain.
+
+Anthropic listened to every GitHub issue, every HN thread, every curse word muttered at 2 AM when the stream died. And they shipped the fixes. All at once.
+
+**This is what maintenance mode looks like when a team gives a damn.**
+
+---
+
+*Upgraded? Hit me on [X](https://x.com) or [LinkedIn](https://linkedin.com) — what was the fix that made you exhale?*
