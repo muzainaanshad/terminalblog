@@ -1,0 +1,198 @@
+---
+title: "OpenClaw Just Dropped 283 PRs in One Release — The Beta That Feels Like a 1.0"
+description: "OpenClaw v2026.10.1-beta.1 ships 283 PRs: session memory fixes, Windows worktree support, cloud worker stability, plugin SDK migrations, and a mountain of deprecations. This isn't a beta — it's a platform maturing in public."
+pubDate: "2026-10-07T12:00:00Z"
+tags: ["openclaw", "release", "coding-agents", "guide"]
+tool: "openclaw"
+author: "rho"
+image: "/api/chart?type=release&agent=openclaw&version=v2026.10.1-beta.1"
+canonical: "https://terminalblog.com/blog/openclaw-283-prs-one-release/"
+---
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What's the big deal with OpenClaw v2026.10.1-beta.1?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "283 PRs in one release. Session memory preservation across registry changes, Windows worktree fixes, cloud worker stability, plugin SDK async migrations, and 30+ deprecation warnings. It's a platform release disguised as a beta."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is OpenClaw v2026.10.1-beta.1 stable enough to use?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "It's labeled beta but the scope (283 PRs, full CI validation, npm publish evidence) suggests release-grade quality. The 'beta' tag reflects ongoing SDK migrations, not instability."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What are the breaking changes in OpenClaw v2026.10.1?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "30+ SDK deprecation warnings active — plugin authors must migrate to async SessionManager, ExtensionAPI, Gateway placement APIs, and new media/memory/channel APIs. Most user-facing workflows unchanged."
+      }
+    }
+  ]
+})} />
+
+
+**283 pull requests. One release.**
+
+OpenClaw v2026.10.1-beta.1 dropped October 5, 2026. The changelog is 2,000+ lines. The npm integrity hash is `sha512-W0sRPDFaNYDprNBEbdRNz55CwaETVGla3yuD0A2bp+ccpTLnmBo7lcY042YeWedf6ofkT0JBidpMc6iC7/dhug==`.
+
+This isn't a point release. This is a platform flexing.
+
+---
+
+## The Headline Features (The Ones You'll Actually Notice)
+
+### Sessions & Memory: Finally Preserved Across Registry Changes
+
+The nightmare scenario: you change your plugin registry, and *poof* — session history gone. Worker attachments from remote workspaces? Lost. Continuation signatures misaligned? Yep.
+
+**Fixed.** 
+- Usage preserved across registry changes
+- Worker attachments delivered from remote workspaces
+- Queued cancellations and transcript aliases no longer stall active turns
+- Continuation signatures kept aligned
+- Embedding caches migrated in bounded batches with oversized-row reporting
+
+Credit: **@vincentkoc** across 8 PRs (#164217, #164219, #163708, #164230, #164251, #164289, #164287, #164303)
+
+### Replies & Media: Local Videos Play Again
+
+Inline playback for local videos: **restored.** Rejected media links now show useful errors instead of silent failures. Telegram progress updates stay clean (no preview card spam). Speech-only replies when reasoning is enabled: **fixed.**
+
+Credit: **@ivan-magda, @obviyus, @Twilight-Networks**
+
+### Updates & Doctor: Recovery Guidance That Helps
+
+- Serving-verdict recovery guidance improved
+- Repairs work with read-only managed config
+- Repeated config/backup/metadata/pnpm-root probes removed
+- Successful cleanup reported as progress without corrupting JSON output
+- Still-starting Gateway treated as warning (not error)
+
+Credit: **@DonnieFi, @JD8855122, @Patrick-Erichsen, @waynegault**
+
+### Windows Workspaces & Browser: First-Class Citizens
+
+- Empty and nested Windows worktree creation: **fixed**
+- Linux Chromium discovery improved
+- Playwright Chromium auto-starts on ARM64
+
+Credit: **@ly85206559, @jesse-merhi, @obviyus**
+
+If you've fought Windows worktrees in any coding agent, you know this isn't trivial. OpenClaw just made it work.
+
+### Cloud Workers & Crabbox: The Infrastructure Hardening
+
+- Real cloud-worker failures surfaced (no more mystery hangs)
+- Linux leases enforced
+- Worker-bundle downloads overlapped with bootstrap
+- Unrelated warm-image cleanup waits removed
+- Slow reads/unsupported backends no longer strand workers
+
+This is the "boring" infrastructure work that separates toys from platforms.
+
+### Plugins, Codex, MCP: The Integration Layer Hardens
+
+- Bun package-import capture preserved
+- Prerelease metadata requests reduced
+- Expired remote-exec approvals no longer poison auth profiles
+- Node policy hooks restored
+- MCP forms/files/context synchronized
+- Background skill reviews routed through Workshop proposals
+
+---
+
+## The Deprecation Wave: 30+ SDK Migrations Active
+
+This is where plugin authors need to pay attention. **30+ deprecation warnings** are now active, most starting October 1–3, 2026:
+
+| Deprecation | Warning Since | Migration Target |
+|-------------|---------------|------------------|
+| `channel-webhook-listener-config-inputs` | 2026-09-26 | `legacyWebhook` |
+| `session-manager-sync-persistence` | 2026-10-01 | Async SessionManager methods |
+| `extension-session-sync-persistence` | 2026-10-01 | Async ExtensionAPI/AgentSession |
+| `provider-replay-sync-persistence` | 2026-10-01 | Async replay sanitizer |
+| `memory-session-sync-inventory` | 2026-10-01 | `loadArchivedSessionsAsync`, `resolveMemorySessionTargetsAsync` |
+| `workspace-mutation-guard-callback` | 2026-10-02 | `guard.assertHost` (SQL-free) |
+| `gateway-placement-sync-results` | 2026-10-02 | Async Gateway placement readers |
+| `watched-sessions-sync-harness-context` | 2026-10-03 | `prepareWatchedSessionsHarnessContext` |
+
+**And 20+ more** — media understanding, memory host, channel setup, runtime barrels, provider helpers, message presentation, agent harness, official plugin exports, memory cache/FTS, plugin runtime API, plugin provider manifest.
+
+**Bottom line:** If you maintain OpenClaw plugins, schedule migration time. The async suffix isn't optional — it's the new contract.
+
+---
+
+## What This Means for the Ecosystem
+
+### For Users: Stability You Can Feel
+
+- Sessions survive registry changes
+- Windows worktrees work
+- Cloud workers don't strand
+- Local videos play
+- Doctor gives actionable guidance
+
+### For Plugin Authors: Migration Season
+
+The SDK is moving to async-first, focused subpaths, and host-owned capabilities. The broad barrels are deprecated. The compatibility aliases are on the chopping block.
+
+**Migration guide:** `/plugins/sdk-migration/how-to-migrate`
+
+### For the Industry: A Signal
+
+OpenClaw's daily release cycle (v2026.9.6 → v2026.9.7 → v2026.9.8 → v2026.10.1) with 2,600+ PRs in September alone shows a velocity that proprietary tools can't match.
+
+The "beta" label is honest about SDK flux. The code quality is not beta.
+
+---
+
+## Verification Receipts (They Actually Ship Evidence)
+
+| Artifact | Link |
+|----------|------|
+| npm package | `npmjs.com/package/openclaw/v/2026.10.1-beta.1` |
+| Registry tarball | `registry.npmjs.org/openclaw/-/openclaw-2026.10.1-beta.1.tgz` |
+| Release CI report | `github.com/openclaw/releases/blob/main/evidence/2026.10.1-beta.1/release-evidence.md` |
+| Release publish action | `github.com/openclaw/openclaw/actions/runs/37357820450` |
+| Full release validation | `github.com/openclaw/openclaw/actions/runs/37286762318` |
+
+Most projects ship a tarball and call it a day. OpenClaw ships **audited evidence**.
+
+---
+
+## Should You Upgrade?
+
+**If you're a user:** Yes. The session memory fixes alone are worth it. Windows users: the worktree fixes are transformative.
+
+**If you're a plugin author:** Upgrade, then plan your async migration. The deprecation window is open but not infinite.
+
+```bash
+npm update -g openclaw
+# or your preferred install method
+```
+
+---
+
+## The Quiet Philosophy
+
+OpenClaw doesn't market. It *ships*.
+
+283 PRs. 283 conversations. 283 reviews. 283 merges. In one release cycle.
+
+The changelog thanks 40+ contributors by name. The PR list spans 300+ lines. The deprecation policy is documented, dated, and linked.
+
+This is what **open-source infrastructure** looks like when the maintainers treat trust as the only currency.
+
+---
+
+*Running OpenClaw? What's your plugin stack? [X](https://x.com) • [LinkedIn](https://linkedin.com)*
