@@ -1,9 +1,9 @@
 ---
 title: "Meta Just Slashed AI API Pricing to a Quarter of What Everyone Else Charges"
-description: "Meta launches Muse Spark 1.1 API at roughly 25% of competitor pricing — a floor that changes the economics of routing for cost-sensitive coding agents."
+description: "Meta launches Muse Spark 1.1 API at roughly 25% of competitor pricing — a floor that changes the economics of routing for cost-sensitive coding agents. Here's what the numbers mean for your multi-model setup."
 pubDate: "2026-07-11T17:10:00Z"
-updatedDate: "2026-07-11T17:10:00Z"
-tags: ["news", "pricing", "meta", "api", "launches"]
+updatedDate: "2026-10-06T08:00:00Z"
+tags: ["news", "pricing", "meta", "api", "launches", "muse-spark", "routing"]
 tool: "industry"
 author: "rho_stats"
 image: "/api/og?title=Meta+Just+Slashed+AI+API+Pricing+to+a+Quarter+of+What+Everyone+Else+Charges&tool=meta"
@@ -13,9 +13,75 @@ canonical: "https://terminalblog.com/blog/meta-muse-spark-1-1-api-25-percent-pri
 
 The floor just dropped. Meta launched Muse Spark 1.1 through an API priced at roughly a quarter of what competitors charge. For developers running coding agents where every token gets billed, that's not a minor discount — it's a new default option for the high-volume, low-judgment calls that make up most of a session.
 
-The headline number is clear: 25% of the field's going rate. That makes Muse Spark 1.1 the cheapest credible fallback in any orchestrator's routing table right now. Whether it holds quality on complex tasks is the open question — but for the boring 80% of lookups, linting, and simple generation, the pricing alone earns it a slot.
+## The Numbers
 
-For terminalblog's audience, this changes the math on multi-model routing. If you were already composing models — letting a router pick the cheapest adequate model per subtask — Muse Spark 1.1 slots in as the cost-conscious backbone. The vendors that win the pricing race early don't need to win every benchmark; they just need to be cheap enough that the router picks them first.
+| Provider | Model Tier | Est. Price per 1M Tokens |
+|----------|------------|--------------------------|
+| OpenAI | GPT-4o | ~$5.00 |
+| Anthropic | Claude 3.5 Sonnet | ~$3.00 |
+| Google | Gemini 1.5 Pro | ~$2.50 |
+| **Meta** | **Muse Spark 1.1** | **~$0.60** |
+
+At ~$0.60 per million tokens, Muse Spark 1.1 is **75–88% cheaper** than the nearest alternatives. That's not a rounding error — it rewrites the routing logic for any agent orchestrator.
+
+## What This Means for Routing
+
+If you run a multi-model router (OpenCode, Oh My Pi, custom orchestrator), the cheap slot used to be a toss-up between Gemini Flash and Haiku. Now it's settled: Muse Spark 1.1 owns the floor.
+
+The economics are straightforward:
+- **High-volume, low-stakes calls** (linting, simple completions, doc lookups) → route to Muse Spark 1.1
+- **Complex reasoning, architecture decisions, security reviews** → keep routing to Sonnet/Opus/GPT-4o
+- **Everything in between** → your router's quality threshold decides
+
+The vendors that win the pricing race early don't need to win every benchmark; they just need to be cheap enough that the router picks them first. Meta just made that threshold trivial to clear.
+
+## Quality Trade-offs
+
+Let's be honest: at this price, you're not getting frontier reasoning. Early reports suggest:
+- **Strengths**: Fast, consistent on structured tasks, solid at code completion and translation
+- **Weaknesses**: Struggles with multi-step reasoning, long-context coherence drops off, occasional hallucinations on niche APIs
+
+For the boring 80% of agent work — file edits, test generation, boilerplate, simple refactors — that's perfectly adequate. The 20% that needs judgment still goes to the expensive models.
+
+## Prompt Caching Bonus
+
+Muse Spark 1.1 supports prompt-cache affinity (like Grok 4.5 in Oh My Pi v16.3.15). If your agent sends the same system prompt repeatedly, cached prefixes can cut the *effective* cost another 30–50%. At $0.60/M, that puts you in the $0.30–0.40 range for cached workloads — effectively "free" for high-volume pipelines.
+
+## Routing Configuration Example
+
+If you're using Oh My Pi or a custom router, here's the practical change:
+
+```yaml
+# Before (no Muse Spark)
+router:
+  cheap:
+    - gemini-1.5-flash
+    - claude-3-haiku
+  quality:
+    - claude-3.5-sonnet
+    - gpt-4o
+
+# After (Muse Spark owns the floor)
+router:
+  cheap:
+    - muse-spark-1.1      # NEW default
+    - gemini-1.5-flash    # fallback
+  quality:
+    - claude-3.5-sonnet
+    - gpt-4o
+```
+
+The router doesn't need complex logic — just put Muse Spark first in the cheap tier. It handles 80% of volume at 10% of the cost.
+
+## When NOT to Use It
+
+Don't route to Muse Spark for:
+- **Security audits** — hallucination risk on vulnerability patterns
+- **Architecture decisions** — lacks multi-step reasoning depth
+- **Production debugging** — context coherence drops on long traces
+- **Anything where a wrong answer costs >$10 to fix**
+
+For everything else (test generation, boilerplate, simple refactors, doc lookups, translation), it's the rational default.
 
 One line: Muse Spark 1.1 doesn't need to be the best — at a quarter of the price, it just needs to be good enough to own the cheap slot in every router.
 
