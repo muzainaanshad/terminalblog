@@ -1,0 +1,222 @@
+---
+title: "OpenHands 1.25 Just Gave Agents a Voice — And Automations Native Git"
+description: "OpenHands v1.25 adds voice dictation to chat, native Git integrations for automations, bulk LLM profile management, model router toggles, canvas app updates, and 30+ fixes. The release that makes agent teams feel native."
+pubDate: 2026-10-07T14:00:00Z
+tags: ["openhands", "release", "coding-agents", "voice", "automations", "canvas", "beginner"]
+tool: "openhands"
+author: "rho"
+image: "/api/chart?type=release&agent=openhands&version=v1.25.0"
+canonical: "https://terminalblog.com/blog/openhands-v1-25-agent-canvas-automation-voice/"
+---
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What's new in OpenHands v1.25?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Voice dictation in chat, native Git integrations for automations, bulk LLM profile management, model router 'Run at conversation start' toggle, Canvas app update actions, per-conversation prompt history, and 30+ bug fixes across frontend, websocket, settings, and agent profiles."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does OpenHands v1.25 have breaking changes?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No breaking changes for users. Default model routers renamed to OpenHands Router Pro/Flash. Some internal APIs updated — plugin authors check SDK 1.53.0."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I enable voice dictation in OpenHands?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Click the microphone icon in the chat composer (added in v1.25). Requires browser microphone permission. Works in both local and cloud sessions."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What are the new automation Git integrations?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Automations now offer native Git integrations (GitHub, GitLab, Bitbucket) before issue-to-PR templates. Filter automations dashboard by creator. Templates shown on cloud backends."
+      }
+    }
+  ]
+})} />
+---
+
+**OpenHands v1.25 dropped October 6.** The changelog reads like a greatest-hits album: voice dictation, native Git for automations, bulk LLM profiles, model router intelligence, Canvas app updates — plus 30+ fixes that plug the leaks you've been working around.
+
+If you've been waiting for OpenHands to feel less like a demo and more like infrastructure — **this is the version.**
+
+---
+
+## 1. Your Agent Just Got a Voice
+
+**New:** Microphone icon in the chat composer. Click, speak, done.
+
+No more typing out "refactor this auth module to use the new middleware pattern" — say it. The browser handles speech-to-text, OpenHands handles the rest.
+
+<details>
+<summary>Why this matters for beginners</summary>
+
+Voice input changes the *kind* of prompts you write. You naturally give more context when speaking ("Hey, can you look at the user service and add rate limiting like we discussed yesterday?") vs. typing ("add rate limiting to user service"). More context = better agent output.
+</details>
+
+Works in local and Cloud sessions. Requires browser mic permission (one-time).
+
+---
+
+## 2. Automations Finally Get Native Git
+
+**Before:** Automations used issue-to-PR templates. You configured a template, the automation filled it, you got a PR. Rigid.
+
+**Now:** Native Git integrations (GitHub, GitLab, Bitbucket) are offered *first* — before templates.
+
+```
+Automation runs → Detects repo → Offers "Create PR on GitHub" / "Push to GitLab" / "Sync to Bitbucket"
+```
+
+Plus:
+- **Filter automations dashboard by creator** — see only *your* runs, or your team's
+- **Templates shown on cloud backends** — parity between local and Cloud
+- **Built-in integration offered before templates** — the happy path is now native
+
+For teams running CI/CD automations — this removes the "which template?" decision fatigue.
+
+---
+
+## 3. Bulk LLM Profiles — Stop Adding Models One by One
+
+**New in Settings → LLM Profiles:**
+- **Bulk-add provider models** — select a provider, pick multiple models, create profiles in one shot
+- **Per-connection bulk add** — if you have multiple API keys for the same provider (personal + team), bulk-add per connection
+- **Model Router "Run at conversation start" toggle** — router classifies *before* the first message, not after
+
+```yaml
+# What this unlocks in practice:
+# Before: Add GPT-4o → save → add GPT-4o-mini → save → add Claude-3.5 → save...
+# After: Select OpenAI → check GPT-4o, GPT-4o-mini, o1-preview → "Create 3 profiles" → done
+```
+
+Credit: **@georgeglarson, @juanmichelini** across 3 PRs (#16426, #17723, #17797)
+
+---
+
+## 4. Canvas Apps Get Update Actions
+
+Canvas (the agent UI framework) now has **Update action for installed apps**.
+
+```bash
+# User sees in Canvas:
+# "Update available for Code Review Agent v2.1 → v2.3"
+# One click → updated, no re-install, config preserved
+```
+
+Also:
+- **Streaming slots retired** — event-id-based reconciliation replaces text-matching (faster, fewer glitches)
+- **SVG icons from manifest** — your custom agents show their actual icon, not a generic puzzle piece
+- **Real tab semantics in conversation drawer** — keyboard navigation works properly
+
+Credit: **@VascoSch92** across 4 PRs (#17465, #17736, #17877, #17612)
+
+---
+
+## 5. Model Router Gets Smart Defaults
+
+- **Auto-enable "Run on first message"** when first router created — no manual toggle hunting
+- **Preselect router classifier model** so it's created even when no profiles exist
+- **Flash template prompt completed** + model table injected
+- **Default routers renamed:** "OpenHands Router Pro" / "OpenHands Router Flash" (clearer than generic names)
+
+The router now *works out of the box* instead of requiring a setup ritual.
+
+---
+
+## 6. Settings Search + Per-Conversation Prompt History
+
+**Settings search:** `Ctrl+F` (`Cmd+F` Mac) in left rail → filters every setting, grouped by category, jump-to-tab. The shortcut shows as a keycap.
+
+**Per-conversation prompt history (experimental):** Each conversation keeps its own input history. Up-arrow in chat A doesn't show prompts from chat B.
+
+Small UX wins that compound daily.
+
+---
+
+## 7. The 30+ Fixes You'll Notice
+
+| Area | Fixed |
+|------|-------|
+| **WebSocket** | Reconnect on foreground, clean disconnect on mobile background, back off refetch bursts that hit cloud rate limits |
+| **Agent Profiles** | Task tracker saved with delegation tools; runtime services provided to named profiles; auto-filled profile name follows model |
+| **Frontend** | Plugins search usable on narrow screens; token counts promote units correctly; composer overflow menu stays open at narrow widths |
+| **Chat** | Long `/btw` responses scrollable; message text kept in composer after "Branch from here"; voice dictation added |
+| **Settings** | Agent Canvas update dialog fits phone viewports; theme contrast ink for Model Router list; "Don't create profiles" kept for router templates |
+| **Accessibility** | One Settings main landmark, Customize aria-current, synced html lang |
+| **Automations** | Load more works past 100 (offset paging); delete confirmation is modal (Esc closes); preset actions hide agent profiles |
+
+---
+
+## Quick Version Context
+
+| Version | Date | Focus |
+|---------|------|-------|
+| **v1.25.0** | Oct 6, 2026 | Voice dictation, native Git automations, bulk LLM profiles, Canvas updates, model router defaults, 30+ fixes |
+| **v1.24.0** | Sep 2026 | Agent Canvas foundation, model router, automations v1 |
+| **v1.23.0** | Aug 2026 | Cloud sessions, workspace improvements |
+
+**v1.24** built the Canvas/automation foundation. **v1.25** makes it *usable* — voice, native Git, bulk ops, smart defaults.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Run automations in CI/CD | **Yes** — native Git integrations remove template friction |
+| Manage multiple models/providers | **Yes** — bulk profiles save 10+ minutes per setup |
+| Use Canvas for custom agents | **Yes** — update actions + SVG icons + real tabs |
+| Want voice input for longer prompts | **Yes** — microphone in composer, zero config |
+| Hit WebSocket rate limits on Cloud | **Yes** — backoff + reconnect fixes |
+| Just want latest stable | **Yes** — zero breaking changes, 30+ fixes |
+
+**Upgrade:**
+```bash
+# Docker (recommended)
+docker pull ghcr.io/openhands/openhands:1.25.0
+
+# Or update your deployment
+# Check https://github.com/All-Hands-AI/OpenHands/releases/tag/v1.25.0
+```
+
+---
+
+## The Bigger Picture
+
+OpenHands is quietly becoming the **agent platform you deploy once and configure forever**.
+
+- **v1.22** → Cloud sessions
+- **v1.23** → Workspace polish
+- **v1.24** → Agent Canvas + Automations + Model Router (the architecture)
+- **v1.25** → Voice + Native Git + Bulk ops + Smart defaults (the usability)
+
+Each release fills a gap. No rewrites. No "v2 coming soon." Just **steady compounding**.
+
+The voice feature alone signals something: OpenHands is building for *operators*, not demo-makers. Operators dictate. Demo-makers type.
+
+---
+
+## Related Articles
+
+- [OpenHands v1.24 — Agent Canvas, Automations, Model Router](/blog/openhands-v1-24-automation-agent-canvas-mcp-fixes/)
+- [OpenHands v1.14 — Git Sync, Free Kimi Breakthrough](/blog/openhands-1-14-git-sync-free-kimi-breakthrough/)
+- [Best Coding Agents 2026 — Decision Guide (Not Another Hype List)](/blog/best-coding-agents-2026-decision-guide/)
+- [Coding Agent Security Checklist 2026](/blog/coding-agent-security-checklist-2026/)
+
+---
+
+*OpenHands is developed by All Hands AI. Changelog source: [github.com/All-Hands-AI/OpenHands/releases/tag/v1.25.0](https://github.com/All-Hands-AI/OpenHands/releases/tag/v1.25.0).*
