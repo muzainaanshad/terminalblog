@@ -1,0 +1,238 @@
+---
+title: "Claude Code v2.1.292 Just Made Plugin Installs Painless — And Gave Sub-Agents Their Own Effort Levels"
+description: "Claude Code v2.1.292 (October 6) adds marketplace install from any source, effort parameter for sub-agents, prompt caching for mods, overloaded retry control, and 50+ fixes. The release that makes plugins finally feel like infrastructure."
+pubDate: 2026-10-07T13:00:00Z
+tags: ["claude-code", "release", "plugins", "subagents", "mods", "mcp", "coding-agent", "beginner"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+v2.1.292+Plugin+Marketplace+Subagent+Effort&tool=claude-code"
+---
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What's new in Claude Code v2.1.292?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Plugin marketplace install from any source, effort parameter for sub-agents, prompt caching for mods, overloaded retry delay control, prompt autocomplete hook, and 50+ bug fixes across sandbox, permissions, MCP, cloud sessions, and Remote Control."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does v2.1.292 have breaking changes?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. This is a patch release with improvements and bug fixes only. Safe to upgrade immediately."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I install plugins from a custom marketplace now?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Run `claude plugin install <plugin> --marketplace <source>` — it adds the marketplace if needed (under the same policy checks as `claude plugin marketplace add`), then installs the plugin from it."
+      }
+    }
+  ]
+})} />
+
+Claude Code **v2.1.292 dropped October 6**, three days after the plugin-stability release v2.1.289. This isn't a feature parade — it's the release that makes **plugin discovery universal**, **sub-agents independently tunable**, and **mods actually fast**.
+
+If you've ever wanted to install a plugin from a private registry without jumping through hoops, or wished your background research agent could think harder while your main agent stays fast — **this is the version.**
+
+---
+
+## 1. Plugin Install From Any Marketplace — Finally
+
+**The headline:** `claude plugin install <plugin> --marketplace <source>`
+
+Before: you had to `claude plugin marketplace add <source>` first, wait for it to succeed, *then* install. Two commands, two policy checks, two failure points.
+
+Now: **one command.** It adds the marketplace if needed (same policy checks), then installs. Done.
+
+```bash
+# Install from a private/internal marketplace
+claude plugin install my-team/plugin --marketplace https://registry.internal.company.com
+
+# Install from a community marketplace
+claude plugin install awesome-plugin --marketplace https://plugins.example.dev
+```
+
+For plugin authors and teams running private registries — this removes the friction that made custom marketplaces feel like a hack.
+
+---
+
+## 2. Sub-Agents Get Their Own `effort` Level
+
+**New:** The `Agent` tool now accepts an `effort` parameter.
+
+```json
+{
+  "tool": "Agent",
+  "parameters": {
+    "prompt": "Deep-dive this legacy auth module and propose a rewrite",
+    "effort": "high"
+  }
+}
+```
+
+Your main agent can run at `effort: "low"` for speed, while a spawned research sub-agent runs at `effort: "high"` for depth — **in the same session.**
+
+For beginners: think of it as giving your intern a longer deadline than your senior dev. The model spends more compute on reasoning before answering. This is the first time you can tune reasoning *per sub-agent* instead of globally.
+
+---
+
+## 3. Prompt Caching for Mods — Your Mods Just Got Faster
+
+**New:** `$.model.complete` now supports prompt caching for mods.
+
+```javascript
+// In your mod
+const result = await $.model.complete({
+  prompt: [{ text: hugeSystemPrompt, cache: true }],
+  system: [{ text: anotherLargeBlock, cache: true }],
+});
+```
+
+Blocks marked `cache: true` are cached up to that point. On subsequent calls, the cached prefix is reused — **latency drops, cost drops.**
+
+If you build mods that send the same large system prompt or context on every turn (documentation loaders, codebase indexers, style guides) — this is the optimization you've been waiting for.
+
+---
+
+## 4. Overloaded Retry Control — Stop the 529 Spiral
+
+**New:** `CLAUDE_CODE_OVERLOADED_RETRY_BASE_DELAY_MS` environment variable.
+
+When Anthropic's API returns 529 (overloaded), Claude Code backs off exponentially. The base delay was hardcoded. Now you control it:
+
+```bash
+# Longer base delay = gentler retry, less hammering
+export CLAUDE_CODE_OVERLOADED_RETRY_BASE_DELAY_MS=5000
+```
+
+For teams running many parallel sessions during peak hours — this prevents your fleet from turning a temporary overload into a cascade of retries.
+
+---
+
+## 5. Prompt Autocomplete Hook — Mods Can Now Extend the Composer
+
+**New:** `prompt.autocomplete` event — a mod can hook this to inject its own rows into the prompt box's autocomplete list.
+
+```javascript
+// In your mod
+$.on('prompt.autocomplete', (ctx) => {
+  if (ctx.query.startsWith('/mycmd')) {
+    ctx.addRow({ label: '/mycmd deploy', description: 'Deploy to staging' });
+    ctx.addRow({ label: '/mycmd rollback', description: 'Rollback last deploy' });
+  }
+});
+```
+
+Your custom slash commands, template snippets, or frequently used patterns — now discoverable in the same autocomplete your users already know.
+
+---
+
+## 6. Workflow Agents in `agent.spawn` Hook — Mods Can Gate Team Spawns
+
+**New:** Workflow agents (the ones spawned via `agent.spawn` for teammates) now appear in the `agent.spawn` mod hook with their `run` and `index`.
+
+A mod can now **refuse** a workflow agent spawn based on policy, quota, or custom logic.
+
+```javascript
+$.on('agent.spawn', (ctx) => {
+  if (ctx.isWorkflowAgent && ctx.run === 'expensive-analysis') {
+    if (teamQuotaExceeded()) {
+      ctx.deny('Team analysis quota exceeded for this hour');
+    }
+  }
+});
+```
+
+For enterprise setups — this is the governance hook you needed.
+
+---
+
+## 7. The 50+ Fixes You'll Actually Feel
+
+| Area | What Was Fixed |
+|------|----------------|
+| **Sandbox/Permissions** | UNC path reads now respect permission prompts; env-var-prefixed commands caught by deny rules; `rm -rf` on Windows 8.3 short names treated as home folder deletion |
+| **MCP** | Tool names >128 chars no longer break all requests; OAuth expiry reported accurately; org-managed settings cache tampering blocked |
+| **Cloud Sessions** | Background agent cleanup on limit hit; scheduled tasks survive retries/edits; thinking setting persists container restarts; artifact uploads fixed for SVG/HEIC/TIFF |
+| **Remote Control** | First message accepts PDFs/files (not just images); subagent pane shows correctly for background agents |
+| **Plugins/Mods** | Hook worker restart safety; guard hook `.catch` semantics fixed; `tool.check` hooks see repaired args; prompt drop reasons >4096 chars no longer ignored |
+| **TUI/UX** | Vim mode cursor/navigation fixes; fullscreen clear spam on iTerm2 fixed; paste handling for overlapping pastes; `/theme` and `/config` save timing fixed |
+| **Code Review** | PR base branch changes handled; CLAUDE.md rules respected from base branch |
+
+---
+
+## Quick Version Context
+
+| Version | Date | Focus |
+|---------|------|-------|
+| **v2.1.292** | Oct 6, 2026 | Plugin marketplace install, sub-agent effort, prompt caching, overloaded retry, autocomplete hook, 50+ fixes |
+| **v2.1.291** | Oct 6, 2026 | Minor patch |
+| **v2.1.290** | Oct 5, 2026 | Minor patch |
+| **v2.1.289** | Oct 3, 2026 | **Plugin stability overhaul** — marketplace stale copies, mod loading, pane crashes, MCP auth, `agent.spawn` |
+| **v2.1.288** | Oct 2, 2026 | 100+ QoL fixes — streaming, resume, auto-mode, permissions |
+
+**v2.1.288** fixed 100+ paper cuts. **v2.1.289** fixed the plugin ecosystem. **v2.1.292** makes plugins universally installable, sub-agents independently smart, and mods fast enough for production.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Use custom/private plugin marketplaces | **Yes** — `--marketplace` flag removes the two-step dance |
+| Run multi-agent workflows | **Yes** — per-sub-agent `effort` is a workflow primitive |
+| Build mods with large prompts | **Yes** — prompt caching cuts latency/cost |
+| Hit 529 errors during peak hours | **Yes** — retry delay control prevents cascade |
+| Want autocomplete for custom commands | **Yes** — `prompt.autocomplete` hook |
+| Just want the latest | **Yes** — zero risk, 50+ fixes |
+
+---
+
+## How to Update
+
+```bash
+# Auto-updater (npm)
+npm update -g @anthropic-ai/claude-code
+
+# Or re-run the installer
+curl -fsSL https://claude.ai/install | bash
+
+# Verify
+claude --version
+# Should show 2.1.292
+```
+
+---
+
+## The Bottom Line
+
+**v2.1.289 made plugins reliable. v2.1.292 makes them discoverable.**
+
+The `--marketplace` flag on `plugin install` is the quiet feature that unlocks private registries, team registries, and community forks without friction. The `effort` parameter on `Agent` is the primitive for **heterogeneous agent teams** — one agent thinks fast, another thinks deep, all in one session. Prompt caching for mods turns "mods are slow" into "mods are infrastructure."
+
+This is the release where the plugin/mod/sub-agent layer graduates from "experimental" to **production primitives**.
+
+If you're building on Claude Code's extensibility, see our [Claude Code alternatives comparison](/blog/claude-code-alternatives-2026/) for how it stacks up. For multi-agent patterns, the new `effort` parameter pairs with `agent.spawn` from v2.1.289 — covered in [Claude Code v2.1.289: Plugin Fixes + agent.spawn](/blog/claude-code-v2-1-289-plugin-fixes-agent-spawn/).
+
+---
+
+## Related Articles
+
+- [Claude Code v2.1.289 Just Fixed the Plugin Nightmares You've Been Living With](/blog/claude-code-v2-1-289-plugin-fixes-agent-spawn/)
+- [Claude Code v2.1.288 — 100+ Fixes You Actually Feel](/blog/claude-code-v2-1-288-100-fixes-you-actually-feel/)
+- [Claude Code v2.1.287 — Mods Plugin System Watchdog](/blog/claude-code-v2-1-287-mods-plugin-system-watchdog/)
+- [Beware: Claude Code Auto-Mode Overrides Hook Ask](/blog/beware-claude-code-auto-mode-overrides-hook-ask/)
+- [Best Coding Agents 2026 — Decision Guide (Not Another Hype List)](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Claude Code is developed by Anthropic. Changelog source: [github.com/anthropics/claude-code/releases/tag/v2.1.292](https://github.com/anthropics/claude-code/releases/tag/v2.1.292).*
