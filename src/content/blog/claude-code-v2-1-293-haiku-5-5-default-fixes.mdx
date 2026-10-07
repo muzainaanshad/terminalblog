@@ -1,0 +1,209 @@
+---
+title: "Claude Code v2.1.293 Just Made Haiku 5.5 the Default — And Fixed the Context Compaction Memory Leak"
+description: "Claude Code v2.1.293 (October 7) adds Claude Haiku 5.5 as the new default Haiku model, fixes context compaction redoing finished work, plugs an HTTP MCP memory leak, fixes Chrome TUI disconnects, and 30+ bug fixes across subagents, Remote Control, plugins, and Windows."
+pubDate: 2026-10-08T14:00:00Z
+tags: ["claude-code", "release", "haiku-5-5", "context-compaction", "mcp", "coding-agent", "beginner"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+v2.1.293+Haiku+5.5+Default+Context+Compaction+Fix&tool=claude-code"
+---
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What's new in Claude Code v2.1.293?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Claude Haiku 5.5 is now the default Haiku model (1M context, $0.10/$0.50 per Mtok), context compaction no longer re-does finished work, HTTP MCP memory leak fixed, Chrome TUI disconnects fixed, subagent tool permissions fixed, 30+ bug fixes across plugins, Remote Control, Windows, and Remote Control."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does v2.1.293 have breaking changes?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No breaking changes. This is a patch release with improvements and bug fixes only. Safe to upgrade immediately."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is Claude Haiku 5.5 and why does it matter?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Haiku 5.5 is Anthropic's newest fast model with 1M context window, priced at $0.10/$0.50 per M tokens ($0.50/$2.50 for prompts over 100K). It replaces the previous Haiku as the default fast model in Claude Code — cheaper and more capable for quick tasks."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What was the context compaction bug?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "When a session hit its context limit and compacted, Claude sometimes treated its own recent completed actions as undone — redoing or retracting work that was already finished. v2.1.293 fixes this so compaction preserves completed work correctly."
+      }
+    }
+  ]
+})} />
+---
+
+Claude Code **v2.1.293 dropped October 7**, one day after the plugin-marketplace release v2.1.292. This isn't a feature parade — it's the release that **swaps the default fast model**, **fixes the context compaction bug that made you redo work**, **plugs an MCP memory leak**, and **stops Chrome TUI from disconnecting**.
+
+If you've ever watched your agent redo a refactor it already finished after a compaction, or had your Chrome-based TUI session die mysteriously — **this is the version.**
+
+---
+
+## 1. Haiku 5.5 Is Now the Default Fast Model
+
+**The headline:** `claude-haiku-5-5` replaces the old Haiku as the default.
+
+| Spec | Old Haiku | Haiku 5.5 |
+|------|-----------|-----------|
+| Context | 200K | **1M** |
+| Input (≤100K) | $0.25/M | **$0.10/M** |
+| Output (≤100K) | $1.25/M | **$0.50/M** |
+| Input (>100K) | $0.25/M | **$0.50/M** |
+| Output (>100K) | $1.25/M | **$2.50/M** |
+
+For beginners: Haiku is the "fast/cheap" model Claude Code uses for quick tasks (file edits, simple searches, formatting). Haiku 5.5 gives you **5× more context** at **60% lower cost** for typical prompts. Your quick tasks just got cheaper and can handle larger files.
+
+```bash
+# Verify you're on the new default
+claude --version
+# 2.1.293
+
+# Model is auto-selected for appropriate tasks
+# No config change needed
+```
+
+---
+
+## 2. Context Compaction No Longer Redoes Finished Work
+
+**The bug:** When a long session hit its context limit, Claude would compact (summarize older messages). But it sometimes **forgot** it had already completed recent actions — so it would redo edits, re-run searches, or retract changes that were *done*.
+
+**The fix:** Compaction now correctly preserves the "done" state of recent actions. Your agent won't redo the refactor it just finished.
+
+<details>
+<summary>Why this matters for beginners</summary>
+
+Context compaction happens silently in long sessions. Before this fix, you'd see your agent "go backward" — re-applying a fix, re-reading a file it already read, undoing a change it made 5 minutes ago. Now it remembers: *done stays done.*
+</details>
+
+---
+
+## 3. HTTP MCP Memory Leak — Plugged
+
+**The bug:** An HTTP-based MCP connection kept **every request it ever sent** in memory until the connection closed. Long-running sessions with MCP servers (GitHub, Slack, custom tools) would leak memory steadily.
+
+**The fix:** Requests are now released after response. No more unbounded growth.
+
+For teams running Claude Code as a daemon with MCP integrations — this was the silent killer. Your memory graph should flatten now.
+
+---
+
+## 4. Chrome TUI (`--chrome`) Disconnects Fixed
+
+**The bug:** Running `claude --chrome` (Claude Code in Chrome via TUI) would randomly disconnect. Also `--no-chrome` was ignored.
+
+**The fix:** Both issues resolved. Chrome-based TUI sessions stay connected; `--no-chrome` is respected.
+
+---
+
+## 5. Subagent Tool Permissions — Finally Consistent
+
+**The bugs fixed:**
+- Subagents and `--agent` sessions were told a built-in tool was disabled for the *whole session* when only *their* tool list excluded it
+- Sessions (including resumed ones) were told to continue or message subagents with `SendMessage` even when a host, permission rule, or `--tools` list removed that tool
+- `claude agents` offered bypass permissions that background sessions ignored when consent was saved only in `.claude/settings.local.json` or a `--settings` file — now it asks for consent first
+
+**The result:** Subagent tool permissions now behave predictably. What you allow/deny at the session level matches what subagents see.
+
+---
+
+## 6. The 30+ Fixes You'll Notice
+
+| Area | Fixed |
+|------|-------|
+| **Context/Compaction** | Finished work no longer redone after compaction; queued message during `←` background move now blocks the move |
+| **MCP** | HTTP connection memory leak plugged; OAuth expiry reported accurately |
+| **Chrome TUI** | Disconnects fixed; `--no-chrome` respected |
+| **Subagents/Permissions** | Tool disable scope fixed; `SendMessage` gating fixed; consent flow for `claude agents` fixed |
+| **Remote Control** | Replies stream smoothly in long sessions; starting history not re-uploaded after credential recovery; PushNotification status fixed |
+| **Plugins/Mods** | `classic.*` hooks survive worker restart; `claude plugin test` supports `$.session.append` via `mock.session`; `claude plugin eval` Bash-grant refusal names the credential store part |
+| **CLI/Commands** | `claude purge` deletes rest + lists failures + exits 1; `claude logs/stop/kill/rm` and daemon commands don't sign you out on expired login; keybindings.json space key no longer error; vim mode `>>`/`<<` and `V`+`d` cursor behavior fixed |
+| **Artifacts** | Transcript row no longer shows `(unprintable path)` during streaming publish; libraries pinned to exact versions ≥2 weeks old |
+| **UltraReview** | Linux upload no longer refuses nested repos over unparseable settings; split-index refusal gives safe git command |
+| **Skills/Sync** | claude.ai skill sync checks every ~40 min (was 10) when idle; edited skill descriptions reach model without `/clear` |
+| **Team/Enterprise** | Policy/managed settings fetched earlier; stalled request retried after 3s |
+| **Windows** | Stopping status line/hook/shell no longer kills unrelated process with recycled PID |
+| **Accessibility** | Agent count in footer persists through sessions-folder read failures |
+
+---
+
+## Quick Version Context
+
+| Version | Date | Focus |
+|---------|------|-------|
+| **v2.1.293** | Oct 7, 2026 | Haiku 5.5 default, context compaction fix, MCP memory leak, Chrome TUI, subagent perms, 30+ fixes |
+| **v2.1.292** | Oct 6, 2026 | Plugin marketplace install, sub-agent effort, prompt caching, overloaded retry, 50+ fixes |
+| **v2.1.289** | Oct 3, 2026 | **Plugin stability overhaul** — marketplace, mod loading, MCP auth, `agent.spawn` |
+| **v2.1.288** | Oct 2, 2026 | 100+ QoL fixes — streaming, resume, auto-mode, permissions |
+
+**v2.1.288** fixed 100+ paper cuts. **v2.1.289** fixed the plugin ecosystem. **v2.1.292** made plugins universally installable and sub-agents independently smart. **v2.1.293** fixes the core runtime bugs that bite you in long sessions — compaction, memory, Chrome, permissions.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Run long sessions that hit context limits | **Yes** — compaction bug fixed, no more redoing work |
+| Use MCP servers (HTTP) in long sessions | **Yes** — memory leak plugged |
+| Use `--chrome` TUI | **Yes** — disconnects fixed |
+| Run subagents with custom tool lists | **Yes** — permission scope fixed |
+| Want cheaper/faster default model | **Yes** — Haiku 5.5 auto-selected |
+| Just want latest stable | **Yes** — zero risk, 30+ fixes |
+
+---
+
+## How to Update
+
+```bash
+# Auto-updater (npm)
+npm update -g @anthropic-ai/claude-code
+
+# Or re-run the installer
+curl -fsSL https://claude.ai/install | bash
+
+# Verify
+claude --version
+# Should show 2.1.293
+```
+
+---
+
+## The Bottom Line
+
+**v2.1.292 made plugins discoverable. v2.1.293 makes long sessions reliable.**
+
+The context compaction fix alone is worth the upgrade — it was the silent productivity killer in sessions over a few hours. The Haiku 5.5 default is a quiet win: your quick tasks just got 5× more context at 60% lower cost. The MCP memory leak fix matters if you run daemons. The Chrome TUI fix matters if you work in-browser.
+
+This is a **maintenance release that feels like a quality-of-life upgrade**. No new workflows to learn. Just fewer things breaking when you push sessions past the comfort zone.
+
+If you're building on Claude Code's extensibility, see our [Claude Code alternatives comparison](/blog/claude-code-alternatives-2026/) for how it stacks up. For the plugin-marketplace release, see [Claude Code v2.1.292: Plugin Installs Painless + Sub-Agent Effort](/blog/claude-code-v2-1-292-plugin-marketplace-subagent-effort/). For the plugin stability overhaul, see [Claude Code v2.1.289: Plugin Fixes + agent.spawn](/blog/claude-code-v2-1-289-plugin-fixes-agent-spawn/).
+
+---
+
+## Related Articles
+
+- [Claude Code v2.1.292 Just Made Plugin Installs Painless — And Gave Sub-Agents Their Own Effort Levels](/blog/claude-code-v2-1-292-plugin-marketplace-subagent-effort/)
+- [Claude Code v2.1.289 Just Fixed the Plugin Nightmares You've Been Living With](/blog/claude-code-v2-1-289-plugin-fixes-agent-spawn/)
+- [Claude Code v2.1.288 — 100+ Fixes You Actually Feel](/blog/claude-code-v2-1-288-100-fixes-you-actually-feel/)
+- [Beware: Claude Code Auto-Mode Overrides Hook Ask](/blog/beware-claude-code-auto-mode-overrides-hook-ask/)
+- [Best Coding Agents 2026 — Decision Guide (Not Another Hype List)](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Claude Code is developed by Anthropic. Changelog source: [github.com/anthropics/claude-code/releases/tag/v2.1.293](https://github.com/anthropics/claude-code/releases/tag/v2.1.293).*
