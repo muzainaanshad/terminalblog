@@ -1,0 +1,164 @@
+---
+title: "GitHub Copilot CLI 1.0.93 Just Made Sandbox Mode Free for Everyone — And MCP Config Finally Updates Live"
+description: "Copilot CLI 1.0.93 drops command sandboxing for all users (no waitlist), MCP server config changes that apply between turns without restart, enterprise network boundaries, and a model picker that now prioritizes GPT-6.1 Sol, GPT-6 Astra/Luna, and Claude 5.5. The terminal agent that lives in your GitHub workflow just got a lot safer and faster to configure."
+pubDate: 2026-10-07T10:00:00Z
+tags: ["copilot-cli", "github", "release", "terminal", "beginner", "sandbox", "mcp", "security"]
+tool: "copilot-cli"
+author: "sage"
+image: "/api/og?title=GitHub+Copilot+CLI+1.0.93+Sandbox+For+All+MCP+Hot+Reload&tool=copilot-cli"
+---
+
+GitHub Copilot CLI **1.0.93** landed this week (October 5–7), and it delivers the two things terminal-agent users have been asking for since sandbox mode launched: **sandbox for everyone, no waitlist**, and **MCP configuration that updates without restarting your session**.
+
+If you've been stuck on the sidelines waiting for sandbox access, or frustrated that every MCP server tweak meant a full CLI restart — this release changes your daily workflow.
+
+---
+
+## 1. Command Sandboxing: Now Available to Everyone
+
+**The headline feature:** `/sandbox` and `--sandbox` are no longer gated. Every Copilot CLI user gets command sandboxing out of the box.
+
+### What Sandbox Actually Does
+
+When you run with `--sandbox`, every shell command the agent wants to execute goes through a security review:
+
+| Without Sandbox | With Sandbox |
+|-----------------|--------------|
+| Agent runs `rm -rf node_modules` instantly | Agent asks: "Run `rm -rf node_modules`? [y/N]" |
+| `npm install` pulls from anywhere | Network calls filtered by allowlist |
+| No audit trail | Every command logged with approval/denial |
+
+### What 1.0.93 Adds
+
+- **Safe `/user` commands run immediately** during active turns — no prompt for read-only ops like `ls`, `cat`, `git status`
+- **Unsafe remote commands rejected automatically** during active turns — no dialog spam, just a clean "blocked"
+- **Commands from relay hosts get queued** — you approve them on your schedule
+- **Local-network allowlists now include `localhost` and loopback** — local dev servers, databases, and proxies work without extra config
+
+**For beginners:** This is the "training wheels" mode that lets you try an autonomous agent without worrying it'll delete your `.env` or push to production. Turn it on, watch it ask before every write, and gradually relax the rules as you trust it.
+
+```bash
+# Try it now
+copilot --sandbox
+# Or in a session
+/sandbox on
+```
+
+---
+
+## 2. MCP Server Config Changes Apply Instantly — No Restart Required
+
+This is the quality-of-life fix that compounds every week.
+
+**Before 1.0.93:** You add an MCP server, realize you forgot an env var, update `mcp.json`, then **restart Copilot CLI entirely** to pick up the change. Your session context, history, and agent state — gone.
+
+**After 1.0.93:** Edit `mcp.json` (or use `copilot mcp add/edit/remove`). The new config applies **between turns**. Your session stays alive. The agent picks up the new tools on its next turn.
+
+```json
+// ~/.copilot/mcp.json
+{
+  "servers": {
+    "my-db": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres"],
+      "env": { "DATABASE_URL": "postgresql://..." }
+    }
+  }
+}
+```
+
+Change the `DATABASE_URL`, save, and the next agent turn sees the updated connection. No restart. No context loss.
+
+---
+
+## 3. Enterprise-Grade Network Boundaries (`permissions.limitTo`)
+
+For teams running Copilot in managed environments, 1.0.93 adds `copilot config set permissions.limitTo <domain-list>`.
+
+```bash
+# Restrict all outbound network requests to approved domains
+copilot config set permissions.limitTo "github.com,api.github.com,raw.githubusercontent.com"
+```
+
+The agent simply cannot reach anything outside that list. MCP servers, package registries, API endpoints — all blocked unless explicitly allowed. This is the control enterprises need to adopt terminal agents without security review bottlenecks.
+
+---
+
+## 4. Model Picker Now Prioritizes the Models You Actually Want
+
+The model picker's recommended list has been reordered to put the current frontier models first:
+
+1. **GPT-6.1 Sol** (OpenAI) — deep reasoning, complex refactors
+2. **GPT-6 Astra / Luna** (OpenAI) — speed-optimized, everyday coding
+3. **Claude 5.5** (Anthropic) — 1M context, strong coding
+
+If you've been manually scrolling past older defaults (Claude 3.5, GPT-4o, etc.), you'll now see the best models at the top. No configuration needed.
+
+---
+
+## 5. The Quiet Fixes That Matter Daily
+
+| Fix | Why You'll Notice |
+|-----|-------------------|
+| **GitHub.com Connector users can expand CLI permissions in-place** | No more "switch sign-in method" dance when a Connector needs more scopes |
+| **`--context long_context` honored at startup** | Accurate context allowance shown in `/context` from the first prompt |
+| **Connector auth errors now prompt to update authorization** | Instead of cryptic "authentication failed", you get a button to fix scopes |
+| **Warmed language servers stay running across LSP requests (sandbox off)** | Faster IntelliSense, no cold-start lag on every file open |
+| **Truncated compact shell commands expand on click** | See the full `git add -A && npm run build && ...` without scrolling |
+
+---
+
+## 6. What's Not in 1.0.93 (But You Asked)
+
+- **No new models** — the model picker reordering is the only model change
+- **No voice/TUI overhaul** — still terminal-first, no voice mode like Codex 0.162-alpha
+- **No plugin marketplace** — skills/plugins still via manual install
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Want sandbox without waitlist** | **Yes** — the flagship feature |
+| **Tweak MCP servers frequently** | **Yes** — hot-reload saves restarts |
+| **Run in a locked-down enterprise** | **Yes** — `permissions.limitTo` is a game-changer |
+| **Just want the latest model** | **No** — model list unchanged, only reordered |
+| **On 1.0.92 and happy** | **Optional** — no breaking changes, but sandbox hot-reload is nice |
+
+```bash
+copilot update
+# Verify sandbox works
+copilot --sandbox
+# Test MCP hot-reload: edit ~/.copilot/mcp.json, save, watch next turn pick it up
+```
+
+---
+
+## The Bottom Line
+
+**Copilot CLI 1.0.93 doesn't add a flashy new capability. It removes the friction that made the existing capabilities annoying.**
+
+Sandbox for all = safer autonomy for beginners. MCP hot-reload = faster iteration for power users. Enterprise network boundaries = adoption path for teams. Model picker reordering = less scrolling for everyone.
+
+This is the kind of release that doesn't make headlines but makes the tool *stay* on your machine instead of being uninstalled after a week.
+
+```bash
+copilot update
+# Then: /sandbox on
+# Then: edit ~/.copilot/mcp.json without restarting
+# Then: keep coding
+```
+
+---
+
+## Related Articles
+
+- [GitHub Copilot CLI 1.0.92 Just Fixed the MCP OAuth Reauth Loop — Your Tools Finally Stay Connected](/blog/github-copilot-cli-1-0-92-mcp-oauth-fix/)
+- [GitHub Copilot CLI 1.0.91 Just Fixed the Windows Sandbox Nightmare — CA Trust, Network Bypass, and Safer Shutdown](/blog/github-copilot-cli-1-0-91-sandbox-ca-network-fixes/)
+- [Copilot CLI Terminal Agent: GitHub Repos at Your Fingertips](/blog/copilot-cli-terminal-agent-github-repos/)
+- [Claude Code vs Copilot CLI: GitHub Battle](/blog/claude-code-vs-copilot-cli-github-battle/)
+
+---
+
+*GitHub Copilot CLI is free for verified students, teachers, and open-source maintainers. $10/mo or $100/yr for individuals. [github.com/github/copilot-cli](https://github.com/github/copilot-cli)*
