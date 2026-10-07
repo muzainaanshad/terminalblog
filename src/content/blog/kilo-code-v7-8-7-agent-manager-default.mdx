@@ -1,0 +1,247 @@
+---
+title: "Kilo Code 7.8.7 Just Made Multi-Project Agent Manager Default — And Gave You Settings Search"
+description: "Kilo Code v7.8.7 makes multi-project Agent Manager the default, adds per-conversation prompt history, settings search with keycap shortcuts, OAuth for MCP servers, separate memory model, and 30+ fixes. The release that makes Agent Manager feel like a product, not a prototype."
+pubDate: 2026-10-07T15:00:00Z
+tags: ["kilo-code", "release", "coding-agents", "agent-manager", "vscode", "cli", "beginner"]
+tool: "kilo"
+author: "rho"
+image: "/api/chart?type=release&agent=kilo&version=v7.8.7"
+canonical: "https://terminalblog.com/blog/kilo-code-v7-8-7-agent-manager-default/"
+---
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What's new in Kilo Code v7.8.7?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Multi-project Agent Manager now default (experimental toggle removed), settings search with Ctrl+F, per-conversation prompt history, OAuth for MCP servers, separate memory model setting, pinned session tabs, and 30+ fixes across VS Code and CLI."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is Kilo Code v7.8.7 breaking?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No breaking changes. The experimental toggle for multi-project Agent Manager is removed — it's now the default. Pre-warmed worktrees moved outside project folder automatically."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I use the new settings search?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Press Ctrl+F (Cmd+F on Mac) in the Kilo Settings sidebar left rail. Results grouped by category, click to jump to tab/setting. Shortcut shown as keycap."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What's the separate memory_model setting?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "In kilo.jsonc, set memory_model to use a different model for automatic project memory saves (e.g., cheaper model). When unset, uses session model. Added by @eborjaa."
+      }
+    }
+  ]
+})} />
+---
+
+**Kilo Code v7.8.7 dropped October 7.** The headline: **Multi-project Agent Manager is now default** — the experimental toggle is gone. But the real story is 30+ changes that turn Agent Manager from "promising prototype" into "daily driver."
+
+If you've been waiting for Kilo's multi-project workflow to stop feeling experimental — **this is the version.**
+
+---
+
+## 1. Multi-Project Agent Manager: Default, Not Experimental
+
+**Before:** You enabled "Experimental: Multi-Project Agent Manager" in settings. It worked but felt like a beta.
+
+**Now:** It's **the default.** The toggle is removed. The old single-project view is gone.
+
+What you get:
+- **Current workspace project first** in the project list
+- **Restored tabs, background sessions, branch defaults** kept per project
+- **Remove active project → remaining project restored** automatically
+- **GitHub org avatars** next to each project (letter tile fallback)
+
+<details>
+<summary>Why this matters for beginners</summary>
+
+If you work on multiple repos (main app + API + shared lib), you used to juggle separate VS Code windows or constantly switch contexts. Now: **one Agent Manager, multiple projects, each with its own sessions, branches, and history.** Click a project → you're there with your tabs and background agents intact.
+</details>
+
+---
+
+## 2. Settings Search — Finally
+
+**Press `Ctrl+F` (`Cmd+F` Mac) in the Kilo Settings left rail.**
+
+- Filters **every setting** in real time
+- Results **grouped by category** — matching settings stay visible
+- Click result → **jumps to tab + highlights setting**
+- Shortcut shows as **keycap** (looks like `Ctrl+F`)
+
+No more clicking through 8 tabs to find "that one MCP timeout setting."
+
+---
+
+## 3. Per-Conversation Prompt History (Experimental)
+
+**New setting:** "Per-Conversation Prompt History" — each conversation keeps its own input history.
+
+```
+Chat A: up-arrow → shows prompts from Chat A only
+Chat B: up-arrow → shows prompts from Chat B only
+```
+
+No more scrolling through "refactor auth" prompts when you're in the "write tests" conversation.
+
+Credit: **@brunoagatao** (#14632)
+
+---
+
+## 4. OAuth for MCP Servers — Sign In, Don't Copy Tokens
+
+**New:** Full OAuth flow for MCP servers in VS Code.
+
+- Authorization links open **through VS Code** (not external browser)
+- Prompt to sign in **after installing** OAuth-protected server from Marketplace
+- Servers needing sign-in **surfaced in chat prompt** with recovery actions
+- Pre-registered OAuth client configurable when server requires it
+
+Credit: **@WebReflection** (#14724)
+
+For teams using private MCP servers — no more copying `MCP_AUTH_TOKEN` into settings. Click, sign in, done.
+
+---
+
+## 5. Separate Model for Memory Saves
+
+**New `memory_model` in `kilo.jsonc`:**
+
+```jsonc
+{
+  "memory_model": "gpt-4o-mini"  // or any model ID
+}
+```
+
+- When set: **automatic project memory saves use this model** (cheaper/faster)
+- When unset/unavailable: falls back to **session model**
+- Your expensive reasoning model (o1, Opus 5.5) stays on the main task; a cheap model handles memory extraction
+
+Credit: **@eborjaa** (#14781)
+
+---
+
+## 6. Pinned Session Tabs — Shift+Click
+
+**Shift+click** any session tab in sidebar or Agent Manager → **pinned**.
+
+- Pinned tabs stay visible, don't get pushed off
+- Context menu shows the gesture next to Pin/Unpin
+- Works in both VS Code sidebar and Agent Manager
+
+---
+
+## 7. Integrated Browser: Any Session, Not Just Agent Manager
+
+**Run "Open Integrated Browser" command** — or let `browser_open` tool reveal the tab automatically.
+
+- Each session gets **its own browser tab**
+- Not locked to Agent Manager anymore
+- Drag, hover, scroll **follow pointer without delay** on high refresh displays
+
+Credit: **@WebReflection** (#14828)
+
+---
+
+## 8. CLI: Double-Esc to Stop Subagent, Steer Running Subagent
+
+**Double-Esc** in subagent view → stops that subagent + anything it started, parent keeps working.
+
+**Steer running subagent from its TUI view** — steer runs as subagent's own agent/model, parent notified over shared agent board.
+
+Credit: **@calebnorman** (#14701, #14702)
+
+---
+
+## 9. The 30+ Fixes You'll Feel
+
+| Area | Fixed |
+|------|-------|
+| **Worktrees** | Pre-warmed worktrees moved outside project folder (`.kilo/worktrees/` only created on demand); build tools no longer see extra checkout; different-drive projects no longer pre-warmed |
+| **Model Precedence** | Mode-configured models win over remembered picks; manual picks apply per agent; reopened sessions show last agent/model; plan follow-up keeps planning session in Plan mode |
+| **Security** | DOMPurify 3.4.16 (XSS fix in markdown); KaTeX 0.19.0 (math rendering); simple-git 4.0.2 (Git command execution vulns) |
+| **MCP** | Wide tool input/output scrolls horizontally; words in MCP output tables don't break into letters; write/edit tools work on Linux with specific network hosts allowed |
+| **Performance** | Workspace scan for marketplace suggestions respects `.gitignore`, single pass, no symlink following; hidden working spinner stops animating after session finishes |
+| **TUI** | Blank screen on startup fixed (worker requests queued until ready); thinking indicators clear after retry; Esc exit from subagent needs second press |
+| **Cloud Sessions** | History renders prompts/replies in correct order (parentID preserved, sorted by creation time) |
+| **Skills** | Every project skill available when one server handles multiple folders; unquoted colons in frontmatter (`description: Use when: ...`) no longer cause "Skill not found" |
+
+---
+
+## Quick Version Context
+
+| Version | Date | Focus |
+|---------|------|-------|
+| **v7.8.7** | Oct 7, 2026 | Multi-project Agent Manager default, settings search, OAuth MCP, memory model, pinned tabs, 30+ fixes |
+| **v7.8.4** | Sep 2026 | Opencode sync, GPT-6/Astra, Cloudflare |
+| **v7.8.1** | Oct 3, 2026 | SBOM, supply chain security |
+| **v7.8.0** | Oct 1, 2026 | Opencode sync, GPT-6/Astra, Cloudflare |
+
+**v7.8.0–7.8.4** brought Opencode sync and cloud providers. **v7.8.7** makes the *core product* (Agent Manager) feel finished.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Use Agent Manager daily | **Yes** — multi-project default, pinned tabs, settings search, per-conv history |
+| Manage multiple repos | **Yes** — GitHub avatars, project isolation, restored context per project |
+| Use private MCP servers | **Yes** — OAuth flow eliminates token management |
+| Want cheaper memory extraction | **Yes** — separate `memory_model` setting |
+| Hit XSS/math/Git vulns | **Yes** — DOMPurify, KaTeX, simple-git all updated |
+| Just want latest stable | **Yes** — zero breaking changes, 30+ fixes |
+
+**Upgrade:**
+```bash
+# VS Code Extension
+code --install-extension kilocode.kilo-code
+
+# CLI (Bun)
+bun add -g @kilocode/kilo-code@7.8.7
+# or npm
+npm update -g @kilocode/kilo-code
+```
+
+---
+
+## The Bigger Picture
+
+Kilo Code's trajectory:
+
+- **v7.0–7.5** → Core agent, MCP, basic Agent Manager
+- **v7.6–7.8.0** → Opencode sync, cloud providers, GPT-6/Astra
+- **v7.8.1–7.8.4** → Security (SBOM), polish
+- **v7.8.7** → **Agent Manager graduates to default**
+
+The pattern: **infrastructure first, then usability.** The multi-project architecture was built in v7.x. v7.8.7 removes the training wheels.
+
+For teams adopting Kilo: this is the version where you can say "yeah, just use Agent Manager" without caveats.
+
+---
+
+## Related Articles
+
+- [Kilo Code v7.8.0 — Opencode Sync, GPT-6, Astra, Cloudflare](/blog/kilo-code-v7-8-0-opencode-sync-gpt6-astra-cloudflare/)
+- [Kilo Code v7.8.1 — SBOM Supply Chain Security](/blog/kilo-code-v7-8-1-sbom-supply-chain-security/)
+- [Kilo vs AmpCode — The Lightweight Agent Showdown](/blog/kilo-vs-ampcode/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Kilo Code is developed by Kilo-Org. Changelog source: [github.com/Kilo-Org/kilocode/releases/tag/v7.8.7](https://github.com/Kilo-Org/kilocode/releases/tag/v7.8.7).*
