@@ -1,0 +1,436 @@
+---
+title: "Your Coding Agent Is Useless at 2 AM — Unless You Set This Up"
+description: "Most developers use coding agents interactively. The real leverage is unattended automation: dependency updates while you sleep, PR reviews before morning standup, security scans on every push. Here's the complete setup guide for agents that work while you don't."
+pubDate: 2026-10-07T10:00:00Z
+tags: ["guide", "pillar", "automation", "hermes", "openhands", "background-tasks", "cron", "coding-agents", "evergreen"]
+tool: "industry"
+author: "sage"
+image: "/api/og?title=Your+Coding+Agent+Is+Useless+at+2AM&tool=industry"
+canonical: "https://terminalblog.com/blog/your-coding-agent-is-useless-at-2am-unless-you-set-this-up/"
+---
+
+You're using your coding agent wrong.
+
+Right now, you open a terminal, type a prompt, watch it work, review the diff, merge. Repeat. That's **interactive mode** — and it's the least valuable way to use these tools.
+
+The developers getting 10x leverage aren't better at prompting. They've set up their agents to **work while they sleep**.
+
+Dependency updates at 3 AM. Security scans on every push. Flaky test triage before standup. Documentation generation on every release. The agent becomes a fleet, not a chatbot.
+
+**This guide shows you exactly how to set it up — safely.**
+
+---
+
+## The Shift: Interactive → Unattended
+
+| Interactive | Unattended |
+|-------------|------------|
+| You drive | Agent drives |
+| One task at a time | Parallel fleets |
+| You review every diff | Policy gates review |
+| Stops when you close laptop | Runs on schedule / events |
+| Human bottleneck | Human gatekeeper |
+
+The agents that support this natively: **Hermes Agent** (cron + background tasks), **OpenHands** (automations + cron), **Goose** (ACP hidden sessions), **Opencode** (background via ACP). Claude Code, Cursor, Codex — interactive only (for now).
+
+---
+
+## Step 1: Pick Your Unattended Agent
+
+### Hermes Agent — The Operator's Choice
+
+Native cron, background delegation, multi-provider routing, credential guards, console dashboard. Built for this from day one.
+
+```bash
+pip install hermes-agent
+hermes config set provider openrouter
+hermes config set openrouter.model nvidia/nemotron-3-ultra:free
+hermes config set openrouter.api_key $OPENROUTER_KEY
+```
+
+**Unattended superpowers:**
+- `hermes cron add "deps" "0 3 * * *" "Update dependencies and open PRs"`
+- `hermes delegate --background --goal "Scan for SQL injection patterns"`
+- Multi-provider failover: if OpenRouter free tier hits 429, routes to Ollama local model automatically
+
+### OpenHands — The Cloud-Native Choice
+
+Automations (cron + GitHub event triggers), Agent Canvas for visual workflows, MCP OAuth persistence, read-only sharing for teams.
+
+```bash
+docker pull ghcr.io/all-hands-ai/openhands:1.24.0
+# Or cloud: https://app.openhands.ai
+```
+
+**Unattended superpowers:**
+- Cron: "Every Monday 9 AM, review open PRs and post summary"
+- Event: "When PR opened, run security scan and comment results"
+- Read-only shared automations: teammates see runs, can't modify config
+
+### Goose — The Extensible Choice
+
+ACP hidden sessions for background agents, PiP for MCP tools, WASM agent loop (runs in browser/edge), ACP-only binary for embedding.
+
+```bash
+curl -fsSL https://github.com/block/goose/releases/download/v1.53.0/goose_v1.53.0_darwin_arm64.tar.gz | tar -xz
+sudo mv goose /usr/local/bin/
+```
+
+**Unattended superpowers:**
+- Hidden ACP sessions: background agents that don't clutter your session list
+- PiP MCP tools: tools become glances, not context switches
+- `goose-acp` binary: embed in CI, Vercel Edge, Cloudflare Workers
+
+---
+
+## Step 2: The Safety Checklist (Non-Negotiable)
+
+**Before you run anything unattended, every item below must be ✅.**
+
+### Separate API Keys for Unattended Work
+
+```bash
+# NEVER use your main key
+export HERMES_UNNATENDED_KEY="sk-or-unattended-..."
+export OPENHANDS_AUTOMATION_KEY="sk-or-automation-..."
+```
+
+Separate keys = separate rate limits, separate billing, revocable without breaking your interactive work.
+
+### Hard Caps on Everything
+
+```yaml
+# Hermes example
+cron:
+  deps-update:
+    schedule: "0 3 * * *"
+    max_steps: 50           # Hard step limit
+    max_cost_usd: 2.00      # Hard dollar limit
+    timeout_minutes: 30     # Hard time limit
+    require_approval: true  # Human gate for PR creation
+```
+
+No caps = surprise $500 bill or infinite loop that deletes your repo.
+
+### Worktree Isolation (Mandatory)
+
+```bash
+# Every unattended job gets its own worktree
+git worktree add ../repo-deps-update main
+git worktree add ../repo-security-scan main
+git worktree add ../repo-doc-gen main
+```
+
+Agents sharing a worktree = merge conflicts, corrupted state, "why did my main branch change?"
+
+### Credential Scoping
+
+```yaml
+# Hermes credential guard
+credentials:
+  github_token:
+    scope: "repo:read,repo:write"  # NOT admin, NOT delete_repo
+    allowed_agents: ["deps-update", "doc-gen"]
+    denied_agents: ["security-scan"]  # Security scan doesn't need write
+```
+
+Principle: **least privilege per agent per job**.
+
+### Logs That Survive Terminal Close
+
+```bash
+# Hermes: logs to ~/.hermes/logs/ automatically
+# OpenHands: persisted in conversation + cloud
+# Goose: ACP session persistence across restarts
+
+# Verify before trusting:
+hermes cron run deps-update --dry-run
+# Check ~/.hermes/logs/cron-deps-update-*.log
+```
+
+If you can't read yesterday's log, you're flying blind.
+
+### Human Gate for Destructive Actions
+
+```yaml
+# Hermes: require_approval: true on any job that can push
+# OpenHands: read-only automations for teammates, manual trigger for prod
+# Goose: ACP session requires explicit task.handoff with approval
+```
+
+Force-push, production deploys, secret rotation — **always human-in-the-loop**.
+
+---
+
+## Step 3: Three Production-Ready Workflows
+
+### Workflow 1: Nightly Dependency Updates (Hermes)
+
+```bash
+# 1. Create the cron job
+hermes cron add deps-update "0 3 * * *" \
+  --goal "Update all dependencies, run tests, open PR if passing" \
+  --max-steps 40 \
+  --max-cost 1.50 \
+  --require-approval
+
+# 2. Test it dry-run
+hermes cron run deps-update --dry-run
+
+# 3. Enable
+hermes cron enable deps-update
+```
+
+**What it does at 3 AM:**
+1. `git worktree add ../repo-deps main`
+2. Runs `npm outdated` / `pip list --outdated` / `cargo outdated`
+3. Updates `package.json`, `requirements.txt`, `Cargo.toml` conservatively
+4. Runs full test suite
+5. If green: creates branch, commits, pushes, opens PR with changelog summary
+6. If red: logs failure, creates issue with error details, **does not open PR**
+
+**Your morning:** PR ready for review. You merge or request changes. Zero manual work.
+
+### Workflow 2: PR Security Scan on Every Push (OpenHands)
+
+```yaml
+# .openhands/automations/security-scan.yaml
+name: "Security Scan on PR"
+trigger:
+  type: "event"
+  event: "pull_request.opened"
+config:
+  read_only: true  # Teammates can see, can't modify
+  agent:
+    model: "openrouter/nvidia/nemotron-3-ultra:free"
+    instructions: |
+      You are a security reviewer. Scan the PR diff for:
+      - SQL injection patterns
+      - XSS vulnerabilities
+      - Hardcoded secrets
+      - Insecure deserialization
+      - Path traversal
+      Post findings as PR comments with file:line references.
+      Do NOT suggest fixes — only identify risks.
+```
+
+**What it does:** Every PR gets an automated security review comment within 2 minutes. Your team sees risks before human review starts.
+
+### Workflow 3: Weekly Codebase Health Report (Hermes + Goose)
+
+```bash
+# Hermes cron for the heavy lifting
+hermes cron add health-report "0 9 * * 1" \
+  --goal "Generate weekly codebase health report: test coverage, complexity, debt, security" \
+  --max-steps 60 \
+  --max-cost 3.00 \
+  --background
+
+# Goose hidden session for the summary
+goose session create --name "weekly-health" --hidden
+goose session run weekly-health \
+  --prompt "Read the health report from Hermes, create executive summary for team Slack"
+```
+
+**Monday 9 AM:** Your team gets a Slack message with:
+- Test coverage delta (+2.3% this week)
+- New TODO/FIXME count (12 added, 3 resolved)
+- Complexity hotspots (3 files > 50 cyclomatic complexity)
+- Security findings (0 critical, 2 medium)
+- Dependency updates pending (7)
+
+---
+
+## Step 4: The Multi-Agent Fleet Pattern
+
+**Don't run one agent. Run a fleet.**
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                    ORCHESTRATOR (Hermes)                    │
+│  Cron scheduler • Provider router • Credential guard • Logs │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+        ┌─────────────┼─────────────┐
+        ▼             ▼             ▼
+┌───────────────┐ ┌───────────────┐ ┌───────────────┐
+│  DEPS AGENT   │ │  SEC AGENT    │ │  DOCS AGENT   │
+│  (Hermes)     │ │  (OpenHands)  │ │  (Goose)      │
+│  Worktree A   │ │  Worktree B   │ │  Worktree C   │
+│  Keys: read   │ │  Keys: read   │ │  Keys: write  │
+│  + write PR   │ │  + comment    │ │  (docs only)  │
+└───────────────┘ └───────────────┘ └───────────────┘
+        │             │             │
+        └─────────────┼─────────────┘
+                      ▼
+         ┌───────────────────────┐
+         │   HUMAN GATE (You)    │
+         │  Review PRs @ 9 AM    │
+         │  Merge / Request /    │
+         │  Investigate alerts   │
+         └───────────────────────┘
+```
+
+**Each agent:**
+- Own worktree
+- Own API key (scoped)
+- Own hard caps
+- Own log stream
+- Single responsibility
+
+**The orchestrator (Hermes):**
+- Schedules cron jobs
+- Routes to cheapest capable provider (Nemotron free → Ollama local → paid fallback)
+- Enforces credential guards
+- Aggregates logs to console dashboard
+
+---
+
+## Step 5: Provider Failover (So It Never Stops)
+
+Free tiers hit limits. Paid APIs go down. Local models crash. **Build failover.**
+
+### Hermes Multi-Provider Config
+
+```yaml
+# ~/.hermes/config.yaml
+providers:
+  primary:
+    name: "openrouter"
+    model: "nvidia/nemotron-3-ultra:free"
+    base_url: "https://openrouter.ai/api/v1"
+    api_key: "$OPENROUTER_KEY"
+    max_requests_per_minute: 20
+    max_requests_per_day: 50
+
+  fallback_1:
+    name: "ollama"
+    model: "qwen3-coder:7b"
+    base_url: "http://localhost:11434/v1"
+    api_key: ""
+    max_requests_per_minute: 60
+    max_requests_per_day: 10000
+
+  fallback_2:
+    name: "openrouter-paid"
+    model: "anthropic/claude-sonnet-4"
+    base_url: "https://openrouter.ai/api/v1"
+    api_key: "$OPENROUTER_PAID_KEY"
+    max_requests_per_minute: 60
+    max_requests_per_day: 10000
+
+routing:
+  strategy: "failover"
+  health_check_interval: 300
+  fallback_on: ["rate_limit", "timeout", "5xx", "circuit_breaker"]
+```
+
+**Behavior:** Free Nemotron handles 80% of work. When it 429s, seamlessly fails over to local Qwen. If local OOMs, fails over to paid Claude. You wake up to completed jobs, not failures.
+
+---
+
+## Step 6: Monitoring & Alerting
+
+**You can't fix what you don't see.**
+
+### Hermes Console Dashboard
+
+```bash
+hermes dashboard
+# Real-time: active jobs, token spend, success/fail rates, provider health
+# Historical: 7/30 day trends, cost per job, failure patterns
+```
+
+### Slack/Telegram Alerts (Minimal)
+
+```yaml
+# Only alert on action-required events
+alerts:
+  - condition: "job_failed_max_retries"
+    channel: "#agent-alerts"
+    message: "❌ {{job_name}} failed after {{retries}} retries. Log: {{log_url}}"
+  
+  - condition: "spend_exceeded_80_percent"
+    channel: "#agent-alerts"
+    message: "⚠️ {{job_name}} at 80% budget (${{spent}}/${{limit}})"
+  
+  - condition: "provider_all_unhealthy"
+    channel: "#agent-alerts"
+    message: "🚨 All providers unhealthy. Unattended jobs paused."
+```
+
+**No success spam.** You only hear when something needs you.
+
+---
+
+## The Real Economics
+
+| Approach | Monthly Cost | Your Time | Coverage |
+|----------|-------------|-----------|----------|
+| Interactive only (Claude Code) | $180-500 | 20 hrs/week | Manual only |
+| Unattended (Hermes + free models) | $0-20 | 2 hrs/week setup | 24/7 automated |
+| Hybrid (unattended + paid for hard tasks) | $50-100 | 3 hrs/week | 24/7 + expert |
+
+**The math:** One nightly deps PR saves 30 min/day × 20 days = 10 hours/month. One security scan/PR saves 15 min × 40 PRs = 10 hours/month. One weekly health report saves 2 hours manual audit.
+
+**22 hours/month automated for $0-20.** That's the leverage.
+
+---
+
+## Common Failure Modes (And How to Avoid Them)
+
+| Failure | Symptom | Prevention |
+|---------|---------|------------|
+| **No worktree isolation** | Main branch corrupted, merge hell | Mandatory `git worktree add` per job |
+| **Shared API keys** | Rate limit kills interactive work | Separate keys per agent per purpose |
+| **No hard caps** | Infinite loop, $500 bill | `max_steps`, `max_cost_usd`, `timeout_minutes` on EVERY job |
+| **No credential scoping** | Security scan gets write access | Least-privilege per agent in config |
+| **No logs** | "It worked yesterday, why fail today?" | Structured logs + retention + alerting |
+| **No human gate** | Force-push to prod at 3 AM | `require_approval: true` on destructive actions |
+| **Single provider** | Free tier 429 = all jobs stop | Multi-provider failover config |
+| **No dry-run** | First run breaks things | `hermes cron run job --dry-run` mandatory |
+
+---
+
+## Your 30-Minute Start Plan
+
+**Tonight, before bed:**
+
+1. **Install Hermes** (5 min): `pip install hermes-agent`
+2. **Get OpenRouter key** (2 min): openrouter.ai → create key → save as `$OPENROUTER_KEY`
+3. **Configure provider** (3 min): `hermes config set provider openrouter` + model + key
+4. **Create worktree** (2 min): `git worktree add ../repo-auto main`
+5. **Write first cron** (5 min): `hermes cron add test-job "0 3 * * *" --goal "Run test suite and report" --max-steps 20 --max-cost 0.50 --dry-run`
+6. **Test dry-run** (3 min): `hermes cron run test-job --dry-run` → check logs
+7. **Enable** (1 min): `hermes cron enable test-job`
+8. **Sleep** — wake up to test results in your repo.
+
+**Tomorrow morning:** Review the log. Adjust. Add second job. Repeat.
+
+---
+
+## The Bottom Line
+
+**Interactive coding agents are power tools. Unattended coding agents are infrastructure.**
+
+You don't run your CI pipeline manually. You don't run your database manually. Stop running your agents manually.
+
+The setup takes 30 minutes. The payoff is forever.
+
+Your coding agent is useless at 2 AM — **unless you set this up tonight.**
+
+---
+
+## Related Articles
+
+- [Hermes Agent: Cron Jobs for Scheduled Automation Tasks](/blog/hermes-cron-jobs-scheduled-automation-tasks/)
+- [Hermes Agent Multi-Provider Model Routing Across 15+ LLMs](/blog/hermes-multi-provider-model-routing-across-15-llms/)
+- [OpenHands v1.24: Automation, Agent Canvas, MCP OAuth Persistence](/blog/openhands-v1-24-automation-agent-canvas-mcp-fixes/)
+- [Coding Agent Security Checklist 2026 — The Operator's Hardening Guide](/blog/coding-agent-security-checklist-2026/)
+- [Why ACP Is the Missing Link for Multi-Agent Coding](/blog/why-ACP-is-the-missing-link-for-multi-agent-coding/)
+- [Best Free AI Coding Agents in 2026 — No Credit Card Required](/blog/best-free-ai-coding-agents-2026-no-credit-card/)
+- [Your Coding Agent Finally Remembers — The Memory Wars Have Begun](/blog/coding-agents-got-memory-october-2026/)
+
+---
+
+*Running multiple AI subscriptions? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you GPT, Claude, Gemini, Grok, DeepSeek, Perplexity and 3 more for $12/mo — one subscription, every model.*
