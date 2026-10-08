@@ -1,0 +1,140 @@
+---
+title: "Claude Code Just Fixed the Hook That Let Attackers Bypass Your Blocks"
+description: "Claude Code v2.1.294 patches a critical hook vulnerability: prompt and agent hooks written as instructions (\"Block commands that...\") were allowing what they should block. Update immediately."
+pubDate: "2026-10-08T16:30:00Z"
+tags: ["claude-code", "security", "release", "hooks", "ai-agent", "coding-agent", "beginner"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+v2.1.294+Security+Fix&tool=claude-code"
+canonical: "https://terminalblog.com/blog/claude-code-v2-1-294-hook-security-fix/"
+---
+
+Claude Code v2.1.294 dropped today — October 8, 2026. The release notes are two bullet points, but the second one is a **security fix you need to understand**.
+
+## The Vulnerability (Plain English)
+
+You know how you can write hooks like this?
+
+```json
+{
+  "hooks": {
+    "Prompt": "Block commands that delete files"
+  }
+}
+```
+
+**That hook was broken.** When written as natural language instructions ("Block commands that..."), the hook **allowed what it was supposed to block**.
+
+The model would read "Block commands that delete files" and... not block them. It treated the instruction as a suggestion, not a rule.
+
+## What Are Hooks? (Beginner Primer)
+
+If you're new to Claude Code: **hooks are your safety net.** They're plain-English rules you write in your settings that Claude follows *before* it runs any command.
+
+Think of them as guardrails:
+
+- `"Block commands that modify production databases"`
+- `"Ask before running git push --force"`
+- `"Deny any command containing 'rm -rf'"`
+- `"Carry on if the build is broken — don't stop on red tests"`
+
+Before v2.1.294, hooks written this way (as natural language instructions) were **advisory, not enforced**. The model "knew" what you wanted but didn't treat it as a hard constraint.
+
+## What v2.1.294 Fixes
+
+1. **Fixed `prompt` and `agent` hooks written as instructions** — they now actually block what you tell them to block
+2. **Improved how `prompt` hooks on Stop and SubagentStop are judged** — when written as instructions like "Carry on if the build is broken," Claude is less likely to stop early
+
+## Why This Matters for Beginners
+
+**This bug meant your safety net had holes.** The agent could ignore your "block" instructions because it misunderstood them as polite requests.
+
+Real-world example: You write `"Block any deployment command on Friday"`. Before this fix, Claude might deploy anyway because it read your instruction as "hey, FYI, maybe don't deploy on Fridays." After the fix, it treats it as a hard rule: *Friday deployment = blocked.*
+
+## How Hooks Actually Work Now
+
+Hooks run at specific points in the agent lifecycle:
+
+| Hook Type | When It Fires |
+|-----------|---------------|
+| `Prompt` | Before every user prompt / model turn |
+| `PreToolUse` | Before any tool executes |
+| `PostToolUse` | After any tool completes |
+| `Stop` | When the agent wants to stop |
+| `SubagentStop` | When a subagent wants to stop |
+
+You can write them as **instructions** (natural language) or **structured rules** (JSON with matchers). v2.1.294 makes the instruction form reliable.
+
+## How to Update
+
+```bash
+# If using the official installer
+claude-code update
+
+# Or via npm
+npm update -g @anthropic-ai/claude-code
+
+# Or re-run your platform's installer
+```
+
+## Verify the Fix Works
+
+After updating, test a simple hook:
+
+```json
+{
+  "hooks": {
+    "Prompt": "Block any command containing 'rm -rf'"
+  }
+}
+```
+
+Try asking Claude to run `rm -rf /tmp/test`. It should now refuse with a clear message.
+
+Test a Stop hook:
+
+```json
+{
+  "hooks": {
+    "Stop": "Carry on if the build is broken — don't stop on red tests"
+  }
+}
+```
+
+Run a failing build. Claude should continue instead of stopping.
+
+## The Bigger Picture: v2.1.280+ Security Hardening Wave
+
+This isn't an isolated fix. It's part of a months-long security hardening wave:
+
+- **v2.1.280**: Opus 5.5 default, massive fix wave
+- **v2.1.283**: Gateway hints, prompt audit, MCP progress fixes
+- **v2.1.284**: Sonnet 5.5 default, gateway spend fixes
+- **v2.1.285**: Desktop command plugin fixes
+- **v2.1.287**: Mods plugin system watchdog
+- **v2.1.288**: 100 fixes you actually feel
+- **v2.1.289**: Plugin fixes, agent spawn
+- **v2.1.292**: Plugin marketplace, subagent effort
+- **v2.1.293**: Security fixes, Windows NTLM leak patched
+- **v2.1.294**: **Hook instruction parsing fixed** ← today
+
+If you're on anything before v2.1.280, you're missing months of security and stability work.
+
+## What This Means for Your Workflow
+
+If you use hooks for safety (and you should), **update today**. The vulnerability was silent — your hooks *looked* like they worked, but they didn't enforce.
+
+After updating:
+1. Audit your existing hooks — they now actually enforce
+2. Add hooks you avoided because "they didn't work anyway"
+3. Test each one with a deliberate violation
+
+## TL;DR
+
+- **v2.1.294 fixes hooks written as natural language instructions**
+- **Your "Block X" hooks were allowing X — now they block X**
+- **Stop/SubagentStop hooks also improved — less premature stopping**
+- **Update now if you use hooks for safety**
+- **Part of ongoing v2.1.280+ security hardening wave (14 releases since July)**
+
+Hooks are only useful if they work. This patch makes them work.

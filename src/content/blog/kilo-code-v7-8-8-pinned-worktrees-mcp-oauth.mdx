@@ -1,0 +1,85 @@
+---
+title: "Kilo Code v7.8.8 Just Pinned Your Worktrees — And Fixed MCP OAuth Security"
+description: "Kilo Code v7.8.8 adds Shift+click to pin worktrees in Agent Manager, opens links in-app with the Integrated Browser, and locks MCP OAuth credentials to their issuing server. Beginner-friendly breakdown."
+pubDate: "2026-10-08T15:30:00Z"
+tags: ["kilo-code", "vscode", "release", "ai-agent", "coding-agent", "beginner", "mcp", "security"]
+tool: "kilo"
+author: "sage"
+image: "/api/og?title=Kilo+Code+v7.8.8+Release&tool=kilo-code"
+canonical: "https://terminalblog.com/blog/kilo-code-v7-8-8-pinned-worktrees-mcp-oauth/"
+---
+
+Kilo Code v7.8.8 dropped October 7, 2026. It's a "minor" patch on paper, but three changes matter for anyone using Agent Manager daily — and v7.8.7 landed the same week with a stack of defaults you probably missed.
+
+If you're new to Kilo Code: it's a VS Code extension + CLI that turns VS Code into a multi-agent coding environment. Think Cursor, but open-source, model-agnostic, and you bring your own API keys. The **Agent Manager** is its command center — a sidebar that runs multiple coding agents in parallel worktrees, each with its own git branch, terminal, and browser.
+
+## 1. Pin Your Worktrees (Finally)
+
+Shift+click any worktree in the Agent Manager sidebar — or right-click → Pin. Pinned worktrees:
+
+- Stay at the top of the list
+- Get the first jump shortcuts (Cmd+1, Cmd+2, etc.)
+- Keep their section when you unpin them
+
+If you juggle 5+ worktrees across projects, this alone saves minutes every session. No more scrolling past stale branches to find the one you're actually working on.
+
+## 2. Links Open In-App Now (When Integrated Browser Is On)
+
+Enable the experimental Integrated Browser, and chat web links open **inside VS Code** — sidebar chats use a browser tab, Agent Manager uses its browser panel.
+
+- In-app links show a browser icon
+- Links no longer open in two browsers at once
+- Choose "System browser" under "Open links in" to opt out
+
+This feels like how VS Code should have worked years ago. The preview now updates while you resize its panel, doesn't stretch the page during resize, and keeps the current page visible until the next one paints.
+
+## 3. MCP OAuth Credentials Are Now Bound to Their Authorization Server
+
+This is a security fix that flew under the radar. Previously, if an MCP server switched authorization servers, it could receive stored refresh tokens or client secrets from the old server.
+
+Now: **OAuth credentials stay bound to the authorization server that issued them.** A server that switches auth servers can no longer raid your stored tokens.
+
+If you use MCP servers with OAuth (GitHub, GitLab, Google, etc.), update immediately.
+
+## v7.8.7 (Same Week) — The Defaults You Missed
+
+v7.8.7 wasn't a patch — it flipped switches on features that were experimental:
+
+- **Multi-project Agent Manager is now default** — current workspace project first, old single-project view gone. Restored tabs, background sessions, and branch defaults stay with their project.
+- **Per-conversation prompt history** — experimental setting keeps prompt input history separate for each conversation.
+- **GitHub org avatars** in the Agent Manager project list (letter tile fallback when no remote).
+- **To-do progress in session dock** — small progress chip above the prompt shows done/current item. Click for full list. Old to-do bar under session title removed.
+- **Settings search** — Ctrl+F (Cmd+F on Mac) filters every setting, results grouped by category.
+- **OAuth sign-in for MCP servers** — open auth links through VS Code, prompt to sign in after installing OAuth-protected server from Marketplace, surface servers needing sign-in from chat prompt with recovery actions.
+- **Shift+click to pin/unpin session tabs** in sidebar and Agent Manager — context menu shows the gesture.
+
+Plus patches: CPU reduction for marketplace scan (respects .gitignore), horizontal scrolling for wide MCP tool I/O, full file paths on @-mention hover, model precedence fixed (mode-configured wins over remembered), staged renames preserved in worktrees, semantic_search available when indexing enabled, TUI blank-screen startup fixed.
+
+## CLI-Specific Fixes
+
+- **TUI no longer starts to a permanently blank screen** — worker requests now queue until ready, failures report instead of silently swallowing
+- **Esc twice in subagent view** stops that subagent while parent keeps working
+- **Steer a running subagent directly from its TUI view** — runs as subagent's own agent/model, parent notified over shared agent board
+- **Build with Bun 1.4.2** fixes intermittent subprocess failures
+
+## How to Update
+
+**VS Code Extension:** Auto-updates, or search "Kilo Code" in Extensions marketplace.
+
+**CLI:**
+```bash
+# If installed via npm
+npm update -g @kilocode/kilocode
+
+# Or re-run your installer
+```
+
+## TL;DR
+
+- **Pin worktrees with Shift+click** — game changer for multi-worktree workflows
+- **Links open in-app** with Integrated Browser (opt-out available)
+- **MCP OAuth credentials locked to issuing server** — security fix, update now
+- **TUI blank-screen startup fixed** — was a silent worker race condition
+- **Subagent steering from TUI** — Esc twice to stop, steer directly
+
+v7.8.7 (released same week) made multi-project Agent Manager default, added per-conversation prompt history, GitHub org avatars in project list, to-do progress in session dock, and Settings search. If you missed that, you got two solid weeks of polish in one go.
