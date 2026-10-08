@@ -100,14 +100,14 @@ function extractFaq(body) {
   const faqContent = faqMatch[1];
   const faqs = [];
   
-  // Pattern 1: **Q1: ...** ... (answer on following lines until next Q or end)
-  const pattern1 = /\*\*Q\d*:\*\*\s*(.*?)\n([\s\S]*?)(?=\n\s*\*\*Q\d*:|$)/gi;
-  let match;
-  while ((match = pattern1.exec(faqContent)) !== null) {
-    const q = match[1].trim().replace(/^["']|["']$/g, '');
-    const a = match[2].trim().replace(/^["']|["']$/g, '');
-    if (q && a) faqs.push({ q, a });
-  }
+  // Pattern 1: **Q1: What is...?** ... (answer on following lines until next Q or end)
+    const pattern1 = /\*\*Q\d*:\s*([^*]+?)\*\*\s*\n([\s\S]*?)(?=\n\s*\*\*Q\d*:|$)/gi;
+    let match;
+    while ((match = pattern1.exec(faqContent)) !== null) {
+      const q = match[1].trim().replace(/^["']|["']$/g, '');
+      const a = match[2].trim().replace(/^["']|["']$/g, '');
+      if (q && a) faqs.push({ q, a });
+    }
   
   // Pattern 2: **Q:** ... (answer on following lines until next Q or end)
   if (faqs.length === 0) {
