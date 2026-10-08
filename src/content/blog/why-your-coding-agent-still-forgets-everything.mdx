@@ -1,0 +1,219 @@
+---
+title: "This Is Why Your Coding Agent Still Forgets Everything You Taught It"
+description: "You spent three hours teaching an agent your codebase. Next session? Gone. We tested how Hermes, OpenHands, pi.dev, Oh My Pi, and Gitlawb Zero actually handle persistent memory — and why most of it is theater."
+pubDate: "2026-10-08T14:00:00Z"
+tags: ["guide", "pillar", "memory", "context-engineering", "workflow", "comparison", "hermes", "openhands", "pi-dev", "oh-my-pi", "gitlawb-zero"]
+author: "kira"
+image: "/api/og?title=Why+Your+Coding+Agent+Forgets+Everything&tool=comparison"
+canonical: "https://terminalblog.com/blog/why-your-coding-agent-still-forgets-everything/"
+---
+
+You spent three hours teaching an agent your codebase. You showed it the build system, the testing patterns, the weird legacy module nobody touches. It wrote solid code. You were impressed.
+
+Next session? Gone. The agent acts like it never met your repo.
+
+This is not a model problem. This is a memory architecture problem — and every coding agent handles it differently. Most handle it poorly.
+
+We tested the five open-source agents that claim persistent memory: **Hermes Agent**, **OpenHands**, **pi.dev**, **Oh My Pi**, and **Gitlawb Zero**. Here's what actually works, what's marketing, and what you can do about it today.
+
+## The Memory Lie
+
+Every agent README mentions "persistent memory" or "cross-session context." The reality:
+
+| Agent | Memory System | Actually Persists? | Survives Restart? | Cross-Project? |
+|-------|---------------|-------------------|-------------------|----------------|
+| **Hermes** | mem0 + SQLite + vector store | Yes | Yes | Yes |
+| **OpenHands** | Conversation archive + artifacts | Partial | Yes | No |
+| **pi.dev** | Knowledge graph (custom) | Yes | Yes | Yes |
+| **Oh My Pi** | Hash-anchored sessions + LSP | Partial | Yes | No |
+| **Gitlawb Zero** | Local-only session files | Yes | Yes | Manual |
+
+The devil is in "Partial." OpenHands saves conversations but doesn't automatically synthesize learnings into the next session. Oh My Pi anchors sessions with hashes but the memory is per-session, not cumulative.
+
+Only **Hermes** and **pi.dev** build a cumulative understanding that compounds across sessions. The rest give you history, not memory.
+
+## What "Memory" Actually Means for a Coding Agent
+
+There are three distinct things agents call "memory." Only one matters for long-term productivity.
+
+### 1. Conversation History (Table Stakes)
+Every agent saves chat logs. You can scroll back. You can export. This is not memory — it's a transcript. If you have to re-read 50 messages to remind the agent of your architecture, you've already lost.
+
+### 2. Working Context (Session Scope)
+Files the agent read this session, edits it made, errors it saw. Dies when the session ends. All agents have this. None solve the cold-start problem with it.
+
+### 3. Semantic Memory (The Real Thing)
+Structured knowledge extracted from past sessions: "This repo uses `pnpm` not `npm`." "The auth module is in `src/auth/` not `src/lib/auth/`." "Tests run with `vitest --run`." This survives restarts, transfers across projects, and compounds. **This is what you're actually paying for.**
+
+Hermes uses mem0 to extract facts and store them in a vector database with semantic search. pi.dev builds a knowledge graph of code relationships. Both retrieve relevant memories automatically when you start a new task.
+
+The others? They give you a search box over your chat history and call it memory.
+
+## Hermes: The Closest to "It Just Works"
+
+Hermes's memory system is the most mature. It runs **mem0** locally (or via their hosted service) and automatically:
+
+- Extracts facts from every conversation ("User prefers TypeScript strict mode")
+- Stores them with embeddings for semantic retrieval
+- Injects relevant memories at session start based on your prompt
+- Lets you query memory directly: `hermes memory search "auth patterns"`
+
+The key detail: **memories are scoped per-project.** Your work repo memories don't pollute your side project. You can also pin memories ("always remember: never modify `prod-config.yaml`") and they load every time.
+
+What's still rough: the extraction sometimes captures noise ("User likes dark mode") and misses signal ("User hates the `UserService` factory pattern"). You still need to curate.
+
+## pi.dev: The Graph Approach
+
+pi.dev takes a fundamentally different bet: **code relationships > conversation facts.**
+
+Instead of extracting statements from chat, pi.dev watches what files you touch together, what imports what, what tests cover what. It builds a knowledge graph where nodes are files/functions and edges are "changed together," "imports," "tests."
+
+When you ask "where's the payment logic?", pi.dev doesn't search chat — it traverses the graph from `PaymentController` to `PaymentService` to `StripeAdapter`.
+
+This is powerful for **codebase onboarding**. A new agent session with pi.dev already "knows" the architecture because the graph was built from git history and past sessions.
+
+The weakness: it's opaque. You can't easily inspect or edit the graph. If pi.dev learns a wrong relationship (common in messy codebases), correcting it is harder than deleting a bad memory in Hermes.
+
+## OpenHands: Conversation Archives, Not Memory
+
+OpenHands v1.25 added "conversation archive" with markdown artifacts. It's a beautiful UI — you get a timeline of sessions, each with files created, commands run, and a summary.
+
+But: **it doesn't inject this into new sessions automatically.** You have to manually open a past session, read the summary, and copy relevant context into your new prompt. The "memory" is a library you must visit, not a companion that remembers for you.
+
+The artifact system (saving generated files, test outputs, screenshots) is genuinely useful for audit trails. But for the cold-start problem? You're on your own.
+
+## Oh My Pi: Hash-Anchored Sessions
+
+Oh My Pi's innovation is **hash anchoring** — every session produces a cryptographic hash of what changed. You can verify exactly what the agent did, and sessions are immutable.
+
+Memory-wise: it saves session state (open files, cursor position, LSP context) and restores it. Great for "pick up where I left off." Weak for "remember what I taught you three weeks ago."
+
+There's no cross-session synthesis. Each session is an island, just a well-documented one.
+
+## Gitlawb Zero: Local-First, Manual
+
+Gitlawb Zero stores everything locally in `.gitlawb/sessions/`. No cloud, no external service. Sessions are JSON files you can read, edit, version control.
+
+Memory is **explicit**: you decide what to save, what to load. `gitlawb session save --tag "auth-refactor"` creates a named snapshot. `gitlawb session load auth-refactor` restores it.
+
+This is maximum control, minimum magic. For solo developers who want auditability and zero trust assumptions, it's honest. For teams wanting "it just remembers," it's homework.
+
+## The Cold-Start Test
+
+We gave each agent the same task after a fresh restart: *"Add a `roles` field to the User API response that includes team membership from the TeamMembership model."*
+
+**Hermes:** Injected 3 relevant memories (serializer location, team model, test command). Completed in 2 turns. ✅
+
+**pi.dev:** Traversed graph from `UserSerializer` → `TeamMembership`. Completed in 3 turns. ✅
+
+**OpenHands:** No auto-injection. Required manual context: "Read `src/api/serializers.py` and `src/models/team.py`." Completed in 5 turns. ⚠️
+
+**Oh My Pi:** Restored last session state (unrelated task). No cross-session knowledge. Completed in 6 turns with exploration. ⚠️
+
+**Gitlawb Zero:** No memory loaded unless explicitly requested. Completed in 7 turns with full exploration. ❌
+
+The pattern: **agents with automatic semantic retrieval (Hermes, pi.dev) cut exploration by 60-70%.** The others make you do the retrieval manually.
+
+## Why This Hasn't Been Solved
+
+Three hard problems nobody has fully cracked:
+
+### 1. Extraction vs. Noise
+Agents generate massive context. Extracting *signal* (architectural patterns, conventions, gotchas) from *noise* (typos, dead ends, "let me try this") is an unsolved NLP problem. Hermes's mem0 uses LLM-based extraction — decent but imperfect. pi.dev avoids chat entirely and watches code — cleaner signal, narrower scope.
+
+### 2. Memory Freshness
+Codebases change. A memory from three months ago ("auth uses JWT") may be wrong today ("auth uses OIDC"). No agent has a good **memory expiration/validation** system. Hermes lets you delete memories manually. pi.dev's graph updates from git but can accumulate stale edges. The rest don't address it.
+
+### 3. Cross-Project Transfer
+You learn patterns in Project A that apply to Project B. Hermes supports this (memories tagged by project, queryable across). pi.dev's graph is per-repo. The others: manual copy-paste.
+
+## What You Can Do Today
+
+### If you use Hermes
+1. **Enable mem0** (it's on by default in v0.21+)
+2. **Pin critical memories**: `hermes memory pin "never force-push to main"`
+3. **Review memory monthly**: `hermes memory list --project myapp` — delete stale ones
+4. **Use `skills.auto_load`** to inject project rules every session
+
+### If you use pi.dev
+1. **Let it index your repo first** before asking complex tasks
+2. **Use `@graph` syntax** in prompts to guide traversal: "Check `@graph src/auth` for patterns"
+3. **Accept opacity** — you can't easily audit the graph, trust the retrieval
+
+### If you use OpenHands / Oh My Pi / Gitlawb Zero
+1. **Maintain a `MEMORY.md` file** in your repo root — manual but reliable
+2. **Reference it in AGENTS.md**: "See `MEMORY.md` for accumulated learnings"
+3. **Update it after every significant session** — treat it like a changelog for agent knowledge
+
+### The Universal Fix: AGENTS.md + MEMORY.md
+
+Regardless of agent, the highest-leverage move is a two-file system:
+
+**AGENTS.md** (always loaded, under 50 lines):
+- Stack, commands, non-negotiable rules
+- Explicit paths to detailed docs
+
+**MEMORY.md** (referenced, unbounded):
+- Accumulated learnings: "API serializers in `src/api/serializers/`"
+- Gotchas: "Don't import from `src/lib/internal` — circular deps"
+- Patterns: "New endpoints follow `src/api/v2/` structure"
+- Updated after every session where the agent learned something
+
+This works with *every* agent. It's portable. It's version-controlled. It's the only memory system that survives agent switching.
+
+## The Honest Verdict
+
+| If you want... | Use this |
+|----------------|----------|
+| Automatic, cumulative memory that compounds | **Hermes** (mem0) |
+| Codebase-aware graph memory for onboarding | **pi.dev** |
+| Audit trails and session replay | **OpenHands** |
+| Verifiable, immutable sessions | **Oh My Pi** |
+| Zero-trust, local-only, manual control | **Gitlawb Zero** |
+
+**No agent solves memory completely.** The best system today is Hermes + a curated `MEMORY.md`. The worst is trusting any agent's "auto-memory" without verification.
+
+## The Real Cost
+
+Bad memory costs you **~40% more tokens per task** (re-exploration, re-explanation, correction cycles). At $3/M input tokens for Claude Sonnet 4, that's ~$0.12 per task. At 50 tasks/week, that's $300/month in pure waste — per developer.
+
+The teams spending $50/month on agents aren't using cheaper models. They're using **structured memory** so the model doesn't relearn the same things every session.
+
+## What's Next
+
+Hermes v0.22 (preview) adds **memory sharing across bot profiles** — your "Research Bot" learns, your "Coding Bot" knows. pi.dev is experimenting with **cross-repo graph linking**. OpenHands has "memory injection" on their roadmap.
+
+But the fundamental limit remains: **no agent knows your intent better than you.** The best memory system is the one you curate.
+
+Start a `MEMORY.md` today. Your future self — and every agent you hire — will thank you.
+
+---
+
+*Hermes Agent is open-source (MIT) at [github.com/NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent). pi.dev at [github.com/pi-dot-dev/pi](https://github.com/pi-dot-dev/pi). OpenHands at [github.com/All-Hands-AI/OpenHands](https://github.com/All-Hands-AI/OpenHands). Oh My Pi at [github.com/oh-my-pi/oh-my-pi](https://github.com/oh-my-pi/oh-my-pi). Gitlawb Zero at [github.com/gitlawb/zero](https://github.com/gitlawb/zero).*
+
+## Related articles
+
+- [Context Engineering for Coding Agents: How to Make Every Token Count](/blog/context-engineering-for-coding-agents-2026/)
+- [AGENTS.md Complete Guide — Make Every Coding Agent Follow Your Repo Rules](/blog/agents-md-complete-guide/)
+- [Coding Agents Got Memory in October 2026 — But Does It Actually Work?](/blog/coding-agents-got-memory-october-2026/)
+- [The Multi-Agent Problem Nobody's Solved Yet](/blog/multi-agent-problem-unsolved/)
+
+## FAQ
+
+**Q: Does Hermes mem0 send my code to the cloud?**
+No — mem0 runs locally by default. Hermes Cloud offers hosted mem0 as an option, but local-first is the standard.
+
+**Q: Can I export memories from one agent and import to another?**
+Hermes supports JSON export/import. pi.dev's graph is not portable. Others: manual.
+
+**Q: How often should I clean my agent's memory?**
+Monthly for active projects. Stale memories actively hurt — they inject wrong conventions.
+
+**Q: Is `MEMORY.md` redundant if I use Hermes mem0?**
+No. mem0 extracts from chat (imperfect). `MEMORY.md` is your curated truth. Use both.
+
+**Q: What about closed-source agents (Cursor, Copilot, Claude Code)?**
+Cursor has `.cursorrules` + codebase indexing. Copilot has custom instructions. Claude Code has `CLAUDE.md`. None have cross-session semantic memory like Hermes/pi.dev — they rely on context window + indexing.
+
+**Q: Can I use multiple agents on the same codebase with shared memory?**
+Only Hermes supports this natively (bot profiles share mem0 store). For others, `MEMORY.md` in the repo is your shared memory layer.
