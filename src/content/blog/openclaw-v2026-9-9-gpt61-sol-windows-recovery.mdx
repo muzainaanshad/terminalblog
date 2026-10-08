@@ -1,0 +1,135 @@
+---
+title: "OpenClaw 2026.9.9 Just Made GPT-6.1 Sol Native — And Fixed the Windows Session Nightmare"
+description: "OpenClaw 2026.9.9 landed October 8 with native GPT-6.1 Sol support, Windows session recovery for junction-backed stores, safer live updates, and cross-platform reliability fixes. Here's what actually changes your daily workflow."
+publishDate: 2026-10-08
+updatedDate: 2026-10-08
+tags: ["openclaw", "release", "v2026.9.9", "gpt-6.1", "windows", "codex", "coding-agent", "beginner"]
+image: "/api/og?title=OpenClaw+2026.9.9+GPT-6.1+Sol+Windows&tool=openclaw"
+canonical: "https://terminalblog.com/blog/openclaw-v2026-9-9-gpt61-sol-windows-recovery/"
+author: "Anshad"
+---
+
+OpenClaw 2026.9.9 dropped today — October 8, 2026. The changelog is short. The impact isn't.
+
+This is the release that **finally makes GPT-6.1 Sol a first-class citizen** on the managed Codex runtime, **fixes Windows session corruption** that's plagued junction-backed stores for months, and **makes background work actually responsive** instead of stalling your gateway.
+
+If you run OpenClaw in production — especially on Windows — this is the update you've been waiting for.
+
+## The One-Line Summary
+
+**GPT-6.1 Sol now works out of the box. Windows sessions stop corrupting. Background jobs stop freezing your gateway. Update today.**
+
+---
+
+## What Actually Changed (Beginner-Friendly)
+
+For context on OpenClaw's recent evolution, see [OpenClaw v2026.9.8: The Tiny Release That Hardened the Entire Stack](/blog/openclaw-v2026-9-8-release-notes/) and [OpenClaw v2026.9.7: Production-Ready Stack](/blog/openclaw-v2026-9-7-safer-browser-stable-macos/). If you're comparing agents, our [OpenClaw vs Hermes comparison](/blog/hermes-vs-openclaw/) breaks down the tradeoffs.
+
+### 1. GPT-6.1 Sol Is Now Native — No Config Required
+
+OpenClaw 2026.9.9 ships the **Codex 0.160.0 managed app-server** with synchronized protocol and catalog metadata. That means:
+
+- GPT-6.1 Sol appears in the model picker automatically
+- No manual catalog editing, no provider hacks, no "which model string do I use"
+- Works on the managed Codex runtime immediately after update
+
+> **Why this matters:** GPT-6.1 Sol is OpenAI's newest reasoning model for coding. Before today, getting it working in OpenClaw meant digging through config files. Now it's just *there*.
+
+### 2. Windows Session Recovery — Junction-Backed Stores Finally Work
+
+If you've ever symlinked or junctioned your OpenClaw data directory to another drive (common on Windows to save C: space), **your sessions could silently fail to publish**. The SQLite store identity wasn't bound to the physical path.
+
+**Fixed in 2026.9.9:** Session creation now binds to the **physical SQLite store identity**. Junction-backed stores publish correctly. No more "why did my session disappear" mysteries.
+
+> **Who this helps:** Anyone running OpenClaw on Windows with data on D:, E:, or a network drive. That's a *lot* of you.
+
+### 3. Safer Live Updates — No More Unstable Database Copies
+
+The updater used to inspect live WAL (Write-Ahead Logging) ownership by making **full database copies**. Unstable. Slow. Risky.
+
+**Now:** It inspects ownership **without copying the database**. Retains 2026.9.8 updater compatibility. Your updates are faster and safer.
+
+### 4. Background Work Stops Stalling Your Gateway
+
+Skill Workshop reviews and rooted cron jobs used to **reuse the prepared runtime** — but they'd stall the Gateway while doing it.
+
+**Now:** They reuse the prepared runtime **without blocking the Gateway**. Your chat stays responsive while background work happens.
+
+### 5. Cross-Platform Reliability — Node Hangs, Sandbox Startup, Metadata Updates
+
+Four fixes that compound:
+- **Node process-exit hangs prevented** — CLI, hook-relay, and Gateway processes no longer hang after output
+- **Node work preserved during metadata updates** — No more lost work when metadata refreshes
+- **Native Windows workspace initialization restored** — Empty workspaces start clean
+- **MXC sandbox readiness and wire compatibility restored** — Sandboxes actually start on Windows
+
+---
+
+## Quick Comparison: 2026.9.8 → 2026.9.9
+
+| Area | 2026.9.8 | 2026.9.9 |
+|------|----------|----------|
+| **GPT-6.1 Sol** | Manual config | **Native, automatic** |
+| **Windows junction stores** | Broken sessions | **Fixed** |
+| **Live update safety** | Full DB copies | **WAL inspection, no copies** |
+| **Background job responsiveness** | Stalls Gateway | **Non-blocking** |
+| **Node process hangs** | Occasional | **Fixed** |
+| **Windows sandbox startup** | Unreliable | **Restored** |
+
+---
+
+## Should You Update?
+
+**Yes, if:**
+- You want GPT-6.1 Sol without config headaches
+- You run OpenClaw on Windows (especially with symlinked data)
+- You run background cron jobs or Skill Workshop reviews
+- You've hit Node hang issues or sandbox startup failures
+
+**No rush if:**
+- You're on Linux/macOS, don't use GPT-6.1 Sol, and everything works
+- You're pinned to 2026.9.8 for a specific compatibility reason
+
+---
+
+## How to Update
+
+### npm (Global CLI)
+```bash
+npm install -g openclaw@2026.9.9
+```
+
+### Docker
+```bash
+docker pull openclaw/openclaw:2026.9.9
+```
+
+### Verify
+```bash
+openclaw --version
+# Should show 2026.9.9
+```
+
+---
+
+## What's Next
+
+The 2026.9.9 release notes explicitly say: *"No intentional capability changes beyond enabling the already-advertised GPT-6.1 Sol model."*
+
+This is a **stability and compatibility drop**. The next feature wave (2026.10.x) will likely bring the next model integrations and Desktop app improvements.
+
+For now: **update, verify GPT-6.1 Sol appears in your model picker, and enjoy Windows sessions that actually persist.**
+
+---
+
+## Release Artifacts
+
+- **npm:** [openclaw@2026.9.9](https://www.npmjs.com/package/openclaw/v/2026.9.9)
+- **Registry tarball:** [openclaw-2026.9.9.tgz](https://registry.npmjs.org/openclaw/-/openclaw-2026.9.9.tgz)
+- **Release evidence:** [github.com/openclaw/releases/blob/main/evidence/2026.9.9/release-evidence.md](https://github.com/openclaw/releases/blob/main/evidence/2026.9.9/release-evidence.md)
+- **Changelog:** [CHANGELOG/2026.9.9.md](https://raw.githubusercontent.com/openclaw/openclaw/main/CHANGELOG/2026.9.9.md)
+- **GitHub Release:** [v2026.9.9](https://github.com/openclaw/openclaw/releases/tag/v2026.9.9)
+
+---
+
+*OpenClaw is open-source (MIT) and available at [github.com/openclaw/openclaw](https://github.com/openclaw/openclaw). Updated October 8, 2026 — covers OpenClaw v2026.9.9 (October 8, 2026). Full changelog: [github.com/openclaw/openclaw/releases/tag/v2026.9.9](https://github.com/openclaw/openclaw/releases/tag/v2026.9.9)*
