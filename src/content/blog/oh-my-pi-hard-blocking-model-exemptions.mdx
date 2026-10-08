@@ -2,7 +2,7 @@
 title: "Oh My Pi Stopped Blocking the Wrong Models — Here's Why That Matters"
 description: "Oh My Pi's AI usage system now exempts specific models from proactive hard-blocking. Smarter, less intrusive guardrails for agent workflows."
 pubDate: "2026-07-03T04:30:00Z"
-updatedDate: "2026-07-03T04:30:00Z"
+updatedDate: "2026-10-08T19:00:00Z"
 tags: ["oh-my-pi", "ai-usage", "hard-blocking", "model-routing", "viral"]
 tool: "oh-my-pi"
 author: "ada"
@@ -23,6 +23,16 @@ The change makes the system smarter:
 - If a model has demonstrated reasoning ability, it's exempted from reasoning blocking
 - If a model is new and unproven, it starts with narrower exemptions
 
+## How Capability-Based Exemptions Work
+
+Under the hood, Oh My Pi maintains a capability matrix per model. When a model is registered in the catalog, it declares capabilities (code, reasoning, vision, tool-use, long-context). The hard-blocking system checks this matrix instead of the model's category tag. The exemption logic lives in `src/usage/hard-block.ts` — it evaluates:
+
+1. **Declared capabilities** — what the model advertises
+2. **Verified benchmarks** — pass/fail on standard evals (HumanEval, MBPP, etc.)
+3. **Runtime success rate** — observed task completion without errors
+
+A model needs 2 of 3 to earn an exemption. This prevents new/unproven models from bypassing guards while letting proven workhorses through.
+
 ## Why This Matters for Agent UX
 
 Hard-blocking is a safety feature. But safety features that block legitimate use are worse than no safety features — they frustrate users and train them to find workarounds.
@@ -30,6 +40,28 @@ Hard-blocking is a safety feature. But safety features that block legitimate use
 Oh My Pi's approach — exempt by capability, not category — is the right balance. It keeps the safety guardrails in place while reducing false positives. The agent gets out of your way when it can, and steps in only when it needs to.
 
 This is the kind of UX polish that comes from real-world usage. Oh My Pi has been iterating on this system across multiple versions, and the exemptions approach shows maturity.
+
+## Comparison: How Other Agents Handle Model Guardrails
+
+| Agent | Guardrail Strategy | False Positive Rate | User Override |
+|-------|-------------------|---------------------|---------------|
+| **Oh My Pi v16+** | Capability-based exemptions | Low (proven capability) | ✅ Configurable |
+| **Claude Code** | Provider-level (Anthropic) | Very low | ❌ Platform controlled |
+| **Cursor** | Router-based (auto-select) | Medium (router decides) | ✅ Manual model pick |
+| **OpenCode** | Skill-based (explicit) | Low (skill declares needs) | ✅ Skill config |
+| **Codex** | None observed | N/A | N/A |
+
+Oh My Pi's capability matrix is the most granular — it's the only agent that learns per-model capability at runtime.
+
+## What This Means for Your Workflow
+
+If you use Oh My Pi with a diverse model catalog (OpenAI, Anthropic, Google, xAI, local models), you'll notice:
+- Fewer "model blocked" interruptions on routine coding tasks
+- Reasoning models (o1, o3, Claude 4) automatically get reasoning exemptions
+- Vision-capable models (GPT-4o, Gemini 2.5) get vision exemptions
+- New local models start restricted until benchmarked
+
+The system is transparent: run `omp usage exemptions` to see which models have which exemptions and why.
 
 ---
 

@@ -2,7 +2,7 @@
 title: "Beware: Codex Desktop on Windows Is Silently Crashing and Leaking 13.9 GiB of Node Processes"
 description: "Freshly reported Codex Desktop bugs on Windows 26.707.8479.0 cause the whole app to silently exit in the in-app browser and retain 147 node.exe processes (13.9 GiB). Here's how to detect and contain it."
 pubDate: "2026-07-13T19:00:00Z"
-updatedDate: "2026-07-13T19:00:00Z"
+updatedDate: "2026-10-08T19:00:00Z"
 tags: ["security", "beware", "codex", "windows", "reliability", "mcp"]
 tool: "codex"
 author: "kira_bug_hunter"
@@ -53,6 +53,21 @@ If `Count` is in the dozens or `MB` is in the thousands, you're leaking node pro
 
 The in-app browser in #32798 appears to crash the *host* renderer path rather than isolating the guest, so a renderer fault takes the whole app down. For #32797, MCP server pools are spawned but not reaped when sessions/launchers churn, so node processes accumulate. #32799 points to a single shared secrets-store lock serializing OAuth reads on the critical task-start thread — contention there stalls startup for the full timeout.
 
+## The Broader Pattern: Windows Is the Stepchild
+
+This cluster isn't an isolated fluke — it's part of a pattern. Our earlier coverage [Windows: The Stepchild of Coding Agents](/blog/windows-stepchild-coding-agents-fixing-up/) documented how process management (`taskkill`, `SIGTERM` handling, orphan cleanup) works differently on Windows, and how Codex Desktop's architecture inherits those gaps. The silent-exit bug (#32798) is a renderer-host integration failure that's Windows-specific because the MSIX sandbox and WebView2 runtime behave differently than the Electron/Custom environments on macOS/Linux. The node-process leak (#32797) is a direct consequence of Windows not reaping child processes the same way POSIX does — when the parent crashes silently, the OS doesn't automatically clean up the process tree.
+
+## Comparison: How Other Agents Handle This
+
+| Agent | In-app browser isolation | Process cleanup on crash | Windows-specific hardening |
+|-------|--------------------------|--------------------------|----------------------------|
+| **Codex Desktop** | ❌ Shared renderer path | ❌ Orphaned node.exe tree | ❌ None observed |
+| **Claude Code** | N/A (terminal-native) | ✅ Proper signal handling | ✅ NTLM leak fixed v2.1.233+ |
+| **OpenCode / Mimo** | N/A (terminal-native) | ✅ Standard POSIX cleanup | ✅ Via WSL2 or native |
+| **Cursor** | ✅ Separate renderer process | ✅ Electron sandbox | ✅ Extensive Windows CI |
+
+The takeaway: terminal-native agents avoid the in-app browser risk entirely, and agents with proper Windows CI catch these leaks before shipping.
+
 ## FAQ
 
 **Q1: Is this a Windows-only problem?**
@@ -72,3 +87,4 @@ The crash kills the desktop process without a clean shutdown, so any unsaved in-
 - [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
 - [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)
 - [Your AI Agents Config Directory Is Now the Most Dangerous Place on Your Machine](/blog/ai-agent-config-directory-attack-surface-2026/)
+- [Windows: The Stepchild of Coding Agents — Fixing Up the Experience](/blog/windows-stepchild-coding-agents-fixing-up/)

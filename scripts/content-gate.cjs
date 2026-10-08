@@ -30,6 +30,7 @@ const CODING_AGENT_TOOLS = new Set([
   'pi-dot-dev', 'oh-my-pi', 'gitlawb-zero', 'codex', 'goose',
   'openclaw', 'codebuff', 'ampcode', 'copilot-cli', 'industry',
   'aider', 'cline', 'qwen-code', 'zed', 'openhands',
+  'groq-code', 'kimi-cli', 'grok-build',
   ]);
 
 const OFF_NICHE_HINTS = [
