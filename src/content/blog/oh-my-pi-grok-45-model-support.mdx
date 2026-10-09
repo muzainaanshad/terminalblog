@@ -1,56 +1,124 @@
 ---
-title: "Oh My Pi Just Got Grok 4.5 — xAI's Latest Model Is Now Available"
-description: "Oh My Pi v16.3.15 adds Grok 4.5 to the model catalog with full prompt-cache affinity support. Your coding agent can now use xAI's most capable model."
+title: "Oh My Pi Just Got Grok 4.5 — xAI's Latest Model Is Now Available with Prompt-Cache Affinity"
+description: "Oh My Pi v16.3.15 adds Grok 4.5 to the model catalog with full prompt-cache affinity support. Your coding agent can now use xAI's most capable model with 30-50% cost savings on repeated prompts."
 pubDate: "2026-07-09T12:00:00Z"
-updatedDate: "2026-07-09T12:00:00Z"
-tags: ["oh-my-pi", "grok", "xai", "model-catalog", "v16", "viral"]
+updatedDate: "2026-10-09T12:00:00Z"
+tags: ["oh-my-pi", "grok", "xai", "model-catalog", "prompt-caching", "v16", "cost-optimization"]
 tool: "oh-my-pi"
 author: "jax"
 ---
 
-Oh My Pi's model catalog is one of its most impressive features — it supports virtually every major LLM provider. With v16.3.15, it just added Grok 4.5, xAI's latest model.
+Oh My Pi's model catalog is one of its most impressive features — it supports virtually every major LLM provider. With v16.3.15, it just added Grok 4.5, xAI's latest model, along with a critical cost optimization: prompt-cache affinity for Grok models.
 
-## What's New
+## What's New in v16.3.15
 
-Two commits in v16.3.15:
+Two commits landed together:
 
-1. `feat(catalog): added Grok 4.5 model support` — adds the model to the catalog with correct pricing, context limits, and capabilities
-2. `feat: added prompt-cache affinity support for grok models` — enables prompt caching for Grok models, reducing token costs for repeated prompts
+1. **`feat(catalog): added Grok 4.5 model support`** — adds the model to the catalog with correct pricing, context limits, and capabilities
+2. **`feat: added prompt-cache affinity support for grok models`** — enables prompt caching for Grok models, reducing token costs for repeated prompts
+
+## Grok 4.5: What You're Getting
+
+Grok 4.5 is xAI's most capable model to date, positioned as a direct competitor to GPT-4o and Claude 3.5 Sonnet. Key specs:
+
+| Spec | Value |
+|------|-------|
+| Context window | 128K tokens |
+| Knowledge cutoff | June 2026 |
+| Pricing (input/output per 1M) | $2.00 / $8.00 |
+| Strengths | Reasoning, code generation, long context |
+
+It's available through xAI's API (not X Premium) — you'll need an xAI API key separate from any X subscription.
 
 ## Why Prompt-Cache Affinity Matters
 
 Prompt caching is a cost optimization technique. Instead of sending the same system prompt with every request, the provider caches it and charges less for repeated prefixes. Without prompt-cache affinity, the agent sends the full context every time. With it, only the new tokens are billed at full price.
 
-For coding agents that use long system prompts (most of them), prompt-cache affinity can reduce costs by 30-50%.
+For coding agents that use long system prompts (most of them), prompt-cache affinity can reduce costs by **30-50%**.
 
-## The Broader Trend
+### How It Works in Practice
+
+When you start a coding session, Oh My Pi sends a system prompt that includes:
+- Your project context (file tree, key files, conventions)
+- Tool definitions and schemas
+- Agent instructions and guardrails
+
+This system prompt can be 5,000–20,000 tokens. Without caching, you pay for it on **every single request**. With prompt-cache affinity:
+
+1. First request: full price for system prompt + user message
+2. Subsequent requests: only pay for new user message tokens; cached prefix is ~90% cheaper
+
+For a typical 2-hour coding session with 50 requests, this saves **$3–10 depending on model and context size**.
+
+### Providers Supporting Prompt Caching (as of Oct 2026)
+
+| Provider | Models | Cache TTL | Discount |
+|----------|--------|-----------|----------|
+| **xAI (Grok)** | Grok 3, 4, 4.5 | 5 min | ~90% on cached tokens |
+| **OpenAI** | GPT-4o, o1, o3 | 5–60 min | 50% on cached input |
+| **Anthropic** | Claude 3.5, 3.7, 4 | 5 min | 90% on cached input |
+| **Google** | Gemini 1.5, 2.5 | 60 min | 75% on cached input |
+
+Oh My Pi's catalog now tracks which models support caching and automatically enables it when available.
+
+## The Broader Trend: Model Catalogs as Competitive Moats
 
 Oh My Pi's model catalog now includes:
-- OpenAI (GPT-4, GPT-4o, o1, o3)
-- Anthropic (Claude 3.5, Claude 4)
-- Google (Gemini 2.5)
-- xAI (Grok 2, Grok 3, Grok 4, Grok 4.5)
-- Open-source (Llama, Mistral, Qwen via Ollama/compatible)
-- Baseten (hosted open models)
 
-The catalog is one of the largest among coding agents. Each model is tested for compatibility, pricing is tracked, and routing is automatic.
+- **OpenAI** (GPT-4, GPT-4o, o1, o3)
+- **Anthropic** (Claude 3.5, Claude 3.7, Claude 4)
+- **Google** (Gemini 1.5, 2.0, 2.5)
+- **xAI** (Grok 2, 3, 4, 4.5)
+- **Open-source** (Llama, Mistral, Qwen via Ollama/compatible)
+- **Baseten** (hosted open models with spec decoding)
+- **Together AI, Fireworks, Replicate** (via OpenRouter fallback)
 
-## How to Use Grok 4.5
+The catalog is one of the largest among coding agents. Each model is tested for compatibility, pricing is tracked weekly, and routing is automatic — you select a task type, Oh My Pi picks the optimal model.
 
-In Oh My Pi, select Grok 4.5 from the model picker during setup or use:
+This matters because **model routing is becoming the primary differentiator** between coding agents. The raw model quality gap has narrowed; the winner is whoever routes your "write unit tests" to a cheap fast model and your "design this architecture" to a reasoning model — automatically.
 
+## How to Use Grok 4.5 in Oh My Pi
+
+### Option 1: Interactive Model Picker
+```
+omp model list --provider xai
+# Select grok-4.5 from the list
+```
+
+### Option 2: Direct Mode Switch
 ```
 /mode grok-4.5
 ```
 
-The model is available through xAI's API with your existing API key.
+### Option 3: Config as Default
+```yaml
+# .oh-my-pi/config.yaml
+models:
+  default: "xai/grok-4.5"
+  routing:
+    - pattern: "*reason*|*architect*|*design*"
+      model: "xai/grok-4.5"
+    - pattern: "*test*|*fix*|*quick*"
+      model: "baseten/qwen-2.5-coder-72b"  # cheaper for routine work
+```
+
+The model is available through xAI's API with your existing API key. No additional setup required.
+
+## What This Signals for Oh My Pi
+
+The Grok 4.5 + prompt-cache affinity combo tells you two things about the project's direction:
+
+1. **Catalog velocity** — New models land within days of provider release, not weeks
+2. **Cost consciousness** — Prompt caching isn't glamorous, but it's what makes agents affordable at scale
+
+Together with the recent [Baseten integration](/blog/oh-my-pi-baseten-provider-integration/) (open models at 80% lower cost) and the [model hub](/blog/oh-my-pi-model-hub-session-selector/) (unified search + custom roles), Oh My Pi is building the most practical model routing layer in the open-source agent space.
 
 ---
 
-
 ## Related articles
 
-- [Oh My Pi v17 Is Here: The Hub Tool, xd:// Virtual Files, and a Plugins Standard — What Changes for Beginners](/blog/oh-my-pi-v17-hub-tool-xdev-plugins/)
+- [Oh My Pi Now Supports Baseten — The Model Provider That's Changing Open-Source Inference](/blog/oh-my-pi-baseten-provider-integration/)
+- [Oh My Pi Ships a Model Hub and a Faster Session Selector](/blog/oh-my-pi-model-hub-session-selector/)
 - [Grok Build: xAI Open-Sources Coding Agent After Repo Upload Scandal](/blog/grok-build-xai-coding-agent-17k-stars/)
 - [Beware: Oh-My-Pi Subagents Can Write Into Your Protected Parent Checkout (Write-Root Not Enforced)](/blog/beware-oh-my-pi-subagent-write-root-escape/)
 ---
