@@ -1,0 +1,196 @@
+---
+title: "AmpCode Just Made Agents Free, Fast, and Multi-Threaded — The September Wave You Missed"
+description: "AmpCode's September-October 2026 wave brought Shared Runners, 6x faster GPT-6 Astra (Plaid Mode), Opus 5.5 as default, multi-Puck conversations, and free tier with BYO compute. Here's what actually changes your workflow."
+pubDate: 2026-10-10T10:00:00Z
+tags: ["ampcode", "release", "coding-agents", "news", "beginner"]
+tool: "ampcode"
+author: "sage"
+image: "/api/og?title=AmpCode+September+October+2026+Wave&tool=ampcode"
+canonical: "https://terminalblog.com/blog/ampcode-september-october-2026-wave/"
+---
+
+AmpCode didn't just ship features in September-October 2026. It **repositioned the entire product** across seven consecutive updates — each one something you'd expect from a different company entirely.
+
+If you've been waiting for a coding agent to stop feeling like a demo and start feeling like infrastructure you can actually afford and trust, this is the wave that happened.
+
+---
+
+## The Headline Features (And Why They're Not Just Marketing)
+
+### 1. Shared Runners — Your Team's Compute, One Click
+**September 24**: Runners can now be shared with your workspace. Start one with `--share` and everyone in your workspace can start threads on that machine from ampcode.com.
+
+**What this means**: You spin up a beefy runner once (your Mac, a cloud VM, whatever). Your whole team connects to it. No more "who has the GPU?" Slack messages. The runner becomes shared infrastructure, not personal tooling.
+
+```bash
+# On the machine with compute
+amp run --share
+
+# Teammates just connect
+amp connect <runner-url>
+```
+
+### 2. The Mac App Is Now Your Runner
+**September 24**: The Amp app for macOS now starts a runner for you. Add a folder in its settings and you no longer need a terminal open to run threads on your Mac.
+
+**What this means**: Install the Mac app → add your project folder → done. Your Mac is now a runner. Close the laptop, threads keep running. Open it later, pick up where you left off.
+
+For beginners: **This is the easiest on-ramp to remote agent compute that exists.** No Docker, no SSH, no cloud accounts. Just your Mac.
+
+### 3. Opus 5.5 Became the Default for "Medium" Mode
+**September 28**: Claude Opus 5.5 now powers `medium`. It solves more tasks for less, and it's easier to steer.
+
+**What this means**: The Dial (low/medium/high/ultra) abstracts model names. You pick *effort level*. Amp routes to whatever model delivers that effort at the best price/performance. Opus 5.5 won the "medium" slot because it's genuinely better at the coding tasks people use medium for.
+
+**You don't need to know this model exists.** You just notice medium mode got smarter and cheaper.
+
+### 4. Plaid Speed — 6x Faster Inference for GPT-6 Astra
+**September 29**: 6x faster inference for GPT-6 Astra. This is the "high" mode model, and it just got dramatically faster.
+
+**What this means**: High-effort tasks (complex refactors, architecture decisions, multi-file edits) now complete in a fraction of the time. The model didn't change — the *serving infrastructure* did. Amp invested in optimized inference and it shows.
+
+### 5. Less Noise — Stop Micromanaging Your Agent
+**September 25**: "If you have the patience to watch your agents work step-by-step, you're giving them too short a leash."
+
+**What this means**: Amp reduced the default verbosity. Agents now batch more work per turn, show fewer intermediate steps, and only surface what needs your decision. You get outcomes, not a play-by-play.
+
+For beginners: **This makes the agent feel faster and more competent** — because it stops asking "is this okay?" for every file write.
+
+### 6. Many, Many Pucks — Multiple Conversations, One Meta-Agent
+**October 6**: You can now have multiple separate conversations with Puck, each with its own Puck.
+
+**What this means**: Puck is Amp's meta-agent — your Amp helper that manages agents, summarizes threads, coordinates work. Before: one Puck, one conversation at a time. Now: **parallel Pucks**. One reviews a PR, another plans a feature, a third debugs production — all simultaneously.
+
+This is **multi-agent orchestration without the framework overhead**. You don't write YAML; you just open another Puck chat.
+
+---
+
+## What This Means for a Beginner
+
+You don't need to understand all seven updates. You need to understand **three shifts**:
+
+| Old AmpCode | New AmpCode |
+|-------------|-------------|
+| Single-thread agent | **Multi-Puck, multi-agent teams** |
+| Your laptop = your compute | **Shared runners + Mac app = team compute** |
+| Pay-per-token anxiety | **Free tier with BYO compute / flat subscriptions** |
+
+**If you're new to coding agents**: Start with the **free tier**, bring your own compute (your Mac, a cloud VM), and build **one skill** for something annoying in your workflow. That skill now follows you everywhere — global plugins work across your entire workspace.
+
+**If you're evaluating for a team**: The Shared Runners + Mac App + Multi-Puck combo means you can run **background automation** (CI babysitting, dependency updates, security scans) while developers use the CLI/IDE for interactive work. Two lanes, one platform.
+
+---
+
+## The "Free Agent" Pivot (September 13)
+
+**September 13** dropped the quiet bombshell: **Amp is now free to use when you bring your own compute and model subscriptions/keys.**
+
+- No token counting on Amp's side
+- No surprise bills
+- You bring the GPU (your Mac, your cloud VM) and the model access (ChatGPT, Anthropic, Google, local via Ollama)
+- Amp provides the orchestration, the UI, the agent logic
+
+**This changes the adoption calculus entirely.** Teams already paying for ChatGPT Enterprise or Anthropic API keys can now run Amp on their existing budget. No new vendor, no new contract, no token meter ticking.
+
+---
+
+## Quick Start: Your First Hour with New AmpCode
+
+```bash
+# 1. Install (or update) — Mac app recommended for beginners
+# Download from https://ampcode.com/download
+
+# 2. Auth + link your model access (optional but recommended)
+amp auth
+amp dial --link-chatgpt   # brings your ChatGPT subscription
+# or: amp dial --link-anthropic
+
+# 3. Start a shared runner on your Mac (or any machine)
+amp run --share
+
+# 4. Create a workspace skill (now global!)
+mkdir -p .amp/skills/my-team-linter
+cat > .amp/skills/my-team-linter/skill.yaml << 'EOF'
+name: "Team Linter"
+description: "Enforces our internal patterns"
+tools: ["edit", "bash"]
+EOF
+
+# 5. Use it everywhere — it's global now
+amp --skill my-team-linter "review this PR for our patterns"
+
+# 6. Try multiple Pucks
+# Open ampcode.com → click "New Puck" → have parallel conversations
+```
+
+---
+
+## What's Still Missing (Honest Assessment)
+
+- **Windows runner parity**: Mac app starts a runner natively; Windows needs CLI (`amp run --share`)
+- **Local-first air-gapped mode**: Still cloud-dependent for auth/licensing; no fully offline mode
+- **Plugin marketplace**: Skills are shareable via GitHub but no central registry with discovery
+- **Native mobile app**: Web + Slack cover mobile access, but no iOS/Android native app
+
+---
+
+## The Bigger Picture: Infrastructure Over Features
+
+September-October 2026 wasn't a feature drop. It was a **repositioning**.
+
+AmpCode stopped competing on "which model is default" and started competing on **infrastructure**:
+- **Runners** for compute (shared, Mac-native, BYO)
+- **Skills** for knowledge (global, workspace-wide, persistent)
+- **Pucks** for orchestration (parallel, meta-agent, coordinating)
+- **Dial** for cost control (effort-based, model-agnostic, BYO-model)
+- **Free tier** for adoption (bring your own compute, no token tax)
+
+For a beginner, this means **less config, more capability**. For a team, it means **automation that survives context switches**.
+
+The agent wars aren't about prompts anymore. They're about **what sticks after the prompt ends**.
+
+AmpCode just made a lot of things stick — and made them free if you bring the compute.
+
+---
+
+## FAQ
+
+**What are AmpCode Shared Runners and how do they work?**
+Start a runner with `amp run --share` on any machine (your Mac, a cloud VM). Everyone in your workspace can connect to it from ampcode.com and start threads. The runner becomes shared team infrastructure.
+
+**How does the Mac app work as a runner?**
+Install the Mac app from ampcode.com, add a project folder in settings. Your Mac now runs agents in the background. Close the laptop, threads persist. No terminal needed.
+
+**What changed with Opus 5.5 and Plaid Speed?**
+Opus 5.5 became the default model for "medium" effort mode — smarter, cheaper, easier to steer. Plaid Mode makes GPT-6 Astra (high mode) 6x faster. You don't configure this; the Dial handles routing automatically.
+
+**What are "Many Pucks" and why do they matter?**
+Puck is Amp's meta-agent. You can now have multiple Puck conversations running in parallel — one reviewing code, one planning features, one debugging. True multi-agent orchestration without YAML.
+
+**Is AmpCode really free now?**
+Yes — if you bring your own compute (Mac, Linux, cloud VM) and model access (ChatGPT, Anthropic, Google, local/Ollama). No token charges from Amp. Flat subscriptions also available if you prefer predictability.
+
+**Can I run AmpCode fully locally/air-gapped?**
+Not yet. Auth and licensing still require connectivity. For fully local workflows, consider OpenCode + Ollama or Hermes Agent instead.
+
+---
+
+## Related Reading
+
+- [AmpCode August 2026 Feature Wave — Global Plugins, ChatGPT Pricing, Orbs](/blog/ampcode-august-2026-feature-wave/)
+- [AmpCode vs GitHub Copilot CLI: IDE Daily Driver or Terminal Agent?](/blog/ampcode-vs-copilot-cli/)
+- [AmpCode vs GitHub Copilot CLI: Pricing and What You Actually Pay at Scale](/blog/ampcode-vs-copilot-cli-pricing-battle/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Coding Agent Pricing Guide 2026](/blog/coding-agent-pricing-guide-2026/)
+
+---
+
+## Related articles
+
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+- [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
+- [Context Engineering for Coding Agents: How to Make Every Token Count](/blog/context-engineering-for-coding-agents-2026/)
+
+---
+
+*Comparing agents is half the work. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** can simplify multi-model access while you test workflows.*
