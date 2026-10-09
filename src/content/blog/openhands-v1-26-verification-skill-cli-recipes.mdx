@@ -1,0 +1,253 @@
+---
+title: "OpenHands v1.26 Just Made Agent Verification a Daily Habit — verify-openhands Skill, CLI, and Live Recipes"
+description: "OpenHands v1.26 (Oct 8) ships the verify-openhands skill with control-openhands CLI, 20+ mapped behaviors with live recipes, daily pass support, authenticated backend view, suspended workspace handling, and 50+ fixes. The release that turns 'does it work?' into a scheduled check."
+pubDate: "2026-10-09T11:00:00Z"
+tags: ["openhands", "release", "v1.26", "verification", "testing", "automation", "beginner", "agent-canvas"]
+tool: "openhands"
+author: "rho"
+image: "/api/og?title=OpenHands+v1.26+Verification+Skill+CLI+Recipes&tool=openhands"
+canonical: "https://terminalblog.com/blog/openhands-v1-26-verification-skill-cli-recipes/"
+---
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What's new in OpenHands v1.26?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The verify-openhands skill with control-openhands CLI, 20+ mapped behaviors with live recipes, daily verification passes, authenticated backend view helper, suspended workspace detection with switch offer, Super Admin onboarding guide, and 50+ fixes across settings, automations, chat, MCP, and accessibility."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is the verify-openhands skill?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "A built-in skill that runs automated verification of OpenHands behaviors — think of it as a test suite for your agent platform. It maps 20+ behaviors to live recipes, runs daily passes, and files reproduced defects automatically. Control it via the control-openhands CLI."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does OpenHands v1.26 have breaking changes?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No user-facing breaking changes. Internal API updates for plugin authors (check SDK 1.53.0). Default model routers already renamed in v1.25."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I run verify-openhands?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Install the skill from the Skills page, then run `control-openhands verify --daily` for scheduled passes or `control-openhands verify --once` for a one-off run. Results appear in the verification dashboard with linked recipes and filed defects."
+      }
+    }
+  ]
+})} />
+---
+
+**OpenHands v1.26 dropped October 8** — and it's the release that finally answers "how do I know my agent platform still works tomorrow?"
+
+The headliner: **verify-openhands** — a built-in skill + CLI that maps 20+ agent behaviors to live recipes, runs daily verification passes, and files defects automatically. You stop wondering "did the update break something?" and start seeing a daily green/red dashboard.
+
+Plus: authenticated backend views, suspended workspace handling, Super Admin onboarding, and 50+ fixes that plug the leaks in settings, automations, WebSocket, chat, and accessibility.
+
+---
+
+## The Headlines (What You'll Actually Feel)
+
+| Feature | Why It Matters |
+|---------|----------------|
+| **verify-openhands skill + `control-openhands` CLI** | Automated verification of 20+ agent behaviors with live recipes |
+| **Daily verification passes** | Scheduled "does it still work?" — results in dashboard, defects auto-filed |
+| **Authenticated backend view helper** | See what your users see — without logging in as them |
+| **Suspended workspace detection + switch offer** | No more "why is nothing working?" — banner explains and offers switch |
+| **Super Admin setup guide on enterprise backends** | First-time admin onboarding that doesn't require tribal knowledge |
+| **50+ fixes** | Settings keyboard ops, WebSocket backoff, chat composer, MCP, a11y |
+
+---
+
+## 1. verify-openhands: The Test Suite Your Agent Platform Needed
+
+**Before v1.26:** You updated OpenHands, crossed fingers, and waited for users to report breaks.
+
+**Now:** You have a **skill that verifies the platform itself.**
+
+### What It Verifies (20+ Behaviors Mapped)
+
+| Category | Behaviors Verified |
+|----------|-------------------|
+| **Agent Profiles** | Delegation tools saved, runtime services provided, auto-filled names follow model |
+| **Automations** | Load more past 100, delete confirmation modal, preset actions hide agent profiles |
+| **Chat** | Long `/btw` responses scrollable, message text kept after "Branch from here", voice dictation |
+| **MCP** | STDIO connection test errors explained without URL hint, catalog identity kept for repeated installs |
+| **Settings** | LLM profile row menu keyboard-operable, server message shown (not raw HttpError), router list contrast |
+| **WebSocket** | Reconnect on foreground, clean disconnect on mobile background, backoff refetch bursts |
+
+### The CLI: `control-openhands`
+
+```bash
+# One-off verification run
+control-openhands verify --once
+
+# Daily scheduled pass (add to cron/systemd)
+control-openhands verify --daily
+
+# Run specific behavior subset
+control-openhands verify --behaviors agent-profiles,automations
+
+# View last run results
+control-openhands verify --status
+```
+
+**Results appear in the verification dashboard** — each behavior shows pass/fail, linked live recipe, and if failed, a filed defect with reproduction steps.
+
+### Live Recipes = Reproducible Tests
+
+Each verified behavior has a **live recipe** — a runnable test that reproduces the behavior. When something breaks:
+1. Recipe fails
+2. Defect auto-filed with: steps to reproduce, expected vs actual, environment snapshot
+3. You fix → recipe passes → defect auto-closes
+
+This is **CI/CD for your agent platform's own behaviors.**
+
+---
+
+## 2. Authenticated Backend View: See What Users See
+
+**New:** `feat(apps): add authenticated backend view helper`
+
+Admins can now **view any backend as an authenticated user** — without impersonation tokens or shared credentials.
+
+```typescript
+// In your admin panel
+import { createAuthenticatedBackendView } from '@openhands/app';
+
+// Generates a time-limited view URL
+const viewUrl = await createAuthenticatedBackendView({
+  backendId: 'prod-us-east-1',
+  userId: 'user-123',
+  ttlMinutes: 30
+});
+```
+
+Use cases:
+- Debug "it works for me but not for user X" — see their exact view
+- Verify RBAC/permission changes instantly
+- Support tickets: "I see what you see" in 30 seconds
+
+---
+
+## 3. Suspended Workspace? You'll Know — And Can Switch
+
+**Before:** Workspace suspended → agent stops responding → you wonder why.
+
+**Now:** Banner appears: **"This workspace is suspended. Reason: billing / quota / policy. [Switch to active workspace]"**
+
+One click → you're on a working backend. No support ticket, no guessing.
+
+---
+
+## 4. Super Admin Onboarding: No More Tribal Knowledge
+
+**New:** First-time Super Admin on enterprise backend → **guided setup wizard** appears automatically.
+
+Covers:
+- Backend registration
+- Model router configuration
+- Plugin catalog sync
+- User/group provisioning
+- Audit log retention
+
+What used to take a Slack thread with the team now takes 5 minutes solo.
+
+---
+
+## 5. The 50+ Fixes You'll Notice Daily
+
+| Area | Fixed |
+|------|-------|
+| **Settings** | LLM profile row menu keyboard-operable (Tab/Enter/Space), profile error toasts show server message not raw HttpError, router list contrast ink |
+| **WebSocket** | Reconnect on foreground, clean disconnect on mobile background, backoff refetch bursts that hit cloud rate limits |
+| **Chat** | Long `/btw` responses scrollable, message text kept in composer after "Branch from here", voice dictation (from v1.25) stable |
+| **MCP** | Failed stdio connection tests explained without URL hint, catalog identity kept for repeated STDIO installs |
+| **Automations** | Load more works past 100 (offset paging), delete confirmation is modal (Esc closes), preset actions hide agent profiles |
+| **Accessibility** | One Settings main landmark, Customize aria-current, synced html lang, close menus/popovers on Escape |
+| **Frontend** | Plugins search usable on narrow screens, token counts promote units correctly, composer overflow menu stays open |
+| **Desktop** | macOS title bar drag region restored |
+
+---
+
+## 6. Quick Version Context
+
+| Version | Date | Focus |
+|---------|------|-------|
+| **v1.26.0** | Oct 8, 2026 | verify-openhands skill + CLI, daily passes, authenticated backend view, suspended workspace handling, Super Admin guide, 50+ fixes |
+| **v1.25.0** | Oct 6, 2026 | Voice dictation, native Git automations, bulk LLM profiles, Canvas updates, model router defaults |
+| **v1.24.0** | Sep 2026 | Agent Canvas foundation, model router, automations v1 |
+
+**v1.24** built the architecture. **v1.25** made it usable. **v1.26** makes it *verifiable*.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Run OpenHands in production / team | **Yes** — daily verification catches regressions before users do |
+| Manage multiple backends | **Yes** — authenticated view + suspended workspace banner |
+| Are Super Admin on new deployment | **Yes** — guided onboarding replaces tribal knowledge |
+| Hit WebSocket rate limits on Cloud | **Yes** — backoff + reconnect fixes (from v1.25, stable in v1.26) |
+| Need keyboard-accessible settings | **Yes** — LLM profile menu fully keyboard-operable |
+| Just want latest stable | **Yes** — zero breaking changes, 50+ fixes |
+
+---
+
+## How to Upgrade
+
+```bash
+# Docker (recommended)
+docker pull ghcr.io/openhands/openhands:1.26.0
+
+# Or update your deployment
+# Check https://github.com/All-Hands-AI/OpenHands/releases/tag/v1.26.0
+```
+
+**After upgrade:** Go to Skills → search "verify-openhands" → install → run `control-openhands verify --once` → watch the dashboard populate.
+
+---
+
+## The Bigger Picture
+
+OpenHands is becoming the **agent platform that verifies itself.**
+
+| Release | Shift |
+|---------|-------|
+| v1.22 | Cloud sessions |
+| v1.23 | Workspace polish |
+| v1.24 | Agent Canvas + Automations + Model Router (architecture) |
+| v1.25 | Voice + Native Git + Bulk ops + Smart defaults (usability) |
+| **v1.26** | **verify-openhands + daily passes + authenticated view (verifiability)** |
+
+Each release fills a gap. No rewrites. No "v2 coming soon." Just **steady compounding** — and now, **automated proof it still works.**
+
+The verify-openhands skill alone changes the operational posture: from "hope it works" to "know it works — here's the daily report."
+
+---
+
+## Related Articles
+
+- [OpenHands v1.25 — Voice Dictation, Native Git Automations, Bulk LLM Profiles](/blog/openhands-v1-25-agent-canvas-automation-voice/)
+- [OpenHands v1.24 — Agent Canvas, Automations, Model Router](/blog/openhands-v1-24-automation-agent-canvas-mcp-fixes/)
+- [OpenHands v1.14 — Git Sync, Free Kimi Breakthrough](/blog/openhands-1-14-git-sync-free-kimi-breakthrough/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Coding Agent Security Checklist 2026](/blog/coding-agent-security-checklist-2026/)
+
+---
+
+*OpenHands is developed by All Hands AI. Changelog source: [github.com/All-Hands-AI/OpenHands/releases/tag/v1.26.0](https://github.com/All-Hands-AI/OpenHands/releases/tag/v1.26.0). Updated October 9, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
