@@ -1,0 +1,226 @@
+---
+title: "Claude Code v2.1.295 Just Dropped 100+ Fixes — The Stability Release You've Been Waiting For"
+description: "Claude Code v2.1.295 (Oct 8) ships 100+ fixes: onFailure block for hooks, Program Status Protocol, remote MCP resilience, mod notification API, gateway timeouts, and fixes for background sessions, VS Code, cloud sessions, and more. The release that makes daily workflows just work."
+pubDate: "2026-10-09T10:00:00Z"
+tags: ["claude-code", "release", "v2.1.295", "stability", "beginner", "hooks", "mcp", "mods"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+v2.1.295+100+Fixes+Stability&tool=claude-code"
+---
+
+**Claude Code v2.1.295 landed October 8** with over 100 fixes. This isn't a feature release — it's the stability patch that plugs the leaks you've been working around for weeks.
+
+If you've been hit by remote MCP servers dropping, background sessions losing their loop, mod hot-reload prompts appearing every turn, or the terminal freezing on massive outputs — **this release fixes all of it.**
+
+---
+
+## The Headlines (What You'll Actually Feel)
+
+| Fixed | Why It Matters |
+|-------|----------------|
+| **Remote MCP servers now back off exponentially** (up to 30s) after repeated drops | No more hammering a dead endpoint; reconnects gracefully |
+| **Background sessions keep their `/loop` wakeups** after container restarts | Unattended agents survive infrastructure hiccups |
+| **Mod hot-reload prompt stops asking every turn** | Approve once, done — no more nagging |
+| **Terminal no longer freezes on 10k+ line outputs** | Massive logs / test runs stop locking the UI |
+| **`onFailure: "block"` for hooks** | A hook that can't start, times out, or crashes *blocks* the action — no silent pass-through |
+| **Program Status Protocol (OSC 7501)** | Your terminal can now show: working / waiting on you / done |
+
+---
+
+## 1. Hooks Finally Get Teeth: `onFailure: "block"`
+
+**Before:** A hook that failed to start, timed out, or exited weirdly — the action went through anyway. Silent failure.
+
+**Now:** Add `"onFailure": "block"` to any command or HTTP hook. If the hook can't run, the tool call **stops**.
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "Bash",
+      "hooks": [{
+        "type": "command",
+        "command": "my-security-check.sh",
+        "onFailure": "block"
+      }]
+    }]
+  }
+}
+```
+
+This is the **permission model you've been asking for**. If your security check crashes, the Bash call dies. No bypass.
+
+---
+
+## 2. Remote MCP: Exponential Backoff, Not Hammering
+
+The #1 complaint about remote MCP servers: they'd reconnect in a tight loop after every drop, burning CPU and API quota.
+
+**v2.1.295 fixes this at the protocol level:**
+- First drop → immediate retry
+- Repeated drops → exponential backoff, **capped at 30 seconds**
+- Server drops connection right after connect? Backs off instead of spinning
+
+Your remote MCP servers (especially self-hosted ones) just became **production-ready**.
+
+---
+
+## 3. Mods Get Native Notifications: `$.ui.notify`
+
+Mod authors — you can now raise **system notifications** from your mods:
+
+```javascript
+// In your mod
+$.ui.notify({
+  title: "Security Review",
+  body: "Found 3 issues in the last PR",
+  channel: "security-review"
+})
+```
+
+Users see a native OS notification (macOS/Windows/Linux) with your custom channel name. No more polling the UI for mod status.
+
+---
+
+## 4. Background Sessions That Survive Reality
+
+| Bug | Fixed |
+|-----|-------|
+| `/loop` wakeup lost when container restarts | ✅ Session now says "wakeup missed, process was down" and Claude is told |
+| `CLAUDE_AUTO_BACKGROUND_TASKS` moved subagent to background *while* edit/shell waited | ✅ Subagent finishes before backgrounding |
+| Background session stopping without notice | ✅ Now reports "process was down" to Claude |
+| Stopping long MCP tool call from Tasks panel didn't tell Claude | ✅ Claude now knows |
+| `FORCE_COLOR=3` leaked into background sessions | ✅ Clean env, no color codes in Claude's output |
+
+**Unattended agents** (`CLAUDE_CODE_RETRY_WATCHDOG`) also get a new knob: `CLAUDE_CODE_RETRY_WATCHDOG_MAX_WAIT_MS` — cap how long it waits out 429/529 errors.
+
+---
+
+## 5. Gateway Timeouts + Model Control (For Teams on Bedrock/Vertex/Foundry)
+
+- **`timeouts.upstream_ttfb_ms`** — Set how long a stream may take to start on Bedrock/Vertex/Foundry before failover or 502
+- **Optional `models` list per upstream** — Only listed models route there (wildcard `*` supported). Failover respects the list.
+- **`forceLoginMethod: "gateway"` + `forceLoginGatewayUrl`** — `/login` opens your corporate gateway on machines without managed settings
+
+No more "which model went where" debugging. You control the routing.
+
+---
+
+## 6. The Daily Paper Cuts (Fixed)
+
+| Annoyance | Fixed |
+|-----------|-------|
+| `/copy` picker included `>` markers | ✅ Quoted text copies clean |
+| `claude plugin install/enable/disable` wrote to settings file that doesn't load — no warning | ✅ Now warns you |
+| `claude -p` stayed open after last turn — no clue why | ✅ stderr now says what it's waiting for |
+| `claude plugin validate` — README missing install line = exit code 1 | ✅ Prints the line to paste, exit code stays 0 |
+| Fable models missing from `/model` picker on Gateway sessions | ✅ Now shows built-in row |
+| Admin spend view showed old groups after session ended | ✅ Fixed |
+| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` hid spend limit in `/usage` | ✅ Spend limit request goes to signed-in gateway |
+| Subagents in worktrees showed parent's git branch/status | ✅ Now shows their own |
+
+---
+
+## 7. VS Code Extension: The Focus Bouncing Fix
+
+If you run two Claude views side-by-side in VS Code — **typing no longer jumps to the wrong conversation.**
+
+Also fixed:
+- `Ctrl/Cmd+Shift+Tab` in chat input no longer switches permission mode
+- "Fork conversation from here" / Rewind restore work after background agent activity
+
+---
+
+## 8. Self-Hosted Runners + Cloud Sessions
+
+- Runner stops passing `CCR_AUTO_MODE_ALLOW/ENVIRONMENT/SOFT_DENY` into session env
+- Git fetches on large repos no longer cut off mid-progress (`CLAUDE_RUNNER_FETCH_SERVER_PROGRESS_CAP_MS` tunes this)
+- Cloud sessions: missed activity appears **all at once** after reconnect (not row-by-row)
+- Cloud session unarchive: first message after unarchive now gets a reply
+- Setup script box in cloud env form: taller, grows, draggable resize
+
+---
+
+## 9. Code Review: Stops Skipping Your CLAUDE.md
+
+**Fixed:** Code Review was skipping a large `CLAUDE.md`'s rules when the PR edited that file. Now it reads the rules *from the PR's version* — your security guidelines actually apply.
+
+Also: re-reviews now say "X issues remain open" instead of "no issues found" when earlier findings are still open.
+
+---
+
+## 10. Quick Version Context
+
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| **v2.1.295** | Oct 8, 2026 | **Stable** | 100+ fixes: hook blocking, MCP backoff, mod notifications, background survival, gateway timeouts |
+| v2.1.294 | Oct 8, 2026 | Stable | Hook security fix |
+| v2.1.293 | Oct 7, 2026 | Stable | Haiku 5.5 default, context compaction fix |
+| v2.1.292 | Oct 6, 2026 | Stable | Mods platform, plugin marketplace, subagent effort, prompt caching |
+
+**v2.1.295 is the cumulative stability patch.** If you're on v2.1.290–294, update. If you're on v2.1.28x — **definitely update.**
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| Run remote MCP servers | **Yes** — exponential backoff alone is worth it |
+| Use Mods / write Mods | **Yes** — `$.ui.notify`, hot-reload fixed, Button children |
+| Run unattended / background agents | **Yes** — `/loop` survival, retry watchdog cap |
+| Use Bedrock/Vertex/Foundry via Gateway | **Yes** — `upstream_ttfb_ms`, model allowlists |
+| Hit terminal freezes on big outputs | **Yes** — freezing fixed |
+| Use VS Code extension with multiple views | **Yes** — focus bouncing fixed |
+| Just want "it works" | **Yes** — 100+ fixes, zero breaking changes |
+
+---
+
+## How to Update
+
+```bash
+# Auto-update (if installed via npm/brew/scoop/choco)
+claude --version  # should show 2.1.295
+
+# Or reinstall
+npm install -g @anthropic-ai/claude-code@latest
+# brew upgrade claude-code
+# scoop update claude-code
+# choco upgrade claude-code
+```
+
+Verify: Run a remote MCP server, kill it, watch it back off. Enable a mod with `$.ui.notify`. Set `onFailure: "block"` on a hook and break it — the tool call should block.
+
+---
+
+## The Bottom Line
+
+**v2.1.295 doesn't add features. It removes the friction that made you doubt the tool.**
+
+Hooks that actually block. MCP that doesn't spin. Mods that notify natively. Background agents that survive container restarts. Gateway routing you control. A terminal that doesn't freeze.
+
+This is the release where Claude Code **stops being beta infrastructure and starts being reliable infrastructure.**
+
+```bash
+npm install -g @anthropic-ai/claude-code@latest
+# Then: add onFailure: "block" to your security hook
+# Add $.ui.notify to your mod
+# Set upstream_ttfb_ms on your Bedrock gateway
+```
+
+---
+
+## Related Articles
+
+- [Claude Code v2.1.294 — Hook Security Fix](/blog/claude-code-v2-1-294-hook-security-fix/)
+- [Claude Code v2.1.293 — Haiku 5.5 Default, Context Compaction Fix](/blog/claude-code-v2-1-293-release/)
+- [Claude Code v2.1.292 — Mods Platform, Plugin Marketplace](/blog/claude-code-v2-1-292-plugin-marketplace-subagent-effort/)
+- [Claude Code v2.1.288 — 100 Fixes You Actually Feel](/blog/claude-code-v2-1-288-100-fixes-you-actually-feel/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Beware: AgentJacking — Sentry MCP Hijacks Claude Code, Cursor, Codex](/blog/beware-agentjacking-sentry-mcp-hijacks-claude-code-cursor-codex/)
+
+---
+
+*Claude Code is developed by Anthropic. Changelog source: [github.com/anthropics/claude-code/releases/tag/v2.1.295](https://github.com/anthropics/claude-code/releases/tag/v2.1.295). Updated October 9, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
