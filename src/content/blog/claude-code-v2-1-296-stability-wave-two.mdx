@@ -1,0 +1,275 @@
+---
+title: "Claude Code v2.1.296 Just Dropped Another 100+ Fixes — The Stability Wave Keeps Coming"
+description: "Claude Code v2.1.296 (Oct 9) ships 100+ more fixes: MCP exponential backoff refined, mod notification API native, background agents survive container restarts, proxy/gateway headers fixed, WebFetch 100k char limit removed, terminal freeze on massive outputs solved, and onFailure: block for hooks finally has teeth. Two days after v2.1.295, the reliability wave continues."
+pubDate: "2026-10-10T10:00:00Z"
+tags: ["claude-code", "release", "v2.1.296", "stability", "beginner", "hooks", "mcp", "mods", "gateway"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+v2.1.296+Another+100+Fixes&tool=claude-code"
+canonical: "https://terminalblog.com/blog/claude-code-v2-1-296-stability-wave-two/"
+---
+
+**Claude Code v2.1.296 landed October 9** — literally the day after v2.1.295. Another 100+ fixes. This isn't a feature release either. It's the second half of a stability wave that plugs the remaining leaks v2.1.295 didn't reach.
+
+If v2.1.295 was "hooks get teeth and MCP stops spinning," v2.1.296 is "the edge cases you didn't know were breaking things until they stopped."
+
+---
+
+## The Headlines (What You'll Actually Feel)
+
+| Fixed | Why It Matters |
+|-------|----------------|
+| **Proxy/gateway beta headers no longer kill requests** | Corporate proxies that reject unknown headers — fixed |
+| **WebFetch now reads past 100k characters with `offset`** | No more silently truncated pages |
+| **Terminal freezing on 10k+ line outputs — gone** | Massive test runs / logs stop locking the UI |
+| **Resumed subagents keep their thinking & prompt cache** | Background agents don't lose context on message receipt |
+| **`onFailure: "block"` for hooks now enforced everywhere** | A hook that can't run = tool call blocks, period |
+| **Mods get native OS notifications via `$.ui.notify`** | No more polling the UI for mod status |
+| **Scheduled tasks (`/loop`) survive compaction & handoff** | Unattended agents keep their cadence |
+| **Gateway sign-in gets a Deny button** | Stalled approvals end in seconds, not minutes |
+
+---
+
+## 1. Corporate Proxies & Gateways: Beta Headers No Longer Break You
+
+**The problem:** Proxies/gateways that reject one of Claude Code's beta headers with anything other than 400 — or with a second beta header — would kill the request entirely.
+
+**The fix:** Requests now handle non-400 rejections and multi-header rejections gracefully. If you're behind a corporate proxy or using a gateway that strips unknown headers, **this release unbreaks your connection.**
+
+---
+
+## 2. WebFetch: The 100k Character Ceiling Is Gone
+
+**Before:** `WebFetch` silently dropped page text past 100,000 characters. You'd get partial content with zero warning.
+
+**Now:** It tells you how much was unread and takes an `offset` parameter to continue reading.
+
+```bash
+# Fetch the next chunk
+/fetch https://example.com/huge-page --offset 100000
+```
+
+For anyone scraping docs, reading long specifications, or pulling API references — **this removes a silent data-loss bug.**
+
+---
+
+## 3. Terminal Freeze on Massive Outputs: Fixed
+
+**Before:** 10,000+ line outputs (test suites, build logs, `grep -r` on large repos) would freeze the terminal interface completely.
+
+**Now:** The rendering pipeline handles large outputs without locking. You can scroll, search, and interrupt normally.
+
+This was one of the most reported "daily driver" annoyances. **Gone.**
+
+---
+
+## 4. Resumed Subagents Keep Their Brains
+
+**The bug:** When a subagent received a message mid-run (via teammates, background sessions, or Cowork), it lost its earlier thinking and prompt cache. Context gone.
+
+**The fix:** Resumed subagents and teammates now **preserve their thinking and prompt cache** after receiving a message mid-run.
+
+Your background agents maintain continuity. They don't "forget" what they were doing just because you sent them a note.
+
+---
+
+## 5. Hooks: `onFailure: "block"` Now Has Teeth Everywhere
+
+v2.1.295 introduced `onFailure: "block"`. v2.1.296 **enforces it comprehensively**:
+
+- Command hooks that fail to start, time out, or crash → **block the tool call**
+- HTTP hooks that return non-2xx, timeout, or network error → **block the tool call**
+- No silent pass-through. No "well the hook failed but we ran it anyway."
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "Bash",
+      "hooks": [{
+        "type": "command",
+        "command": "./security-check.sh",
+        "onFailure": "block"
+      }]
+    }]
+  }
+}
+```
+
+If your security check crashes, the Bash call **dies**. This is the permission model you've been asking for.
+
+---
+
+## 6. Mods Get Native Notifications: `$.ui.notify`
+
+Mod authors — you can now raise **system-level notifications** from your mods:
+
+```javascript
+// In your mod
+$.ui.notify({
+  title: "Security Review",
+  body: "Found 3 issues in the last PR",
+  channel: "security-review"
+})
+```
+
+Users see a **native OS notification** (macOS/Windows/Linux) with your custom channel name. No more polling the UI for mod status. No more "did it run?" uncertainty.
+
+---
+
+## 7. Background Agents That Actually Survive
+
+| Bug | Fixed |
+|-----|-------|
+| `/loop` wakeup lost when container restarts | ✅ Session reports "wakeup missed, process was down" and tells Claude |
+| Scheduled tasks never firing after `←` or `/background` handoff | ✅ Fixed |
+| Recurring tasks firing extra run on every resume/respawn/fork | ✅ Fixed |
+| Compaction silently dropping scheduled tasks | ✅ Tasks from this version forward survive compaction |
+
+**Unattended agents** (`CLAUDE_CODE_RETRY_WATCHDOG`) also get `CLAUDE_CODE_RETRY_WATCHDOG_MAX_WAIT_MS` — cap how long it waits out 429/529 errors.
+
+---
+
+## 8. Gateway Sign-In: The Deny Button
+
+**Before:** Gateway sign-in approval page had no Deny button. If you walked away, the terminal waited... indefinitely.
+
+**Now:** **Deny button ends the pending sign-in immediately.** The waiting terminal stops within seconds.
+
+Small UX fix. Massive quality-of-life for gateway users.
+
+---
+
+## 9. Session Attach/Logs by Partial Name
+
+```bash
+# Before: needed full session ID
+claude attach abc123-def456-ghi789
+claude logs abc123-def456-ghi789
+
+# Now: partial name works
+claude attach morning-debug
+claude logs morning-debug
+```
+
+If you run multiple sessions, this saves you `claude agents` → copy ID → paste every time.
+
+---
+
+## 10. The Daily Paper Cuts (Fixed)
+
+| Annoyance | Fixed |
+|-----------|-------|
+| `/copy` picker included `>` markers | ✅ Quoted text copies clean |
+| `claude plugin install/enable/disable` wrote to wrong settings file — no warning | ✅ Now warns you |
+| `claude -p` stayed open after last turn — no clue why | ✅ stderr now says what it's waiting for |
+| `claude plugin validate` — README missing install line = exit code 1 | ✅ Prints the line to paste, exit code stays 0 |
+| Fable models missing from `/model` picker on Gateway sessions | ✅ Now shows built-in row |
+| Subagents in worktrees showed parent's git branch/status | ✅ Now shows their own |
+| Conversation compaction sometimes failing with "null is not an object" | ✅ Fixed |
+| PNG/JPEG/WebP images over 8,000px failing to send from remote sessions | ✅ Auto-scales down |
+| Messages with 17-20 attached files delivering only first 16 | ✅ All files now send |
+
+---
+
+## 11. Windows-Specific Fixes
+
+| Before | After |
+|--------|-------|
+| Multi-line `!` shell blocks in skills/commands failing with CRLF line endings | ✅ Works with CRLF |
+| Interactive `claude` hanging/crashing with "Raw mode not supported" on piped input | ✅ Explains why and exits cleanly (use `-p` for piped) |
+| Keyboard not working after restart (first sign-in, provider setup, `/tui`) | ✅ Fixed |
+| `/ultrareview` dropping uncommitted changes without warning when `git stash create` failed | ✅ Warns and refuses |
+| `/ultrareview` failing with `core.safecrlf=true` | ✅ Fixed |
+
+---
+
+## 12. Quick Version Context
+
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| **v2.1.296** | Oct 9, 2026 | **Stable** | 100+ fixes: proxy headers, WebFetch offset, terminal freeze, subagent cache, hook blocking, mod notifications, background survival |
+| v2.1.295 | Oct 8, 2026 | Stable | 100+ fixes: hook blocking, MCP backoff, mod notifications, background survival, gateway timeouts |
+| v2.1.294 | Oct 8, 2026 | Stable | Hook security fix |
+| v2.1.293 | Oct 7, 2026 | Stable | Haiku 5.5 default, context compaction fix |
+
+**v2.1.295 + v2.1.296 = a two-day, 200+ fix stability wave.** If you're on v2.1.290 or earlier — **update now.**
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| Run behind a corporate proxy/gateway | **Yes** — beta header rejection fixed |
+| Fetch long pages with WebFetch | **Yes** — 100k char limit gone |
+| Hit terminal freezes on big outputs | **Yes** — freezing fixed |
+| Run background/unattended agents | **Yes** — `/loop` survives compaction & handoff |
+| Use Mods / write Mods | **Yes** — `$.ui.notify`, hot-reload fixed |
+| Use Gateway for sign-in | **Yes** — Deny button ends stalled approvals |
+| Run Windows (especially with CRLF files) | **Yes** — multiple Windows fixes |
+| Just want "it works" | **Yes** — 200+ fixes in 48 hours, zero breaking changes |
+
+---
+
+## How to Update
+
+```bash
+# Auto-update (if installed via npm/brew/scoop/choco)
+claude --version  # should show 2.1.296
+
+# Or reinstall
+npm install -g @anthropic-ai/claude-code@latest
+# brew upgrade claude-code
+# scoop update claude-code
+# choco upgrade claude-code
+```
+
+**Verify the fixes work:**
+1. Run a remote MCP server, kill it, watch it back off exponentially
+2. Enable a mod with `$.ui.notify` — get a native OS notification
+3. Set `onFailure: "block"` on a hook and break it — the tool call should block
+4. Fetch a >100k char page with WebFetch — use `offset` to paginate
+5. Run a massive test suite — terminal should not freeze
+
+---
+
+## The Bottom Line
+
+**v2.1.295 was "hooks get teeth." v2.1.296 is "the teeth bite everywhere."**
+
+Two days. 200+ fixes. Zero breaking changes. The issues that made you doubt the tool — proxy breaks, truncated fetches, frozen terminals, amnesiac subagents, silent hook failures — **gone.**
+
+This isn't a feature release. It's the release where Claude Code **stops being beta infrastructure and becomes the reliable daily driver you've been waiting for.**
+
+```bash
+npm install -g @anthropic-ai/claude-code@latest
+# Then: add onFailure: "block" to your security hook
+# Add $.ui.notify to your mod
+# Fetch that 500k char spec page with offset pagination
+```
+
+---
+
+## Related Articles
+
+- [Claude Code v2.1.295 — 100+ Fixes: The Stability Release You've Been Waiting For](/blog/claude-code-v2-1-295-stability-release-youve-been-waiting-for/)
+- [Claude Code v2.1.294 — Hook Security Fix](/blog/claude-code-v2-1-294-hook-security-fix/)
+- [Claude Code v2.1.293 — Windows NTLM Leak Patched](/blog/claude-code-v2-1-233-security-fix-windows-ntlm-leak/)
+- [Claude Code v2.1.292 — Mods Platform, Plugin Marketplace](/blog/claude-code-v2-1-292-plugin-marketplace-subagent-effort/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Beware: AgentJacking — Sentry MCP Hijacks Claude Code, Cursor, Codex](/blog/beware-agentjacking-sentry-mcp-hijacks-claude-code-cursor-codex/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release You've Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+
+---
+
+*Claude Code is developed by Anthropic. Changelog source: [github.com/anthropics/claude-code/releases/tag/v2.1.296](https://github.com/anthropics/claude-code/releases/tag/v2.1.296). Updated October 10, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
