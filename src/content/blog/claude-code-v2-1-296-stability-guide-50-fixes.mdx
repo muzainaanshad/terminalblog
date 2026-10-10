@@ -1,0 +1,151 @@
+---
+title: "Claude Code v2.1.296 Stability Guide — 50 Fixes That Make Daily Workflows Stop Breaking"
+description: "Claude Code v2.1.296 (October 9) ships 50+ bug fixes across subagents, plugins, Remote Control, Windows, MCP, and cloud sessions. A beginner-friendly breakdown of the stability release that makes daily workflows reliable — subagent permissions persist, Remote Control survives credential renewal, plugins stop silently failing."
+pubDate: "2026-10-10T09:00:00Z"
+tags: ["claude-code", "guide", "v2.1.296", "stability", "bug-fixes", "coding-agent", "beginner"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+v2.1.296+Stability+Guide&tool=claude-code"
+---
+
+Claude Code **v2.1.296 dropped October 9**, three days after v2.1.295. This isn't a feature parade — it's the release that makes **subagents reliable**, **Remote Control actually persist**, and **plugins stop silently failing**.
+
+If you've been bitten by subagent tool permissions resetting, Remote Control sessions vanishing after credential renewal, or plugin hooks that only work on the second try — this is your update.
+
+---
+
+## The Headline Fixes (What You'll Actually Notice)
+
+| Area | What Was Broken | What's Fixed |
+|------|-----------------|--------------|
+| **Subagents** | Tool permissions reset on resume; subagent model ignored `CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL` | Permissions persist; workflow subagent model now respected |
+| **Remote Control** | Sessions archived while still connected; credential renewal dropped sessions | Sessions stay alive; renewal is seamless |
+| **Plugins** | Marketplace install failed for names like `constructor`; hooks skipped on late load | All names work; late-loading hooks fire correctly |
+| **MCP** | HTTP SSE transport unsupported; descriptions truncated at 2K chars | SSE transport works; 4K char limit |
+| **Windows** | PowerShell commands >1KB always prompted; Git Bash `rm -rf /c/Users` bypassed prompts | 32KB threshold; bypass mode respects Git Bash |
+| **Cloud Sessions** | Gateway `allowedProviders` with `"gateway"` locked out laptops; auto-mode refused valid artifact updates | Gateway laptops work; auto-mode stops false sharing conflicts |
+
+---
+
+## Subagents: Permissions Finally Persist
+
+The biggest daily friction: you grant a subagent a tool permission, resume the session, and it's gone. v2.1.296 fixes **managed-settings `PreToolUse` hooks that deny with `"continue": false`** — they now refuse the call without ending the turn, and permissions survive resume.
+
+Also fixed: `CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL` now actually runs every workflow agent on one model while other subagents keep theirs. Before, it was silently ignored.
+
+---
+
+## Remote Control: Survives Credential Renewal
+
+Two related fixes land together:
+- **Fixed**: `claude purge` leaving prompts in history when text held Unicode separators (U+2028, U+2029) — this was corrupting Remote Control transcript sync
+- **Fixed**: Remote Control cleanup archiving sessions that were still connected or just re-attached
+
+The net effect: your phone session stays alive when your laptop renews its auth token. No more "where did my session go?" after a coffee break.
+
+---
+
+## Plugins: Marketplace Names Work, Hooks Fire
+
+**Marketplace install** now refuses names like `constructor` or `prototype` clearly instead of failing with an internal error. Plugin secrets named `constructor` or `prototype` no longer get deleted on next save.
+
+**SessionStart hooks** of a late-loading plugin no longer get skipped when a different plugin with the same name (or another spelling) already ran. This was a silent failure — your plugin loaded, but its startup hook never fired.
+
+---
+
+## MCP: SSE Transport + 4K Descriptions
+
+**SSE transport** is now supported for MCP servers — critical for servers behind load balancers or corporate proxies that don't play nice with stdio.
+
+**MCP tool descriptions** sent up front and server instructions now default to **4,096 characters** (was 2,048). If your MCP server has rich tool schemas, they'll actually reach the model now.
+
+---
+
+## Windows: PowerShell 32KB, Git Bash Respected
+
+- **PowerShell commands** longer than ~1KB used to always ask for permission. Now allow rules and read-only detection apply up to **32 KB**.
+- **Git Bash `rm -rf /c/Users/<name>`** in bypass permissions mode now asks — it was silently succeeding before.
+- **stdio MCP servers** on Windows no longer get force-killed at shutdown; stdin closes first, process tree killed only if still running after 300 ms.
+
+---
+
+## Cloud Sessions & Gateway: Laptop Lockout Fixed
+
+A regression in v2.1.295: a Claude apps gateway serving `allowedProviders` with `"gateway"` was **locking out laptops** that named that gateway in user settings. Fixed.
+
+Also fixed: a saved gateway sign-in being ignored on machines whose managed settings set `forceLoginMethod` to `gateway` with no `forceLoginGatewayUrl`.
+
+---
+
+## The Rest (50+ Fixes Total)
+
+| Category | Fix |
+|----------|-----|
+| **Hooks** | PostToolUse hooks in managed settings now apply `updatedMCPToolOutput`; headless sessions start folder's `.mcp.json` correctly after cd/reload |
+| **Transcripts** | `CLAUDE_CODE_TRANSCRIPT_LOCAL_GC` no longer drops messages with Unicode separators; large transcript files not rewritten when freeing <10% |
+| **Auto-mode** | Tool calls with no usable answer show as dim "Not run" instead of red error; occasional false sharing-conflict refusals fixed |
+| **Debug** | Hook commands now log command, plugin, outcome, duration — slow hooks identifiable |
+| **Cost** | `/cost`, status line, `--max-budget-usd`, SDK cost figures price Sonnet 5.5 cache reads at $0.10/Mtok (was $0.20) |
+| **VS Code** | `claudeCode.spinnerVerbs` missing from extension settings — fixed, malformed value no longer breaks chat panel |
+| **Workflows** | Script files with CRLF line endings (Windows checkouts) no longer refused |
+| **OpenTelemetry** | `tool_result` events now include `git_commit_id` after `git commit -q` or `git -C <dir> commit` |
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Use subagents daily | **Yes** — permissions persist, workflow model works |
+| Use Remote Control cross-machine | **Yes** — sessions survive credential renewal |
+| Run plugins from marketplace | **Yes** — install works, hooks fire reliably |
+| Use MCP with SSE or rich schemas | **Yes** — transport + 4K limit |
+| Develop on Windows | **Yes** — PowerShell 32KB, Git Bash respected |
+| Use cloud sessions / gateway | **Yes** — laptop lockout fixed |
+| Just want the latest model | **No** — no model changes (Sonnet 5.5 default since v2.1.280) |
+
+---
+
+## How to Update
+
+```bash
+# Check current version
+claude --version
+
+# Update to latest (v2.1.296)
+npm install -g @anthropic-ai/claude-code@latest
+
+# Or via installer (auto-updates)
+# macOS/Linux
+curl -fsSL https://claude.ai/install | bash
+
+# Windows (winget)
+winget install Anthropic.ClaudeCode
+
+# Verify
+claude --version
+# Should show 2.1.296
+```
+
+---
+
+## The Bottom Line
+
+**v2.1.296 doesn't add features. It removes friction.**
+
+50+ fixes across the exact surfaces that make daily workflows brittle: subagent permissions, Remote Control persistence, plugin reliability, MCP completeness, Windows usability. This is the release you update to before your next long coding session — not because something new is possible, but because the things that already worked stop breaking.
+
+---
+
+## Related Articles
+
+- [Claude Code v2.1.295: Stability Release You've Been Waiting For](/blog/claude-code-v2-1-295-stability-release-youve-been-waiting-for/)
+- [Claude Code v2.1.293: Haiku 5.5 Default, 30+ Fixes](/blog/claude-code-v2-1-293-haiku-5-5-default-fixes/)
+- [Claude Code v2.1.288: 100+ Fixes — Streaming Crashes, Resume, Auto-Mode](/blog/claude-code-v2-1-288-100-fixes-you-actually-feel/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
+
+*Claude Code is proprietary (source-available) and available at [github.com/anthropics/claude-code](https://github.com/anthropics/claude-code). Updated October 10, 2026 — covers v2.1.296 released October 9, 2026. Full changelog: [github.com/anthropics/claude-code/blob/main/CHANGELOG.md](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)*

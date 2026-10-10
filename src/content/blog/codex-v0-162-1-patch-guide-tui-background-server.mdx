@@ -1,0 +1,109 @@
+---
+title: "Codex v0.162.1 Patch Guide — TUI Crash Fix + Background Server Compatibility"
+description: "Codex v0.162.1 (October 9) is a surgical patch: fixes TUI crashes on multi-line async questions and startup failures when background server feature settings drift from CLI defaults. A beginner-friendly breakdown of the stable channel update."
+pubDate: "2026-10-10T10:00:00Z"
+tags: ["codex", "guide", "v0.162.1", "patch", "tui", "stability", "coding-agent", "beginner"]
+tool: "codex"
+author: "sage"
+image: "/api/og?title=Codex+v0.162.1+Patch+Guide&tool=codex"
+---
+
+**Codex v0.162.1 dropped October 9** — 13 hours ago as of this writing. It's a **two-fix patch release** on the stable channel. No new features. Just the crashes that were biting people daily.
+
+If you've had the TUI crash when an async question wraps multiple lines, or seen startup fail because your background server's feature flags drifted from CLI defaults — this is your update.
+
+---
+
+## The Two Fixes
+
+### 1. TUI Crash on Multi-Line Async Questions (Fixed)
+
+**The bug:** When an asynchronous question from the agent contained multiple lines (like a long prompt with embedded hyperlinks), the TUI would crash trying to render it. Line breaks and complete hyperlink destinations were lost — then the whole UI went down.
+
+**The fix:** PR [#51866](https://github.com/openai/codex/pull/51866) — multi-line async questions now preserve line breaks and full hyperlink destinations. The TUI stays up.
+
+**Who this hits:** Anyone using the TUI (`codex` in terminal) with agents that ask multi-step questions or present options with links. Common in code review flows and multi-file refactors.
+
+---
+
+### 2. Background Server Feature Drift (Fixed)
+
+**The bug:** You start a background server (`codex app-server start`). Later, you run `codex` CLI with different feature flags. The compatibility check would fail on **explicit command-line feature overrides** — even when they were intentional. Startup would refuse to connect.
+
+**The fix:** PR [#52648](https://github.com/openai/codex/pull/52648) — compatibility checks now apply **only to explicit command-line feature overrides**. Implicit/default settings no longer block connection.
+
+**Who this hits:** Teams sharing a background server, CI pipelines, anyone running `codex` with `--feature` flags that differ from the server's config.
+
+---
+
+## Version Context
+
+| Version | Date | Type | Notes |
+|---------|------|------|-------|
+| **v0.162.1** | Oct 9, 2026 | **Stable (Latest)** | This patch — TUI crash + server compat |
+| v0.162.0 | Oct 8, 2026 | Stable | Worktrees, pinned tasks, transcript navigation |
+| v0.160.0 | Oct 1, 2026 | Stable | Guardian review, history pagination, TUI persistence, Windows sandbox, WSL hardening |
+| v0.155.0 | Sep 17, 2026 | Stable | First stable since Feb — Guardian, command center, Windows fixes |
+| v0.163.0-alpha.5 | Oct 10, 2026 | Alpha | Latest alpha (voice, task mgmt, Touch ID, daemon updates) |
+
+**v0.162.1 is the stable channel** — recommended for daily use. The alpha channel (v0.163.0-alpha.x) has experimental voice, task hiding/archiving, Touch ID for MCP, and configurable daemon updates.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Use Codex TUI daily | **Yes** — multi-line async question crash is gone |
+| Run background server + CLI with feature flags | **Yes** — drift no longer blocks startup |
+| Want voice / task management / Touch ID | **No** — those are in alpha (v0.163.0-alpha.x) |
+| Just want the latest model | **No** — no model changes (GPT-6 Astra since v0.154) |
+
+---
+
+## How to Update
+
+```bash
+# Stable (v0.162.1) — RECOMMENDED for daily use
+npm install -g @openai/codex@0.162.1
+
+# Or just "latest" on stable channel
+npm install -g @openai/codex@latest
+
+# Via installer (auto-updates to stable)
+# macOS/Linux
+curl -fsSL https://codex.openai.com/install | bash
+
+# Windows (scoop)
+scoop update codex
+
+# Verify
+codex --version
+# Should show 0.162.1
+```
+
+---
+
+## The Bottom Line
+
+**v0.162.1 is a "sleep better" release.**
+
+Two bugs. Both crash-class. Both fixed. The TUI crash on multi-line questions was the kind that made you lose context mid-review. The background server drift made shared servers flaky.
+
+Update before your next session. It takes 30 seconds.
+
+---
+
+## Related Articles
+
+- [Codex 0.155/0.160/0.162: Guardian Review, Voice, Task Management — The Complete Wave](/blog/codex-0-160-guardian-review-history-windows-fixes/)
+- [Codex 0.160: Guardian Review — Your Agent Finally Remembers](/blog/codex-0-160-guardian-review-history-windows-fixes/)
+- [Codex vs Copilot CLI: Terminal Battle](/blog/codex-vs-copilot-cli-terminal-battle/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [OpenCode v1.18.18: Reliability, MCP, Desktop Overhaul](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
+---
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
+
+*Codex is open-source (MIT) and available at [github.com/openai/codex](https://github.com/openai/codex). Updated October 10, 2026 — covers v0.162.1 released October 9, 2026. Full changelog: [github.com/openai/codex/releases](https://github.com/openai/codex/releases)*
