@@ -1,0 +1,205 @@
+---
+title: "Claude Code Just Made Haiku 5.5 the Default — And Dropped 100+ Fixes You'll Actually Feel"
+description: "Claude Code v2.1.296 (Oct 9) promotes Haiku 5.5 to default, adds subagent auto-compact, Read tool allow_large, Windows stdio MCP graceful shutdown, and 100+ bug fixes. Beginner-friendly breakdown of the release that makes daily work smoother."
+pubDate: "2026-10-10T15:00:00Z"
+tags: ["claude-code", "release", "coding-agent", "beginner", "haiku-5-5", "stability"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+v2.1.296+Haiku+5.5+Default&tool=claude-code"
+canonical: "https://terminalblog.com/blog/claude-code-v2-1-296-haiku-5-5-default-massive-fix-wave/"
+---
+
+Claude Code **v2.1.296** landed October 9, and it's the kind of release that doesn't scream — it just makes everything work better. The headline: **Claude Haiku 5.5 is now the default Haiku model** (1M context, $0.10/$0.50 per M tokens). But the real story is the 100+ fixes that eliminate daily papercuts.
+
+If you've been fighting Windows hook crashes, MCP server restarts, subagent context limits, or token counting quirks — this update fixes the things that made you sigh.
+
+---
+
+## The Big Changes You'll Notice
+
+### 1. Haiku 5.5 Is Now the Default Haiku
+
+**What changed:** `claude-haiku-5-5` replaces the previous Haiku as the default. 1M context window. Pricing: $0.10 input / $0.50 output per M tokens ($0.50/$2.50 for prompts over 100K).
+
+**Why beginners care:** Haiku 5.5 is genuinely strong at coding now. You get 1M context at Haiku prices. For quick edits, file reads, and everyday tasks, it's the new sweet spot — faster than Sonnet, cheaper than Opus, capable enough for most things.
+
+### 2. Subagents Can Now Auto-Compact Earlier Than Main Conversation
+
+**New:** `autoCompactWindow` in subagent frontmatter and `--agents` definitions.
+
+**What it does:** Your main conversation might have a 200K auto-compact window. A focused subagent doing a code review can compact at 50K. Different agents, different memory strategies.
+
+**Why it matters:** Long-running subagents (like a security reviewer that reads your whole codebase) no longer balloon the main context. They self-manage.
+
+### 3. Read Tool Gets `allow_large` — Read Past Size Limits in One Call
+
+**New:** `allow_large` option on the Read tool.
+
+**What it does:** When Claude needs an entire file and context has room, it can now read past the usual size limit in a single call. No more chunked reads for large config files, generated code, or logs.
+
+**For beginners:** "Read the whole file" now actually works for large files. Less back-and-forth, less context fragmentation.
+
+### 4. Windows: stdio MCP Servers Shut Down Gracefully (Finally)
+
+**Fixed:** stdio MCP servers on Windows now get `stdin` closed first, then 300ms grace period before process tree kill.
+
+**What this means:** No more corrupted MCP server state on Windows. Your database connections, file watches, and background processes in MCP servers get a clean shutdown signal.
+
+### 5. Windows: `claude plugin install` Works Without SSH Keys
+
+**Fixed:** GitHub `owner/repo` plugin sources now retry over HTTPS when no SSH key is configured.
+
+**Why it matters:** Plugin installs on Windows just work now. No more "generate SSH key, add to GitHub, try again" dance.
+
+---
+
+## The Fixes That Eliminate Daily Annoyances
+
+| Fix | What It Solved |
+|-----|----------------|
+| **Hook output altered by plugin hint tags** | Hooks that output text resembling plugin hints no longer get mangled |
+| **Secret redaction missed key-with-no-value patterns** | JSON inside shell strings now properly redacts all secrets |
+| **VTE terminal escape sequence (`52;c;…`) after copy** | Clean copy/paste in MATE Terminal and similar |
+| **Toasts waiting unseen behind `/diff` panel** | Notifications now appear immediately, not after you close diff |
+| **Esc during `UserPromptSubmit` hook ending headless sessions** | Interrupts behave correctly in automation |
+| **Resumed subagents told user rejected interrupted tool call** | Subagents no longer get gaslit about what happened |
+| **Plugin `$` methods running in wrong working directory** | Mods now execute in the calling agent's directory |
+| **`claude self-hosted-runner` misleading errors** | Now names the org admin setting or says "needs fresh work order" |
+| **Workflow scripts silently truncating deep nested results** | 20,000+ level nesting now works without data loss |
+| **PowerShell commands >1KB always asking permission** | Allow rules and read-only detection now work up to 32KB |
+| **`rm -rf /c/Users/<name>` in Git Bash not asking in bypass mode** | Dangerous commands still prompt correctly |
+| **Fullscreen mode: link under mouse now underlined** | Visual affordance for clickable links |
+| **Transcript toggle (Ctrl+O) responsiveness in code-heavy chats** | Syntax-highlighted blocks cached — instant toggle |
+| **`/cost`, status line, `--max-budget-usd` pricing corrected** | Sonnet 5.5 cache reads now $0.10/M (was $0.20) |
+| **MCP tool description limit: 2,048 → 4,096 chars** | Richer tool schemas reach the model |
+| **Backgrounding (`←`) now stops turn instead of finishing out of sight** | No more surprise background completions |
+| **VS Code: `claudeCode.spinnerVerbs` missing from settings** | Settings.json validates and completes correctly |
+| **VS Code: Windows file links (`C:\repo\file.ts`) now open** | Click-to-open works on Windows paths |
+| **VS Code: working indicator respects reduced motion** | No animation when OS/settings disable it |
+| **Cloud sessions: queue position now per-session** | No more "everyone shows position 1" |
+| **Cloud sessions: message sent during reply stays below** | No more jumping above the reply on finish |
+
+---
+
+## The "Wait, That's Fixed?" Quality-of-Life Fixes
+
+- **Bash permission checks for for-loops over globs** — accuracy improved
+- **Forked skills from Workflow subagents deliver to correct agent** — not main conversation
+- **In-process agent teammates: first `SendMessage` works** — no more loading delay
+- **Background session `/loop` wakeup notice** — tells you when it woke while process was down
+- **Raw terminal hyperlink bytes drawn as clickable links** — hidden addresses now visible
+- **Plugin marketplaces with large git submodules** — only plugin-holding submodules fetched
+- **`/advisor` dialog shows "No advisor" when saved model unavailable** — no ghost checkmarks
+- **MCP background task notification shows full task ID** — no more truncated IDs
+- **Vim mode `~` cursor position fixed** — `x` after `~` works, `3~` doesn't run into next line
+- **Cursor landing position after pasting accented text (macOS)** — fixed off-by-one
+- **Terminal freezing on 10K+ line responses** — Ctrl+C now works
+- **Mod hot-reload guard hooks with `.catch`** — calls properly refused during reload
+- **Plugin hooks nesting thousands of levels** — no more bare stack overflow
+- **`claude plugin test` with `session.append` hooks** — mock.session reads back appended rows
+- **`claude plugin eval` on Macs with Docker Desktop** — refusal names which credential store held the link
+- **Claude apps gateway refusing `desktop` policy with browser keys** — fixed
+- **`claude agents` bypass permissions consent flow** — asks first, notices if ignored
+- **Backgrounding (`←`) with unsent prompt text** — cancels move instead of losing text
+- **Esc/No on permission prompt during backgrounding** — stops turn correctly
+- **Agents view placeholder rows on folder read failure** — fixed
+- **Path-scoped rules and nested CLAUDE.md loading via `cat`/`head`/`grep`** — now works, not just `Read` tool
+- **Pasted text beginning/ending with same words** — no longer sent as typed
+- **Skill name in pasted text + accent merge** — no longer treated as typed
+- **`/feedback` Ctrl+O/Ctrl+Z during send** — no longer leaves send impossible to cancel
+- **`claude purge` on undeletable files** — deletes rest, lists failures, exits 1
+- **Keybindings.json: lone space key no longer error** — `ctrl+ k` gets warning not error
+- **Vim mode `>>`/`<<` on spaces-only lines** — cursor position fixed
+- **Vim mode `V` then `d` cursor landing** — first non-blank, `.` acts on cursor line
+- **Windows: stopping status line/hook/shell command killing unrelated PID** — fixed
+- **Auto mode denial message reverted** — back to "denial covers outcome"
+- **Cloud sessions asleep after container restart** — reverted 2.1.290 fix, sessions stay asleep
+- **Team/Enterprise startup: policy fetch earlier, 3s retry** — faster org startup
+- **Claude in Chrome: fewer refused page actions on slow tab reporting** — smoother browsing
+- **Claude in Chrome cloud sessions: org mismatch explained** — tells you which org extension must match
+- **Bash edit diff note: "files changed while command ran"** — includes other process writes
+- **Artifacts: libraries pinned to exact versions 2+ weeks old** — supply chain stability
+- **claude.ai skill sync: every 40 min (was 10) when idle** — less background traffic
+- **Agent/MCP server announcement order: non-ASCII sorts after ASCII** — consistent ordering
+- **OpenTelemetry `@mention` logging: max 100 agent + 100 MCP events per prompt** — bounded
+- **Self-hosted runner orchestrator: 4-6s random poll interval** — replicas don't thundering-herd
+- **Claude Tag Slack: workspace mismatch in Enterprise Grid** — fixed
+- **Claude Tag Slack: admin connector changes apply after task finishes** — no mid-task disruption
+- **Claude Tag Slack: thread routine with extra notes continues in thread** — no orphaned runs
+- **Claude Tag Slack: Google connector "all connected" after one sign-in** — fixed
+- **Claude Tag admin: lists unconnected Enterprise Grid with Connect button** — discoverable
+- **Claude Tag Slack: channel rules limit 20 → 50** — more granular control
+- **Code Review: Add repo dialog lists each failure with reason** — missing write access, etc.
+
+---
+
+## Version Context
+
+| Version | Date | Type | Notes |
+|---------|------|------|-------|
+| **v2.1.296** | Oct 9, 2026 | **Latest Stable** | Haiku 5.5 default, subagent auto-compact, Read allow_large, Windows MCP fixes, 100+ fixes |
+| v2.1.295 | Oct 8, 2026 | Stable | Hook `onFailure:block`, OSC 7501, `/copy` quoted text, MCP backoff, backgrounding fixes |
+| v2.1.294 | Oct 8, 2026 | Stable | Prompt/agent hook instruction fixes, Stop/SubagentStop judgment |
+| v2.1.293 | Oct 7, 2026 | Stable | **Haiku 5.5 added**, agentType in subagentStatusLine, isDeferred in mods, context compaction fix |
+
+**v2.1.296 is the cumulative polish release** — it includes everything from 293-295 plus the new features above.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Use Haiku for daily coding | **Yes** — Haiku 5.5 is a meaningful upgrade |
+| Run subagents for code review, security, docs | **Yes** — `autoCompactWindow` per subagent |
+| Read large files (generated code, configs, logs) | **Yes** — `allow_large` reads in one call |
+| **On Windows** | **Yes** — MCP graceful shutdown, plugin HTTPS fallback, PowerShell 32KB |
+| Use self-hosted runners | **Yes** — git fetch fixes, misleading errors fixed |
+| Run cloud sessions | **Yes** — queue position, message ordering, container recovery |
+| Want accurate cost tracking | **Yes** — Sonnet 5.5 cache pricing corrected |
+| On v2.1.295 and happy | **Optional** — no breaking changes, but 100+ fixes add up |
+
+---
+
+## How to Update
+
+```bash
+# npm (most common)
+npm update -g @anthropic-ai/claude-code
+
+# Verify
+claude --version
+# Should show 2.1.296
+```
+
+---
+
+## The Bottom Line
+
+**v2.1.296 doesn't add a killer feature. It removes the friction that made you work around the tool.**
+
+Haiku 5.5 as default means your quick tasks get 1M context at Haiku speed. Subagent auto-compact means long-running specialists don't pollute main context. Windows MCP shutdown means your MCP servers survive restarts. The 100+ fixes mean the things that annoyed you Tuesday are gone Wednesday.
+
+This is the release you update for, then forget you updated — because everything just works.
+
+```bash
+npm update -g @anthropic-ai/claude-code
+# Then: keep coding
+```
+
+---
+
+## Related Articles
+
+- [Claude Code v2.1.295: Stability Release You've Been Waiting For](/blog/claude-code-v2-1-295-stability-release-youve-been-waiting-for/)
+- [Claude Code v2.1.294: Hook Security Fix](/blog/claude-code-v2-1-294-hook-security-fix/)
+- [Claude Code v2.1.293: Haiku 5.5 Default, 30+ Fixes](/blog/claude-code-v2-1-293-haiku-5-5-default-fixes/)
+- [Claude Code v2.1.296: Stability Guide — 50 Fixes](/blog/claude-code-v2-1-296-stability-guide-50-fixes/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+- [How to Setup AI Coding Agents — Complete Beginner Guide](/blog/how-to-setup-ai-coding-agents/)
+
+---
+
+*Claude Code is proprietary (issues/docs repo only). Anthropic API pricing applies. [github.com/anthropics/claude-code](https://github.com/anthropics/claude-code)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? [aiFiesta](https://aifiesta.link/muhammed-anshad) gives you all of them and more for just $12/mo. One subscription, every answer.*
