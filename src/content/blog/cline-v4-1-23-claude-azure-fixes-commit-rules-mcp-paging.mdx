@@ -1,0 +1,173 @@
+---
+title: "Cline v4.1.23 Just Fixed the Azure Claude 400 Error — And Your Commit Messages Finally Follow .clinerules"
+description: "Cline v4.1.23 (Oct 7) fixes the custom Anthropic base URL 400 error, adds GPT-6.1 Sol to recommended models, makes Generate Commit Message respect .clinerules, and lets MCP tools page overflow output. The quiet reliability patch you needed."
+pubDate: "2026-10-11T10:00:00Z"
+tags: ["cline", "release", "v4.1.23", "azure", "anthropic", "commit-messages", "mcp", "coding-agent", "beginner"]
+tool: "cline"
+author: "sage"
+image: "/api/og?title=Cline+v4.1.23+Azure+Claude+Fix&tool=cline"
+canonical: "https://terminalblog.com/blog/cline-v4-1-23-claude-azure-fixes-commit-rules-mcp-paging/"
+---
+
+**Cline v4.1.23 dropped October 7** — and it's the kind of release that fixes the things that made you silently curse at your terminal.
+
+The headlines: **Claude through custom Anthropic base URLs (Azure AI Foundry, corporate gateways) works again**, **Generate Commit Message now follows your `.clinerules`**, **MCP tool output that exceeds context is now pageable**, and **Kimi K3 and other picky models no longer reject requests**. Plus a model catalog refresh adding GPT-6.1 Sol.
+
+If you're on Azure, behind a corporate gateway, or just want commit messages that match your project conventions — this is your update.
+
+---
+
+## 1. The Azure / Corporate Gateway 400 Error: Fixed
+
+**The bug:** Since v4.1.22, using Claude through a custom Anthropic base URL (Azure AI Foundry, corporate proxies, self-hosted gateways) threw a **400 error**. Cline started sending an option that only Anthropic's own API accepts.
+
+**The fix:** v4.1.23 strips that option for non-Anthropic endpoints. Your Azure / corporate / self-hosted Claude just works again.
+
+**Who this hits:** Anyone on Azure AI Foundry, corporate Anthropic gateways, or any non-official Anthropic endpoint. If you saw "400 Bad Request" when calling Claude — update and it's gone.
+
+---
+
+## 2. Generate Commit Message Finally Respects `.clinerules`
+
+**Before:** You spent hours crafting `.clinerules` with your commit conventions — language, format, ticket references, conventional commits style. Then you hit "Generate Commit Message" and got generic garbage that ignored all of it.
+
+**Now:** **Generate Commit Message reads and follows your `.clinerules`.** Your conventions apply to commit messages too.
+
+```markdown
+# .clinerules example
+- Commits: conventional format (feat/fix/chore: scope - description)
+- Reference Jira ticket: PROJ-123
+- Language: English, imperative mood
+```
+
+Now when Cline generates a commit message, you get:
+```
+feat(auth): add OAuth2 refresh token rotation - PROJ-456
+```
+
+Instead of:
+```
+update auth files
+```
+
+---
+
+## 3. MCP Tool Output That Exceeds Context: Now Pageable
+
+**The problem:** An MCP tool returns more output than fits in context. The overflow was just... gone. Lost. You knew there was more but couldn't reach it.
+
+**The fix:** Cline now returns a **preview + a link it can page through with `read_files`**. The output past the cutoff is no longer lost.
+
+```text
+[MCP Tool Result]
+Preview (first 50KB): {...}
+⚠️ Output truncated. Use read_files to page through the rest.
+Link: mcp://tool-result/abc123/page/2
+```
+
+**Why it matters:** Database queries, log dumps, large file reads — you can now page through results instead of hitting a hard wall. The agent can fetch page 2, page 3, etc., using the same tool.
+
+---
+
+## 4. Kimi K3 and Picky Models: Reasoning Level Auto-Negotiation
+
+**The bug:** Models like Kimi K3 that only accept certain reasoning levels would **reject the request entirely**. You'd get an error instead of a response.
+
+**The fix:** Cline now **picks the closest reasoning level the model supports**. You ask for "high" → model only supports "medium" → Cline sends "medium" automatically. No error, no manual tweaking.
+
+---
+
+## 5. Model Catalog Refresh: GPT-6.1 Sol Added, DeepSeek V4.1 Flash Dropped
+
+| Change | Details |
+|--------|---------|
+| **Added to recommended** | GPT-6.1 Sol |
+| **Added to free list** | Solar Mini 4 |
+| **Removed from free list** | DeepSeek V4.1 Flash, space-bunny-alpha |
+| **Default model changes** | 302.AI, AKI.IO, Blue Claw, CoralBricks, CrossModel, DevPass, DigitalOcean, GMI Cloud, LLM Gateway, Mistral, NanoGPT, Neon, Nvidia, Ofox, Requesty, Subconscious, The Grid AI, Vivgrid, Vultr |
+| **Vultr model IDs renamed** | If you pinned a Vultr model, re-select it |
+
+**Note:** If you use any of those providers *without* pinning a model, expect a different default after update.
+
+---
+
+## 6. Approve/Reject on Tool Approvals: Race Condition Fixed
+
+**Before:** You click "Approve" on a tool call while the panel is still updating → a late update failure rejects a *later, unrelated* approval. You approve one thing, something else gets rejected. Chaos.
+
+**Now:** Approve/Reject work **right away**, even while the panel updates. A late update failure no longer poisons subsequent approvals.
+
+---
+
+## 7. Focus Chain Cleanup on Task Reopen
+
+**Fixed:** Old tasks no longer show leftover Focus Chain checklist rows when reopened. Clean slate every time.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| **v4.1.23** | Oct 7, 2026 | **Stable** | Azure 400 fix, .clinerules for commits, MCP paging, Kimi reasoning fix, model refresh |
+| v4.1.22 | Oct 2026 | Stable | Introduced the 400 bug (fixed in .23) |
+| Desktop v0.0.45 | Oct 8, 2026 | Desktop | Separate Desktop release |
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Use Claude via Azure / corporate gateway / custom base URL | **Urgent** — v4.1.22 is broken for you |
+| Want commit messages that match your conventions | **Yes** — `.clinerules` now respected |
+| Hit MCP output truncation on large results | **Yes** — paging now works |
+| Use Kimi K3 or models with limited reasoning levels | **Yes** — auto-negotiation added |
+| Just want latest stable | **Yes** — zero breaking changes, 7 fixes |
+
+---
+
+## How to Update
+
+```bash
+# VS Code / Cursor / JetBrains extension
+# Auto-updates or: Extensions → Cline → Update
+
+# CLI (if using standalone)
+# Check https://github.com/cline/cline/releases/tag/v4.1.23
+
+# Desktop app (separate release channel)
+# Desktop v0.0.45 released Oct 8
+```
+
+**Changelog:** [github.com/cline/cline/compare/v4.1.22...v4.1.23](https://github.com/cline/cline/compare/v4.1.22...v4.1.23)
+
+---
+
+## The Quiet Pattern
+
+Cline doesn't ship "features" for demos. It ships **fixes for the workflow you actually live in**.
+
+- Azure 400 error → blocks enterprise teams → fixed
+- Commit message ignoring conventions → daily annoyance → fixed
+- MCP output lost → debugging blind → fixed
+- Model rejects request → silent failure → fixed
+
+This is the release you update for, not the one you tweet about.
+
+---
+
+## Related Articles
+
+- [Cline Desktop Free Coding Models — Zero API Keys](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Cline v4.1.10 — Web Search Lands](/blog/cline-v4-1-10-web-search-lands/)
+- [Cline Just Fixed What Broke Your Trust — v4.1.8](/blog/cline-just-fixed-what-broke-your-trust-v4-1-8/)
+- [Beware: Cline Injection Supply Chain Attack via GitHub Actions](/blog/beware-clinejection-supply-chain-attack-github-actions/)
+- [Beware: Cline Kanban WebSocket RCE](/blog/beware-cline-kanban-websocket-rce/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Cline is developed by the Cline team. Changelog source: [github.com/cline/cline/releases/tag/v4.1.23](https://github.com/cline/cline/releases/tag/v4.1.23). Updated October 11, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
