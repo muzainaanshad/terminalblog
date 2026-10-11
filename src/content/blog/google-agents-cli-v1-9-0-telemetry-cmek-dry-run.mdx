@@ -1,0 +1,190 @@
+---
+title: "Google Agents CLI v1.9.0 Just Turned On Usage Telemetry By Default — And Added CMEK Encryption for Agent Runtime Deploys"
+description: "Google Agents CLI v1.9.0 (Oct 6) enables usage telemetry by default (opt-out with AGENTS_CLI_TELEMETRY=0), adds CMEK encryption for Agent Runtime deployments, dry-run deployment validation, new ADK project defaults, Terraform log sink fixes, and clearer tool-not-found errors on Windows."
+pubDate: "2026-10-11T16:00:00Z"
+tags: ["google", "agents-cli", "release", "v1.9.0", "telemetry", "cmek", "agent-runtime", "dry-run", "adk", "terraform", "beginner"]
+tools: ["agents-cli"]
+author: "rho"
+image: "/api/og?title=Google+Agents+CLI+v1.9.0+Telemetry+CMEK&tool=agents-cli"
+canonical: "https://terminalblog.com/blog/google-agents-cli-v1-9-0-telemetry-cmek-dry-run/"
+---
+
+Google **Agents CLI v1.9.0** dropped **October 6** — and it's the release that makes your agent deployments **auditable, encrypted, and validatable before you commit**.
+
+The headline: **usage telemetry is now on by default** (one log entry per command to your own Google Cloud project — command name, exit code, error class, duration, versions; never arguments or file contents). Opt out with `AGENTS_CLI_TELEMETRY=0` or `DO_NOT_TRACK=1`.
+
+But the real power: **CMEK encryption for Agent Runtime** (`deploy --key`), **dry-run deployment validation** (`deploy --dry-run` checks APIs, IAM, secrets before real deploy), **new ADK project defaults** (enterprise GenAI, Go formatters), and **Terraform log sink fixes** that stop log deletion on re-apply.
+
+If you deploy agents to Google Cloud — this is the update that makes it production-grade.
+
+---
+
+## The One-Line Summary
+
+**Telemetry on by default (your project, your data). CMEK encryption for Agent Runtime. Dry-run validates before deploy. New ADK defaults. Terraform stops deleting logs. Windows tool errors finally make sense. Update today.**
+
+---
+
+## The Headlines (What You'll Actually Feel)
+
+| Feature | Why It Matters |
+|---------|----------------|
+| **Usage telemetry on by default** | One log/command to your GCP project — analytics on tool use, efficiency, issues. Opt-out anytime |
+| **CMEK encryption (`deploy --key`)** | Customer-managed Cloud KMS keys for Agent Runtime — meets `constraints/gcp.restrictNonCmekServices` |
+| **Dry-run deploy (`deploy --dry-run`)** | Validates APIs, engine, IAM, `actAs`, secrets before real deploy — read-only, exits 1 on definite problems |
+| **New ADK project defaults** | `GOOGLE_GENAI_USE_ENTERPRISE=true`, Go formatters enabled, no duplicate JSONRPC on agent card |
+| **Terraform log sink fix** | Re-applying no longer replaces BigQuery log sink tables (was deleting all exported logs) |
+| **Clear Windows tool errors** | Blocked tools (AppLocker, etc.) name the tool + OS reason instead of `PermissionError` traceback |
+
+---
+
+## 1. Usage Telemetry: Your Analytics, Your Project
+
+**What it does:** Each command writes **one log entry to your own Google Cloud project** with: command name, exit code, error class, duration, CLI/Python/OS versions. **Never arguments or file contents.** Purpose: analytics on your tool use, process efficiency, issue diagnosis.
+
+**Opt out:**
+```bash
+export AGENTS_CLI_TELEMETRY=0
+# or
+export DO_NOT_TRACK=1
+```
+
+**Check status:**
+```bash
+agents-cli info
+# Shows whether telemetry is on
+```
+
+**Why it matters:** You get **observability on your own agent operations** — which commands fail, how long they take, what errors repeat — without sending sensitive data to Google. It's *your* telemetry in *your* project.
+
+---
+
+## 2. CMEK Encryption: Customer-Managed Keys for Agent Runtime
+
+**What it does:** `agents-cli deploy --key <kms-key>` encrypts an **Agent Runtime agent with a customer-managed Cloud KMS key (CMEK)**. Works in projects enforcing `constraints/gcp.restrictNonCmekServices`. Key can only be set at agent creation. `deploy --list` shows it in a new **Encryption column** (#83).
+
+**Why it matters:** **Compliance-ready deployments.** Regulated industries (finance, healthcare, gov) often require CMEK. Now Agent Runtime supports it natively — no workarounds, no "encrypt at rest later."
+
+---
+
+## 3. Dry-Run Deploy: Validate Before You Commit
+
+**What it does:** `agents-cli deploy --dry-run` checks an Agent Runtime deployment against Google Cloud:
+- Enabled APIs
+- Target engine
+- IAM permissions
+- `actAs` on service account
+- Secrets
+
+**Behavior:** Definite problem → exits code 1. Check that cannot run → warns only. **Read-only network calls** — no actual deployment.
+
+**Why it matters:** **Catch config errors before they hit production.** CI pipelines can run `--dry-run` as a gate. No more "deploy failed after 5 minutes because IAM was missing."
+
+---
+
+## 4. New ADK Project Defaults: Enterprise-Ready From `init`
+
+**What changed:**
+- **Python projects:** `GOOGLE_GENAI_USE_ENTERPRISE=true` (replaces deprecated `GOOGLE_GENAI_USE_VERTEXAI`). Existing projects keep working — `deploy` respects whichever your `.env` sets.
+- **Go projects:** `gofmt` and `goimports` formatters enabled → `agents-cli lint` reports formatting issues, `lint --fix` fixes them.
+- **Agent card:** No longer appends duplicate `JSONRPC 0.3` interface on every request to `.well-known/agent-card.json` (#84).
+
+**Why it matters:** **New projects start with enterprise defaults.** No "forgot to set env var" surprises. Go projects get formatting hygiene from day one.
+
+---
+
+## 5. Terraform Log Sink Fix: Stop Deleting Your Logs
+
+**What it does:** Re-applying Terraform generated by this release (e.g., `agents-cli infra single-project` or `infra cicd`) **no longer replaces BigQuery log sink tables once logs have arrived.**
+
+**Before:** Re-apply → log sink table replaced → **all exported logs deleted.**
+
+**Now:** Logs stay. `completions_view` also gains a `service_version` column with deployment revision. Run `agents-cli scaffold upgrade` to get this in existing projects.
+
+**Why it matters:** **Log retention is non-negotiable for production.** This fix makes Terraform re-apply safe for audited environments.
+
+---
+
+## 6. Windows Tool Errors That Make Sense
+
+**What it does:** A tool that exists but cannot run (e.g., `uv.exe` blocked by AppLocker) now **fails with a clear error naming the tool and the OS reason** instead of a `PermissionError` traceback (#61).
+
+**Before:** `PermissionError: [WinError 5] Access is denied` — "which tool? why?"
+
+**Now:** "`uv.exe` blocked by AppLocker on Windows" — **immediately actionable.**
+
+**Also:** Installed extensions no longer print a warning on every command. Notice appears **only when a command overridden by an extension runs** (#91).
+
+---
+
+## Quick Version Context
+
+| Version | Date | Focus |
+|---------|------|-------|
+| **v1.9.0** | Oct 6, 2026 | **Telemetry default, CMEK, dry-run, ADK enterprise defaults, Terraform log fix, Windows errors** |
+| v1.8.x | Sep 2026 | Core agent deployment, ADK scaffolding |
+| v1.7.x | Aug 2026 | Multi-project infra, CI/CD templates |
+
+**v1.9.0 is the "production hardening" release** — telemetry for observability, CMEK for compliance, dry-run for safety, Terraform fix for log integrity.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Deploy to Agent Runtime in regulated env | **Yes** — CMEK support is critical |
+| Run CI/CD for agent deployments | **Yes** — `--dry-run` as pipeline gate |
+| Want observability on CLI usage | **Yes** — telemetry in your project (opt-out available) |
+| Start new ADK projects | **Yes** — enterprise defaults from `init` |
+| Re-apply Terraform for infra | **Yes** — log sink fix prevents data loss |
+| Develop on Windows with AppLocker | **Yes** — errors finally make sense |
+| Happy on v1.8.x, no compliance needs | **Optional** — but dry-run alone worth it |
+
+---
+
+## How to Upgrade
+
+```bash
+# pipx (recommended)
+pipx upgrade agents-cli
+
+# pip
+pip install --upgrade agents-cli
+
+# Verify
+agents-cli --version
+# Should show 1.9.0
+
+# Check telemetry status
+agents-cli info
+```
+
+---
+
+## The Bigger Picture
+
+Google Agents CLI is positioning as **the deployment and operations layer for ADK agents** — not just "create agent," but "deploy, validate, encrypt, observe, iterate."
+
+v1.9.0 adds the **operational maturity** that enterprise adoption requires:
+- **Observability** (telemetry)
+- **Compliance** (CMEK)
+- **Safety** (dry-run)
+- **Reliability** (Terraform log fix)
+- **DX** (clear errors, smart defaults)
+
+This isn't a feature release. It's a **trust release**.
+
+---
+
+## Related Articles
+
+- [Google Antigravity Killed Gemini CLI — The Terminal AI War Just Got Real](/blog/google-antigravity-killed-gemini-cli-terminal-ai-war/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+- [How to Setup AI Coding Agents — Complete Beginner Guide](/blog/how-to-setup-ai-coding-agents/)
+
+---
+
+*Google Agents CLI is open-source (Apache-2.0) and available at [github.com/google/agents-cli](https://github.com/google/agents-cli). Updated October 11, 2026 — covers v1.9.0 released October 6, 2026. Full release notes: [github.com/google/agents-cli/releases/tag/v1.9.0](https://github.com/google/agents-cli/releases/tag/v1.9.0)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
