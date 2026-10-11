@@ -1,0 +1,164 @@
+---
+title: "What Developers Actually Think About Cursor, Claude Code & AI Coding — From 300+ HN Comments"
+description: "Real developers share unfiltered opinions on Cursor, Claude Code, and AI coding assistants. The gripes are specific, the praise is conditional, and nobody's fully satisfied."
+publishDate: "2026-10-11"
+updatedDate: "2026-10-11"
+tags: ["coding-agents", "claude-code", "cursor", "developer-experience", "hn-discussion"]
+heroImage: "/blog/hn-ai-coding-sentiment/hero.png"
+heroAlt: "Developer sentiment about AI coding agents from Hacker News discussions"
+draft: false
+---
+
+A thread titled **"AI coding is a nightmare. Am I the only one experiencing this?"** hit Hacker News in July 2026. It wasn't a product announcement. It was a developer venting — and 300+ comments later, it became one of the most honest conversations about AI coding tools on the internet.
+
+The original poster listed six specific gripes. The responses didn't defend the tools. They *added* to the list.
+
+Here's what developers actually think when the marketing hype isn't in the room.
+
+---
+
+## The Six Gripes That Started It All
+
+The OP's complaints were surgical:
+
+1. **Duplicate function syndrome** — "You'll often find it writing three duplicate functions for the exact same feature in a single file. Why? Because it's terrified of blowing up the context window, so it only reads a fraction of a large file and completely misses the existing functionality."
+
+2. **Add-only, never delete** — "AI prefers adding new code over modifying existing code, and it rarely deletes anything. After a few iterations, your codebase becomes a mountain of dead code."
+
+3. **Zero holistic awareness** — "It hyper-focuses on the current task and couldn't care less if its changes break other parts of the system."
+
+4. **Context window cliff** — "If you try to solve the issues above by dumping all the necessary context into the prompt, you'll hit the 200k token limit in no time. After just two more turns, it triggers auto-compacting, and suddenly it turns back into an idiot."
+
+5. **Long context = brain damage** — "The longer the context, the more incoherent its responses become."
+
+6. **The "I understand!" trap** — "You burn through millions of tokens, and every time it replies with 'I understand!' or 'I've got it completely!', the code it spits out still refuses to run."
+
+These aren't edge cases. They're the daily reality for developers pushing these tools past "hello world."
+
+---
+
+## The Cursor vs. Claude Code vs. Codex Reality Check
+
+A parallel thread asked: **"Is anyone on HN still actually using Cursor in 2026?"** The answers reveal a fragmented landscape where everyone's cobbling together their own workflow.
+
+**Cursor loyalists stay for the UI:**
+> "I really just prefer the GUI of having the changes easily highlighted. If I can get something to apply that with Claude Code or Codex or OpenCode or whatever, I'd swap over without thinking." — *jjice*
+
+**The defectors left for pricing and stability:**
+> "I stopped using Cursor because of how terribly optimised it is (worse than VSCode despite being a fork). It would routinely take up 50% of the CPU resources on my MacBook M4 and gigabytes of RAM for absolutely no reason. I switched to Zed, and I'm never going back to Electron/non-native IDEs." — *joefourier*
+
+**Enterprise users are being forced toward first-party tools:**
+> "Plenty of enterprises are still using Cursor, though they are facing plenty of pressure because Anthropic and OpenAI bundle Claude Code and Codex which can make it hard to justify an additional license for a third-party harness." — *alephnerd*
+
+**The "grandfathered plan" trap is real:**
+> "I'm still on their old 500 requests/month plan and the value is simply unbeatable for $20. I've been able to use agents without worrying about usage for my job and personal projects paired with the $20 Codex sub and I dread the day when they finally get rid of the requests plan." — *justAnotherHero*
+
+**Zed + Claude Code is emerging as a power combo:**
+> "Zed with Claude code is the best of both worlds." — *drunkan*
+
+The pattern: nobody's married to one tool. They're mixing Claude Code for deep tasks, Cursor/Codex for speed, and local editors for control.
+
+---
+
+## The Auto-Mode Controversy
+
+When Anthropic made **auto-mode the default in Claude Code** (August 2026), the reaction was split.
+
+**The "just let it run" camp:**
+> "I've been running `--dangerously-skip-permissions` in every instance of Claude for the last year. It's almost a reflex to me. For the most part Claude behaves well, but I don't blindly trust it. LLMs are inherently dangerous tools, and reviewing individual commands (or spamming `y`) doesn't make them less so. Safety is the responsibility of the developer putting sane guardrails (like VCS, immutable filesystems, or read-only tokens). Using more Claude to categorize the safety of Claude commands is not the answer." — *awkii*
+
+**The "prompts don't constrain behavior" realists:**
+> "If you're relying on a prompt to constrain agent behavior, you've already lost." — *AmbroseBierce*
+
+**The sandbox advocates:**
+> "Sandboxing seems like the obvious solution. These tools prompt me to review an absurd number of very complex bash commands where there is realistically no way to carefully review them. I just want to put the thing in a box with the code and let it run any number of commands on the code without prompting." — *steve_taylor*
+
+**Docker/devcontainer workflows are the de facto standard:**
+> "I've been running Claude Code with `--dangerously-skip-permissions` in a Docker container for the last month or so, allowing me to get up and stretch my legs while it does its thing. I definitely wouldn't want to run it unsandboxed." — *arvyy*
+
+The consensus: **auto-mode is fine if you sandbox. Dangerous if you don't.** But sandboxing is still DIY — devcontainers, Docker, Podman, custom wrappers. No one-click solution exists.
+
+---
+
+## The "Add Instead of Change" Problem Is Universal
+
+Multiple threads converged on the same architectural failure mode:
+
+> "The most painful part is the 'add instead of change/delete' habit. The real test for AI coding assistants isn't whether they can generate code, but whether they can understand the existing system, reuse the right abstraction, remove bad code, and own the whole call chain after the change." — *PaiDxng*
+
+> "function addData() {..... function addDataNew() {.... function addDataForAddData {.... function addDataForNewAddData {..." — *minibucket*
+
+This isn't a model limitation. It's a **training incentive problem**. Models are rewarded for producing *more* code that *appears* to solve the task. Deleting code looks like "not doing work." Refactoring looks risky. Adding is safe.
+
+Developers who solve this impose **external discipline**:
+- Opinionated `AGENTS.md` / `CLAUDE.md` files that forbid mass rewrites
+- Spec-driven workflows: write the spec first, then implement
+- Second-agent code review against architectural rules
+- Ruthless context management — "don't leave context up to the LLM"
+
+> "These problems come from giving LLMs too much agency. The fix is to ruthlessly manage context yourself, and use a harness that only allows one LLM response at a time. Don't leave context up to the LLM, and check everything it is doing. This gives you most of the speed increase while still giving you clean, concise, human-reviewed code." — *chr15m*
+
+---
+
+## The Context Window Is a Trap
+
+The 200k token limit sounds generous. In practice, it's a ceiling you hit *fast* when you try to give the model enough context to stop hallucinating.
+
+> "Long context = instant brain damage. Just when you've painstakingly stuffed the perfect amount of context into the window, the model completely loses its mind. The longer the context, the more incoherent its responses become."
+
+The workaround developers actually use: **smaller contexts, more sessions, explicit handoffs.**
+
+> "I have very opinionated AGENTS.md files at the repo level, and at various other levels in the repo where more specialised rules are needed but I don't want those in my context unless that specific section of the codebase is going to be used or touched. I make a lot of use of skills. And my sessions are almost all 'spec driven'..." — *sollawen*
+
+> "Spec driven development can help some, even for brownfield projects. You can have an LLM swallow up your entire project and spit out a spec, and then review that yourself. For any issue, start a brand new context, point it to the spec, explain the issue and explain if it's a regression." — *taffydavid*
+
+The pattern: **don't try to fit the whole codebase in context.** Fit the *spec* in context. Let the model work from a contract, not a memory dump.
+
+---
+
+## The "It Doesn't Know What We Tried in March" Problem
+
+One comment cut through the technical complaints to the organizational reality:
+
+> "Most of the pain you're describing is the model not knowing anything your team knows. It doesn't know you already tried that approach in March and it broke billing. Until you feed it that history it will keep confidently repeating your old mistakes at higher speed." — *iamalizaidi*
+
+This is the **institutional memory gap**. AI coding tools have zero access to:
+- Failed experiments and why they failed
+- Architectural decisions made in Slack/Notion/linear
+- Tribal knowledge about "that service is fragile, don't touch it"
+- Regulatory/compliance constraints that aren't in code
+
+The teams getting results treat AI as a **new hire that needs onboarding** — not a senior dev. They write `AGENTS.md` files that encode the unwritten rules. They feed postmortems into the context. They treat context as a *curated artifact*, not a dump.
+
+---
+
+## What It Means for You
+
+If you're evaluating AI coding tools in late 2026, here's the unvarnished take from developers in the trenches:
+
+| Reality | What Marketing Says | What Developers Do |
+|---------|---------------------|-------------------|
+| **No tool works out of the box** | "Autonomous coding agent" | Build custom harnesses, write AGENTS.md, sandbox everything |
+| **Auto-mode needs guardrails** | "Safe by default" | Run in Docker/devcontainers, use `--dangerously-skip-permissions` *inside* the box |
+| **Context management is the skill** | "200k token context window" | Keep contexts small, spec-driven, session-per-task |
+| **Code quality degrades without process** | "Writes production code" | Enforce spec → plan → implement → review loops, second-agent reviews |
+| **Pricing models trap you** | "Simple subscription" | Grandfathered plans ending, API costs 5-10x subscription, enterprises forced to first-party tools |
+| **The UI matters more than the model** | "Best model wins" | Cursor's diff view > raw CLI; Zed's native perf > Electron bloat |
+
+**The developers winning with these tools aren't "prompt engineering."** They're doing software engineering *with* an unpredictable junior partner. They write specs. They enforce boundaries. They sandbox. They review. They treat the AI as a power tool that kicks back — not a replacement for judgment.
+
+---
+
+## The Bottom Line
+
+Hacker News doesn't suffer hype gladly. When 300+ developers pile into a thread about AI coding, the signal is clear:
+
+**The tools are genuinely useful. The workflow is not solved.**
+
+Anyone selling "autonomous coding" is selling a demo. The production reality is: **spec-driven development, ruthless context curation, sandboxed execution, and human architectural ownership.** The AI writes the code. You still own the system.
+
+That's not a limitation. That's the job.
+
+---
+
+*Want the raw threads? [AI coding nightmare (340+ comments)](https://news.ycombinator.com/item?id=48770319) • [Cursor in 2026 (250+ comments)](https://news.ycombinator.com/item?id=48554513) • [Auto-mode default (313 comments)](https://news.ycombinator.com/item?id=49239021)*
