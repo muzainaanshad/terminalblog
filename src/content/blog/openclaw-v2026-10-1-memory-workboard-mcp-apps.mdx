@@ -1,0 +1,221 @@
+---
+title: "OpenClaw 2026.10.1 Just Made Agent Memory Survive Everything — Registry Changes, Gateway Restarts, and Cross-Session Context"
+description: "OpenClaw 2026.10.1 (Oct 10) adds Claude Haiku 5.5, Workboard sidebar, MCP Apps that stay alive across views, sealed immutable installations, and fixes that make memory, sessions, and background work actually reliable. The managed Codex runtime gets its biggest stability drop yet."
+pubDate: "2026-10-11T00:30:00Z"
+tags: ["openclaw", "release", "v2026.10.1", "claude-haiku-5.5", "workboard", "mcp-apps", "immutable-install", "memory", "windows", "beginner"]
+tools: ["openclaw"]
+author: "rho"
+image: "/api/og?title=OpenClaw+2026.10.1+Memory+Workboard+MCP&tool=openclaw"
+canonical: "https://terminalblog.com/blog/openclaw-v2026-10-1-memory-workboard-mcp-apps/"
+---
+
+OpenClaw 2026.10.1 dropped October 10 — and it's the release that finally makes **agent memory survive the things that used to kill it**. Registry changes. Gateway restarts. Background work. Model switches. Plugin updates. All the ways your context used to vanish? Gone.
+
+Plus: **Claude Haiku 5.5 is now native**, a **Workboard sidebar** for personal task tracking, **MCP Apps that keep their tools alive while you chat**, and **sealed immutable installations** that you can activate/recover like Git tags.
+
+If you run OpenClaw in production — especially on Windows — this is the update you've been waiting for.
+
+---
+
+## The One-Line Summary
+
+**Memory survives restarts. MCP Apps stay alive. Installations become immutable/recoverable. Windows worktrees finally work. Update today.**
+
+---
+
+## The Headlines (What You'll Actually Feel)
+
+| Feature | Why It Matters |
+|---------|----------------|
+| **Memory survives registry changes + Gateway restarts** | Your agent's context doesn't vanish when infra moves |
+| **Claude Haiku 5.5 native** | Fast, cheap, smart — appears in model picker automatically |
+| **Workboard sidebar + personal board pinning** | Personal task tracking inside the agent UI |
+| **MCP Apps call tools while views stay open** | Browser/DB/design tools don't disconnect when you switch tabs |
+| **Sealed immutable installations** | Deploy → seal → activate/recover like Git tags |
+| **Windows worktree fixes** | Empty/nested worktrees create correctly |
+| **Background CLI replies don't hang** | Your chat stays responsive while cron jobs run |
+
+---
+
+## 1. Memory That Survives Everything (The Big One)
+
+**What it does:** OpenClaw 2026.10.1 preserves **usage across registry changes**, **delivers worker attachments from remote workspaces**, **prevents queued cancellations from stalling active turns**, **keeps continuation signatures aligned**, and **migrates embedding caches in bounded batches with oversized-row reporting**.
+
+**In English:** Your agent's memory — what it learned, what it's working on, what files it touched — **survives the infrastructure events that used to wipe it.**
+
+| Before 2026.10.1 | After 2026.10.1 |
+|------------------|-----------------|
+| Registry change → memory gone | Registry change → memory preserved |
+| Gateway restart → context lost | Gateway restart → context kept |
+| Model switch → reasoning tail cut off | Model switch → answers survive |
+| Background job → chat stalls | Background job → chat responsive |
+
+**Why beginners care:** You spend hours teaching an agent your codebase. Then a Gateway restart or model switch wipes it. Now: **the context sticks.** This is the difference between "toy" and "tool."
+
+---
+
+## 2. Claude Haiku 5.5 Is Now Native
+
+**What it does:** Added native support for **Claude Haiku 5.5** (#166706).
+
+**Why it matters:** Haiku 5.5 is Anthropic's **fast, cheap, smart** model — perfect for high-volume coding tasks (edits, refactors, tests). Before today, getting it in OpenClaw meant config hacking. Now it's **just in the model picker**.
+
+**Cost context:** Haiku 5.5 is ~1/10th the cost of Opus 5.5 for similar coding performance on routine tasks. If you're cost-conscious, this is your daily driver.
+
+---
+
+## 3. Workboard Sidebar: Personal Kanban Inside Your Agent
+
+**What it does:** Added **Workboard sidebar navigation and personal board pinning** (#164604).
+
+**What you get:**
+- A sidebar panel for personal task boards
+- Pin your most-used boards (they stay top)
+- Navigate between boards without leaving the agent
+
+**Why beginners care:** You're debugging auth → need to track "check JWT expiry," "verify refresh flow," "test logout." Instead of a separate Notion/Trello/Linear tab, **the board lives where the agent works.** Context stays unified.
+
+---
+
+## 4. MCP Apps That Don't Die When You Look Away
+
+**What it does:** MCP Apps can now **call their tools while their views remain open**, with **inline message confirmations** and **synchronized forms/files/context** (#164496, #164493, #164277).
+
+**Before:** Open MCP browser tool → switch to chat → browser tool disconnects → lose your place.
+
+**Now:** Browser/DB/Figma/terminal stays **alive and interactive** while you chat with the agent. Inline confirmations appear in the chat. Forms, files, context stay **synchronized**.
+
+**Why it matters:** MCP is becoming the standard for agent-tool integration. This makes it **usable for real workflows** — not just demos.
+
+---
+
+## 5. Sealed Immutable Installations: Deploy Like Git Tags
+
+**What it does:** Adopted **sealed immutable installation generations with activation and recovery support** (#163799, #164306).
+
+**What it means:**
+- Prepare a sealed generation (like `git tag v1.2.3`)
+- **Activate** it → becomes live
+- **Recover** to previous generation if something breaks
+- `--no-restart` stays preparation-only (safe)
+- Existing installations **not converted automatically** (opt-in)
+
+**Why it matters:** Production OpenClaw deployments can now do **zero-downtime, rollback-safe updates** — the same discipline you expect from Kubernetes, now for your agent runtime.
+
+---
+
+## 6. Windows Worktrees Finally Work
+
+**What it does:** Fixed **empty and nested Windows worktree creation**, improved **Linux Chromium discovery**, and **automatically starts Playwright Chromium on ARM64** (#164202, #164249, #163510, #163281).
+
+**If you've ever:** Created a worktree on Windows → empty folder → "why is nothing here?" → **Fixed.**
+
+**Also:** Nested worktrees (worktree inside worktree) now create correctly. Playwright Chromium auto-starts on ARM64 Linux (no manual install).
+
+---
+
+## 7. Background Work Stops Blocking Your Chat
+
+**What it does:** Recovered interrupted database workers and Doctor migrations. **Kept background CLI replies from hanging**. Preserved automatic chat following as new content arrives (#163258, #165854, #167091).
+
+**The experience:** You kick off a long Skill Workshop review or cron job. **Your chat stays responsive.** New messages appear. You keep working. The background job reports when done.
+
+**Why it matters:** OpenClaw is becoming a **platform that runs background automation while you use it interactively** — not "one or the other."
+
+---
+
+## 8. Gateway Startup With Large Plugins: No More Multi-Minute Stalls
+
+**What it does:** Valid startups no longer capture/discard plugin Doctor modules on every config read. **Windows plugin captures use fast pinned-descriptor copy** again. Catalog updates don't recapture plugins. Model changes don't freeze Gateway. Windows launchers keep working after pnpm updates (#168017, #167544, #161267, #167905).
+
+**If you run:** OpenClaw with many plugins on Windows → **Gateway starts in seconds, not minutes.**
+
+---
+
+## 9. Security & Privacy Hardening
+
+**What it does:** Rejected NUL execution arguments before startup. **Failed closed on unresolved peer credentials**. Prevented stale Codex sessions and foreign live owners from mutating successor workspaces. **Kept private runtime context out of replies and saved conversations** (#164770, #165021, #164197, #164203, #163471, #164561).
+
+**Translation:** Multiple attack vectors closed. Your agent's private context (secrets, internal reasoning) **stays private** — not leaked into saved conversations or replies.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Focus |
+|---------|------|-------|
+| **2026.10.1** | Oct 10, 2026 | Memory survival, Haiku 5.5, Workboard, MCP Apps alive, sealed installs, Windows fixes, background responsiveness, security |
+| **2026.9.9** | Oct 8, 2026 | GPT-6.1 Sol native, Windows junction stores fixed, safer live updates, background non-blocking |
+| **2026.9.8** | Sep 2026 | Hardened stack, Doctor improvements |
+| **2026.9.7** | Sep 2026 | Safer browser, stable macOS |
+
+**2026.9.x** fixed the foundation. **2026.10.1** makes it *reliable enough to trust with production work.*
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| Run OpenClaw in production | **Yes** — memory survival + sealed installs = operational maturity |
+| Run on Windows | **Yes** — worktree fixes + fast plugin startup |
+| Use MCP Apps (browser, DB, design) | **Yes** — tools stay alive across views |
+| Want Haiku 5.5 without config | **Yes** — native in picker |
+| Need rollback-safe deployments | **Yes** — sealed immutable generations |
+| Just want latest stable | **Yes** — massive fix wave, zero breaking changes |
+
+**No rush if:** You're pinned to 2026.9.x for compatibility — but test 2026.10.1 in staging. The memory fixes alone are worth it.
+
+---
+
+## How to Update
+
+```bash
+# npm (Global CLI)
+npm install -g openclaw@2026.10.1
+
+# Docker
+docker pull openclaw/openclaw:2026.10.1
+
+# Verify
+openclaw --version
+# Should show 2026.10.1
+```
+
+---
+
+## What's Next
+
+The 2026.10.1 release notes show **130+ contributors** and fixes across every subsystem. The velocity is real.
+
+Next wave (2026.11.x) will likely bring:
+- More model integrations (GPT-6.2, Opus 6, etc.)
+- Desktop app improvements
+- ACP protocol enhancements
+- Plugin marketplace features
+
+For now: **update, verify memory survives a Gateway restart, and enjoy Haiku 5.5 in your picker.**
+
+---
+
+## Release Artifacts
+
+- **npm:** [openclaw@2026.10.1](https://www.npmjs.com/package/openclaw/v/2026.10.1)
+- **Docker:** `docker pull openclaw/openclaw:2026.10.1`
+- **GitHub Release:** [v2026.10.1](https://github.com/openclaw/openclaw/releases/tag/v2026.10.1)
+- **Changelog:** [CHANGELOG/2026.10.1.md](https://raw.githubusercontent.com/openclaw/openclaw/main/CHANGELOG/2026.10.1.md)
+
+---
+
+## Related Articles
+
+- [OpenClaw 2026.9.9 Just Made GPT-6.1 Sol Native — And Fixed the Windows Session Nightmare](/blog/openclaw-v2026-9-9-gpt61-sol-windows-recovery/)
+- [OpenClaw v2026.9.8 — The Tiny Release That Hardened the Entire Stack](/blog/openclaw-v2026-9-8-release-notes/)
+- [OpenClaw vs Hermes: The Managed Codex Runtime Showdown](/blog/hermes-vs-openclaw/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*OpenClaw is open-source (MIT) and available at [github.com/openclaw/openclaw](https://github.com/openclaw/openclaw). Updated October 11, 2026 — covers OpenClaw 2026.10.1 (October 10, 2026). Full changelog: [github.com/openclaw/openclaw/releases/tag/v2026.10.1](https://github.com/openclaw/openclaw/releases/tag/v2026.10.1)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
