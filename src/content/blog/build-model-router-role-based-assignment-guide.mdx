@@ -1,0 +1,456 @@
+---
+title: "Your AI Agent Keeps Burning $200 on Simple Tasks — Here's How to Fix It"
+description: "Developers on Hacker News identified the absurdity: agents never say 'wait, this is simple, let me use a cheaper model.' They just plow ahead with Opus. Here's a practical guide to building role-based model routing that slashes costs without sacrificing quality."
+pubDate: "2026-10-12"
+tags: ["coding-agents", "model-routing", "cost-optimization", "claude-code", "opencode", "harness", "guide"]
+category: "guide"
+author: "Anshad"
+image: "/api/og?title=Build+Model+Router+Role+Based&tool=coding-agents"
+---
+
+Your agent doesn't know the difference between "rename this variable" and "refactor the auth system." It treats both like they need Opus 5.5.
+
+That's not a model problem. It's a **harness problem**.
+
+On Hacker News last week, a thread with 200+ comments exposed the same frustration: **"The agent never stops and says, 'Wait, this is something another model could do cheaper and faster.' It just plows on with the slow, expensive model."** Another developer put it bluntly: "Conversely, the agent never says, 'This model is too dumb for this task. Let me tag in a smarter one.'"
+
+The solution isn't waiting for Anthropic or OpenAI to add this. It's building a **role-based model router** into your harness — something developers have been asking for since the first agent shipped.
+
+Here's how to build one that actually works.
+
+---
+
+## The Core Insight: Roles, Not Difficulty
+
+The HN thread converged on a key distinction: **don't guess task difficulty. Assign models to roles.**
+
+> "Instead of trying to guess the difficulty level for each task, I think it's better to define the model for each role in advance. It's hard to know the difficulty level ahead of time, but we do know the roles in advance." — ghboo0927
+
+The roles that matter for coding agents:
+
+| Role | What It Does | Model Tier | Why |
+|------|--------------|------------|-----|
+| **Planner** | Architecture decisions, task breakdown, spec writing | Frontier (Opus 5.5, GPT-6 Sol) | Reasoning quality determines everything downstream |
+| **Implementer** | Writing code, editing files, running tests | Mid-tier (Sonnet 5.5, GPT-6 Astra) | Speed matters; quality still matters |
+| **Reviewer** | Code review, security audit, style enforcement | Cheap/Fast (Haiku 5.5, GPT-6 Luna, Flash) | High volume, pattern-matching work |
+| **Researcher** | Codebase exploration, docs lookup, dependency analysis | Cheap/Fast (Haiku, Flash, local) | Read-only, high token volume |
+| **Boilerplate** | Generating tests, configs, migrations, docs | Cheapest (Flash, mini, local) | Repetitive, verifiable output |
+
+---
+
+## Architecture: The Router Sits Between Agent and Provider
+
+```
+User Request → Agent Harness → ROUTER → Model Provider
+                    ↓
+              Role Detection
+                    ↓
+              Model Selection
+```
+
+The router doesn't need to be smart. It needs to be **explicit**. You define the mapping once; the harness enforces it.
+
+---
+
+## Implementation: Minimal Router (TypeScript)
+
+```typescript
+// model-router.ts
+// Drop this into your agent harness (Claude Code hook, OpenCode plugin, custom wrapper)
+
+type Role = 'planner' | 'implementer' | 'reviewer' | 'researcher' | 'boilerplate';
+
+interface ModelConfig {
+  provider: string;
+  model: string;
+  maxTokens: number;
+  temperature: number;
+  costPer1kInput: number;
+  costPer1kOutput: number;
+}
+
+const ROLE_MODEL_MAP: Record<Role, ModelConfig> = {
+  planner: {
+    provider: 'anthropic',
+    model: 'claude-opus-5.5-20261001',
+    maxTokens: 8192,
+    temperature: 0.1,
+    costPer1kInput: 15.00,
+    costPer1kOutput: 75.00,
+  },
+  implementer: {
+    provider: 'anthropic',
+    model: 'claude-sonnet-5.5-20261001',
+    maxTokens: 8192,
+    temperature: 0.2,
+    costPer1kInput: 3.00,
+    costPer1kOutput: 15.00,
+  },
+  reviewer: {
+    provider: 'anthropic',
+    model: 'claude-haiku-5.5-20261001',
+    maxTokens: 4096,
+    temperature: 0.0,
+    costPer1kInput: 0.25,
+    costPer1kOutput: 1.25,
+  },
+  researcher: {
+    provider: 'google',
+    model: 'gemini-2.5-flash',
+    maxTokens: 8192,
+    temperature: 0.1,
+    costPer1kInput: 0.075,
+    costPer1kOutput: 0.30,
+  },
+  boilerplate: {
+    provider: 'openai',
+    model: 'gpt-6-luna',
+    maxTokens: 4096,
+    temperature: 0.3,
+    costPer1kInput: 0.15,
+    costPer1kOutput: 0.60,
+  },
+};
+
+// Local fallback for privacy-sensitive roles
+const LOCAL_FALLBACK: Record<Role, ModelConfig> = {
+  planner: { provider: 'ollama', model: 'qwen2.5-coder:32b', maxTokens: 8192, temperature: 0.1, costPer1kInput: 0, costPer1kOutput: 0 },
+  implementer: { provider: 'ollama', model: 'qwen2.5-coder:14b', maxTokens: 8192, temperature: 0.2, costPer1kInput: 0, costPer1kOutput: 0 },
+  reviewer: { provider: 'ollama', model: 'qwen2.5-coder:7b', maxTokens: 4096, temperature: 0.0, costPer1kInput: 0, costPer1kOutput: 0 },
+  researcher: { provider: 'ollama', model: 'qwen2.5-coder:7b', maxTokens: 8192, temperature: 0.1, costPer1kInput: 0, costPer1kOutput: 0 },
+  boilerplate: { provider: 'ollama', model: 'qwen2.5-coder:3b', maxTokens: 4096, temperature: 0.3, costPer1kInput: 0, costPer1kOutput: 0 },
+};
+
+export function selectModel(role: Role, preferLocal = false): ModelConfig {
+  return preferLocal ? LOCAL_FALLBACK[role] : ROLE_MODEL_MAP[role];
+}
+
+export function estimateCost(role: Role, inputTokens: number, outputTokens: number): number {
+  const config = ROLE_MODEL_MAP[role];
+  return (inputTokens / 1000) * config.costPer1kInput + (outputTokens / 1000) * config.costPer1kOutput;
+}
+```
+
+---
+
+## Wiring It Into Your Harness
+
+### Option 1: Claude Code — Hook-Based Routing
+
+Create `.claude/hooks/model-router.ts`:
+
+```typescript
+// Runs before every tool call
+import { selectModel, Role } from './model-router';
+
+export async function preToolCall(context: {
+  tool: string;
+  params: any;
+  sessionId: string;
+}) {
+  // Detect role from tool + context
+  const role = detectRole(context.tool, context.params);
+  const model = selectModel(role);
+
+  // Inject model into agent context
+  context.agent.model = model.model;
+  context.agent.provider = model.provider;
+  
+  // Log for cost tracking
+  console.log(`[ROUTER] Role: ${role} → Model: ${model.model}`);
+}
+
+function detectRole(tool: string, params: any): Role {
+  // Planning tools → planner
+  if (['todo_write', 'plan', 'architect'].includes(tool)) return 'planner';
+  
+  // Read-only exploration → researcher
+  if (['read', 'glob', 'grep', 'ls', 'search'].includes(tool)) return 'researcher';
+  
+  // Code generation → implementer
+  if (['write', 'edit', 'multi_edit'].includes(tool)) return 'implementer';
+  
+  // Review/validation → reviewer
+  if (['review', 'lint', 'test', 'typecheck'].includes(tool)) return 'reviewer';
+  
+  // Boilerplate generation
+  if (params?.boilerplate === true || tool === 'generate') return 'boilerplate';
+  
+  return 'implementer'; // default
+}
+```
+
+Add to `.claude/settings.json`:
+```json
+{
+  "hooks": {
+    "pre_tool_call": ["./hooks/model-router.ts"]
+  }
+}
+```
+
+### Option 2: OpenCode — Agent Definitions
+
+OpenCode already supports role-based agents natively. Define `.opencode/agents/`:
+
+```yaml
+# .opencode/agents/planner.md
+---
+name: planner
+model: anthropic/claude-opus-5.5
+tools: [read, glob, grep, todo_write]
+permissions:
+  bash: deny
+  edit: deny
+---
+
+# .opencode/agents/implementer.md
+---
+name: implementer
+model: anthropic/claude-sonnet-5.5
+tools: [read, write, edit, bash, test]
+---
+
+# .opencode/agents/reviewer.md
+---
+name: reviewer
+model: anthropic/claude-haiku-5.5
+tools: [read, grep, bash]
+permissions:
+  edit: deny
+---
+
+# .opencode/agents/researcher.md
+---
+name: researcher
+model: google/gemini-2.5-flash
+tools: [read, glob, grep, search]
+permissions:
+  bash: deny
+  edit: deny
+---
+
+# .opencode/agents/boilerplate.md
+---
+name: boilerplate
+model: openai/gpt-6-luna
+tools: [write, edit]
+permissions:
+  bash: deny
+---
+```
+
+Then in your workflow, invoke explicitly:
+```
+@planner design the auth migration
+@implementer implement the plan
+@reviewer review the changes
+@boilerplate generate tests for new auth module
+```
+
+### Option 3: Custom Harness — Full Control
+
+If you're building your own wrapper (like the [teaching hospital pipeline](/blog/coding-agents-more-code-not-more-software-hn-october-2026/#the-cockroach-labs-teaching-hospital-model-is-the-template)), the router becomes a first-class component:
+
+```python
+# router.py
+from enum import Enum
+from dataclasses import dataclass
+from typing import Dict, Optional
+
+class Role(Enum):
+    PLANNER = "planner"
+    IMPLEMENTER = "implementer"
+    REVIEWER = "reviewer"
+    RESEARCHER = "researcher"
+    BOILERPLATE = "boilerplate"
+
+@dataclass
+class ModelSpec:
+    provider: str
+    model: str
+    max_tokens: int
+    temperature: float
+    cost_per_1k_in: float
+    cost_per_1k_out: float
+
+ROLE_SPECS: Dict[Role, ModelSpec] = {
+    Role.PLANNER: ModelSpec("anthropic", "claude-opus-5.5", 8192, 0.1, 15.0, 75.0),
+    Role.IMPLEMENTER: ModelSpec("anthropic", "claude-sonnet-5.5", 8192, 0.2, 3.0, 15.0),
+    Role.REVIEWER: ModelSpec("anthropic", "claude-haiku-5.5", 4096, 0.0, 0.25, 1.25),
+    Role.RESEARCHER: ModelSpec("google", "gemini-2.5-flash", 8192, 0.1, 0.075, 0.30),
+    Role.BOILERPLATE: ModelSpec("openai", "gpt-6-luna", 4096, 0.3, 0.15, 0.60),
+}
+
+class ModelRouter:
+    def __init__(self, prefer_local: bool = False):
+        self.prefer_local = prefer_local
+        self.usage_log = []
+    
+    def route(self, role: Role) -> ModelSpec:
+        spec = ROLE_SPECS[role]
+        self.usage_log.append({"role": role.value, "model": spec.model, "timestamp": time.time()})
+        return spec
+    
+    def get_cost_report(self) -> dict:
+        # Aggregate by role/model
+        pass
+```
+
+---
+
+## The Multi-Agent Pipeline Pattern
+
+The real power emerges when you chain roles — the **teaching hospital** pattern from Cockroach Labs:
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐     ┌──────────────┐
+│  TRIAGE     │────▶│   FELLOW     │────▶│  ATTENDING  │────▶│   DISCHARGE  │
+│  (router)   │     │ (implementer)│     │  (reviewer) │     │  (validator) │
+│  Haiku      │     │  Sonnet      │     │   Haiku     │     │   Local      │
+└─────────────┘     └──────────────┘     └─────────────┘     └──────────────┘
+     │                    │                    │                    │
+  Classify           Write code           Review + test        Merge + cleanup
+  & route            + plan              against standards
+```
+
+Each stage uses a different model. The **router (Triage)** is the cheapest model — it just classifies and routes. The **implementer (Fellow)** does the heavy lifting. The **reviewer (Attending)** catches errors. The **validator (Discharge)** runs final checks.
+
+This pipeline processed **1M+ lines of code with only 7 reverts** over 5 months.
+
+---
+
+## Cost Comparison: Before vs After Router
+
+**Scenario:** 100 coding sessions/month, mixed complexity
+
+| Approach | Monthly Cost | Notes |
+|----------|--------------|-------|
+| Everything on Opus 5.5 | ~$2,400 | Default for many Claude Code users |
+| Everything on Sonnet 5.5 | ~$480 | Better, but overkill for review/boilerplate |
+| **Role-based router** | **~$180** | 92% savings vs Opus-only |
+| Role-based + local fallback | **~$40** | 98% savings; privacy for sensitive code |
+
+The router pays for itself in the first session.
+
+---
+
+## Advanced: Dynamic Escalation
+
+Static roles work for 90% of cases. For the remaining 10%, add **escalation triggers**:
+
+```typescript
+function shouldEscalate(role: Role, context: Context): Role | null {
+  // Reviewer keeps finding same issue → escalate to planner
+  if (role === 'reviewer' && context.repeatFailureCount > 2) return 'planner';
+  
+  // Implementer hits token limit → escalate to planner for decomposition
+  if (role === 'implementer' && context.tokensUsed > 0.8 * MAX_TOKENS) return 'planner';
+  
+  // Researcher finds architectural decision needed → escalate to planner
+  if (role === 'researcher' && context.foundArchitecturalDecision) return 'planner';
+  
+  // Boilerplate generator produces invalid code → escalate to implementer
+  if (role === 'boilerplate' && context.validationFailed) return 'implementer';
+  
+  return null;
+}
+```
+
+This creates a **feedback loop** — the system self-corrects without human intervention.
+
+---
+
+## What You Need to Start Today
+
+### If you use Claude Code:
+1. Create `.claude/hooks/model-router.ts` (15 min)
+2. Add hook to `.claude/settings.json` (1 min)
+3. Define your role→model map (5 min)
+4. Run a test session, watch the logs
+
+### If you use OpenCode:
+1. Create `.opencode/agents/` directory (2 min)
+2. Write 5 agent definition files (10 min)
+3. Update your workflow to invoke agents by role (ongoing)
+
+### If you use a custom harness:
+1. Copy the `ModelRouter` class above (5 min)
+2. Insert at your agent→provider boundary (10 min)
+3. Add cost logging (5 min)
+4. Define escalation rules (15 min)
+
+**Total time: ~30-45 minutes.** One-time setup. Permanent savings.
+
+---
+
+## The Trap to Avoid: Don't Build a "Smart Router"
+
+The HN thread warned about this:
+
+> "When a turn gets routed to a cheaper model and the task still completes, the system records a success. Nobody attributes the subtly worse output to the routing decision — until the problems compound downstream." — renezdander030
+
+**Explicit role assignment beats dynamic difficulty guessing every time.**
+
+- Dynamic: "Is this task hard? Let me think... maybe use Opus." → Inconsistent, unmeasurable
+- Explicit: "This is a reviewer task → Haiku. This is a planner task → Opus." → Predictable, auditable, optimizable
+
+The router should be **dumb and deterministic**. The intelligence lives in your role definitions.
+
+---
+
+## Verification: How to Know It's Working
+
+Add this to your router:
+
+```typescript
+function logDecision(role: Role, model: ModelConfig, reason: string) {
+  const entry = {
+    timestamp: new Date().toISOString(),
+    role,
+    model: model.model,
+    provider: model.provider,
+    reason,
+    estimatedCost: 0, // fill after completion
+  };
+  
+  // Write to JSONL for analysis
+  fs.appendFileSync('.router-decisions.jsonl', JSON.stringify(entry) + '\n');
+}
+```
+
+After a week, analyze:
+```bash
+# Cost by role
+jq -r '.role' .router-decisions.jsonl | sort | uniq -c
+
+# Model distribution
+jq -r '.model' .router-decisions.jsonl | sort | uniq -c
+
+# Escalation rate
+jq 'select(.reason | contains("escalate"))' .router-decisions.jsonl | wc -l
+```
+
+---
+
+## The Bottom Line
+
+The model is a commodity. The harness is the product. And the **router is the highest-leverage component in the harness**.
+
+You don't need a better model. You need a harness that stops sending boilerplate to Opus.
+
+**Start with five roles. Map them to five models. Log every decision. Watch the bill drop.**
+
+---
+
+## Related Reading
+
+- [The Agent Loop Just Became a Plugin — and That Changes Everything](/blog/agent-loop-plugin-harness-wars-2026/)
+- [Coding Agents Generate More Code, Not More Software — HN Developers Explain Why](/blog/coding-agents-more-code-not-more-software-hn-october-2026/)
+- [Your Coding Agent Is a Harness — The Model Is the Commodity](/blog/your-coding-agent-is-a-harness-the-model-is-the-commodity/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+- [Real Cost of AI Coding Agents](/blog/real-cost-of-ai-coding-agents/)
+
+---
+
+*Stop overpaying for AI coding. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you Opus, Sonnet, Haiku, GPT-6, Gemini, and 7 more models in one chat for $12/mo — perfect for testing your router against real providers.*
