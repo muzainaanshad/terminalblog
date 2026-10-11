@@ -1,0 +1,169 @@
+---
+title: "Kilo Code v7.8.8 Just Made Your Worktrees Stick — Pinned Sessions, In-App Browser, and MCP OAuth That Actually Works"
+description: "Kilo Code v7.8.8 (Oct 7) adds pinned worktrees in Agent Manager, integrated browser tabs per session, MCP OAuth credential binding, and session tab shortcuts. The open-source Cursor alternative keeps polishing the daily driver experience."
+pubDate: "2026-10-10T16:00:00Z"
+tags: ["kilocode", "release", "v7.8.8", "agent-manager", "worktrees", "integrated-browser", "mcp-oauth", "beginner"]
+tools: ["kilocode"]
+author: "rho"
+image: "/api/og?title=Kilo+Code+v7.8.8+Pinned+Worktrees+Browser+MCP&tool=kilocode"
+canonical: "https://terminalblog.com/blog/kilocode-v7-8-8-pinned-worktrees-integrated-browser-mcp-oauth/"
+---
+
+Kilo Code v7.8.8 dropped October 7, and it's the kind of release that doesn't scream — it just **makes the tool disappear**. Pinned worktrees that stay where you put them. Browser tabs that live inside your session. MCP OAuth tokens that don't leak across servers. Session switching that finally respects your muscle memory.
+
+If you've been using Kilo as your daily driver, this is the update that removes the last few papercuts.
+
+---
+
+## The Headlines (What You'll Actually Feel)
+
+| Feature | Why It Matters |
+|---------|----------------|
+| **Pinned worktrees in Agent Manager** | Shift+click or context menu → worktrees stay at top, keep jump shortcuts, survive unpin |
+| **Integrated browser per session** | Sidebar chats use browser tabs, Agent Manager uses its panel — no more dual-browser chaos |
+| **MCP OAuth credential binding** | Tokens stay bound to the auth server that issued them — no more cross-server leakage |
+| **Session tab shortcuts** | `Cmd+Alt+Left/Right` (Mac) / `Ctrl+Alt+Left/Right` (Win/Linux) to flip between sessions |
+| **Compact session headers** | More sessions fit in sidebar, scroll-to-bottom button clears prompt rail |
+| **Settings search** | `Ctrl+F` / `Cmd+F` filters every setting, grouped by category, jump-to-tab |
+
+---
+
+## 1. Pinned Worktrees: Your Most Important Context Stays Put
+
+**What it does:** In Agent Manager, Shift+click a worktree (or use the context menu) to **pin it**. Pinned worktrees:
+- Stay at the top of the list
+- Get the first jump shortcuts (1, 2, 3...)
+- Keep their section when you unpin them
+
+**Why beginners care:** You probably have 3–5 active worktrees — main, feature/auth, feature/api, hotfix, experiment. Before v7.8.8, the one you *actually* need right now could slide down the list. Now it's **anchored**. Your mental model matches the UI.
+
+**The flow:**
+1. Open Agent Manager sidebar
+2. Shift+click the worktree running your main task
+3. It jumps to top, gets shortcut `1`
+4. `Ctrl+Alt+1` (or `Cmd+Alt+1`) jumps straight to it
+
+---
+
+## 2. Integrated Browser: One Tab Per Session, No More Chaos
+
+**What it does:** When the experimental **Integrated Browser** is enabled:
+- Sidebar chats open links in a **browser tab inside the editor**
+- Agent Manager uses its **browser panel**
+- Links show a browser icon
+- **No more links opening in two browsers at once**
+
+**Choose "System browser" under "Open links in" to opt out.**
+
+**Why beginners care:** You're debugging a PR, click a GitHub link, it opens in your system Chrome *and* the integrated preview. Now you have two tabs, neither focused. v7.8.8: **one link → one tab → inside your session**. Context stays where you are.
+
+**Also fixed:**
+- Page loads and SPA route changes keep current page visible until next paint (no blank flash)
+- Resize the panel → preview updates live, no stretch
+- Clear warning when browser opened without active session, address bar disabled until session selected
+
+---
+
+## 3. MCP OAuth: Tokens That Stay Loyal
+
+**What it does:** MCP OAuth credentials (refresh tokens, client secrets) are now **bound to the authorization server that issued them**.
+
+**Before:** If an MCP server switched auth servers (common in enterprise rotations), it could receive stored tokens meant for the old server. Security risk. Confusing failures.
+
+**Now:** Token ↔ auth server binding is enforced. A server that switches auth servers **cannot** receive old credentials.
+
+**Why it matters:** MCP is becoming the standard for agent-tool integration. OAuth is how enterprise MCP servers auth. This fix makes Kilo **enterprise-ready for MCP** — not just "works on my machine."
+
+---
+
+## 4. Session Tab Shortcuts: Muscle Memory Finally Works
+
+**What it does:** `Cmd+Alt+Left/Right` (Mac) / `Ctrl+Alt+Left/Right` (Win/Linux) switches between **session tabs in the sidebar AND Kilo editor tabs**.
+
+Shortcut hints appear on the tabs and in the prompt.
+
+**Why it matters:** You have 4 sessions open. You're in session 3, need to check session 1. Old way: mouse → sidebar → click. New way: `Ctrl+Alt+Left` ×2. **Your fingers never leave the keyboard.**
+
+---
+
+## 5. Settings Search: Find Anything in Seconds
+
+**What it does:** A search field at the top of the Settings left rail (`Ctrl+F` / `Cmd+F` to focus):
+- Filters **every setting** in real-time
+- Results **grouped by category** so matching settings stay visible
+- Click a result → jumps to its tab AND setting
+
+**Why beginners care:** Kilo has *hundreds* of settings. Finding "that one MCP timeout setting" used to mean clicking through 8 tabs. Now: type "mcp timeout" → jump → done.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Focus |
+|---------|------|-------|
+| **v7.8.8** | Oct 7, 2026 | Pinned worktrees, integrated browser tabs, MCP OAuth binding, session shortcuts, compact headers, settings search |
+| **v7.8.7** | Oct 5, 2026 | Multi-project Agent Manager default, separate memory model, per-conversation prompt history, GitHub org avatars, to-do progress chip, settings search foundation |
+| **v7.6.0** | Sep 10, 2026 | `/goal` with pause/resume, OS notifications, Agent Manager PR loop, Keep Awake, Claude Code import |
+
+**v7.8.x** is the **Agent Manager polish wave**. v7.6 made it powerful. v7.8 makes it *livable*.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Use Agent Manager daily | **Yes** — pinned worktrees + shortcuts = daily time savings |
+| Use Integrated Browser | **Yes** — tabs per session, no blank flashes, no dual opens |
+| Run MCP servers with OAuth | **Yes** — credential binding is a security fix |
+| Want settings search | **Yes** — `Ctrl+F` everywhere |
+| Just want latest stable | **Yes** — no breaking changes, pure polish |
+
+**No rush if:** You're on v7.8.7 and everything works — but the pinned worktrees alone are worth the 30-second update.
+
+---
+
+## How to Upgrade
+
+```bash
+# VS Code Marketplace (auto-updates)
+# Search "Kilo Code" → Update
+
+# Or via CLI
+npm update -g @kilocode/cli
+
+# JetBrains plugin: 7.1.9 (released Oct 8)
+```
+
+**Breaking changes:** None. Safe to upgrade immediately.
+
+---
+
+## The Bigger Picture
+
+Kilo Code isn't chasing the "most features" trophy. It's chasing **"disappears when you use it."**
+
+| Release Wave | What It Solved |
+|--------------|----------------|
+| v7.4.x | Core stability, worktree foundation |
+| v7.5.x | PR loop, keep-awake, Claude import |
+| v7.6.x | `/goal` autonomy, notifications, PR fixes |
+| **v7.8.x** | **Agent Manager as daily driver — pin, search, shortcut, browse, secure** |
+
+Each wave removes a reason to leave the IDE. v7.8.8 removes **four**.
+
+---
+
+## Related Articles
+
+- [Kilo Code Just Made Long Agent Runs Manageable — /goal, Notifications, and PR Fixes](/blog/kilocode-v7-4-22-clickable-refs-agent-manager-pr-actions-aws-gcp-auth/)
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Kilo vs Cursor: Open Source vs Paid IDE](/blog/cursor-vs-kilocode/)
+- [Kilo vs OpenCode: Two Open Source Philosophies](/blog/kilocode-vs-opencode/)
+
+---
+
+*Kilo Code is developed by Kilo-Org. Changelog source: [github.com/Kilo-Org/kilocode/releases/tag/v7.8.8](https://github.com/Kilo-Org/kilocode/releases/tag/v7.8.8). Updated October 10, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
