@@ -1,0 +1,122 @@
+---
+title: "Goose Just Got Adaptive Thinking — And You Can Finally Export Your Sessions"
+description: "Goose v1.54.0 brings adaptive thinking for Claude 5.5 models, HTML session export with an interactive viewer, first-time setup improvements, and critical Windows fixes. Here's what actually matters."
+publishDate: 2026-10-11
+updatedDate: 2026-10-11
+tags: ["goose", "release", "ai-agents", "coding-agents"]
+heroImage: "/images/goose-v154-adaptive-thinking.jpg"
+heroAlt: "Goose v1.54.0 adaptive thinking and HTML session export features"
+draft: false
+---
+
+Goose v1.54.0 dropped on October 6, 2026. If you're not following the Block (formerly Square) open-source agent closely, you might've missed it. But this release quietly fixes three things that have annoyed developers for months: opaque model reasoning, no way to share/debug sessions, and Windows feeling like a second-class citizen.
+
+Here's the breakdown.
+
+## The Headline Feature: Adaptive Thinking for Claude 5.5
+
+Goose now automatically adjusts how much "thinking" Claude Sonnet 5.5 and Haiku 5.5 do based on task complexity. Previously, you got max thinking tokens every time — expensive and slow for simple edits. Now the agent detects the task type and scales reasoning accordingly.
+
+**Why this matters:** You stop burning tokens on "change this variable name" tasks while still getting deep reasoning for architectural decisions. The PR ([#12761](https://github.com/aaif-goose/goose/pull/12761)) implements this at the provider level, so it works across CLI and desktop.
+
+For beginners: you don't configure anything. It just works. The model "thinks less" for trivial edits and "thinks more" for complex refactors.
+
+## HTML Session Export — Finally, Shareable Debugging
+
+Ever wanted to send a colleague exactly what your agent did? Or replay a session to understand why it went off rails? v1.54.0 adds HTML export with an **interactive viewer** ([#11977](https://github.com/aaif-goose/goose/pull/11977)).
+
+The export includes:
+- Full conversation history with tool calls expanded
+- Token usage per turn
+- Model reasoning (when available)
+- A timeline slider to scrub through the session
+
+Open the HTML in any browser. No Goose installation required on the receiving end. This is huge for:
+- **Code reviews** — show the agent's logic, not just the diff
+- **Bug reports** — attach the session file instead of screenshots
+- **Learning** — study how the agent approaches problems
+
+Run `goose session export --format html` or use the desktop app's new "Export Session" button.
+
+## First-Time Setup Now Asks Your Mode
+
+New users used to drop into a default mode with no guidance. Now `goose configure` prompts you to pick a mode (Agent, Chat, or Plan) during initial setup ([#12629](https://github.com/aaif-goose/goose/pull/12629)).
+
+Small UX win, big onboarding impact. Beginners no longer wonder "what do I do now?"
+
+## Windows: System Node.js in the npx Wrapper
+
+If you've run Goose on Windows via `npx`, you've hit the bundled Node.js mismatch — wrong version, missing native modules, silent failures. v1.54.0 switches the Windows wrapper to use your **system Node.js** ([#12176](https://github.com/aaif-goose/goose/pull/12176)).
+
+Result: `npx @goose-ai/goose` now respects your `nvm`/`fnm`/`volta` version. Native addons (like `sqlite3` or `better-sqlite3` for local storage) actually load. No more "works on macOS, breaks on Windows" for the CLI entry point.
+
+## Show Thinking: Transparency On Demand
+
+Set `GOOSE_CLI_SHOW_THINKING=1` (or any truthy value) and the CLI now prints the model's internal reasoning blocks in real time ([#12454](https://github.com/aaif-goose/goose/pull/12454)). Previously this was hidden or required debug flags.
+
+Great for:
+- **Trust verification** — see *why* the agent chose that approach
+- **Prompt engineering** — understand how your instructions translate to reasoning
+- **Debugging hallucinations** — catch the moment the model goes off track
+
+## Copilot Token Auto-Refresh
+
+Two related fixes ([#12627](https://github.com/aaif-goose/goose/pull/12627), [#12616](https://github.com/aaif-goose/goose/pull/12616)): Goose now detects revoked GitHub Copilot tokens and refreshes them automatically when listing models. No more "authentication failed" errors mid-session because your token expired 3 hours ago.
+
+## The Rest (Bug Fixes & Polish)
+
+| Fix | What It Solves |
+|-----|----------------|
+| Hyphenated GPT 6.1 Sol aliases ([#12689](https://github.com/aaif-goose/goose/pull/12689)) | `gpt-6.1-sol-high` etc. now parse correctly |
+| ASAR validation for updates ([#12599](https://github.com/aaif-goose/goose/pull/12599)) | Desktop auto-update stops failing on Electron ASAR packs |
+| Protocol version stamping ([#12580](https://github.com/aaif-goose/goose/pull/12580)) | ACP clients negotiate versions cleanly |
+| Vision support detection ([#12594](https://github.com/aaif-goose/goose/pull/12594)) | Models with vision get image tools; others don't |
+| Bedrock cache token accounting ([#12586](https://github.com/aaif-goose/goose/pull/12586)) | Accurate cost tracking for Anthropic on Bedrock |
+| Responses API cache read tokens ([#12509](https://github.com/aaif-goose/goose/pull/12509)) | OpenAI Responses API usage reporting fixed |
+| Session naming + reasoning effort for GPT-6.1-Sol ([#12605](https://github.com/aaif-goose/goose/pull/12605)) | No more crashes on "none" effort |
+| Chat loading state reflection ([#12603](https://github.com/aaif-goose/goose/pull/12603)) | UI doesn't show stale state during stream |
+| Config messages for tom ([#12634](https://github.com/aaif-goose/goose/pull/12634)) | Provider config parsing hardened |
+| GLM pricing from zhipuai catalog ([#12673](https://github.com/aaif-goose/goose/pull/12673)) | Correct cost estimates for Zhipu models |
+| Extension lease routing ([#12723](https://github.com/aaif-goose/goose/pull/12723)) | Extension ops get proper timeouts/isolation |
+| Foreground subagents in state machine ([#12632](https://github.com/aaif-goose/goose/pull/12632)) | Subagent output appears in real time |
+| Per-inference extension leases ([#12161](https://github.com/aaif-goose/goose/pull/12161)) | Extensions don't leak across turns |
+| Nostr session sharing removed ([#12453](https://github.com/aaif-goose/goose/pull/12453)) | Dead code cleaned, binary smaller |
+| Rust 1.99.0 upgrade ([#12714](https://github.com/aaif-goose/goose/pull/12714)) | Latest Rust, better compile times |
+
+## Should You Upgrade?
+
+**Yes, if:**
+- You use Claude 5.5 models (adaptive thinking = cheaper/faster)
+- You've wanted to share/debug sessions (HTML export)
+- You're on Windows via npx (system Node.js fix)
+- You use GitHub Copilot provider (auto token refresh)
+
+**No rush if:**
+- You're on a stable v1.53.x and nothing above bites you
+- You only use local models via Ollama (no provider changes)
+
+## Installation
+
+```bash
+# macOS / Linux
+curl -fsSL https://goose.ai/install.sh | sh
+
+# Windows (PowerShell)
+irm https://goose.ai/install.ps1 | iex
+
+# Or via npm (now uses system Node on Windows)
+npx @goose-ai/goose@latest
+```
+
+Desktop app: Download from [goose.ai](https://goose.ai) or the [GitHub releases page](https://github.com/aaif-goose/goose/releases/tag/v1.54.0).
+
+## Bottom Line
+
+Goose v1.54.0 isn't a flashy feature drop. It's the kind of release that makes daily usage smoother: smarter model spending, debuggable sessions, Windows that works, and auth that doesn't randomly break. For a free, local-first, multi-provider agent — that's exactly the velocity you want.
+
+---
+
+**Related reads:**
+- [Goose v1.53-54: HTML Export, Adaptive Thinking Wave](/blog/goose-v1-53-54-html-export-adaptive-thinking-wave)
+- [Goose vs Claude Code: Extensibility Showdown](/blog/goose-vs-claude-code-extensibility)
+- [Why Goose's Rust Architecture Matters](/blog/goose-rust-agent-why-it-matters)
