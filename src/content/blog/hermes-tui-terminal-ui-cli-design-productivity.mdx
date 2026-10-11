@@ -1,10 +1,11 @@
 ---
 title: "Why Hermes Agent's Terminal UI Is the Most Thoughtful CLI Design in Years"
-description: "A deep appreciation of Hermes Agent's TUI — slash commands, keyboard-driven workflows, process management, and what makes a CLI feel like home."
+description: "A deep appreciation of Hermes Agent's TUI — slash commands, keyboard-driven workflows, process management, skills system, watch patterns, and what makes a CLI feel like home for developers who live in the terminal."
 pubDate: "2026-07-03T13:25:00Z"
-updatedDate: "2026-07-03T13:25:00Z"
+updatedDate: "2026-10-11T10:00:00Z"
+updated: true
 author: "Hermes Blog Team"
-keywords: "terminal AI assistant, CLI tools, developer terminal workflow, Hermes Agent TUI, autonomous life assistants, workflow orchestration, terminal UI design, slash commands"
+keywords: "terminal AI assistant, CLI tools, developer terminal workflow, Hermes Agent TUI, autonomous life assistants, workflow orchestration, terminal UI design, slash commands, skills system, process management"
 ---
 Most AI assistants feel like web apps that happen to have a CLI wrapper. Hermes Agent feels like a **terminal-native tool** — designed by developers who actually live in the command line.
 
@@ -21,7 +22,35 @@ Instead of forcing every interaction into a chat paradigm, Hermes uses **slash c
 /debug   → root-cause analysis of a failure
 ```
 
-Each slash command loads a **skill** — a packaged workflow with steps, tools, and exit criteria. The result is consistent, repeatable output quality.
+Each slash command loads a **skill** — a packaged workflow with steps, tools, and exit criteria. The result is consistent, repeatable output quality. Skills are versioned, shareable, and composable. You can browse available skills with `/skill list`, install community skills via `/skill install <name>`, and even write your own in YAML. This turns ad-hoc prompting into repeatable engineering.
+
+## The Skills System: Workflows as Code
+
+A skill isn't just a prompt template — it's a structured workflow definition:
+
+```yaml
+name: refactor-api
+version: "1.2"
+description: "Safe API refactoring with contract tests"
+steps:
+  - name: analyze-contracts
+    tool: read
+    args: { pattern: "**/*.openapi.yaml" }
+  - name: generate-tests
+    tool: generate
+    args: { type: "contract-test", coverage: "full" }
+  - name: apply-changes
+    tool: edit
+    args: { strategy: "hash-anchored" }
+  - name: verify
+    tool: test
+    args: { suite: "contract" }
+exitCriteria:
+  - all-tests-pass
+  - no-breaking-changes
+```
+
+This means `/ship refactor-api` runs the entire pipeline with built-in verification. No more "looks good to me" — the skill defines what "done" means.
 
 ## Process Management That Works
 
@@ -42,11 +71,13 @@ hermes submit audit-codebase-3f7 "yes"
 hermes kill audit-codebase-3f7
 ```
 
-This is a full process supervisor tracking stdin, stdout, stderr, exit codes, and resource usage for every agent.
+This is a full process supervisor tracking stdin, stdout, stderr, exit codes, and resource usage for every agent. You get `hermes logs <session>` for full history, `hermes export <session>` for reproducible artifacts, and `hermes resume <session>` to pick up where you left off — even across machine restarts.
 
 ## Keyboard-Native Navigation
 
 Hermes's TUI is keyboard-driven: Tab cycles panels, `/` focuses the command bar, `Ctrl+P` searches history, `Ctrl+R` fuzzy-finds sessions, Esc cancels operations. The interface follows the principle that every action should be faster with a keyboard than a mouse.
+
+Panel layout is configurable: split horizontally, vertically, or use the "focus" mode that maximizes the active pane. Sessions persist their layout, so your debugging setup with logs on the left and code on the right is exactly how you left it.
 
 ## Process Watch Patterns
 
@@ -54,19 +85,34 @@ When spawning a long-running agent, Hermes supports **watch patterns** — strin
 
 ```bash
 hermes run --watch "Application startup complete" --notify
+hermes run --watch "ERROR" --notify=telegram --watch "test passed" --notify=desktop
 ```
 
-When the pattern matches, Hermes notifies you via Telegram, Discord, or desktop. No polling, no log spelunking.
+When the pattern matches, Hermes notifies you via Telegram, Discord, or desktop. No polling, no log spelunking. You can chain multiple watch patterns with different notification targets per pattern.
 
-The CLI is where developers live. Hermes's TUI was designed for people who spend 8+ hours a day in a terminal — it shows in every detail.
+## Local-First Architecture
+
+Unlike cloud-first agents, Hermes runs entirely on your machine. Your code, your context, your API keys never leave your infrastructure unless you explicitly configure a remote provider. The TUI connects to a local gateway (default port 8765) that manages model routing, skill execution, and process supervision. This means:
+
+- **Zero latency** for local model inference (via Ollama, llama.cpp)
+- **Full privacy** — no telemetry, no code uploads
+- **Offline-capable** — skills and local models work without internet
+- **Auditable** — every tool call, every token, every decision is in your logs
+
+## Why This Matters for Daily Work
+
+The difference shows up in the small things: `Ctrl+C` actually cancels the current agent action instead of killing your terminal. The status bar shows token usage in real-time. You can pipe `hermes run` output into `jq` or `grep` because it's just stdout. The TUI respects your `$EDITOR` and `$PAGER` environment variables.
+
+For developers who spend 8+ hours a day in a terminal, these aren't features — they're table stakes. Hermes is the first AI agent that treats the terminal as a first-class environment, not an afterthought.
 
 ---
-
 
 ## Related articles
 
 - [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
 - [Context Engineering for Coding Agents: How to Make Every Token Count](/blog/context-engineering-for-coding-agents-2026/)
 - [The AI Coding Trust Paradox: 42% of Code Is AI-Generated, But Only 29% of Developers Believe It](/blog/ai-coding-trust-paradox-verification-crisis/)
+- [Hermes Agent Deep Dive: The Most Capable Open-Source Autonomous Coding Assistant](/blog/deep-dive-hermes-agent-autonomous-coding-assistant/)
+- [Hermes Local-First Architecture: Privacy, Self-Hosted, and You Own Your Data](/blog/hermes-local-first-architecture-privacy-self-hosted/)
 ---
 *The smartest developers don't pick one AI — they use them all. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** brings 9+ premium models into one chat for $12/mo. Your AI toolkit, simplified.*
