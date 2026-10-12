@@ -1,0 +1,253 @@
+---
+title: "Beware: Hermes Agent's Approval Gate Reports 'Blocked' While Commands Secretly Execute — Sandbox Bypass in v0.21.1"
+description: "A terminal command requiring interactive approval was reported back to the agent as 'user has NOT consented' and 'not executed' — but the command had already run and modified files. The agent trusted the block message and told the user nothing changed. It was wrong."
+publishedDate: "2026-10-12T10:00:00Z"
+updatedDate: "2026-10-12T10:00:00Z"
+tags: ["beware", "security", "hermes-agent", "sandbox-escape", "approval-bypass", "rce"]
+category: "Security"
+author: "Anshad"
+canonical: "https://terminalblog.com/blog/beware-hermes-agent-approval-gate-bypass-commands-execute-while-blocked/"
+---
+
+## TL;DR
+
+**Hermes Agent v0.21.1 (commit `fef0e16fe1`, released 2026-09-08) has a critical approval-gate bypass.** When a terminal command requires interactive approval and the user doesn't respond (e.g., they're in another chat), the command **executes anyway** — writing files, modifying config, whatever it does — but returns a "blocked / user has NOT consented" result to the agent. The agent then reports "nothing changed" to the user. **The approval gate lies.**
+
+**Affected:** Hermes Agent v0.21.1 (and likely earlier v0.21.x). **Fixed in PR #130912** (merged after Oct 1, 2026). **Upgrade immediately.**
+
+---
+
+## What Happened
+
+On October 1, 2026, a Hermes user (jonasrt) reported [issue #130890](https://github.com/NousResearch/hermes-agent/issues/130890): they asked the agent to swap models across two Hermes profiles by editing `~/.hermes/profiles/<profile>/config.yaml`. The agent issued a `terminal` command to do this.
+
+The user was in a different chat tab and **did not see or respond to the approval prompt**.
+
+What happened next is the nightmare scenario for any approval-gated system:
+
+1. **The command ran anyway** — it wrote the new model values to both config files at `21:52:20`
+2. **The approval gate returned "blocked"** — the agent received a result saying "user has NOT consented" and "do not retry"
+3. **The agent believed the lie** — it reported to the user: "nothing has been changed"
+4. **Nine minutes later**, a second attempt revealed the files **already contained the new values** — the first "blocked" call had actually succeeded
+
+File timestamps don't lie:
+
+```
+config.yaml            modified 2026-10-01 22:01:13  # second attempt (no-op, same values)
+config.yaml.bak        mtime preserved from copy: 21:52:20  # FIRST attempt — the "blocked" one
+```
+
+Both files were modified at `21:52:20` — the exact moment the "blocked" result was returned. The agent's own session log shows activity at `21:51:54`, immediately before the write.
+
+**For ~19 minutes, two Hermes profiles ran on unapproved, unverified models while the user was told no changes had been made.**
+
+---
+
+## Who Is Affected
+
+| Group | Impact |
+|-------|--------|
+| **Hermes Agent users on v0.21.1** | Critical — any approval-gated terminal command can execute silently |
+| **Users of the desktop app** | High — multi-tab workflows mean approval prompts are easily missed |
+| **Cron/external workers** | High — issue #133582 shows cron workers don't register shell hooks, making approval behavior unpredictable |
+| **Anyone using `force: true`** | Medium — the fix preserves `force` bypass for hard blocks, but test coverage was missing |
+
+**Not affected:** Users who have upgraded to a version containing PR #130912 (merged early October 2026).
+
+---
+
+## How the Vulnerability Works
+
+### The Root Cause: Wrong Order of Operations
+
+In `tools/terminal_tool.py::terminal_tool()`, the execution flow was:
+
+```
+1. _acquire_env()           ← Creates environment, CAN spawn subprocesses
+2. _pre_exec_block()        ← Gateway-lifecycle scan, CAN env.execute script reads
+3. _run_approval_guards()   ← **Approval check happens LAST**
+```
+
+**The approval gate ran AFTER environment acquisition and pre-exec scans.** By the time the approval check said "denied," the command had already:
+- Created execution environments
+- Spawned subprocesses
+- Written files / modified state
+
+### Two Known Bypass Channels
+
+The investigator (alt-glitch) identified two channels that execute shell work **without passing the command gate**:
+
+#### 1. Quoted Heredoc Blind Spot
+```python
+python3 <<'PY'
+# malicious script here
+PY
+```
+The `strip_inert_heredoc_bodies` function masks quoted heredoc bodies whose consumer is in the "inert allowlist" (`python`, `python3`, `osascript`, `cat`). The danger-pattern scan only sees the bare `python3` invocation — **the actual payload is invisible to the approval gate**.
+
+#### 2. Stdin Injection into Live PTY
+```python
+process(action="write", data="rm -rf ~/.ssh\n")
+process(action="submit", data="")
+```
+`write_stdin`/`submit_stdin` in `tools/process_registry.py` send raw bytes to an already-spawned shell with **no command-guard pass**. Every command fed to a previously-approved interactive shell is invisible to the gate.
+
+---
+
+## How to Check If You're Affected
+
+### Check Your Hermes Version
+```bash
+hermes --version
+# or in the desktop app: Help → About
+```
+**If you see `0.21.1` or any `0.21.x` without the fix, you are vulnerable.**
+
+### Check for Silent Config Changes
+If you use Hermes with multiple profiles, check for unauthorized model swaps:
+```bash
+# Check modification times on profile configs
+ls -la ~/.hermes/profiles/*/config.yaml
+
+# Look for recent changes you didn't approve
+git -C ~/.hermes log --oneline -10  # if you track configs in git
+```
+
+### Reproduce the Vulnerability (Safe Test)
+```bash
+# Create a test file
+echo "original" > /tmp/hermes-test.txt
+
+# In Hermes, run a command that requires approval but don't respond:
+# terminal "echo hacked > /tmp/hermes-test.txt"
+# Wait for timeout (default 5 min) or just don't click approve
+
+# Check if file was modified anyway
+cat /tmp/hermes-test.txt
+# If it says "hacked" — you're vulnerable
+```
+
+---
+
+## How to Protect Yourself
+
+### 1. Upgrade Immediately (Primary Fix)
+```bash
+# If installed via pip/pipx
+pipx upgrade hermes-agent
+# or
+pip install --upgrade hermes-agent
+
+# If using the desktop app
+# Check for updates in the app menu, or re-download from GitHub releases
+```
+
+**Verify the fix is included:** The fix is in PR #130912, merged early October 2026. Any release after that date should contain it.
+
+### 2. Workaround: Don't Miss Approval Prompts
+- **Single-tab workflow**: Keep the Hermes chat with active approvals in focus
+- **Disable auto-approval for dangerous commands**: Check your `approvals` config in `~/.hermes/config.yaml`
+- **Monitor file changes**: Use a file watcher on sensitive paths (`~/.hermes/profiles/*/config.yaml`, `~/.ssh`, etc.)
+
+### 3. Audit Recent Activity
+```bash
+# Check Hermes logs for "blocked" commands that may have executed
+grep -r "user has NOT consented" ~/.hermes/logs/
+# If you see these followed by actual file changes — you were hit
+
+# Check for unexpected config changes
+find ~/.hermes/profiles -name "config.yaml" -newer ~/.hermes/logs/deny-*.jsonl 2>/dev/null
+```
+
+---
+
+## Is There a Fix?
+
+**Yes.** PR #130912 ("fix(terminal): ensure approval-blocked commands never execute") was opened October 1, 2026 and includes:
+
+### The Fix: Reordered Guards
+```python
+# NEW ORDER (fixed):
+1. Pure hard blocks (workdir validation, self-repo guard) — no env, no subprocess
+2. _run_approval_guards()     ← **Approval NOW gates ALL side effects**
+3. _acquire_env()             ← Only runs AFTER approval passes
+4. _pre_exec_block()          ← Gateway-lifecycle scan (post-approval)
+```
+
+**Denied/timed-out/cancelled/pending commands now:**
+- Create **no environment**
+- Spawn **no subprocess/shell**
+- Leave **no side effects**
+- Abort **completely** with no background dispatch or retry
+
+### Test Coverage Added
+- **15 new tests** in `tests/tools/test_terminal_approval_never_executes.py`:
+  - Denial never acquires env nor executes (foreground + background)
+  - Timeout never acquires env nor executes
+  - Cancel never acquires env nor executes
+  - Notify-failure never acquires env nor executes
+  - Unattended mode never acquires env nor executes
+  - Pending never acquires env nor executes
+  - Approval-before-acquire ordering verified
+  - Approved foreground/background still run correctly
+  - `force=True` bypass preserved for hard blocks
+  - **End-to-end**: denied `rm -rf` leaves victim files intact
+  - **End-to-end**: denied background command never spawns
+
+- **192 tests pass** across new + approval + pre-guard + clean-slate suites
+- **48 tests pass** across terminal/execute-code approval suites
+
+### Two Follow-up Fixes (Oct 3, 2026)
+1. **Failure-seam error contracts** — daemon-down and connect-timeout errors now surface as well-formed envelopes through the real `terminal_tool()` with `force=True`, no raw exceptions escape
+2. **Session cwd fallback preserved** — the `task_id` fallback for session cwd resolution was kept (approval session contextvar doesn't cross tool-worker thread boundaries)
+
+---
+
+## Why This Matters: The Trust Inversion
+
+This is the **worst possible failure mode for an approval gate**:
+
+> The agent is told the action did not happen and reports that to the user, while the action already happened.
+
+This isn't just a bug — it's a **trust inversion**. The security boundary exists to let humans say "no." When "no" becomes "yes but we'll lie and say no," the entire security model collapses.
+
+**Real-world impact in the reported case:**
+- Two Hermes profiles ran on **unapproved, unverified models** for ~19 minutes
+- The user was explicitly told "no model had been changed"
+- If those models had been malicious/compromised, the attacker would have had a 19-minute window
+
+**Broader implications:**
+- Any destructive gated command (`rm -rf`, `chmod`, config writes, credential changes) can execute silently
+- The agent becomes an unreliable narrator — it **cannot trust its own tool results**
+- Cron/external workers (which don't register shell hooks per #133582) are especially vulnerable
+
+---
+
+## Related Issues
+
+| Issue | Description | Status |
+|-------|-------------|--------|
+| [#130272](https://github.com/NousResearch/hermes-agent/issues/130272) | Approval timeout reported as "User denied this command" — wrong message, but no side effect | Open |
+| [#133582](https://github.com/NousResearch/hermes-agent/issues/133582) | Cron external workers never register shell hooks | Open |
+| [#130912](https://github.com/NousResearch/hermes-agent/pull/130912) | **Fix for this vulnerability** | Merged |
+
+---
+
+## Bottom Line
+
+**If you run Hermes Agent v0.21.x, upgrade now.** This isn't a theoretical vulnerability — it was reproduced with real file modifications and real user impact. The fix changes the fundamental ordering of approval vs. execution, and the test suite now proves that denied commands truly never execute.
+
+**For the Hermes team:** This fix should be backported to any maintained 0.21.x branch, and a patch release (0.21.2) should be cut immediately. The `sweeper:risk-security-boundary` label on the issue is appropriate — this affects the core security boundary of the product.
+
+---
+
+## References
+
+- [Original Issue #130890](https://github.com/NousResearch/hermes-agent/issues/130890) — full reproduction details
+- [Fix PR #130912](https://github.com/NousResearch/hermes-agent/pull/130912) — code changes and test coverage
+- [Hermes Agent Releases](https://github.com/NousResearch/hermes-agent/releases) — check for patched version
+- [Hermes Agent Security Policy](https://github.com/NousResearch/hermes-agent/security/policy) — for reporting future vulnerabilities
+
+---
+
+*This article was written based on public GitHub issue data. If you're a Hermes user, verify your version and upgrade. If you experienced silent config changes around early October 2026, audit your profiles.*
