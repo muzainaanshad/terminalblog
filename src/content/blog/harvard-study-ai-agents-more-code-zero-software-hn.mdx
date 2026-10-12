@@ -1,0 +1,111 @@
+---
+title: "Harvard Study: AI Agents Write 30% More Code, Ship 0% More Software — HN Reacts"
+description: "New research across 700+ firms confirms the review bottleneck. 200+ Hacker News developers weigh in on token waste, the 'open slop' crisis, agents that don't talk to each other, and why sandboxing is becoming table stakes."
+pubDate: "2026-10-12"
+updatedDate: "2026-10-12"
+author: "Anshad"
+tags: ["ai-coding-agents", "hacker-news", "developer-opinions", "code-review", "productivity", "harvard-study"]
+heroImage: "/images/hn-ai-coding-agents.png"
+---
+
+## What Happened: The Study That Confirmed What Everyone Suspected
+
+Last week, Ars Technica covered a Harvard study that analyzed 300 million work events across 700+ software companies using data from Jellyfish. The finding was blunt: **AI coding agents increase lines of code by 30%, commits by 20%, and pull requests by 23% — but issue resolution rates didn't budge.**
+
+The bottleneck? Code review. Review time ballooned 49%. The share of PRs requiring changes nearly doubled. Comments per PR jumped 35%. Companies hired 14% more people just to do reviews. And AI review tools? They only handled 23% of review comments and 11% of PRs — humans still did the heavy lifting.
+
+The Hacker News thread exploded. Over 200 comments. Developers didn't just nod — they recognized their daily reality in the data.
+
+---
+
+## Developer Reactions: "This Is My Life Now"
+
+### The Review Bottleneck Is Real
+
+One commenter put it plainly: *"I'm forced to use AI at work and this is absolutely 10000% true. Soooooo much slop code goes into the basin, which dozens of people need to sift through, strain out the dreck, then eventually close their eyes and release into the wild because now we have new SLAs so we're not seen as a bottleneck to progress."*
+
+Another noted the manufacturing parallel: *"This lines up with basic manufacturing principals, run the machines faster so as to give away quality leads to costs spiral in rework and inspection efforts."*
+
+The study found firms using AI agents saw review time increase 49%. But the comments revealed something the data couldn't capture: **the psychological toll.** Reviewers aren't just spending more time — they're reviewing code they didn't write, don't fully understand, and can't easily verify. One developer said they've started "closing their eyes and releasing" because leadership treats review throughput as a metric to optimize.
+
+### The "Open Slop" Problem
+
+A separate HN thread titled *"Open source software is slowly turning into open slop software"* struck a nerve. The author, who runs a 5x Claude subscription, wrote:
+
+> *"Code has become extremely cheap to produce... But this also means it is getting easier to copy a product, put it on public GitHub and announce you've killed the paid version. Being open source shouldn't give you a pass for shipping slop."*
+
+They tested an "CodeRabbit killer" open-source tool against Greptile and their own reviewer. Results: the open-source tool found 31% of bugs with 86% precision. Greptile found 69% with 68% precision. Their own tool missed 4 real bugs Greptile caught — and they published that honestly.
+
+The thread sparked a debate about **"open source, closed development"** — the idea that maintainers should keep code visible but restrict contributions to known, trusted committers. As one commenter put it: *"Gresham's Law applies here too. Bad code drives out good. And if it costs money to maintain good code, it's going to hasten its departure."*
+
+### Agents Don't Talk to Each Other
+
+A developer posted: *"I usually have several coding agents running at once (who doesn't nowadays?); claude code, codex, grok and none of them knows what they are working on. If codex figures something out, I want claude to know it, I'm the one copying it across."*
+
+They built **agent-mesh** — a hub letting multiple agents share context via a local message bus. The pain point is universal: every agent starts fresh, rebuilds the same mental model, and the human becomes the sync layer. Multiple commenters said they'd been doing the same manual copy-paste between Claude Code, Cursor, and Codex.
+
+### Token Waste Is a Design Flaw
+
+Another Show HN: *"I Cut my Agent Tokens By 50%"* — a team watched Claude Code's tool calls and noticed **most time was spent regex-searching the codebase**. They built Indexio, a Rust indexer that serves context via MCP, cutting tokens 50-60% and lookup time from seconds to milliseconds.
+
+A commenter asked: *"I cut a lot of my tokens just by installing a language server plugin. What does this offer over that?"* The author replied: *"LSP's would be better at handling symbols... This covers the 90% of the rest of the larger context lookups that are currently being hit with grep and read calls."*
+
+The insight: **current agents treat every codebase as unknown territory.** They don't persist indexes, don't reuse context, and burn tokens rediscovering what they knew five minutes ago.
+
+### Sandboxing Is Becoming Table Stakes
+
+A macOS developer built **Airlock** — a VM sandbox for AI agents — because *"we've all read the horror stories of files accidentally being deleted"* and *"their permission classifier is getting better, it still requires a lot of trust."*
+
+Airlock shows you exactly what the agent ran and what changed before merging back. It can block network access entirely. The fact that a solo developer felt compelled to build this says everything about the current trust level.
+
+---
+
+## The Real Insight: We're Optimizing the Wrong Metric
+
+The Harvard study measured **lines of code, commits, PRs** — output metrics. But software delivery is an **outcome metric** (issues resolved, features shipped). The gap between them is where the review bottleneck lives.
+
+Developers on HN aren't arguing AI doesn't help. They're saying:
+
+1. **Speed without verification creates debt faster than you can pay it down.**
+2. **The "last mile" — review, integration, testing — hasn't been automated.**
+3. **Tooling assumes a single agent workflow; reality is multi-agent, multi-tool chaos.**
+4. **Open source incentives reward "shipped" over "correct."**
+
+One commenter summarized: *"You can push things through the pipe faster, but if we want to continue to live in a sane world where someone is responsible for what happens, then you aren't going to find that with AI coding bots."*
+
+Another proposed the grim solution: *"Easy... rehire dismissed coders and make them reviewers... everyone's a winner."*
+
+---
+
+## What It Means for You
+
+### If You're Adopting AI Agents Now
+
+- **Budget for review capacity, not just generation capacity.** The study shows 14% more reviewers needed. Plan for it.
+- **Don't measure success by commits/PRs.** Measure by issues resolved per sprint.
+- **Invest in context persistence.** Tools like Indexio, agent-mesh, or custom MCP servers pay off fast if you run agents daily.
+- **Sandbox by default.** Airlock, Docker, or VM-based workflows aren't paranoia — they're hygiene.
+
+### If You're Building Tooling
+
+- **The unsolved problem is inter-agent communication.** Not "agent talks to human" — agent talks to agent.
+- **Review tooling is wide open.** AI review handles <25% of comments. There's room for specialized reviewers (security, perf, architecture).
+- **Token efficiency is a product feature.** If your agent burns $50/session rediscovering the codebase, you'll lose to one that doesn't.
+
+### If You're Evaluating "AI-Native" Startups
+
+- **Ask for eval data.** The "CodeRabbit killer" thread proved claims without evidence are the norm.
+- **Look for "open source, closed development"** — it's a quality signal.
+- **Test the review path, not the generation path.** That's where the time goes.
+
+---
+
+## The Bottom Line
+
+The HN discussions reveal a consensus the study only hinted at: **AI coding agents are currently net-neutral for team velocity.** They shift work from writing to reviewing, from creation to verification. The tools that win won't be the ones that generate the most code — they'll be the ones that make the review bottleneck disappear.
+
+Right now, that bottleneck is human. And humans are expensive, tired, and increasingly asked to "close their eyes and release."
+
+---
+
+*Want more developer-sourced takes? Subscribe to the terminalblog newsletter — we read the threads so you don't have to.*

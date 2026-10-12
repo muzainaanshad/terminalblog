@@ -12,11 +12,14 @@
 const fs = require('fs');
 const path = require('path');
 
+// Load .env if present
+try { require('dotenv').config({ path: path.join(__dirname, '..', '.env') }); } catch {}
+
 const ROOT = path.join(__dirname, '..');
 const BLOG = path.join(ROOT, 'src', 'content', 'blog');
 const API = 'https://dev.to/api/articles';
 const STATE_PATH = path.join(ROOT, 'tmp', 'devto-state.json');
-const KEY = process.env.DEVTO_API_KEY || '9Kw5MgKzMvJ2g1G8TCUoR3un';
+const KEY = process.env.DEVTO_API_KEY;
 
 function hasFlag(f) { return process.argv.includes(f); }
 function argVal(f) {
