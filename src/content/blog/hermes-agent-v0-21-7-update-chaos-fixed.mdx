@@ -1,0 +1,96 @@
+---
+title: "Hermes Agent Just Fixed the Update Chaos — Here's What v0.21.7 Changes"
+description: "The v0.21.7 patch release overhauls how Hermes handles updates, adds channel selection to the desktop app, and fixes firewall-breaking update failures. Plus security hardening for the dashboard."
+pubDate: "2026-10-12T14:00:00Z"
+updatedDate: "2026-10-12T14:00:00Z"
+tags: ["hermes-agent", "release", "updates", "security", "beginner"]
+tool: "hermes"
+author: "Anshad"
+image: "/api/og?title=Hermes+Agent+v0.21.7+Release&tool=hermes-agent"
+canonical: "https://terminalblog.com/blog/hermes-agent-v0-21-7-update-chaos-fixed/"
+---
+
+Hermes Agent v0.21.7 dropped three hours ago. Most patch releases are forgettable — a few bug fixes, maybe a dependency bump. This one? It fundamentally changes how you update Hermes, and it fixes a failure mode that's been silently breaking installs behind corporate firewalls for months.
+
+If you run Hermes (and you should — it's the only agent that actually grows with you), this release matters.
+
+## The Update Problem Nobody Talked About
+
+Here's what happened every time you ran `hermes update` on a source install: it fetched the latest commit on `main`. Not the latest *release*. The latest commit. That sounds fine until you realize `main` moves fast — **2,100 PRs** since v0.21.5 fast. Your install could land on a half-baked commit, a broken migration, or a commit that assumes a database schema that doesn't exist yet.
+
+v0.21.7 fixes this. Source installs now follow **tagged releases** by default. You get v0.21.7, then v0.21.8, then v0.22.0 — stable, tested, documented. If you're already ahead of the latest release (because you were tracking `main`), Hermes waits for the next tag instead of dragging you backward.
+
+Want the firehose? `hermes update --set-channel main` keeps the old behavior. Forks and mirrors still track `main` by default. But the default is now safe.
+
+## Desktop App Finally Gets a Say
+
+Open Settings ▸ About ▸ Updates. There's a new **Update channel** switch: *Stable releases* or *Every commit*. The update dialog even tells you which channel you're on.
+
+This seems small. It's not. It means non-technical team members can run Hermes Desktop without you worrying they'll wake up on a broken commit. They get stable. You get the firehose if you want it.
+
+## Reasoning That Actually Survives Resume
+
+You know the frustration: you're deep in a complex task, Hermes is thinking through a hard problem, you hit resume — and the reasoning is gone. The model starts fresh.
+
+v0.21.7 fixes this. Signed thinking now replays after `hermes chat --resume` and on the next gateway turn. Bedrock Converse reasoning models no longer get rejected on resumed sessions.
+
+This is the kind of quality-of-life fix that compounds. You stop losing context. You stop re-explaining. The agent actually *remembers* its thought process.
+
+## Firewalls Can't Block Updates Anymore
+
+This one bit people quietly. Regional firewalls would intercept the release check and return 403. Hermes would treat it as "no update available" and silently fail. You'd think you're current. You weren't.
+
+Now the stable channel uses your GitHub token when you have one set (`GITHUB_TOKEN` or `gh auth login`). Rate limits show up *as rate limits*, not as mysterious update failures. If you're behind a corporate proxy, your updates just work.
+
+## Security Hardening You Didn't Know You Needed
+
+Four dashboard authentication issues, all reported by Tenable Research (TRA-725 through TRA-728):
+
+- Spoofed `X-Forwarded-For` headers could bypass the per-IP rate limit on native sign-in
+- Unauthenticated login requests could write unbounded values to the auth audit log
+- Public `/auth/` routes had no request-body size limit
+- Native sign-in could send login codes to a non-loopback redirect, enabling session takeover
+
+Plus a git filter hardening fix: automatic git calls (workspace snapshots, subagent worktrees, kanban, worktree cleanup) could run `clean`/`smudge`/`process` filters defined by an untrusted repository's config — *before the first prompt*. That's a supply chain attack vector. Closed.
+
+## The Window Is Massive
+
+Since v0.21.6 (four days ago): **740 non-merge commits** across **4,156 changed files** (+86,775 / −26,980), **204 merged PRs**, **69 closed issues**.
+
+The release notes explicitly say: *Full curated release notes for this window ship with v0.22.0, which will document everything from v0.21.0 onward — highlights, feature areas, and complete contributor credits. Nothing in this window is skipped.*
+
+Translation: v0.22.0 is going to be a *major* release document. The team is holding back the full story for the next minor version.
+
+## What's Also In There (Undocumented on Purpose)
+
+- Plugins running built-in Desktop app actions (`ctx.runAction`)
+- A plugin SDK pet bubble (`ctx.pet.say`) — yes, really
+- Core-made Codex requests so plugins never hold the token
+- Skills installed mid-session reaching the model without a prompt rebuild
+- Krea 2 Medium Turbo as default image lane for new paid subscribers, with FAL fallback
+- Faster desktop updates (React Compiler pass cached by content, compiled renderer reused)
+- Pinned installs that check out only the pin
+- Compaction marks emitted to Relay
+- New community plugins: memory-shield, command-ledger, Memoria, Model Router, wyoming-voice-bridge, codex-account-switch, redline
+
+## How to Update
+
+- **Desktop app**: updates itself. Microsoft Store installs update through the Store.
+- **CLI (git installs)**: `hermes update`, or re-run the installer one-liner.
+- **Docker / Hermes Cloud**: `nousresearch/hermes-agent:stable` (or `:latest`).
+
+## The Bottom Line
+
+Hermes Agent v0.21.7 isn't flashy. It doesn't add a new model or a shiny UI. It fixes the plumbing that makes the flashy stuff reliable.
+
+Updates that don't break. Reasoning that survives resume. Firewalls that don't silently block you. Security holes you didn't know existed, closed.
+
+This is what a maturing open-source agent looks like. The feature velocity stays high (204 PRs in 4 days), but the foundation gets stronger.
+
+Run `hermes update`. Then check Settings ▸ About ▸ Updates. Flip the channel to *Stable releases* if you want boring, reliable updates. Keep it on *Every commit* if you want to live on the edge.
+
+Either way, you're now in control.
+
+---
+
+*This article covers Hermes Agent v0.21.7 released October 11, 2026. For the full changelog, see [v0.21.6...v0.21.7](https://github.com/NousResearch/hermes-agent/compare/v0.21.6...v0.21.7).*
