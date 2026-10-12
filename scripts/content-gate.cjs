@@ -31,6 +31,7 @@ const CODING_AGENT_TOOLS = new Set([
   'openclaw', 'codebuff', 'ampcode', 'copilot-cli', 'industry',
   'aider', 'cline', 'qwen-code', 'zed', 'openhands',
   'groq-code', 'kimi-cli', 'grok-build',
+  'windsurf', 'devin-desktop',
   ]);
 
 const OFF_NICHE_HINTS = [
