@@ -1,0 +1,200 @@
+---
+title: "Codex Just Learned to Juggle — v0.162.0 Adds Worktrees, Pinned Tasks, and Links You Can Actually Click"
+description: "Codex v0.162.0 stable (October 8) ships managed Git worktrees, pinned tasks in the Command Center, clickable URLs in approval prompts, transcript copy/navigation, and live web access for custom providers. The open-source terminal agent finally handles multi-tasking like a pro."
+pubDate: "2026-10-11T10:00:00Z"
+tags: ["codex", "release", "v0.162.0", "worktrees", "tui", "coding-agent", "beginner", "open-source"]
+tool: "codex"
+author: "sage"
+image: "/api/og?title=Codex+v0.162.0+Worktrees+Pinned+Tasks&tool=codex"
+canonical: "https://terminalblog.com/blog/codex-v0-162-0-worktrees-pinned-tasks-stable/"
+---
+
+**Codex v0.162.0 dropped October 8** — and for the first time, the open-source terminal agent from OpenAI can genuinely work on multiple things at once.
+
+Not "open another terminal tab." Not "background a process and hope." **Managed Git worktrees** — real, isolated working directories that share the same repo but let you run parallel agents on different branches without stepping on each other's toes.
+
+If you've ever wanted to refactor the auth module *while* your agent fixes a bug in the payment flow *while* another agent writes tests for the new API — this is the release you've been waiting for.
+
+---
+
+## The Headline Feature: Managed Worktrees (Finally)
+
+**What it is:** `codex` can now create and list Git worktrees from trusted local projects when the worktrees feature is enabled (PR [#50148](https://github.com/openai/codex/pull/50148)).
+
+**Why it matters:** Before v0.162.0, running two Codex agents on the same repo meant:
+- File conflicts when both agents edited the same file
+- Git history confusion — whose commit is whose?
+- Context bleeding — Agent A sees Agent B's half-finished changes
+
+Now you spin up a worktree per task. Each agent gets its own clean directory. They share the same `.git` folder but have separate working trees. When the task is done, you merge or discard.
+
+**For beginners:** Think of it like opening the same project in two VS Code windows — except each window has its own AI agent, and they don't fight over files.
+
+```bash
+# Enable worktrees (one-time setup)
+codex config set worktrees.enabled true
+
+# In your project, create a worktree for a new task
+codex worktree add feature/auth-refactor
+
+# Codex creates: ../your-project-feature-auth-refactor/
+# Run a separate agent there
+cd ../your-project-feature-auth-refactor
+codex
+```
+
+---
+
+## Pinned Tasks in the Command Center — Stop Losing Your Place
+
+**What it is:** Press `p` on any task in the agent Command Center (the `Ctrl+A` dashboard) to pin it. Pinned tasks stay in a shared "Pinned" group at the top, even across sessions (PR [#51500](https://github.com/openai/codex/pull/51500)).
+
+**Why it matters:** The Command Center used to be a scrolling graveyard. Your important task from Tuesday? Buried under 50 newer entries. Now you pin the ones that matter — the refactor you're reviewing, the bug you're tracking, the PR you're polishing — and they stay visible.
+
+**For beginners:** It's like starring emails in Gmail. The stuff you actually care about stops disappearing.
+
+---
+
+## Clickable URLs in Approval Prompts — No More Copy-Paste
+
+**What it is:** URLs in approval headers, questions, MCP prompts, warnings, banners, and verification prompts are now clickable — even when they wrap across lines (PRs [#51439](https://github.com/openai/codex/pull/51439), [#51449](https://github.com/openai/codex/pull/51449), [#51450](https://github.com/openai/codex/pull/51450), [#51451](https://github.com/openai/codex/pull/51451), [#51452](https://github.com/openai/codex/pull/51452), [#51458](https://github.com/openai/codex/pull/51458)).
+
+**Why it matters:** Your agent asks: "Should I open this PR? https://github.com/your-org/your-repo/pull/1234". Before: select, copy, switch to browser, paste. Now: click. Done.
+
+**For beginners:** It's the smallest change that saves the most cumulative time. You'll click a link in the TUI once and wonder how you lived without it.
+
+---
+
+## Transcript Navigation & Copy — Your History Is Finally Usable
+
+**What it is:** 
+- `/copy` command to copy transcript blocks
+- `Ctrl+Insert` to copy selections
+- Configurable mouse-wheel scroll speed (`tui.mouse_scroll_speed`) (PRs [#50434](https://github.com/openai/codex/pull/50434), [#50215](https://github.com/openai/codex/pull/50215), [#50209](https://github.com/openai/codex/pull/50209))
+
+**Why it matters:** You're in a long session. The agent wrote a brilliant regex three hours ago. You need it now. Before: scroll up, hope your terminal buffer didn't truncate, manually select. Now: `/copy` → paste. Or `Ctrl+Insert` on the block.
+
+**For beginners:** Your conversation history is now a clipboard, not a scrollback buffer.
+
+---
+
+## Live Web Access & Remote Compaction for Custom Providers
+
+**What it is:** Custom Responses-compatible model providers can now configure live web access and remote compaction capabilities (PR [#50459](https://github.com/openai/codex/pull/50459)).
+
+**Why it matters:** If you're running Codex with a local model via Ollama, LM Studio, or a custom gateway — your agent can now browse the web and offload context compaction to the server. This was previously locked to OpenAI's hosted models.
+
+**For beginners:** Your self-hosted model just got superpowers. It can search docs, read API references, and compact its own context without eating your local RAM.
+
+---
+
+## JavaScript Helpers for Streaming + Ranked Tool Search
+
+**What it is:** New JS helpers for streaming promise results as they settle, plus opt-in ranked tool search in Code Mode (PRs [#51126](https://github.com/openai/codex/pull/51126), [#51209](https://github.com/openai/codex/pull/51209)).
+
+**Why it matters:** If you're building on top of Codex (plugins, custom tools, integrations), streaming promises let you process results incrementally instead of waiting for the full response. Ranked tool search means the agent finds the right tool faster when you have dozens registered.
+
+**For beginners:** This is "plumbing" — but it's the kind that makes custom extensions feel snappy instead of laggy.
+
+---
+
+## Bug Fixes That Actually Change Daily Life
+
+| Fix | Why You Care |
+|-----|--------------|
+| Server model/reasoning defaults respected for new TUI threads | Your provider settings stick when you start fresh |
+| CRLF line endings preserved in `apply_patch` | Windows users: no more line-ending wars in diffs |
+| Linux sandbox startup fixed with multiple denied files | Sandbox actually starts on restricted systems |
+| Windows drive-letter file access restored | `C:\projects\my-app` works again on Win10 |
+| `Retry-After` honored for retryable failures | Rate limits don't hammer your API quota |
+| Windows PowerShell 7 module path checksum fix | Installer works on modern PowerShell |
+
+---
+
+## Version Context — Where v0.162.0 Fits
+
+| Version | Date | Channel | Highlights |
+|---------|------|---------|------------|
+| **v0.162.0** | Oct 8, 2026 | **Stable (Latest)** | Worktrees, pinned tasks, clickable URLs, transcript copy, web access for custom providers |
+| v0.162.1 | Oct 9, 2026 | Stable | Patch: TUI crash on multi-line questions + background server compat |
+| v0.160.0 | Oct 1, 2026 | Stable | Guardian review, history pagination, TUI persistence, Windows sandbox, WSL hardening |
+| v0.155.0 | Sep 17, 2026 | Stable | First stable since Feb — Guardian, command center, Windows fixes |
+| v0.163.0-alpha.x | Oct 10+ | Alpha | Voice, task mgmt, Touch ID, daemon updates |
+
+**v0.162.0 is the stable release you want today.** The patch (v0.162.1) fixes two crashes — important if you hit them, but not feature additions. The alpha channel has voice and task management but isn't recommended for daily production work.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Want parallel agents on the same repo | **Yes** — worktrees are the feature |
+| Use the Command Center daily | **Yes** — pinned tasks change the workflow |
+| Click links in approval prompts | **Yes** — it's addictive once you try it |
+| Run custom/local models | **Yes** — web access + remote compaction unlocked |
+| Build Codex plugins/extensions | **Yes** — streaming helpers + ranked search |
+| Just want the latest model | **No** — model unchanged (GPT-6 Astra since v0.154) |
+
+---
+
+## How to Update
+
+```bash
+# Stable (v0.162.0) — RECOMMENDED for daily use
+npm install -g @openai/codex@0.162.0
+
+# Or just "latest" on stable channel (will pull v0.162.1 patch)
+npm install -g @openai/codex@latest
+
+# Via installer (auto-updates to stable)
+# macOS/Linux
+curl -fsSL https://codex.openai.com/install | bash
+
+# Windows (scoop)
+scoop update codex
+
+# Verify
+codex --version
+# Should show 0.162.0 or 0.162.1
+```
+
+**To enable worktrees:**
+```bash
+codex config set worktrees.enabled true
+# Then restart Codex
+```
+
+**To try pinned tasks:** Open Command Center (`Ctrl+A`), navigate to a task, press `p`.
+
+---
+
+## The Bottom Line
+
+**v0.162.0 doesn't add a new model. It adds *agency*.**
+
+Worktrees mean your agent can parallelize. Pinned tasks mean you can prioritize. Clickable URLs mean you stay in flow. Transcript copy means your history works *for* you.
+
+This is the release where Codex stops feeling like a single-threaded chat loop and starts feeling like a **multi-agent workspace** — in your terminal, open-source, no subscription required.
+
+```bash
+codex upgrade
+# Enable worktrees: codex config set worktrees.enabled true
+# Pin your important tasks in Command Center (Ctrl+A → p)
+```
+
+---
+
+## Related Articles
+
+- [Codex v0.162.1 Patch Guide — TUI Crash Fix + Background Server Compatibility](/blog/codex-v0-162-1-patch-guide-tui-background-server/)
+- [Codex 0.155/0.160/0.162: Guardian Review, Voice, Task Management — The Complete Wave](/blog/codex-0-160-guardian-review-history-windows-fixes/)
+- [Codex vs Copilot CLI: Terminal Battle — Which Terminal Agent Actually Ships?](/blog/codex-vs-copilot-cli-terminal-battle/)
+- [Best Coding Agents 2026 — Decision Guide (Not Another Hype List)](/blog/best-coding-agents-2026-decision-guide/)
+- [Claude Code v2.1.296: 100+ Fixes — The Stability Wave Keeps Coming](/blog/claude-code-v2-1-296-stability-wave-two/)
+
+---
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
+
+*Codex is open-source (MIT) and available at [github.com/openai/codex](https://github.com/openai/codex). Updated October 11, 2026 — covers Codex v0.162.0 stable released October 8, 2026. Full changelog: [github.com/openai/codex/releases](https://github.com/openai/codex/releases)*
