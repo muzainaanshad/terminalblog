@@ -1,0 +1,116 @@
+---
+title: "GitHub Copilot CLI Just Got a Massive Upgrade — Sandbox, Timeline, and Auth All Fixed"
+description: "Version 1.0.96 lands with interactive sandbox settings, permission decision tracking in timeline, case-insensitive model IDs, and Entra auth improvements. Here's what actually matters."
+publishDate: 2026-10-13
+updatedDate: 2026-10-13
+tags: ["copilot-cli", "github", "release", "terminal", "coding-agents"]
+tools: ["copilot-cli"]
+author: "Anshad"
+canonicalUrl: "https://terminalblog.com/blog/github-copilot-cli-1-0-96-sandbox-timeline-auth-overhaul/"
+---
+
+GitHub Copilot CLI 1.0.96 dropped on October 12, and it's the kind of release that makes you wonder how you lived without these features. This isn't a patch — it's a proper feature drop that touches sandbox, authentication, model selection, and session visibility.
+
+## The Big Three Changes
+
+### 1. Interactive Sandbox Settings (Finally)
+
+Sandbox configuration used to be a "edit JSON, hope it works" experience. Now you get an interactive setup that suggests environment secrets and lets you add masking hosts before saving.
+
+```bash
+copilot sandbox
+```
+
+This opens a guided flow. It detects common secrets (API keys, tokens) and prompts you to mask them. No more accidentally leaking credentials in transcripts.
+
+### 2. Timeline Now Shows WHO Made Each Permission Decision
+
+This is huge for debugging. Every permission prompt in your timeline now shows exactly what decided it:
+
+- **You** — manual approval
+- **Assisted Permissions** — AI judge said yes
+- **Policy** — org policy allowed it
+- **Unattended Fallback** — auto-approved because nobody was watching
+
+```bash
+# See it in action
+copilot timeline
+```
+
+### 3. Model IDs Are Now Case-Insensitive
+
+`/model gpt-6.1-sol` and `/model GPT-6.1-SOL` now work identically. The CLI saves the canonical ID automatically. Small change, saves daily frustration.
+
+## Authentication That Actually Works
+
+**Entra (Azure AD) broker auth on macOS** — If your org uses Microsoft Entra ID, the CLI now uses the native broker instead of forcing browser fallback. Falls back gracefully if broker isn't available.
+
+**`/user list` shows auth source** — You can now see which account uses which authentication method at a glance.
+
+**Remote session resume uses your configured GitHub auth** — No more re-authenticating when reconnecting to cloud sessions.
+
+## Sandbox Improvements That Matter
+
+| Feature | What It Does |
+|---------|--------------|
+| `/add-dir` | Grants sandbox access to directories for current session only |
+| Network bypass prompts | Shows prompt whenever proxy blocks a destination (not just once) |
+| Windows temp directory fixes | Sandboxed commands write to granted temp dir — tools that rename temp files now work |
+| `uv`/`pnpm` support | Cache writes work by default when dev tool access enabled |
+
+## Model Picker Gets Smarter
+
+The model picker now prioritizes:
+- **GPT-6.1 Sol**
+- **GPT-6 Astra / Luna**
+- **Claude 5.5 models**
+
+Retired models are hidden. You're not scrolling past deprecated options anymore.
+
+## Session Quality of Life
+
+- **Git repos reach input prompt faster** — Interactive sessions in repos don't hang on startup
+- **Retry progress messages** — See "Recovering from transient failure..." before the response arrives
+- **No auth warning on signed-out catalog unavailability** — Cleaner UX when account-owned catalog is down but you're signed out
+- **`/allow-all` available during startup** — Works while enterprise policy is still resolving
+
+## Settings Cleanup
+
+User settings now **only** read from `~/.copilot/settings.json`. Keys in `~/.copilot/config.json` are ignored. One source of truth, less confusion.
+
+Invalid config entries no longer reset your entire settings — dismissed prompts, trusted folders, and sign-ins survive a single bad JSON entry.
+
+## Windows Taskbar Icons Stay Grouped
+
+CLI updates now use a stable icon path. Your taskbar doesn't spawn a new icon every update.
+
+## What's Still Pre-Release (1.0.97)
+
+Released hours after 1.0.96, the pre-release adds:
+- Agent-scoped declarative hooks for custom agents
+- Inline images render by default on supported terminals (`/settings inlineImages false` to disable)
+- Autopilot denies preToolUse "ask" decisions instead of hanging on unwatched permission dialogs
+- Emergency memory relief bypasses cooldown before V8 OOM kills the session
+- Skills/plugins from `--plugin-dir` now reach autocomplete and invocation after `--resume`
+
+## Should You Update?
+
+**Yes.** 1.0.96 is stable. The sandbox improvements alone are worth it if you've ever fought with credential masking or network prompts. Timeline permission tracking is a debugging superpower.
+
+```bash
+# Update
+copilot upgrade
+
+# Or via package manager
+brew upgrade copilot-cli
+# winget upgrade GitHub.CopilotCLI
+# scoop update copilot-cli
+```
+
+## Bottom Line
+
+This release feels like the Copilot CLI grew up. Sandbox is usable, auth works across platforms, and you can finally see why a permission was granted. If you've been holding off on the CLI because "it's still rough," 1.0.96 is the version that changes that.
+
+---
+
+*Using Copilot CLI daily? The timeline permission tracking alone will save you hours of "why did that run?" debugging. Try `/timeline` after your next session.*
