@@ -1,0 +1,215 @@
+---
+title: "Claude Code Just Learned to Save Your Tokens While You Sleep — v2.1.299"
+description: "Claude Code v2.1.299 (October 14) adds idle compaction that auto-shrinks 200K+ token conversations before cache expiry, CLAUDE_CODE_DISABLE_FILE_MENTIONS to stop file content leaks, mod media access, and 50+ fixes. The release that respects your context window."
+pubDate: 2026-10-14T15:00:00Z
+tags: ["claude-code", "release", "v2.1.299", "idle-compaction", "file-mentions", "mods", "beginner"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+v2.1.299+Idle+Compaction&tool=claude-code"
+canonical: "https://terminalblog.com/blog/claude-code-v2-1-299-idle-compaction-file-mentions-mod-power/"
+---
+
+Claude Code v2.1.299 dropped **October 14, 2026** — and it quietly solves the biggest silent money leak in your workflow.
+
+You leave a 300K-token session open overnight. Come back. Your next message *should* be instant (prompt cache hit). Instead, it reprocesses the entire conversation. **Tokens burned. Money gone.**
+
+v2.1.299 fixes this with **idle compaction** — plus file mention control, mod media access, and 50+ fixes that actually change daily work.
+
+---
+
+## The Headline: Idle Compaction That Saves Real Money
+
+**What it does:** A conversation sitting idle for ~54 minutes with 200K+ tokens now **auto-compacts** before the one-hour prompt cache expires.
+
+```bash
+# Your session at 2 PM: 300K tokens, you step away
+# 2:54 PM: Claude silently compacts to ~50K summary
+# 3:00 PM: You return. Next message = cache hit. Instant. Cheap.
+```
+
+**Knobs you control:**
+- `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS` — change the 200K threshold
+- `"idleCompaction": false` in settings.json — turn it off entirely
+- Requires v2.1.290+ (you have it if you updated recently)
+
+**Why beginners care:** You didn't know prompt cache expires in an hour. You didn't know idle conversations silently burn thousands of tokens on resume. **Now you don't lose money while grabbing coffee.**
+
+---
+
+## File Mentions: Stop Leaking File Contents to the Model
+
+**New env var:** `CLAUDE_CODE_DISABLE_FILE_MENTIONS=1`
+
+**Before:** You type `@src/config.ts` — Claude gets the *entire file contents* dumped into context. Every mention. Every file. Tokens you didn't ask for.
+
+**Now:** With this flag, Claude gets **only the path**. It reads the file with its own tools when it needs to. You control the context.
+
+```bash
+export CLAUDE_CODE_DISABLE_FILE_MENTIONS=1
+claude
+# @ mentions now pass paths, not contents
+```
+
+**Why it matters:** Large codebases = massive context bloat from casual `@` references. This flag puts you back in charge of what enters the conversation.
+
+---
+
+## Mods Get Media Access — Your Agents Can Now See
+
+**New hook capability:** `$.prompt.media` in `prompt.submit` hooks (for mods installed via managed settings).
+
+```javascript
+// In your mod's prompt.submit hook
+export async function promptSubmit({ prompt, $ }) {
+  const images = $.prompt.media?.images || []
+  const docs = $.prompt.media?.documents || []
+  
+  if (images.length) {
+    // Analyze attached screenshots, diagrams, mockups
+    const analysis = await $.llm.chat({
+      messages: [{ role: 'user', content: ['Analyze this UI:', ...images] }]
+    })
+    // Inject context back into the prompt
+    return { ...prompt, metadata: { uiAnalysis: analysis } }
+  }
+}
+```
+
+**What this enables:**
+- Mods that read attached screenshots and auto-generate UI code
+- Document-aware agents that reference PDFs you drop in
+- Security mods that scan uploaded images for secrets before the model sees them
+
+**For beginners:** Mods were blind to attachments. Now they're not. The ecosystem just got eyes.
+
+---
+
+## Session Identity for Managed Mods
+
+**New:** `$.session.identity()` — tells mods how the session is signed in, org, and email when `forceLoginOrgUUID` is set.
+
+```javascript
+const identity = $.session.identity()
+// { type: 'managed', orgUuid: '...', email: 'user@company.com' }
+// or { type: 'personal' }
+// or { type: 'api-key' }
+```
+
+Enterprise mods can now enforce policies per-identity. Personal mods can adapt behavior. The agent knows *who* it's working for.
+
+---
+
+## Effort & Fast Mode in Agent View
+
+**New slash commands in agent view (peek panel):**
+- `/effort` — set default reasoning effort for new sessions
+- `/fast` — toggle fast mode default
+- Bare `/model`, `/effort`, `/fast` now open pickers instead of doing nothing
+
+**Why it matters:** You configure your *defaults* once. Every new session inherits them. No more `/model sonnet` `/effort high` every single time.
+
+---
+
+## The Daily Paper Cuts (Finally Fixed)
+
+| Annoyance | Fixed |
+|-----------|-------|
+| `/usage` showing >100% used | ✅ Capped at 100% |
+| MCP servers named `constructor`/`prototype` never connecting | ✅ Reserved names now work |
+| Sandbox failing on WSL2: `bwrap: Can't mkdir /mnt/c/Program Files/ClaudeCode` | ✅ Fixed |
+| Debug logging (`--debug`) causing memory leaks and exit hangs | ✅ Fixed |
+| `/btw` jumping transcript to bottom while scrolled up | ✅ Stays where you are |
+| Fullscreen "Update installed" notice hidden behind idle hint | ✅ Shows beside it |
+| Cloud sessions freezing on slow connections during large uploads | ✅ Fixed |
+| `claude mcp list` / `claude doctor` calling empty `.mcp.json` invalid | ✅ Now valid |
+| Windows: orphaned PowerShell processes from liveness checks | ✅ Cleaned up |
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| **v2.1.299** | Oct 14, 2026 | **Stable** | **Idle compaction, file mention control, mod media, session identity, effort/fast defaults, 50+ fixes** |
+| v2.1.295 | Oct 8, 2026 | Stable | Hook blocking, MCP backoff, mod notifications, background survival |
+| v2.1.292 | Oct 6, 2026 | Stable | Mods platform, plugin marketplace, subagent effort |
+
+**v2.1.299 is the "quality of life" release.** No headline features — just the things that make daily work stop hurting.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| Leave sessions open for hours | **Yes** — idle compaction = real token savings |
+| Use `@` file mentions heavily | **Yes** — `DISABLE_FILE_MENTIONS` controls context bloat |
+| Write/use mods with managed settings | **Yes** — media access + session identity |
+| Run on WSL2 / Windows | **Yes** — sandbox + process fixes |
+| Hit >100% usage display bugs | **Yes** — fixed |
+| Just want "it works better" | **Yes** — 50+ fixes, zero breaking changes |
+
+**No rush if:** You're on v2.1.295+ and nothing above bites you — but idle compaction alone pays for the update in one forgotten session.
+
+---
+
+## How to Update
+
+```bash
+# Auto-update (npm/brew/scoop/choco)
+claude --version  # should show 2.1.299
+
+# Or reinstall
+npm install -g @anthropic-ai/claude-code@latest
+# brew upgrade claude-code
+# scoop update claude-code
+# choco upgrade claude-code
+```
+
+**Verify it works:**
+```bash
+# Test idle compaction: leave a 250K+ token session for 60 min, resume
+# Test file mentions: export CLAUDE_CODE_DISABLE_FILE_MENTIONS=1; @ a large file
+# Test mod media: drop an image in a managed mod session
+```
+
+---
+
+## The Bottom Line
+
+**v2.1.299 doesn't shout. It saves.**
+
+- Stops burning tokens while you sleep (idle compaction)
+- Stops leaking file contents on every `@` mention (DISABLE_FILE_MENTIONS)
+- Gives mods eyes (media access) and identity awareness
+- Fixes 50+ papercuts that made you workaround the tool
+
+This is the release where Claude Code **respects your context window, your tokens, and your time.**
+
+```bash
+npm install -g @anthropic-ai/claude-code@latest
+# Then: export CLAUDE_CODE_DISABLE_FILE_MENTIONS=1
+# Then: watch your token bill drop
+```
+
+---
+
+## Related Articles
+
+- [Claude Code v2.1.295 Just Dropped 100+ Fixes — The Stability Release You've Been Waiting For](/blog/claude-code-v2-1-295-stability-release-youve-been-waiting-for/)
+- [Claude Code v2.1.294 — Hook Security Fix](/blog/claude-code-v2-1-294-hook-security-fix/)
+- [Claude Code v2.1.293 — Haiku 5.5 Default, Context Compaction Fix](/blog/claude-code-v2-1-293-haiku-5-5-default-fixes/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+- [Beware: AgentJacking — Sentry MCP Hijacks Claude Code, Cursor, Codex](/blog/beware-agentjacking-sentry-mcp-hijacks-claude-code-cursor-codex/)
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+
+---
+
+*Claude Code is developed by Anthropic. Changelog source: [github.com/anthropics/claude-code/releases/tag/v2.1.299](https://github.com/anthropics/claude-code/releases/tag/v2.1.299). Published October 14, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
