@@ -1,0 +1,217 @@
+---
+title: "OpenClaw 2026.10.3 Just Fixed the Update Nightmare — Blocked Upgrades, Lost Sign-Ins, and Doctor Recovery All Solved"
+description: "OpenClaw 2026.10.3 (October 13) unblocks stuck updates, preserves saved OAuth sign-ins during Doctor repairs, fixes Mac app local connections, and makes conversations survive compaction and interrupted provider replies. 79 PRs, 97 contributors — the stable release that makes OpenClaw reliable enough for production."
+pubDate: "2026-10-14T14:00:00Z"
+tags: ["openclaw", "release", "v2026.10.3", "updates", "doctor", "saved-signins", "mac", "stability", "beginner"]
+tools: ["openclaw"]
+author: "rho"
+image: "/api/og?title=OpenClaw+2026.10.3+Update+Fixes&tool=openclaw"
+canonical: "https://terminalblog.com/blog/openclaw-2026-10-3-update-blockers-fixed-saved-signins-doctor/"
+---
+
+OpenClaw **2026.10.3** dropped **October 13** (10 hours ago as of this writing) — and it's the stable release that finally makes **updates reliable**, **sign-ins survive Doctor repairs**, and **conversations survive the chaos** that used to break them.
+
+79 pull requests. 97 contributors. Zero breaking changes.
+
+If you've ever had an update strand your install, lost your OAuth tokens during a Doctor run, or watched a conversation vanish after a Gateway restart — this is the update you've been waiting for.
+
+---
+
+## The One-Line Summary
+
+**Updates that unblock themselves. Sign-ins that survive repairs. Conversations that don't die. Mac app that connects. Update today.**
+
+---
+
+## The Headlines (What You'll Actually Feel)
+
+| Feature | Why It Matters |
+|---------|----------------|
+| **Blocked updates unblocked** | Leftover recovery work cleared, completed records archived — next upgrade just works |
+| **Saved sign-ins preserved during Doctor** | Unreadable legacy auth file no longer discards your OAuth profiles |
+| **Mac app connects during local setup** | No more \"cannot connect\" on first run |
+| **Conversations survive compaction + interrupted replies** | Deleted sessions cancel cleanly; interrupted provider replies don't vanish context |
+| **Windows service accounts recognized** | Updates handle different Task Scheduler names for same service account |
+| **pnpm 12 launchers stay usable** | `openclaw` command survives staging cleanup after updates |
+
+---
+
+## 1. Updates That Don't Strand You (The Big One)
+
+**What it does:** Updates now **clear eligible leftover recovery work** and **archive completed update records** that previously blocked the next upgrade (#168388, #169038).
+
+**In English:** You hit "update." Something interrupts it (Windows elevation prompt, network blip, laptop sleep). **Before:** Stranded install, blocked future updates, manual cleanup. **Now:** Update recovers. Next time you run it, it picks up where it left off or cleanly restarts.
+
+**Also fixed:**
+- **Interrupted 2026.9.8 updates** — updated CLI settles aborted records that prevented another update (#169027)
+- **FreeBSD package recovery** — recovery helpers repair or retire interrupted npm package updates (#168775)
+- **Leftover updater copies** — Doctor removes abandoned npm updater copy that prevents the next update (#170170)
+- **Candidate checks with older updaters** — newer candidate no longer rejected solely because Doctor would update version/setup/migration bookkeeping (#170195)
+- **Older Node updaters** — avoid unnecessary rollback when time measurement differs (#169915)
+- **Updates requested in chat** — fixed Doctor cleanup check that falsely refused permission and rolled back chat-requested updates (#170218)
+- **Doctor during updates** — Doctor continues after later process check fails when it already verified the updater (#169563, #169665)
+- **Windows service accounts** — updates recognize different Task Scheduler names for same service account (#169481)
+- **Windows update/recovery paths** — updater workers recognize short names and different capitalization for same installation folder (#169292, #169397)
+- **pnpm service commands** — new/repaired Gateway service commands use pnpm's durable installation link (#170003)
+- **pnpm 12 launchers** — fixed native pnpm updates keep `openclaw` command usable after staging cleanup (#170131)
+- **Service refresh refusals** — update restarts preserved Gateway service after safely refusing to rewrite its definition (#169658)
+- **Busy state databases** — optional progress logging no longer aborts update solely because database is briefly busy (#168210, #169283)
+- **Unrelated dependency copying** — updates avoid copying dependencies from unrelated enclosing installations (#168927, #169551)
+- **Configured update memory limits** — update commands retain configured Node memory limits (#168889)
+- **Repair outcomes and next steps** — unfinished Doctor maintenance reported as pending with useful next action (#167714, #168905)
+- **Update handoff reports** — already reported update outcome no longer produces second misleading failure (#168587, #168993)
+
+**Why beginners care:** Updating agent runtimes used to be a "clear your schedule" event. Now it's **fire-and-forget**. This is the difference between "hobby project" and "production infrastructure."
+
+---
+
+## 2. Saved Sign-Ins Survive Doctor Repairs
+
+**What it does:** An unreadable legacy auth file **no longer causes the affected cleanup to discard saved OAuth profiles** (#170256).
+
+**Before:** Doctor runs a repair → encounters unreadable legacy auth file → **discards ALL your saved OAuth profiles** (GitHub, Anthropic, OpenAI, Google, etc.). You re-authenticate everything.
+
+**Now:** Doctor **identifies the file to inspect or restore before retrying**, while unrelated repairs continue. Previously deleted profiles and retired credential imports are not restored (correctly), but your active sign-ins **survive**.
+
+**Why it matters:** You spend hours setting up model providers, MCP servers, plugin auth. A routine Doctor run shouldn't nuke it. Now it doesn't.
+
+---
+
+## 3. Mac App Finally Connects on First Run
+
+**What it does:** Fixes that let the Mac app connect during local setup.
+
+**Before:** Install Mac app → open → "Cannot connect to Gateway" → confusion → give up.
+
+**Now:** It just connects. The local Gateway starts, the app finds it, you're working.
+
+**Why it matters:** Mac users are a huge chunk of the coding agent audience. First-run experience = adoption. This removes a major friction point.
+
+---
+
+## 4. Conversations That Survive Compaction and Interrupted Replies
+
+**What it does:** 
+- **Deleting an unfinished conversation** — records cancellation before stopping its unfinished reply, allowing chat clients to receive the cancelled status (commit e115a6a)
+- **Interrupted provider replies** — conversations continue after compaction or interrupted provider replies
+
+**Before:** Provider times out mid-stream → conversation context corrupted → you lose the thread.
+
+**Now:** Cancellation is explicit. Chat clients know what happened. Context stays clean.
+
+**Why it matters:** You're in a deep debugging session. Provider hiccups. **You don't lose your place.** The conversation is recoverable.
+
+---
+
+## 5. Windows: Service Accounts, Paths, and pnpm Fixed
+
+**What it does:** Multiple Windows-specific fixes that make OpenClaw behave like a native Windows citizen:
+
+- **Service accounts** — Updates recognize different Task Scheduler names for the same service account and can restart the Gateway without rewriting a service owned by somebody else (#169481)
+- **Update/recovery paths** — Updater workers recognize short names and different capitalization for the same installation folder. Recovery snapshots stop rejecting their own Windows temporary directory (#169292, #169397)
+- **pnpm 12 launchers** — Fixed native pnpm updates keep the `openclaw` command usable after staging cleanup, including with a symlinked global bin folder (#170131)
+
+**Why it matters:** If you run OpenClaw on Windows (especially in a team with mixed account setups), these were the papercuts that made you consider switching to Linux. Fixed.
+
+---
+
+## 6. Codex Plugin Compatibility & Plugin Package Repairs
+
+**What it does:**
+- **Codex plugin compatibility** — Official external Codex packages older than 2026.9.7 are reported unavailable before they break replies. Eligible official updates follow the core release (#170306)
+- **Plugin package repairs** — A replacement package can be saved while its data migration is unfinished, allowing Doctor to continue. **Finish `openclaw doctor --fix` before restarting or reloading the replacement** (#170339)
+
+**Why it matters:** Plugin ecosystem reliability. Your custom tools and integrations don't break silently when core updates.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Focus |
+|---------|------|-------|
+| **2026.10.3** | Oct 13, 2026 | **Update unblocking, saved sign-ins, Mac connect, conversation survival, Windows fixes, plugin repairs** |
+| 2026.10.5-beta.1 | Oct 11, 2026 | Safer updates (beta), restart-safe conversations, faster Gateway, X channel, voice, ClawHub |
+| 2026.10.1 | Oct 10, 2026 | Memory survival, Haiku 5.5, Workboard, MCP Apps alive, sealed installs, Windows fixes |
+| 2026.9.9 | Oct 8, 2026 | GPT-6.1 Sol native, Windows junction stores fixed, safer live updates |
+
+**2026.10.1** made memory reliable. **2026.10.5-beta.1** made the platform reliable (beta). **2026.10.3** promotes the update fixes to **stable** — this is the one you deploy to production.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| Run OpenClaw in production | **Yes** — update unblocking + sign-in preservation = operational maturity |
+| Had updates strand before | **Yes** — this is the fix you've been waiting for |
+| Run on Windows | **Yes** — service accounts, paths, pnpm all fixed |
+| Use Doctor regularly | **Yes** — sign-ins survive, repair outcomes actionable |
+| Use Mac app | **Yes** — first-run connect fixed |
+| Run Codex plugins | **Yes** — compatibility reporting prevents silent breaks |
+| Need absolute stability | **Yes** — this is the stable release, 79 PRs tested |
+
+**No rush if:** You're pinned to 2026.9.x for compatibility — but test 2026.10.3 in staging. The update fixes alone are worth it.
+
+---
+
+## How to Update
+
+```bash
+# npm (Global CLI)
+npm install -g openclaw@2026.10.3
+
+# Docker
+docker pull openclaw/openclaw:2026.10.3
+
+# Verify
+openclaw --version
+# Should show 2026.10.3
+```
+
+---
+
+## What's Next
+
+The 2026.10.3 release notes show **97 contributors** and fixes across every subsystem. The velocity is real.
+
+Next wave (2026.10.x / 2026.11.x) will likely bring:
+- Beta fixes from 2026.10.5 promoted to stable
+- More model integrations (GPT-6.2, Opus 6, etc.)
+- Desktop app improvements
+- ACP protocol enhancements
+- Plugin marketplace features
+
+For now: **update, verify updates unblock themselves, and enjoy sign-ins that survive Doctor.**
+
+---
+
+## Release Artifacts
+
+- **npm:** [openclaw@2026.10.3](https://www.npmjs.com/package/openclaw/v/2026.10.3)
+- **Docker:** `docker pull openclaw/openclaw:2026.10.3`
+- **GitHub Release:** [v2026.10.3](https://github.com/openclaw/openclaw/releases/tag/v2026.10.3)
+- **Changelog:** [CHANGELOG/2026.10.3.md](https://raw.githubusercontent.com/openclaw/openclaw/main/CHANGELOG/2026.10.3.md)
+- **Formatted Release Notes:** [docs.openclaw.ai/releases/2026.10.3](https://docs.openclaw.ai/releases/2026.10.3)
+
+---
+
+## Related Articles
+
+- [OpenClaw 2026.10.1 Just Made Agent Memory Survive Everything](/blog/openclaw-v2026-10-1-memory-workboard-mcp-apps/)
+- [OpenClaw 2026.10.5-beta.1 Just Made Updates Survive Everything](/blog/openclaw-v2026-10-5-beta1-safer-updates-restart-safe-conversations/)
+- [OpenClaw vs Hermes: The Managed Codex Runtime Showdown](/blog/hermes-vs-openclaw/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+
+---
+
+*OpenClaw is open-source (MIT) and available at [github.com/openclaw/openclaw](https://github.com/openclaw/openclaw). Published October 14, 2026 — covers OpenClaw 2026.10.3 released October 13, 2026. Full changelog: [github.com/openclaw/openclaw/releases/tag/v2026.10.3](https://github.com/openclaw/openclaw/releases/tag/v2026.10.3)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
