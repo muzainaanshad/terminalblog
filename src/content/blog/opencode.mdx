@@ -1,0 +1,190 @@
+---
+title: "OpenCode 2 Just Landed — Per-Project Auto-Accept, Native ARM64, and the End of Auto-Updates"
+description: "OpenCode v2.0.28 (October 13) drops per-project auto-accept permissions, native Windows ARM64 builds, WinGet install, and kills auto-updates in favor of explicit control. The open-source agent just grew up."
+pubDate: "2026-10-14T14:00:00Z"
+tags: ["opencode", "release", "v2", "open-source", "coding-agent", "beginner"]
+tool: "opencode"
+author: "Anshad"
+image: "/api/og?title=OpenCode+2+Launched&tool=opencode"
+canonical: "https://terminalblog.com/blog/opencode-v2-just-launched-per-project-auto-accept-windows-arm64/"
+---
+
+OpenCode 2 is here. Not a beta. Not a preview. **v2.0.28 dropped October 13, 2026** and it's the default install on opencode.ai.
+
+If you've been waiting for the "stable" signal before jumping from v1 — this is it. The migration path (`opencode upgrade --major`) has been live since v1.19.0. Now the new architecture is the default.
+
+Here's what actually matters for your daily workflow.
+
+## The Headlines (What You'll Actually Feel)
+
+| Feature | Why It Matters |
+|---------|----------------|
+| **Per-project auto-accept** | Set `mod+shift+a` per project — no more global "approve everything" or "approve nothing" |
+| **Native Windows ARM64** | Surface Pro, Snapdragon laptops — native binaries, no x64 emulation tax |
+| **WinGet install** | `winget install Anomaly.OpenCode` — finally a real Windows package manager path |
+| **No more auto-updates** | You run `/update` or `opencode upgrade` — runtime never changes mid-session |
+| **Built-in worktree tools** | `worktree_create`, `worktree_list`, `worktree_remove` in Code Mode — isolated contexts, normal approval |
+| **Release highlights dialog** | Post-update TUI shows what's new once, `/highlights` to reopen |
+
+---
+
+## 1. Per-Project Auto-Accept: The Permission Model Finally Makes Sense
+
+**Before:** One global setting. Either you approve every edit (dangerous) or you approve nothing (slow).
+
+**Now:** `Settings → Projects → Auto-accept permissions` — override the default **per project**.
+
+Press `mod+shift+a` in any session to toggle for the current project. The TUI shows the active state.
+
+**Why beginners care:** You're experimenting in a throwaway repo? Auto-accept on. Working on production? Strict approval. Your muscle memory doesn't change — the *context* does.
+
+This is the permission model every coding agent should have copied years ago. OpenCode shipped it first.
+
+---
+
+## 2. Native Windows ARM64: No More Emulation Tax
+
+If you're on a Snapdragon X Elite/Plus laptop (Surface Pro 11, Dell XPS 13 2024, Lenovo ThinkPad T14s Gen 6), you've been running x64 binaries under emulation. That means:
+
+- Slower startup
+- Higher battery drain
+- Native addons (sqlite3, ripgrep) running through WoW64
+
+**v2.0.28 ships native ARM64 CLI, terminal, and desktop binaries.** Download the "Windows (ARM64)" asset from the release page or the new download page selector.
+
+**WinGet makes it one command:**
+```powershell
+winget install --id Anomaly.OpenCode -e
+# or for the desktop app
+winget install --id Anomaly.OpenCode.Desktop -e
+```
+
+WinGet handles upgrades automatically. No more manual `.msi` downloads.
+
+---
+
+## 3. Auto-Updates Are Dead. Explicit Updates Won.
+
+OpenCode **stopped auto-installing updates** in v1.19.0. v2.0.28 makes it permanent.
+
+**Old way:** Agent restarts mid-session because an update downloaded in background. You lose context. You lose flow.
+
+**New way:** You run `/update` in the TUI or `opencode upgrade` from CLI. **You decide when the runtime changes.**
+
+This is a philosophy shift: *the operator controls the environment, not the agent.* For CI/automation, this is huge — your build pipeline doesn't randomly pull a new runtime.
+
+---
+
+## 4. Built-In Worktree Tools: Isolation Without the Git Hassle
+
+Three new Code Mode tools:
+- `opencode.worktree_create` — spin up an isolated worktree
+- `opencode.worktree_list` — see what's active
+- `opencode.worktree_remove` — clean up (requires edit approval, `force: true` discards changes)
+
+**Why this matters:** You're debugging a flaky test. Spin a worktree, reproduce, fix, merge back. Your main worktree stays clean. The agent handles the git commands — you just approve the edits.
+
+This is **native worktree support** without leaving your agent session. No `git worktree add` memorization required.
+
+---
+
+## 5. Release Highlights Dialog: You'll Actually Read the Changelog
+
+After updating, the TUI home screen shows a **one-time highlights dialog** with the key changes. Run `/highlights` anytime to reopen. Disable with `highlights: false` in `cli.json`.
+
+Small UX win, big impact: you actually know what changed without digging through GitHub releases.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Focus |
+|---------|------|-------|
+| **v2.0.28** | Oct 13, 2026 | **Per-project auto-accept, native ARM64, WinGet, no auto-updates, worktree tools, highlights** |
+| v1.19.0 | Oct 11, 2026 | OpenCode 2 upgrade path (`upgrade --major`), ultrafast tier, PTY validation |
+| v1.18.35 | Oct 6, 2026 | xAI images, agent-readable stats, ecosystem growth |
+| v1.18.18 | Sep 2026 | Major reliability overhaul — MCP desktop, plugin system |
+
+**v1.18.x** made OpenCode reliable. **v1.19.0** made it upgradable. **v2.0.x** makes it *yours* — per-project control, native platforms, explicit updates.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Want per-project permission control | **Yes** — the killer feature |
+| Run Windows on ARM (Snapdragon) | **Yes** — native binaries = real performance |
+| Use WinGet / want managed updates | **Yes** — official packages now exist |
+| Run OpenCode in CI/CD | **Yes** — explicit `/update` = predictable runtime |
+| Are on v1.19.0 and happy | **Yes** — safe migration, `upgrade --major` works |
+| Have custom v1 plugins not yet ported | **Test first** — plugin API changed in v2 |
+
+**Migration from v1:** Run `opencode upgrade --major` (added in v1.19.0). It downloads v2, migrates config/skills/sessions, rolls back on failure. One command.
+
+---
+
+## How to Install / Upgrade
+
+```bash
+# Fresh install (macOS / Linux)
+curl -fsSL https://opencode.ai/v2/install | bash
+
+# Fresh install (Windows - native ARM64 or x64)
+irm https://opencode.ai/v2/install.ps1 | iex
+
+# Windows via WinGet (recommended)
+winget install --id Anomaly.OpenCode -e
+
+# Upgrade from v1.x
+opencode upgrade --major
+
+# Upgrade within v2.x
+opencode upgrade
+# or in TUI: /update
+```
+
+**Verify:**
+```bash
+opencode --version
+# Should show 2.0.28+
+```
+
+---
+
+## The Bigger Picture
+
+OpenCode's thesis: **provider-neutral, local-first, skill-driven.**
+
+While Claude Code locks you to Anthropic, Cursor locks you to their IDE, Codex locks you to OpenAI — OpenCode lets you swap models, providers, and backends without rewriting your workflow.
+
+v2.0.28 doesn't change that thesis. It **removes the friction** from owning your environment:
+- Per-project permissions = you decide risk per context
+- Native ARM64 = your hardware runs at full speed
+- WinGet = Windows is a first-class citizen
+- Explicit updates = you control the runtime
+- Worktree tools = isolation without git gymnastics
+- Highlights = you stay informed without effort
+
+This is what "open source agent" looks like when it grows up.
+
+---
+
+## Related Articles
+
+- [OpenCode v1.19.0 Just Dropped — The OpenCode 2 Upgrade Path Is Here](/blog/opencode-v1-19-opencode-2-upgrade-path-lands/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+- [OpenCode vs Codex: The Provider-Neutral Advantage](/blog/opencode-vs-codex/)
+
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+---
+
+*OpenCode is developed by Anomaly. Changelog source: [opencode.ai/changelog](https://opencode.ai/changelog) and [github.com/anomalyco/opencode/releases](https://github.com/anomalyco/opencode/releases). Published October 14, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
