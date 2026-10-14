@@ -44,7 +44,7 @@ function parse(file) {
   const updated = fm.updatedDate || fm.pubDate;
   const ts = updated ? new Date(updated).getTime() : 0;
   const ageDays = ts ? Math.floor((Date.now() - ts) / 864e5) : 999;
-  const tags = String(fm.tags || '').split(',').map(t => t.trim().replace(/[\[\]"']/g, ''));
+  const tags = String(fm.tags || '').split(',').map(t => t.trim().replace(/[\[\]\"']/g, ''));
   const evergreen = PILLAR_TAGS.some(t => tags.includes(t)) || PILLAR_TAGS.some(t => slug.includes(t)) || PILLAR_TAGS.some(t => (fm.title || '').toLowerCase().includes(t));
   
   // Check for FAQ section
@@ -96,42 +96,40 @@ function parse(file) {
 function extractFaq(body) {
   const faqMatch = body.match(/^## FAQ\s*\n([\s\S]*?)(?:\n## |\n---|\n$)/m);
   if (!faqMatch) return [];
-  
+
   const faqContent = faqMatch[1];
   const faqs = [];
-  
-  // Pattern 1: **Q1: What is...?** ... (answer on following lines until next Q or end)
-    const pattern1 = /\*\*Q\d*:\s*([^*]+?)\*\*\s*\n([\s\S]*?)(?=\n\s*\*\*Q\d*:|$)/gi;
-    let match;
-    while ((match = pattern1.exec(faqContent)) !== null) {
+
+  // Pattern 1: **What is...?** or **How do...?** ... (bolded question followed by answer on next line)
+  // Matches: **Question?**\n\nAnswer or **Question?**\nAnswer
+  const pattern1 = /\*\*([^*?]+(?:\?|:))\*\*\s*\n\s*\n?([\s\S]*?)(?=\n\*\*[^*?]+(?:\?|:)\*\*|$)/gi;
+  let match;
+  while ((match = pattern1.exec(faqContent)) !== null) {
+    const q = match[1].trim().replace(/^["']|["']$/g, '');
+    const a = match[2].trim().replace(/^["']|["']$/g, '');
+    if (q && a && q.length > 3) faqs.push({ q, a });
+  }
+
+  // Pattern 2: **Q1: What is...?** ... (numbered Q format)
+  if (faqs.length === 0) {
+    const pattern2 = /\*\*Q\d*:\s*([^*]+?)\*\*\s*\n\s*\n?([\s\S]*?)(?=\n\s*\*\*Q\d*:|$)/gi;
+    while ((match = pattern2.exec(faqContent)) !== null) {
       const q = match[1].trim().replace(/^["']|["']$/g, '');
       const a = match[2].trim().replace(/^["']|["']$/g, '');
       if (q && a) faqs.push({ q, a });
     }
-  
-  // Pattern 2: **Q:** ... (answer on following lines until next Q or end)
+  }
+
+  // Pattern 3: **Q:** ... (answer on following lines until next Q or end)
   if (faqs.length === 0) {
-    const pattern2 = /\*\*Q:\*\*\s*(.*?)\n([\s\S]*?)(?=\n\s*\*\*Q:|$)/gi;
-    while ((match = pattern2.exec(faqContent)) !== null) {
+    const pattern3 = /\*\*Q:\*\*\s*(.*?)\n([\s\S]*?)(?=\n\s*\*\*Q:|$)/gi;
+    while ((match = pattern3.exec(faqContent)) !== null) {
       const q = match[1].trim();
       const a = match[2].trim();
       if (q && a) faqs.push({ q, a });
     }
   }
-  
-  // Pattern 3: **What is...** or **Is there...** ... (bolded question followed by answer)
-    if (faqs.length === 0) {
-      const pattern3 = /\*\*(What is|What are|Is there|Are free|Which|How much|Are coding|What is the|How do|Can I|Should I|Why|What's|What is the catch).*?\*\*\s*\n([\s\S]*?)(?=\n\s*\*\*(What is|What are|Is there|Are free|Which|How much|Are coding|What is the|How do|Can I|Should I|Why|What's|What is the catch).*?\*\*|$)/gi;
-      while ((match = pattern3.exec(faqContent)) !== null) {
-        // match[0] is the full match, we need to extract the full question from it
-        const fullMatch = match[0];
-        const qMatch = fullMatch.match(/\*\*(.*?)\*\*/);
-        const q = qMatch ? qMatch[1].trim() : match[1].trim();
-        const a = match[2].trim();
-        if (q && a) faqs.push({ q, a });
-      }
-    }
-  
+
   // Pattern 4: Q: ... A: ... (plain text, with or without numbers, with or without bold)
   if (faqs.length === 0) {
     const pattern4 = /(?:^|\n)(?:\*\*)?(?:Q|Question)\s*\d*[:：]\s*(.*?)(?:\n|\r)(?:\*\*)?(?:A|Answer)\s*\d*[:：]\s*(.*?)(?=\n(?:Q|Question)\s*\d*[:：]|\n\*\*(?:Q|Question)|$)/gi;
@@ -141,7 +139,7 @@ function extractFaq(body) {
       if (q && a) faqs.push({ q, a });
     }
   }
-  
+
   return faqs;
 }
 
