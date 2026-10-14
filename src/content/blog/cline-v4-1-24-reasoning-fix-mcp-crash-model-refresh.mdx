@@ -1,0 +1,170 @@
+---
+title: "Cline v4.1.24 Just Fixed the Reasoning Off Bug — And MCP Servers No Longer Crash Your Editor"
+description: "Cline v4.1.24 (Oct 13) fixes 'reasoning off' failing on GPT-6 Astra, Opus 5.5, Fable 5, makes MCP servers that exit early stop crashing the extension host, adds Claude Haiku 5.5 to recommended models, and refreshes the catalog with new providers. The stability patch you needed."
+pubDate: "2026-10-14T14:00:00Z"
+tags: ["cline", "release", "v4.1.24", "reasoning", "mcp", "model-catalog", "coding-agent", "beginner"]
+tool: "cline"
+author: "sage"
+image: "/api/og?title=Cline+v4.1.24+Reasoning+Fix&tool=cline"
+canonical: "https://terminalblog.com/blog/cline-v4-1-24-reasoning-fix-mcp-crash-model-refresh/"
+---
+
+**Cline v4.1.24 dropped October 13** — and it's the kind of release that fixes the things that made you silently restart VS Code.
+
+The headlines: **Turning reasoning OFF now works on every model** (GPT-6 Astra, GPT-6.1 Sol, Claude Fable 5, Opus 5.5), **MCP servers that exit early no longer crash your extension host 3 seconds later**, **images no longer inflate token estimates and trigger premature auto-compaction**, and the **model catalog adds GPT-6.1 Sol, Step 5 Preview, and new providers**.
+
+If you've hit the "reasoning off = 400 error" wall, had MCP crashes, or wondered why auto-compaction ran way too early — this is your update.
+
+---
+
+## The One-Line Summary
+
+**Reasoning off works everywhere. MCP crashes fixed. Token estimates sane. Catalog fresh. Update today.**
+
+---
+
+## 1. "Reasoning Off" Finally Works on Every Model
+
+**The bug:** Since reasoning controls launched, turning reasoning **off** would throw a **400 error** on GPT-6 Astra, GPT-6.1 Sol, Claude Fable 5, and Claude Opus 5.5. You wanted faster, cheaper responses — instead you got an error.
+
+**The fix:** v4.1.24 makes **reasoning off work on every provider**. No more model-specific whitelist. You toggle it, it works.
+
+**Also fixed:** Level-only Gemini models (that only accept "low/medium/high" not token budgets) no longer reject requests with thinking-budget errors. Cline now sends the right format automatically.
+
+---
+
+## 2. MCP Servers That Exit Early: Extension Host Crash Fixed
+
+**The bug:** An MCP server or hook that exits before reading all its input would **crash the extension host ~3 seconds later**. You'd be coding, everything fine, then *boom* — VS Code extension host restarts, your session state wobbles.
+
+**The fix:** Cline now handles early-exit MCP servers gracefully. No more delayed crash. The tool call fails cleanly, you see the error, you move on.
+
+**Why it matters:** MCP is becoming core infrastructure. Flaky servers shouldn't take down your editor. This fix makes MCP **production-ready reliability**.
+
+---
+
+## 3. Images No Longer Inflate Token Estimates (Auto-Compaction Sanity)
+
+**The bug:** A ~90 KB screenshot counted as **~30,000 tokens** (base64 at text rate). A few images in conversation → auto-compaction triggers **long before you're near the actual context limit**. You'd lose history prematurely.
+
+**The fix:** Each image now adds a **flat 1,600 estimated tokens** instead of base64 byte-counting. Auto-compaction uses the **resolved model's actual context window** (not the bare catalog entry).
+
+**Result:** Your conversation history lasts as long as it should. No more "why did it compact at 20% capacity?"
+
+---
+
+## 4. Model Catalog Refresh: GPT-6.1 Sol, Step 5 Preview, New Providers
+
+| Change | Details |
+|--------|---------|
+| **Added to recommended** | GPT-6.1 Sol |
+| **Added to free list** | Solar Mini 4, Step 5 Preview |
+| **Removed from free list** | DeepSeek V4.1 Flash, space-bunny-alpha |
+| **New providers** | AI/ML API, LowRouter, Prime Inference |
+| **v0 provider** | Now ships only `v0-1.5-md` (models.dev dropped v0) |
+| **OpenCode Go endpoint** | Moved to `https://opencode.ai/inference/go/v1` |
+| **Default model changes** | 302.AI, CrossModel, Cortecs, DigitalOcean, NEAR AI Cloud, Ofox → Claude Haiku 5.5; DevPass → LLM Gateway; LLM Gateway, Meta → Muse Wonder 1.0; Aixy → GPT-6.1 Sol; CloudFerro Sherlock, Moark → GLM 5.3; Ambient, NanoGPT, Neuralwatt, Novita AI → various |
+
+**Note:** If you use any of those providers *without pinning a model*, expect a different default after update. **Pin your models** if you want stability.
+
+---
+
+## 5. Symlink Rule Files + `.claude/skills` Discovery
+
+**Fixed:** Rule files that are **symlinks now load** from config directories (instead of being skipped). Edits to a link's target pick up on next refresh.
+
+**Added:** Cline now **scans `.claude/skills`** — so skills authored for Claude Code are visible to Cline. Cross-pollination FTW.
+
+---
+
+## 6. Scheduled Runs: Queued Runs Claimed Correctly, Failed Runs Reported Honestly
+
+- **Queued runs** now claimed correctly under `bun:sqlite` (previously bound NULL, stayed pending forever)
+- **Provider errors** (retired model IDs) now record runs as **failed with error message** — not silently succeeding
+- **Cron superseding** — newer occurrence of same schedule cancels older queued ones (no backlog replay)
+
+---
+
+## 7. Composio Connectors: Meta Tools, Connect Links, Host Auth
+
+- Signed-in sessions register **Composio meta tools** (search, manage connections, wait, multi-execute)
+- Agent can **find connector tools across toolkits**, hand you a **Connect Link** for unconnected apps
+- **Host-supplied auth** via new `connectorsRequest` option (forwarded to scheduled sessions)
+
+---
+
+## 8. Editor Tool: `old_text` Null Handling
+
+The editor tool now advertises `old_text` as a plain string. When schema allowed null, some models sent `null` instead of replacement text. Null is still accepted at runtime (treated as omitted) — but the schema guides models correctly now.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| **v4.1.24** | Oct 13, 2026 | **Stable** | Reasoning off fix, MCP crash fix, token estimates, catalog refresh, symlinks, skills, scheduled runs, Composio |
+| v4.1.23 | Oct 7, 2026 | Stable | Azure 400 fix, `.clinerules` for commits, MCP paging, Kimi reasoning, model refresh |
+| Desktop v0.0.45 | Oct 8, 2026 | Desktop | SSH remotes, Haiku 5.5 fixed |
+| Desktop v0.0.46 | Oct 13, 2026 | Desktop | **Latest Desktop** — separate channel |
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Hit "reasoning off = 400 error" on GPT-6/Claude 5.x | **Urgent** — v4.1.23 and earlier broken for you |
+| Use MCP servers | **Yes** — extension host crash fixed |
+| See auto-compaction trigger too early | **Yes** — token estimates fixed |
+| Want latest models (GPT-6.1 Sol, Step 5 Preview) | **Yes** — catalog refreshed |
+| Use symlinked rule files or `.claude/skills` | **Yes** — now supported |
+| Run scheduled/cron agents | **Yes** — queued runs + honest failures |
+| Just want latest stable | **Yes** — zero breaking changes, 8+ fixes |
+
+---
+
+## How to Update
+
+```bash
+# VS Code / Cursor / JetBrains extension
+# Auto-updates or: Extensions → Cline → Update
+
+# CLI (if using standalone)
+# Check https://github.com/cline/cline/releases/tag/v4.1.24
+
+# Desktop app (separate release channel)
+# Desktop v0.0.46 released Oct 13
+```
+
+**Changelog:** [github.com/cline/cline/compare/v4.1.23...v4.1.24](https://github.com/cline/cline/compare/v4.1.23...v4.1.24)
+
+---
+
+## The Quiet Pattern Continues
+
+Cline doesn't ship "features" for demos. It ships **fixes for the workflow you actually live in**.
+
+- Reasoning off → 400 error → blocks cost control → **fixed**
+- MCP early exit → extension host crash → **fixed**  
+- Screenshot = 30k tokens → premature compaction → **fixed**
+- New model drops → wait for release → **catalog auto-refreshes**
+
+This is the release you update for, not the one you tweet about.
+
+---
+
+## Related Articles
+
+- [Cline v4.1.23 Just Fixed the Azure Claude 400 Error](/blog/cline-v4-1-23-claude-azure-fixes-commit-rules-mcp-paging/)
+- [Cline Desktop Free Coding Models — Zero API Keys](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Cline v4.1.10 — Web Search Lands](/blog/cline-v4-1-10-web-search-lands/)
+- [Cline Just Fixed What Broke Your Trust — v4.1.8](/blog/cline-just-fixed-what-broke-your-trust-v4-1-8/)
+- [Beware: Cline Injection Supply Chain Attack via GitHub Actions](/blog/beware-clinejection-supply-chain-attack-github-actions/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Cline is developed by the Cline team. Changelog source: [github.com/cline/cline/releases/tag/v4.1.24](https://github.com/cline/cline/releases/tag/v4.1.24). Published October 14, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
