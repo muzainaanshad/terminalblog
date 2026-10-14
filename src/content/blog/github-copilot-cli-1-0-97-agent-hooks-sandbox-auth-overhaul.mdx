@@ -1,0 +1,158 @@
+---
+title: "GitHub Copilot CLI 1.0.97 Just Dropped — Agent Hooks, Smarter Sandbox, and Auth That Finally Works"
+description: "Copilot CLI 1.0.97 lands with agent-scoped declarative hooks, interactive sandbox settings, case-insensitive model IDs, Entra broker auth on macOS, and timeline permission tracking. Here's what actually changes your daily workflow."
+pubDate: 2026-10-14
+tags: ["copilot-cli", "github", "release", "terminal", "coding-agents", "beginner"]
+tools: ["copilot-cli"]
+author: "Anshad"
+canonicalUrl: "https://terminalblog.com/blog/github-copilot-cli-1-0-97-agent-hooks-sandbox-auth-overhaul/"
+---
+
+GitHub Copilot CLI 1.0.97 dropped on October 13, and it's the kind of stable release that makes you realize how much friction you've been tolerating. This isn't a patch — it's a proper feature drop that touches sandbox, authentication, model selection, agent extensibility, and session visibility all at once.
+
+## The Big Three Changes
+
+### 1. Agent-Scoped Declarative Hooks (Custom Agents Just Got Real)
+
+You can now define **declarative hooks for custom agents** — not just global ones. This means your specialized agents (code reviewer, test writer, security auditor) can each have their own pre/post tool hooks without polluting the global namespace.
+
+```json
+// .copilot/agents/code-reviewer.json
+{
+  "name": "code-reviewer",
+  "hooks": {
+    "preToolUse": [
+      { "matcher": "Edit|Write", "command": "echo 'Reviewing change...'" }
+    ],
+    "postToolUse": [
+      { "matcher": "Edit|Write", "command": "npm run lint --if-present" }
+    ]
+  }
+}
+```
+
+**Why this matters**: Before, hooks were global. Now each agent carries its own behavior. Your security auditor can block `rm -rf` while your test writer auto-runs the test suite. No more one-size-fits-all.
+
+### 2. Interactive Sandbox Settings (Finally)
+
+Sandbox configuration used to be a "edit JSON, hope it works" experience. Now you get a guided interactive setup:
+
+```bash
+copilot sandbox
+```
+
+This opens a flow that **detects common secrets (API keys, tokens) and prompts you to mask them** before saving. No more accidentally leaking credentials in transcripts.
+
+**What you get**:
+- Environment secret suggestions based on your project
+- Masking hosts for sensitive domains
+- Visual confirmation before anything writes to config
+
+### 3. Timeline Now Shows WHO Made Each Permission Decision
+
+This is huge for debugging. Every permission prompt in your timeline now shows exactly what decided it:
+
+| Source | Meaning |
+|--------|---------|
+| **You** | Manual approval |
+| **Assisted Permissions** | AI judge said yes |
+| **Policy** | Org policy allowed it |
+| **Unattended Fallback** | Auto-approved because nobody was watching |
+
+```bash
+# See it in action
+copilot timeline
+```
+
+## Authentication That Actually Works
+
+### Entra (Azure AD) Broker Auth on macOS
+If your org uses Microsoft Entra ID, the CLI now uses the **native broker** instead of forcing browser fallback. Falls back gracefully if broker isn't available.
+
+### `/user list` Shows Auth Source
+You can now see which account uses which authentication method at a glance.
+
+### Remote Session Resume Uses Your Configured GitHub Auth
+No more re-authenticating when reconnecting to cloud sessions.
+
+## Quality-of-Life Improvements That Add Up
+
+| Feature | What Changed |
+|---------|--------------|
+| **Model IDs case-insensitive** | `/model gpt-6.1-sol` and `/model GPT-6.1-SOL` work identically; canonical ID saved automatically |
+| **Inline images on by default** | Render by default on supported terminals; `/settings inlineImages false` to disable |
+| **Remote plugin marketplace retries with your token** | After HTTPS auth fails, retries once with your signed-in GitHub token |
+| **Streamed responses behind TLS proxies** | Complete when `close_notify` is omitted |
+| **GitHub SCP remotes with absolute paths** | Owner and name now resolve correctly |
+| **Custom agents discovered beyond 100 files** | No more "too many agents" limit; deep nesting works |
+| **Autopilot denies "ask" decisions instead of hanging** | PreToolUse hooks that return "ask" get denied, not stuck on a dialog nobody watches |
+| **Windows taskbar icons stay grouped across updates** | Stable icon path prevents duplicate taskbar entries |
+| **Saved settings survive invalid config.json entries** | Dismissed prompts, trusted folders, sign-ins preserved |
+| **`/config` hides managed permission rules** | Read-only unless set by your org |
+| **`/usage` shows billed AI Credits** | Token-billed sessions visible, including after resume |
+| **File reads with non-standard view_range** | Show line range and count in timeline; exports don't contain literal "undefined" |
+| **Transcript text selection fixed** | Dragging no longer highlights/copies row below pointer |
+| **Power BI & Bluebird MCP servers** | Accept published resource scopes during sign-in |
+| **Secret redaction in JSON output** | Preserves valid variable references while redacting |
+| **Resumed sessions report interrupted tool calls** | Avoids replaying canceled writes |
+| **Synchronous `/task` JSON output** | Includes failed child error and lifecycle events |
+| **GitHub MCP tool selections use correct endpoint** | Requested write tools stay available |
+| **Cached MCP tool calls recheck on catalog refresh** | Concurrent refresh doesn't stale the cache |
+| **Plugin-dir skills/agents reach autocomplete** | No longer missing from invocation |
+| **Resumed sessions rebuild hooks from correct plugin list** | Disabled plugins don't come back; local marketplace plugins persist |
+| **`/user` switch choices visible in short terminals** | Account checks don't hide new-session options |
+| **Permission retry budget per request** | Unrelated calls don't consume each other's retries |
+| **Background-shell wait status animation fixed** | No animation when no foreground work running |
+| **Emergency memory relief bypasses cooldown** | Long sessions survive V8 OOM with compacted history instead of crashing |
+
+## What This Means for Beginners
+
+### You Stop Fighting the Tool
+
+**Before 1.0.97**: Configure sandbox via JSON → leak a secret → wonder why auth broke → manually fix timeline gaps → curse at case-sensitive model IDs.
+
+**After 1.0.97**: Run `copilot sandbox` → guided setup masks secrets → auth just works (Entra broker on Mac) → timeline tells you exactly why that command ran → model IDs work however you type them.
+
+### Custom Agents Become Maintainable
+
+Agent-scoped hooks mean you can build a **library of specialized agents** (reviewer, tester, documenter, migrator) each with their own guardrails. Share them with your team. Version them. They don't step on each other's toes.
+
+### Debugging Permission Issues Becomes Trivial
+
+Open `copilot timeline` → see "Unattended Fallback" on that 2 AM deploy → realize your org policy needs tightening. No more guessing.
+
+## The Honest Take
+
+This release doesn't reinvent the category. It **removes the papercuts** that made daily use frustrating.
+
+- Sandbox config: fixed
+- Auth on Mac with Entra: fixed  
+- Model ID typos: fixed
+- Permission debugging: fixed
+- Custom agent isolation: fixed
+- Memory crashes in long sessions: mitigated
+
+If you've been using Copilot CLI, update today. If you've been holding off because "it feels rough," 1.0.97 is the version where it stops feeling rough.
+
+```bash
+# Update
+copilot update
+
+# Or reinstall
+curl -fsSL https://github.com/github/copilot-cli/releases/latest/download/copilot-linux-x64.tar.gz | tar -xz
+```
+
+---
+
+## Related Articles
+
+- [GitHub Copilot CLI 1.0.96 — Sandbox, Timeline, and Auth Overhaul](/blog/github-copilot-cli-1-0-96-sandbox-timeline-auth-overhaul/)
+- [GitHub Copilot CLI 1.0.95 — Entra Auth, Sandbox Context Fixes](/blog/github-copilot-cli-1-0-95-entra-auth-sandbox-context-fixes/)
+- [AmpCode vs GitHub Copilot CLI: IDE Daily Driver or Terminal Agent?](/blog/ampcode-vs-copilot-cli/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*GitHub Copilot CLI is free for individual use. Enterprise features require GitHub Copilot Enterprise. [github.com/github/copilot-cli](https://github.com/github/copilot-cli)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
