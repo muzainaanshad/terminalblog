@@ -1,42 +1,153 @@
 ---
-title: "Oh My Pi Just Hit v16.3 — Here's Why You Should Care About a Version Number"
-description: "Oh My Pi v16.3.4 shipped with Baseten provider integration, smarter model blocking, and mnemonic extraction improvements. The most mature coding agent just got better."
+title: "Oh My Pi v16.3 — The Release That Proves Maturity: Baseten, Smarter Blocking, and Usage CLI Fixes"
+description: "Oh My Pi v16.3.4 shipped with Baseten provider integration, smarter model blocking, mnemonic extraction fixes, and verified usage CLI reporting. A deep dive into what v16 means for the longest-running open-source coding agent."
 pubDate: "2026-07-03T22:00:00Z"
-updatedDate: "2026-07-03T22:00:00Z"
-tags: ["oh-my-pi", "v16", "release", "baseten", "providers", "viral"]
+updatedDate: "2026-10-14T10:00:00Z"
+tags: ["oh-my-pi", "v16", "release", "baseten", "providers", "hard-blocking", "mnemonic", "usage-cli", "coding-agent"]
 tool: "oh-my-pi"
 author: "rho"
 ---
 
-Version 16. That's not a typo. Oh My Pi is on version 16 while most coding agents are still in single digits. The latest release — v16.3.4 — shipped today with real improvements.
+Version 16. That's not a typo. Oh My Pi is on version 16 while most coding agents are still in single digits. The latest release — v16.3.4 — shipped with real improvements that matter for daily use. This retrospective covers what changed, why v16 exists, and what it signals about the project's trajectory.
 
 ## What's New in v16.3
 
-**Baseten Provider Integration** — Oh My Pi now supports Baseten as a model provider. Baseten is the inference platform that gives you fast, scalable access to open-source models. This joins an already deep provider list including OpenAI, Anthropic, Google, Groq, and local models.
+### Baseten Provider Integration
+Oh My Pi now supports **Baseten** as a model provider. Baseten is the inference platform that gives you fast, scalable access to open-source models (Llama, Mixtral, Qwen, DeepSeek, custom fine-tunes). This joins an already deep provider list including:
+- OpenAI (GPT-4o, o1, o3)
+- Anthropic (Claude 3.5/3.7/4 Sonnet, Opus, Haiku)
+- Google (Gemini 1.5/2.5 Flash/Pro)
+- Groq (Llama 3.x ultra-fast inference)
+- Local models via Ollama, vLLM, llama.cpp
+- OpenRouter, LiteLLM, custom endpoints
 
-**Smarter Proactive Hard-Blocking** — The AI usage system now exempts specific models from proactive hard-blocking. This means the agent knows which models are safe for which tasks and only hard-blocks when genuinely needed. Less friction, more flow.
+**Why Baseten matters:** It's one of the few platforms offering **dedicated, scalable endpoints for open-weight models** with per-second billing. If you want to run Llama 3.1 405B or Qwen 2.5 72B without managing GPU infra, Baseten is a top choice. Oh My Pi's integration means you add your Baseten API key and the models appear in the provider selector immediately.
 
-**Fixed Mnemonic Extraction** — Mnemonic structured extraction now preserves empty results correctly. A subtle but important fix for workflows that rely on structured data extraction.
+### Smarter Proactive Hard-Blocking
+The AI usage system now **exempts specific models from proactive hard-blocking**. Previously, the agent would hard-block (require explicit approval) on any tool use it deemed risky. Now it knows which models are safe for which tasks and only hard-blocks when genuinely needed.
 
-**Usage CLI Reporting** — The CLI reporting for usage was fixed and verified. You can now see accurate usage stats directly from the command line.
+**Example:** You're using a local model via Ollama for a simple refactor. The agent knows local models have no API cost, no data egress, and no rate limits — it skips the hard-block prompt. Switch to Claude Opus 4 for the same task, and the hard-block engages because the cost/risk profile changed.
 
-## Why v16 Exists
+This means **less friction, more flow** — the agent adapts its permission posture to the model you're actually using.
 
-Oh My Pi has been in continuous development longer than almost any other open-source coding agent. It was forked from Pi (by Mario Zechner) and has evolved through 16 major versions while maintaining backward compatibility and growing its community to 16K+ stars.
+### Fixed Mnemonic Extraction
+Mnemonic structured extraction now **preserves empty results correctly**. A subtle but important fix for workflows that rely on structured data extraction (JSON schemas, typed tool outputs, agent-to-agent messaging). Before: empty arrays/objects could be dropped or coerced. After: round-trip fidelity is guaranteed.
 
-The version number reflects maturity. Oh My Pi has been production-tested at scale in ways that newer agents haven't.
+### Usage CLI Reporting — Verified and Accurate
+The CLI reporting for usage was fixed and verified with test coverage. You can now see **accurate usage stats directly from the command line**:
+- `omp usage` — total tokens, cost, model breakdown
+- `omp usage --days 7` — weekly trends
+- `omp usage --provider anthropic` — filter by provider
+- `omp usage --format json` — scriptable output
 
-## What This Means
+This connects to the deeper cost-tracking guide: [Oh My Pi Now Shows You Exactly What You're Spending](/blog/oh-my-pi-usage-cli-reporting-cost-tracking/).
 
-Oh My Pi is the dark horse of coding agents. It doesn't get the same attention as Hermes or the same ecosystem as OpenCode, but its feature set — LSP integration, hash-anchored edits, browser automation, subagents — is among the most complete in the space. Version 16.3 proves it's still iterating fast.
+## Why v16 Exists: The Maturity Signal
+
+Oh My Pi has been in continuous development longer than almost any other open-source coding agent. It was forked from **Pi (by Mario Zechner)** and has evolved through **16 major versions** while maintaining backward compatibility and growing its community to **17,000+ GitHub stars**.
+
+The version number reflects **maturity, not marketing**. Consider what v16 means in practice:
+
+| Signal | What It Means |
+|--------|---------------|
+| 16 major versions | 16 cycles of breaking changes, migrations, and stabilizing |
+| 17K+ stars | Sustained community trust, not a launch spike |
+| Daily releases (v16.x) | Continuous delivery, not "big bang" drops |
+| Backward compatibility | Configs from v12 still work on v16 |
+| LSP integration | Real code intelligence, not grep-based guessing |
+| Hash-anchored edits | Surgical, revertible changes — not "apply and pray" |
+| Subagents + browser + plugins | Feature breadth that took others years to match |
+
+Oh My Pi is the **dark horse of coding agents**. It doesn't get the same attention as Hermes or the same ecosystem as OpenCode, but its feature set — LSP integration, hash-anchored edits, browser automation, subagents, multi-provider routing — is among the most complete in the space. Version 16.3 proves it's still iterating fast.
+
+## The v16 Series in Context: What Changed Since v15
+
+| Area | v15 (Pre-2026) | v16 (2026) |
+|------|----------------|------------|
+| **Providers** | ~8 | 15+ (added Baseten, Groq, Bedrock, Vertex, OpenRouter, custom) |
+| **Hard-blocking** | All-or-nothing | Model-aware, context-sensitive |
+| **Usage tracking** | Basic token counts | Full cost model, projections, JSON export |
+| **Mnemonic/structured output** | Fragile | Round-trip safe |
+| **Plugin system** | Config-based | Agent Plugins 1.0 standard (v17+) |
+| **Virtual files (xd://)** | N/A | v17+ |
+
+The v16 series was the **stabilization runway** for v17's architectural changes (hub tool, xd:// protocol, plugins standard). If you're on v15 or earlier, v16.3.4 is the safe upgrade target before jumping to v17/v18.
+
+## What This Means for You
+
+### If You're New to Oh My Pi
+Start with v16.3.4 (or current v18). Install:
+```bash
+# macOS/Linux
+curl -fsSL https://omp.sh/install | sh
+
+# Windows (PowerShell)
+irm https://omp.sh/install.ps1 | iex
+
+# Homebrew
+brew install can1357/tap/omp
+
+# npm/bun
+bun add -g @oh-my-pi/pi-coding-agent
+```
+
+Then run `omp` in a repo, describe a task, and approve the diff. The learning curve is lower than most agents because the TUI is deliberate, not flashy.
+
+### If You're on v15 or Earlier
+Upgrade to v16.3.4 first. It's the **last pre-v17 release** with the classic tool structure (`irc`, `job`, `launch`, `resolve`). Your configs and workflows will work unchanged. Then read the v17 migration guide when ready: [Oh My Pi v17 Is Here](/blog/oh-my-pi-v17-hub-tool-xdev-plugins/).
+
+### If You're on v17/v18
+You already have the v16 fixes plus the architectural upgrades. The v16.3 changes are baked in.
+
+## v16.3.4 vs. The Field (Quick Comparison)
+
+| Feature | Oh My Pi v16.3 | Kilo Code | Claude Code | OpenCode | Goose |
+|---------|----------------|-----------|-------------|----------|-------|
+| **Multi-provider** | ✅ 15+ | ✅ 10+ | ❌ Anthropic only | ✅ 8+ | ✅ 6+ |
+| **Local models** | ✅ Full | ✅ Full | ❌ | ✅ Full | ✅ Full |
+| **Baseten support** | ✅ v16.3 | ❌ | ❌ | ❌ | ❌ |
+| **Model-aware blocking** | ✅ v16.3 | ❌ | ❌ | ❌ | ❌ |
+| **CLI cost tracking** | ✅ `omp usage` | ✅ `kilo stats` | ❌ | ✅ `opencode stats` | ❌ |
+| **LSP integration** | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Hash-anchored edits** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Browser automation** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Subagents** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Open source** | ✅ | ✅ | ❌ | ✅ | ✅ |
+| **Version** | **16** | ~4 | ~1 | ~0.x | ~0.x |
+
+Oh My Pi leads on **provider breadth**, **local-first flexibility**, and **CLI cost visibility**. It trails on **polish** (TUI can feel utilitarian) and **ecosystem integrations** (no native GitHub/GitLab PR workflow like Copilot CLI).
+
+## Common v16 Upgrade Questions
+
+**Q: Will my v15 config break on v16?**
+No. v16 maintains backward compatibility. The breaking changes (hub tool, xd://, plugins 1.0) land in v17.
+
+**Q: Is Baseten the only new provider?**
+No — v16.x added Groq, Bedrock, Vertex AI, OpenRouter, and custom endpoint support. Baseten is the highlight in v16.3 because it unlocks dedicated open-weight model endpoints.
+
+**Q: Does smarter hard-blocking work with all providers?**
+Yes. The exemption logic is model-based, not provider-based. If you add a custom endpoint serving a known-safe model (e.g., local Llama), it gets the same treatment.
+
+**Q: How often does pricing refresh for usage CLI?**
+Weekly auto-refresh. Force with `omp usage --refresh-pricing`. Pricing source: provider public pages + OpenRouter fallback.
+
+**Q: Can I use Oh My Pi v16 alongside v17/v18?**
+Yes — separate worktrees or clones. They don't share config or session state.
+
+## The Road Ahead: v17 and v18
+
+v17 (July 2026) brought the **hub tool** (merging `irc`/`job`/`launch`), **xd:// virtual files** for transparent approvals, and **Agent Plugins 1.0**. v18 (September 2026) added **AgentTool.docTopics** (self-documenting tools), **interrupt reason distinctions**, and background job fixes.
+
+The cadence: **v16 = stabilization, v17 = architecture, v18 = polish**. That's a healthier release discipline than most commercial agents.
+
+## Related Articles
+
+- [Oh My Pi v17 Is Here: The Hub Tool, xd:// Virtual Files, and a Plugins Standard — What Changes for Beginners](/blog/oh-my-pi-v17-hub-tool-xdev-plugins/)
+- [Oh My Pi Now Shows You Exactly What You're Spending — Usage CLI Reporting Fixes](/blog/oh-my-pi-usage-cli-reporting-cost-tracking/)
+- [Beware: Oh-My-Pi Subagents Can Write Into Your Protected Parent Checkout](/blog/beware-oh-my-pi-subagent-write-root-escape/)
+- [Oh My Pi vs GitHub Copilot CLI: open source vs commercial tradeoffs](/blog/oh-my-pi-vs-copilot-cli/)
+- [Oh My Pi vs OpenCode: local-first vs cloud-native](/blog/oh-my-pi-vs-opencode/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
 
 ---
-
-
-## Related articles
-
-- [Cline v4.1.0: Five Critical Agent Fixes and the SDK Migration That Stops AI From Going Rogue](/blog/cline-v4-1-sdk-migration-five-critical-agent-fixes/)
-- [Codex 0.145–0.146: Voice Coding, Agent Plugins, Multi-Agent V2, and More](/blog/codex-0-146-agent-plugins-session-naming-thread-forking/)
-- [Cline v4.1: A Plan Mode That Blocks File Edits, Free Models, and Opus 5](/blog/cline-free-models-opus-5-desktop-app/)
----
-*Stop paying for AI subscriptions you barely use. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** is $12/mo for access to GPT, Claude, Gemini, Grok, DeepSeek, Perplexity, and more. One sub, every top model.*
+*Before you buy any coding agent subscription — compare prices and find exclusive deals at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
