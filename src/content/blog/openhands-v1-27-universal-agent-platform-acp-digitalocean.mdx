@@ -1,0 +1,213 @@
+---
+title: "OpenHands 1.27 Just Became the Universal Agent Platform — Pi, OpenCode, and DigitalOcean in One Release"
+description: "OpenHands v1.27 (October 12) adds Pi and OpenCode as built-in ACP agents, connects Agent Canvas to DigitalOcean Managed Agents, ships browser recording for verification, and finalizes automation setup flows. The release that lets you run ANY coding agent from one control plane."
+pubDate: "2026-10-14T15:00:00Z"
+tags: ["openhands", "release", "v1.27", "acp", "pi", "opencode", "digitalocean", "agent-canvas", "beginner"]
+tool: "openhands"
+author: "rho"
+image: "/api/og?title=OpenHands+1.27+Universal+Agent+Platform&tool=openhands"
+canonical: "https://terminalblog.com/blog/openhands-v1-27-universal-agent-platform-acp-digitalocean/"
+---
+
+**OpenHands v1.27 dropped October 12** — and it just rewrote what "agent platform" means.
+
+You've been picking ONE agent: OpenHands, or Claude Code, or Codex, or Gemini CLI. **Now you pick NONE of them.** You pick OpenHands Canvas, and it runs *all of them* — Pi, OpenCode, Claude Code, Codex, Gemini — across local, self-hosted, and now **DigitalOcean Managed Agents** backends.
+
+This isn't a feature. It's a **category shift**.
+
+---
+
+## The Headlines (What You'll Actually Feel)
+
+| Feature | Why It Matters |
+|---------|----------------|
+| **Pi + OpenCode as built-in ACP agents** | Run Pi (`npx pi-acp`) and OpenCode (`npx opencode-ai acp`) inside Canvas — no config, no wrapper scripts |
+| **DigitalOcean Managed Agents backend** | Cloud sandboxes that pause when idle, resume from any device, billed per-second |
+| **Browser recording for verify-openhands** | Record video of agent behaviors — visual proof it works (or doesn't) |
+| **Automation setup finalized** | Split-panel forms, draft persistence, guided flow — automations that don't fight you |
+| **ACP model lists from agents** | No more hardcoded model tables — agents tell Canvas what they support |
+| **50+ fixes** | WebSocket backoff, theme-aware toasts, a11y, MCP, settings, onboarding |
+
+---
+
+## 1. One Canvas, Every Agent (The ACP Breakthrough)
+
+**Before v1.27:** OpenHands Canvas ran OpenHands agent. Want Claude Code? Different tool. Want Codex? Different tool. Want to compare them? Open three terminals.
+
+**Now:** Canvas speaks **ACP (Agent Client Protocol)** natively. During onboarding — or anytime in Settings — you pick your agent:
+
+```
+Choose your agent:
+├── OpenHands (built-in)
+├── Claude Code (ACP)
+├── Codex (ACP)
+├── Gemini CLI (ACP)
+├── Pi (ACP) ← NEW
+└── OpenCode (ACP) ← NEW
+```
+
+**Pi** runs via `npx -y --package=pi-acp --package=@earendil-works/pi-coding-agent pi-acp`
+**OpenCode** runs via `npx -y opencode-ai acp`
+
+Both download on first use. Both work on **local backends only** (your machine or self-hosted Agent Server). Neither is pre-baked in the Docker image — Canvas fetches them lazily.
+
+### Why This Changes Everything
+
+You're debugging a gnarly refactor. You spin up **OpenHands** for the architecture view. It suggests a pattern. You switch to **Pi** — it writes the implementation in a single pass. You verify with **Codex** — it catches the edge case OpenHands missed. **All in one Canvas. Same workspace. Same context.**
+
+No context switching. No "which tool has the right model?" You have **all the tools, all the models, one control plane.**
+
+---
+
+## 2. DigitalOcean Managed Agents: Cloud Sandboxes That Pause
+
+**New Providers tab in Add Backend → DigitalOcean Managed Agents.**
+
+Sign in with a `doctl` personal access token. Create or open an OpenHands agent. Every session launches in an **isolated DigitalOcean sandbox** with its own disk and conversation history.
+
+### The Magic: Pause on Idle, Resume Anywhere
+
+- Agent working on a 3-hour migration → you close laptop → **sandbox pauses, billing stops**
+- Next morning on your iPad → open Canvas → **resume exactly where it left off**
+- Different device, different network, **same agent, same files, same mind**
+
+```bash
+# One-time setup
+doctl auth init
+
+# Launch from Canvas → or CLI:
+doctl harness-runtime launch --harness opencode --name my-agent
+# Drops you straight into chat. Ctrl-D detaches. Reattach anytime.
+```
+
+**For teams:** No more "who's running the long task on their laptop?" The cloud sandbox *is* the agent's home. Your laptop is just a window.
+
+---
+
+## 3. verify-openhands Gets Eyes: Browser Recording
+
+The verification skill (introduced in v1.26) now **records video** of browser interactions:
+
+```bash
+control-openhands verify --once --record-video
+# Produces: verification-run-2026-10-14.mp4
+```
+
+**What you see:** Real browser footage of the agent clicking, typing, navigating, asserting. When a behavior fails, you *watch* the failure — no log spelunking.
+
+**Why it matters:** "It works on my machine" becomes "here's the video of it working on *every* machine." CI/CD for your agent platform's own behaviors, now with receipts.
+
+---
+
+## 4. Automation Setup: From "Fighting Forms" to "Guided Flow"
+
+Automations (Canvas's workflow engine) got a complete UX overhaul:
+
+- **Split-panel setup** — form on left, live preview on right
+- **Draft persistence** — close the tab, come back tomorrow, your half-built automation waits
+- **Guided flow** — step-by-step instead of one massive form
+- **Template parity** — cloud backends now show the same templates as local
+
+**Before:** "Which field goes where? Why did it error? Let me start over."
+
+**Now:** You build. It shows. It saves. It works.
+
+---
+
+## 5. ACP Model Lists: Agents Tell You What They Support
+
+**Old way:** Canvas hardcoded model tables for each ACP agent. New model drops → wait for OpenHands release → update → model appears.
+
+**New way:** `feat(acp): take ACP model lists from the agent instead of hardcoding them`
+
+Canvas asks the agent: "What models do you support?" Agent replies. Canvas shows them. **Zero lag.** New model in Pi? Shows up next Canvas refresh. New model in OpenCode? Same.
+
+This is what "protocol-native" means: the *agent* owns its capabilities. The *platform* just displays them.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Focus |
+|---------|------|-------|
+| **v1.27.0** | Oct 12, 2026 | Pi + OpenCode ACP, DigitalOcean backend, browser recording, automation flow, ACP model lists, 50+ fixes |
+| **v1.27.1** | Oct 12, 2026 | Patch: Docker MARS modules, theme-aware warnings, verify-openhands map maintenance |
+| **v1.26.0** | Oct 8, 2026 | verify-openhands skill + CLI, daily passes, authenticated backend view, suspended workspace banner |
+| **v1.25.0** | Oct 6, 2026 | Voice dictation, native Git automations, bulk LLM profiles, Canvas updates |
+
+**v1.24** built the architecture. **v1.25** made it usable. **v1.26** made it verifiable. **v1.27** made it **universal**.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Want to compare Pi vs OpenCode vs Codex vs Claude Code | **Yes** — one Canvas, all agents, zero config |
+| Run team agents on laptops (painful) | **Yes** — DigitalOcean sandboxes = pause/resume from any device |
+| Run verify-openhands in CI | **Yes** — video evidence of passes/failures |
+| Build automations daily | **Yes** — setup flow finally respects your time |
+| Need latest model support instantly | **Yes** — ACP agents self-report their catalogs |
+| Just want stable fixes | **Yes** — 50+ fixes, zero breaking changes |
+
+**No rush if:** You're pinned to v1.26 for plugin compatibility — but test v1.27 in staging. The ACP expansion alone is worth the validation cycle.
+
+---
+
+## How to Upgrade
+
+```bash
+# Docker (recommended)
+docker pull ghcr.io/openhands/openhands:1.27.1
+
+# Or update your deployment
+# Check https://github.com/All-Hands-AI/OpenHands/releases/tag/v1.27.1
+```
+
+**After upgrade:**
+1. Settings → Agent Canvas → Add Backend → Providers → **DigitalOcean Managed Agents** (try it)
+2. Settings → Agents → **Choose Pi or OpenCode** → start a conversation
+3. Skills → search "verify-openhands" → install → `control-openhands verify --once --record-video`
+
+---
+
+## The Bigger Picture
+
+OpenHands isn't building *an* agent. It's building **the control plane for all agents.**
+
+| Release | Shift |
+|---------|-------|
+| v1.22 | Cloud sessions |
+| v1.23 | Workspace polish |
+| v1.24 | Agent Canvas + Automations + Model Router (architecture) |
+| v1.25 | Voice + Native Git + Bulk ops + Smart defaults (usability) |
+| v1.26 | verify-openhands + daily passes + authenticated view (verifiability) |
+| **v1.27** | **ACP universality + cloud sandboxes + visual verification (the platform play)** |
+
+Each release fills a gap. No rewrites. No "v2 coming soon." Just **steady compounding** — and now, **the platform that runs every other platform's agent.**
+
+The question isn't "which agent should I use?" It's "why would I use anything *but* the platform that runs them all?"
+
+---
+
+## Related Articles
+
+- [OpenHands v1.26 — Verification Skill, CLI, Daily Passes](/blog/openhands-v1-26-verification-skill-cli-recipes/)
+- [OpenHands v1.25 — Voice Dictation, Native Git Automations, Bulk LLM Profiles](/blog/openhands-v1-25-agent-canvas-automation-voice/)
+- [OpenHands v1.24 — Agent Canvas, Automations, Model Router](/blog/openhands-v1-24-automation-agent-canvas-mcp-fixes/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Coding Agent Security Checklist 2026](/blog/coding-agent-security-checklist-2026/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
+---
+
+*OpenHands is developed by All Hands AI. Changelog source: [github.com/All-Hands-AI/OpenHands/releases/tag/v1.27.0](https://github.com/All-Hands-AI/OpenHands/releases/tag/v1.27.0) and [v1.27.1](https://github.com/All-Hands-AI/OpenHands/releases/tag/v1.27.1). Published October 14, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
