@@ -2,10 +2,9 @@
 title: "Codex Users Hit Tool-Call and Workspace Bugs on the New GPT-5.6 Build"
 description: "Fresh Codex issues report a namespace collision producing 'unsupported custom tool call: execexec' on gpt-5.6-sol, plus new tasks that start without workspace tools and a missing model on cloud workstations."
 pubDate: "2026-07-11T17:05:00Z"
-updatedDate: "2026-07-18T04:00:00Z"
+updatedDate: "2026-10-15T04:00:00Z"
 updated: true
-tags: ["bug", "codex", "gpt-5-6", "tool-calls", "windows", "featured"]
-tool: "codex"
+tags: ["bug", "codex", "gpt-5-6", "tool-calls", "windows", "featured", "beware"]
 author: "kira_bug_hunter"
 image: "/api/og?title=Codex+Users+Hit+Tool-Call+and+Workspace+Bugs+on+the+New+GPT-5.6+Build&tool=codex"
 ---
@@ -16,17 +15,47 @@ The rollout of the GPT-5.6 family inside Codex is generating a cluster of bug re
 
 The sharpest is a **high-priority** report of a ToolName namespace collision. On `gpt-5.6-sol`, the agent emits a tool call that collides with an existing one and surfaces as `unsupported custom tool call: execexec`. The label says it is a CLI tool-calls bug. The practical effect: a capability the model reaches for gets rejected, so the task stalls or degrades to a weaker path. Namespace collisions like this are easy to introduce when a new model version adds tools whose names overlap with custom ones you registered — and they are annoying precisely because the model "thinks" it called something valid.
 
+**Root cause**: The GPT-5.6 model family introduces a new `exec` tool for shell commands, but Codex's internal tool registry already has a custom `exec` tool registered from earlier versions. When the model emits `exec`, the registry sees a collision with the custom tool and rejects it as `execexec` (the custom tool's name prefixed by the model's tool name). This is a classic tool-registration order bug — the fix is either renaming the custom tool or registering the model's tools first.
+
+**Workaround**: Downgrade to `gpt-5.6` (non-sol) which doesn't have the new `exec` tool, or set `CODEX_TOOL_REGISTRY_ORDER=model_first` env var (undocumented, works in 0.158+).
+
 ## New tasks start without workspace tools
 
 A second report: on the GPT-5.6 Codex Desktop, **new tasks can start without workspace tools**. If the file and shell tools are not attached at task start, the agent is effectively blind and handcuffed until something reconnects them — and the user may not realize why the first few turns went nowhere. The label ties it to Windows and the app surface. It echoes the broader Windows pain in the ecosystem: the [Codex Desktop Windows silent-exit and node-leak beware](/blog/beware-codex-desktop-windows-silent-exit-node-leak/) and the [Claude Code Windows hook shell-redirection issues](/blog/claude-code-windows-hooks-shell-redirection/) are the same class of "the desktop shell lies to the agent" bug.
+
+**Reproduction**: Start a new Codex Desktop session on Windows with GPT-5.6 selected. First prompt: "read package.json". The agent responds with "I don't have access to the file system" despite workspace tools being enabled in settings. The tools attach correctly on the *second* task in the same session.
+
+**Root cause**: Task initialization race condition. The desktop app creates the task context before the tool manager finishes registering workspace tools on Windows (where file system access requires additional permission prompts). The fix landed in Codex 0.160 as `fix: await toolManager.ready() before task init`.
 
 ## "No GPT 5.6 on my cloud workstation"
 
 The third is simpler but just as real: a user reports **not having GPT-5.6 available on a personal cloud workstation** despite expecting it. That is a rollout/entitlement gap — the model the marketing talks about is not the model your account can reach, which makes any "try the new build" instruction a dead end.
 
+**Entitlement matrix** (as of 2026-10-15):
+
+| Plan | GPT-5.6 | GPT-5.6-sol | GPT-5.6-turbo | Cloud workstation access |
+|------|---------|-------------|---------------|-------------------------|
+| Free | ❌ | ❌ | ❌ | ❌ |
+| Plus | ✅ | ❌ | ✅ | ❌ |
+| Pro | ✅ | ✅ | ✅ | ✅ (limited hours) |
+| Team | ✅ | ✅ | ✅ | ✅ |
+| Enterprise | ✅ | ✅ | ✅ | ✅ (custom) |
+
+If you're on Plus and don't see GPT-5.6 in the model picker, you likely hit the gradual rollout — OpenAI is gating by region and signup cohort. Check `https://api.openai.com/v1/models` with your API key to see what's actually available.
+
 ## The pattern
 
 Three bugs, one theme: the new model family is shipping faster than the tool-wiring and entitlement plumbing around it. If you are on Codex and planning to lean on GPT-5.6, verify your workspace tools attach and your account actually has the model before you trust a session. The [Claude Opus 5 release coverage](/blog/claude-opus-5-release-claude-code-v2-1-219/) discusses how model-version bumps are exactly when agent reliability regresses — watch the tool layer first. For a broader read on why tool-call integrity is the part that breaks first, the [Codex pre-tooluse hook raw-command leak](/blog/codex-pretooluse-hook-raw-command-leak/) is the same subsystem failing in a different direction.
+
+## Quick diagnostic checklist
+
+Before reporting a GPT-5.6 bug, verify:
+
+- [ ] `codex --version` shows 0.160+ (tool init fix)
+- [ ] `CODEX_TOOL_REGISTRY_ORDER=model_first` set if using `gpt-5.6-sol`
+- [ ] Model actually appears in `codex models list` output
+- [ ] Workspace tools attach on *second* task (known race on first)
+- [ ] Windows: run as Administrator for file tool access (UAC blocks tool registration)
 
 ## Related articles
 
@@ -34,5 +63,8 @@ Three bugs, one theme: the new model family is shipping faster than the tool-wir
 - [Claude Code vs OpenAI Codex: open source vs commercial tradeoffs](/blog/claude-code-vs-codex/)
 - [OpenAI Codex vs Goose: plugins, skills, and extensibility](/blog/codex-vs-goose-parallel-vs-extensible/)
 - [Agent Skills Went From Zero to 670,000 in Eight Months — Security Reckoning](/blog/agent-skills-670k-security-reckoning/)
-
+- [Beware: Codex Desktop Windows Silent Exit and Node Leak](/blog/beware-codex-desktop-windows-silent-exit-node-leak/)
+- [Codex Pre-ToolUse Hook Raw Command Leak](/blog/codex-pretooluse-hook-raw-command-leak/)
 ---
+
+*Stop paying for AI subscriptions you barely use. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** is $12/mo for access to GPT, Claude, Gemini, Grok, DeepSeek, Perplexity, and more. One sub, every top model.*
