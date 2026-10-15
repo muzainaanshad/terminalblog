@@ -1,0 +1,291 @@
+---
+title: "Claude Code v2.1.300 Just Gave Mods Superpowers — And AWS Advisors Arrived"
+description: "Claude Code v2.1.300 (October 15) drops AWS /advisor support, OpenTelemetry GenAI tracing, virtualText for mods, prompt.change hooks, and 80+ fixes. The release that makes mods feel like first-class citizens."
+pubDate: 2026-10-15T15:00:00Z
+tags: ["claude-code", "release", "v2.1.300", "aws", "advisor", "opentelemetry", "mods", "hooks", "advanced"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+v2.1.300+AWS+Advisor+Mods&tool=claude-code"
+canonical: "https://terminalblog.com/blog/claude-code-v2-1-300-aws-advisor-opentelemetry-mod-power/"
+---
+
+Claude Code v2.1.300 landed **October 15, 2026** — and it's the first release where mods stop feeling like hacks and start feeling like platform primitives.
+
+You get `/advisor` on AWS, OpenTelemetry GenAI semantic conventions, `virtualText` that draws in the prompt box without polluting context, a `prompt.change` hook that catches every non-typed edit, and 80+ fixes that collectively eliminate entire classes of daily friction.
+
+---
+
+## The Headline: `/advisor` Arrives on AWS — Your Agent Gets a Second Brain
+
+**New command:** `/advisor` — picks an advisor model that reviews your agent's work *before* it commits.
+
+```bash
+# In a Claude Code session on AWS
+/advisor                    # pick from available advisors
+/advisorModel opus-5.5      # or set via flag
+--advisor sonnet-5.5        # CLI flag
+CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1  # disable entirely
+```
+
+**How it works:** No advisor runs until you explicitly choose one. The advisor sees the agent's proposed actions and can approve, modify, or block. Think of it as a senior engineer reviewing a junior's PR — except it happens in real-time, every turn.
+
+**Why it matters:** This is the first native "agent overseeing agent" primitive in Claude Code. For teams on AWS, it means:
+- Security review on every dangerous tool call
+- Cost control via cheaper advisor models
+- Compliance gates without leaving the terminal
+
+---
+
+## Mods Get `virtualText` — UI That Doesn't Pollute Context
+
+**New:** `virtualText` on mod prompt decorations — text rendered in the prompt box that **never enters the draft or submitted prompt**.
+
+```javascript
+// In your mod
+export function promptDecorations({ prompt, $ }) {
+  return {
+    virtualText: [
+      { text: '🔒 Secrets scan: clean', color: 'green' },
+      { text: '💰 Est. cost: $0.03', color: 'yellow' },
+      { text: '⚠️ 3 files modified', color: 'red' }
+    ]
+  }
+}
+```
+
+**Before:** Mods injected status into the actual prompt — bloating context, confusing the model, showing up in transcripts.
+
+**Now:** Visual hints for the *human only*. The model never sees them. Your context stays clean. Your transcripts stay readable.
+
+**Use cases that just became trivial:**
+- Live token/cost estimates in the prompt box
+- Security scan results without context pollution
+- Git status, test status, lint warnings — all visible, none in context
+- Multi-line "heads up" displays that vanish on submit
+
+---
+
+## OpenTelemetry GenAI Tracing — Finally, Real Observability
+
+**New semantic attributes** on every trace span:
+
+```
+gen_ai.provider.name        // "anthropic"
+gen_ai.conversation.id      // stable session ID
+gen_ai.tool.name            // "Bash", "Edit", "Agent", etc.
+gen_ai.request.model        // "claude-opus-5.5"
+gen_ai.usage.cache_creation_5m_tokens
+gen_ai.usage.cache_creation_1h_tokens
+error.type                  // standardized error classification
+```
+
+**Plus:** `cache_creation_5m_tokens` and `cache_creation_1h_tokens` split out on `api_request` events — you can finally see *exactly* how much cache write traffic you're generating at each TTL tier.
+
+**Why you care:** Before this, you got generic spans. Now you get **industry-standard GenAI attributes**. Your Datadog, Honeycomb, Grafana, or custom dashboards can:
+- Alert on error.type spikes per tool
+- Track cache efficiency by conversation
+- Cost-attribute per model per session
+- Correlate latency with tool type
+
+No more parsing JSON blobs. It just works with your existing OTel stack.
+
+---
+
+## The `prompt.change` Hook — Catch Every Edit, Not Just Keystrokes
+
+**New hook:** `prompt.change` fires when the prompt box content changes *without a typed edit*:
+
+- History recall (up-arrow)
+- Clear (Escape)
+- Undo (Ctrl+Z)
+- Plugin `fill` operations
+- Paste (in some contexts)
+
+```javascript
+export async function promptChange({ prompt, previousPrompt, $ }) {
+  // Detect: user recalled a command from history
+  if (prompt.startsWith('/') && !previousPrompt.startsWith('/')) {
+    // They recalled a slash command — inject context
+    return { ...prompt, metadata: { recalledFromHistory: true } }
+  }
+  
+  // Detect: plugin filled the prompt
+  if (prompt.length > previousPrompt.length + 50) {
+    // Likely a plugin fill — log for audit
+    await $.audit.log({ type: 'plugin-fill', prompt })
+  }
+}
+```
+
+**Why this changes everything:** Previously, mods only saw `prompt.submit` (on Enter) and `prompt.edit` (on keystroke). They were blind to history recall, undo, clear, and plugin fills. Now you can react to *intent*, not just keystrokes.
+
+---
+
+## Agent Spawn Rewriting — Mods Can Now Rewrite Workflow Agents
+
+**Before:** `agent.spawn` mod hook could only **refuse** workflow agents.
+
+**Now:** It can **rewrite** the agent's `prompt` and `model` before launch.
+
+```javascript
+export async function agentSpawn({ agent, $ }) {
+  if (agent.type === 'workflow') {
+    // Force workflow agents to use cheaper model
+    // Inject extra context from org policy
+    return {
+      ...agent,
+      model: 'sonnet-5.5',
+      prompt: `${agent.prompt}\n\n[ORG POLICY] All file writes require tests.`
+    }
+  }
+}
+```
+
+**Enterprise impact:** Security teams can now enforce model choice, inject policy context, and rewrite agent instructions *at spawn time* — without blocking the agent entirely.
+
+---
+
+## Right-to-Left Text Support — `dir` Prop on Mod Text
+
+**New:** `dir: 'rtl'` on a mod's `Text` component — rows read right-to-left and sit flush right on Windows and VS Code terminals.
+
+```javascript
+$.ui.render({
+  Text: { content: 'مرحبا بالعالم', dir: 'rtl' }
+})
+```
+
+Small feature. Huge for Arabic/Hebrew/Persian developers who've been fighting terminal alignment for years.
+
+---
+
+## The Daily Paper Cuts (Finally Fixed)
+
+| Annoyance | Fixed |
+|-----------|-------|
+| Cloud sessions claiming org policy blocked host when it was local network | ✅ |
+| `/autocompact` warning on smaller window choice | ✅ |
+| `SessionEnd` hooks not running with background commands | ✅ |
+| Subagents you messaged disappearing from `/tasks` | ✅ |
+| Parent agent dropping off breadcrumb while viewing child | ✅ |
+| Agents view eating keystrokes ("up", "down", "escape") in burst input | ✅ |
+| Auto tool search turning off during MCP reconnect | ✅ |
+| Login refused by `forceLoginOrgUUID` leaving stale token | ✅ |
+| `/branch` dropping messages with Unicode separators (U+2028, U+2029) | ✅ |
+| `claude purge` skipping subfolder projects with Unicode separators | ✅ |
+| WorktreeCreate/Remove hooks not firing with `--worktree` | ✅ |
+| OTel `tool_result` missing `git_commit_id` after `git commit -q` (reftable) | ✅ |
+| Mod `prompt.submit` rewrites recorded as typed in OTel | ✅ |
+| Mod hot-reload note appearing in transcript as user input | ✅ |
+| Agent hooks ignoring their `model` (aliases, fallbacks) | ✅ |
+| `--worktree` starting from wrong commit with tag-like branch names | ✅ |
+| Branch showing ".invalid" with reftable repos | ✅ |
+| Scratchpad files named by bare filename instead of full path | ✅ |
+| Remote-control servers giving up on connection renewal | ✅ |
+| VS Code/Cursor/Devin launching CLI tool twice at startup | ✅ |
+| `prompt.edit` hook not firing for `chat:newline` (Ctrl+J) | ✅ |
+| 400-error loops when MCP tool schema rejected by API | ✅ |
+| Resume losing compaction-kept messages after output-limit cut | ✅ |
+| MCP tools/instructions hidden until next call after compaction | ✅ |
+| Remote Control sessions marked stopped while running | ✅ |
+| Resume losing compaction summary after retried/unfinished reply | ✅ |
+| Claude polling output file instead of event-driven | ✅ |
+| Feature flags stale behind TLS-inspecting proxy | ✅ |
+| `daemon stop --any` lying about stopped services | ✅ |
+| `daemon stop` silent exit with sessions listed running | ✅ |
+| Cowork cloud Write/Edit reporting success for local paths | ✅ |
+| Deferred tool search on resume for never-listed tools | ✅ |
+| Dim text invisible on dark ANSI / 16-color terminals | ✅ |
+| Cloud sessions hanging 5 min/turn when policy unreadable | ✅ |
+| Cloud session re-running answered message after restart | ✅ |
+| Self-hosted runner freezing when nobody reads output | ✅ |
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| **v2.1.300** | Oct 15, 2026 | **Stable** | **AWS /advisor, OTel GenAI, virtualText, prompt.change, agent.spawn rewrite, 80+ fixes** |
+| v2.1.299 | Oct 14, 2026 | Stable | Idle compaction, DISABLE_FILE_MENTIONS, mod media, session identity |
+| v2.1.295 | Oct 8, 2026 | Stable | Hook blocking, MCP backoff, mod notifications, background survival |
+
+**v2.1.300 is the "mods graduate" release.** The platform primitives arrived. Mods aren't second-class anymore — they get hooks for every meaningful event, UI primitives that don't pollute context, and the ability to govern agent spawns.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| Build/run mods (especially managed) | **Yes** — virtualText, prompt.change, agent.spawn rewrite, OTel |
+| Run on AWS / Claude Platform | **Yes** — `/advisor` is net-new capability |
+| Need observability / cost tracking | **Yes** — GenAI OTel attributes are standard now |
+| Use worktrees / reftable repos | **Yes** — branch, purge, spawn hooks all fixed |
+| Run self-hosted runners | **Yes** — orchestrator freeze fixed |
+| Hit any paper cut above | **Yes** — 80+ fixes, zero breaking changes |
+| Just want "it works better" | **Yes** — this is a quality leap |
+
+**No rush if:** You're on v2.1.299 and nothing above bites you. But the mod primitives alone make this the release to standardize on.
+
+---
+
+## How to Update
+
+```bash
+# Auto-update (npm/brew/scoop/choco)
+claude --version  # should show 2.1.300
+
+# Or reinstall
+npm install -g @anthropic-ai/claude-code@latest
+# brew upgrade claude-code
+# scoop update claude-code
+# choco upgrade claude-code
+```
+
+**Verify it works:**
+```bash
+# Test /advisor (AWS only)
+/advisor
+
+# Test virtualText in a mod
+# Test prompt.change hook fires on history recall
+# Check OTel spans have gen_ai.* attributes
+```
+
+---
+
+## The Bottom Line
+
+**v2.1.300 doesn't just fix bugs. It graduates mods to platform citizens.**
+
+- `/advisor` gives you a second brain on AWS
+- `virtualText` gives mods UI without context cost
+- OTel GenAI attributes give you real observability
+- `prompt.change` lets mods see *intent*, not just keystrokes
+- `agent.spawn` rewrite lets governance mods govern
+- 80+ fixes remove the death-by-papercuts
+
+This is the release where you stop working around Claude Code and start building *on* it.
+
+```bash
+npm install -g @anthropic-ai/claude-code@latest
+# Then: build that mod you've been putting off
+# Then: watch your OTel dashboard light up
+```
+
+---
+
+## Related Articles
+
+- [Claude Code Just Learned to Save Your Tokens While You Sleep — v2.1.299](/blog/claude-code-v2-1-299-idle-compaction-file-mentions-mod-power/)
+- [Claude Code v2.1.295 Just Dropped 100+ Fixes — The Stability Release You've Been Waiting For](/blog/claude-code-v2-1-295-stability-release-youve-been-waiting-for/)
+- [Claude Code v2.1.294 — Hook Security Fix](/blog/claude-code-v2-1-294-hook-security-fix/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+- [Beware: AgentJacking — Sentry MCP Hijacks Claude Code, Cursor, Codex](/blog/beware-agentjacking-sentry-mcp-hijacks-claude-code-cursor-codex/)
+
+---
+
+*Claude Code is developed by Anthropic. Changelog source: [github.com/anthropics/claude-code/releases/tag/v2.1.300](https://github.com/anthropics/claude-code/releases/tag/v2.1.300). Published October 15, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
