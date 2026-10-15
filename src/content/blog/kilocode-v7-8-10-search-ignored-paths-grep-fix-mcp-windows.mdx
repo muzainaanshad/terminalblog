@@ -1,0 +1,184 @@
+---
+title: "Kilo Code v7.8.10 Just Fixed the Search Annoyances You've Been Living With"
+description: "Kilo Code v7.8.10 (pre-release, Oct 14) adds Search Ignored Paths so node_modules stops polluting results, fixes grep on non-UTF-8 files, lets mobile fork sessions from any message, and stops MCP sign-in from resetting. The daily driver keeps getting smoother."
+pubDate: 2026-10-15T15:00:00Z
+tags: ["kilocode", "release", "v7.8.10", "search", "grep", "mcp", "windows", "beginner"]
+tool: "kilo"
+author: "rho"
+image: "/api/og?title=Kilo+Code+v7.8.10+Search+Ignored+Paths&tool=kilocode"
+canonical: "https://terminalblog.com/blog/kilocode-v7-8-10-search-ignored-paths-grep-fix-mcp-windows/"
+---
+
+Kilo Code v7.8.10 dropped **October 14, 2026** (pre-release). It's not a flashy feature parade — it's the release that fixes the **daily paper cuts** that make you sigh every time you search, grep, or reconnect MCP.
+
+If you've ever searched for a function and got 500 results from `node_modules`, had grep crash on a legacy encoding file, or watched MCP sign-in reset itself for no reason — this update is for you.
+
+---
+
+## The Headlines (What You'll Actually Feel)
+
+| Fix | Why You Care |
+|-----|--------------|
+| **Search Ignored Paths setting** | Tell glob/grep to skip `node_modules`, `dist`, `build`, `.next` — but still search *inside* them when you need to |
+| **grep no longer crashes on non-UTF-8** | ISO-8859-1 / Windows-1252 files won't throw "Invalid ripgrep match output" |
+| **Mobile: fork session from any message** | Start a new remote CLI session from a specific point in history |
+| **MCP sign-in stops resetting** | OAuth recovery no longer clears credentials another session just refreshed |
+| **Windows background jobs use less CPU** | And actually stop when you ask them to |
+
+---
+
+## 1. Search Ignored Paths: Your Glob Results Just Got Usable
+
+**The problem:** You search for `useAuth` and get 200 matches from `node_modules/.pnpm/...`, `dist/`, `.next/`, `build/` — drowning out your actual code.
+
+**The fix:** New **experimental "Search Ignored Paths" setting** (VS Code & CLI). Add folders/files to ignore during glob/grep — *but* the agent can still search inside them when explicitly asked.
+
+```json
+// settings.json
+"kilocode.search.ignoredPaths": [
+  "node_modules",
+  "dist",
+  "build",
+  ".next",
+  "coverage",
+  "*.log"
+]
+```
+
+**Before:** Search = noise. You mentally filter every time.
+**Now:** Search = your code. The junk stays hidden unless you *want* it.
+
+**Why beginners love this:** You stop learning to "search around the noise." You just search. The tool does the filtering.
+
+---
+
+## 2. grep Finally Handles Legacy Encodings
+
+**The problem:** Your codebase has a few ISO-8859-1 or Windows-1252 files (old Windows projects, generated files, vendor code). `grep` throws **"Invalid ripgrep match output"** and fails the whole search.
+
+**The fix:** v7.8.10 catches non-UTF-8 matches and handles them gracefully. The search completes. You get results. No more crashes.
+
+```bash
+# This used to crash on mixed-encoding repos
+# Now it just works
+kilocode grep "TODO" --include="*.txt"
+```
+
+**Why it matters:** Real-world repos aren't clean UTF-8. This fix removes a silent "works on my machine" failure mode.
+
+---
+
+## 3. Mobile: Fork a Session from Any Message
+
+**New CLI capability:** `create_session` now accepts `cloneUpToMessageId`.
+
+```bash
+# Fork from a specific message — only transcript up to that point
+# Only file edits made BEFORE that message are restored
+kilocode create_session --clone-up-to-message-id msg_abc123
+```
+
+**Use case:** You're on mobile, reviewing a 50-turn session. The agent went off-track at message 37. Fork from message 36, steer it right, continue on your laptop.
+
+**Why it's clever:** You don't clone the *entire* history. You clone *up to the decision point*. Clean slate, relevant context.
+
+---
+
+## 4. MCP Sign-In Stops Resetting Itself
+
+**The bug:** Automatic OAuth recovery would **clear stored credentials** that another session just refreshed. Signing into a remote MCP server only updated the auth warning in *one* session — others stayed stuck on "sign in required."
+
+**The fix (two parts):**
+1. OAuth recovery no longer stomps on credentials another session just saved
+2. Sign-in now **syncs the authentication warning across ALL open sessions**
+3. Optional MCP stream probe restricted to its own endpoint — can't rewrite OAuth metadata/token responses
+
+**Result:** You sign in once. Every session knows. No more "wait, I just signed in" loops.
+
+---
+
+## 5. Windows: Background Jobs That Don't Hog CPU or Refuse to Die
+
+**Two fixes from @mardausdennis:**
+
+| Issue | Before | After |
+|-------|--------|-------|
+| CPU usage during background jobs | High | **Reduced** |
+| Job stops when command finishes | Sometimes stayed active, treated unrelated programs as part of job | **Stops cleanly** |
+| Job won't stop safely | Silent hang | **Fails with error explaining why** |
+
+**In practice:** You run a long build in the background. It finishes. The job *actually stops*. Your CPU drops. If it *can't* stop safely, you get an error message telling you why — not a silent zombie process.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **v7.8.10** | Oct 14, 2026 | **Pre-release** | Search ignored paths, grep encoding fix, mobile session fork, MCP sign-in sync, Windows background job fixes |
+| v7.8.9 | Oct 13, 2026 | Pre-release | Drag-drop projects, Shift-click links, unified picker, theme-matched browser, smart retries |
+| v7.8.8 | Oct 7, 2026 | Release | Pinned worktrees, integrated browser tabs, MCP OAuth binding, session shortcuts |
+
+**v7.8.x is the "daily driver polish" wave.** Each pre-release removes 3–6 papercuts. v7.8.10 removes **five more**.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Search gets polluted by `node_modules`/`dist` | **Yes** — Search Ignored Paths = daily time savings |
+| Have non-UTF-8 files in repo | **Yes** — grep crash fixed |
+| Use mobile to manage sessions | **Yes** — fork from any message |
+| MCP sign-in keeps resetting | **Yes** — root cause fixed |
+| Run background jobs on Windows | **Yes** — CPU/stop fixes |
+| Are on v7.8.9 and happy | **Yes** — pure polish, no breaking changes |
+
+**No rush if:** You're on stable channel (v7.8.x pre-releases don't auto-update). Enable pre-release in VS Code extensions settings or use `npm update -g @kilocode/cli@next` to test.
+
+---
+
+## How to Upgrade
+
+```bash
+# VS Code Marketplace (pre-release channel)
+# Search "Kilo Code" → enable pre-release → Update
+
+# CLI (pre-release)
+npm update -g @kilocode/cli@next
+
+# JetBrains: Check for updates (bundled CLI pins to v7.8.10)
+```
+
+**Breaking changes:** None. Safe to upgrade immediately.
+
+---
+
+## The Bigger Picture: Kilo Optimizes for the Operator Who Lives Here All Day
+
+| Release Wave | What It Solved |
+|--------------|----------------|
+| v7.4.x | Core stability, worktree foundation |
+| v7.5.x | PR loop, keep-awake, Claude import |
+| v7.6.x | `/goal` autonomy, notifications, PR fixes |
+| **v7.8.x** | **Agent Manager as daily driver — pin, search, shortcut, browse, secure, reorder, theme-match, retry-smart, ignore-paths, encoding-safe, mobile-fork, mcp-sync, windows-clean** |
+
+Each wave removes a reason to leave the IDE. v7.8.10 removes **five more**.
+
+The pattern is consistent: **Kilo fixes the friction you feel *right now*.** Not demo features. Not checkbox marketing. The search noise, the grep crash, the MCP relogin loop, the Windows CPU drain — that's what the next patch fixes.
+
+---
+
+## Related Articles
+
+- [Kilo Code v7.8.9 Just Made Your Projects Draggable — Reorder Agent Manager, Shift-Click Links, and Theme-Matched Browser](/blog/kilocode-v7-8-9-drag-drop-projects-agent-manager/)
+- [Kilo Code v7.8.8 Just Made Your Worktrees Stick — Pinned Sessions, In-App Browser, and MCP OAuth That Actually Works](/blog/kilocode-v7-8-8-pinned-worktrees-integrated-browser-mcp-oauth/)
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Kilo vs Cursor: Open Source vs Paid IDE](/blog/claude-code-vs-kilo/)
+
+---
+
+*Kilo Code is developed by Kilo-Org. Changelog source: [github.com/Kilo-Org/kilocode/releases/tag/v7.8.10](https://github.com/Kilo-Org/kilocode/releases/tag/v7.8.10). Published October 15, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
