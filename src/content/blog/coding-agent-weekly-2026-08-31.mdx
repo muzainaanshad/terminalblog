@@ -2,7 +2,8 @@
 title: "Coding Agent Weekly — 2026-08-31: Cursor 3 Glass, NTLM Leak, Cursor Worktree RCE"
 description: "Weekly roundup of AI coding agent developments — security alerts, pricing shifts, and community reactions."
 pubDate: 2026-08-31
-updatedDate: 2026-10-03
+updatedDate: 2026-10-16T04:00:00Z
+updated: true
 tags: ["newsletter", "roundup", "coding-agents", "weekly"]
 tool: "industry"
 author: "sage"
@@ -12,19 +13,66 @@ High-signal only — no just-shipped noise.
 
 ### [Cursor 3 Just Replaced Your Code Editor With an Agent Command Center — Here's the Honest Truth](https://terminalblog.com/blog/cursor-3-glass-agents-window-review/)
 
-Cursor 3 'Glass' shipped the Agents Window, Composer 2, cloud agents, and a marketplace. But early adopters hit hard walls: no VS Code extensions, broken diffs, no WSL. Here's what actually works and what doesn't. The Agents Window is Cursor's new command center for managing multiple agent sessions, but it shipped without VS Code extension support — a dealbreaker for many. Composer 2 adds multi-file editing but diffs are unreliable. Cloud agents promise parallel execution but require a separate subscription.
+Cursor 3 'Glass' shipped the Agents Window, Composer 2, cloud agents, and a marketplace. But early adopters hit hard walls: no VS Code extensions, broken diffs, no WSL. Here's what actually works and what doesn't.
+
+**The Agents Window** is Cursor's new command center for managing multiple agent sessions — think tmux for AI coding. You can spawn, pause, and switch between agents working on different tasks. But it shipped without VS Code extension support, which is a dealbreaker for teams relying on language servers, linters, or custom tooling that lives in the extension ecosystem.
+
+**Composer 2** adds multi-file editing with a diff view, but the diffs are unreliable — users report missing changes, phantom edits, and conflicts that don't resolve cleanly. For anything beyond a 2-3 file change, most developers are falling back to manual edits or git.
+
+**Cloud agents** promise parallel execution in Cursor's infrastructure, but require a separate subscription ($20/mo on top of Pro). The value prop is "run agents while your laptop sleeps," but the current beta has cold-start latency of 30-60s per agent spawn.
+
+**Marketplace** is the long-term play: community-built agent templates, skills, and workflows. Early entries are promising (React component generator, API scaffold, test writer) but discovery and quality control are non-existent.
+
+**Bottom line**: Glass is a v1 platform release masquerading as an editor update. If you live in VS Code extensions, wait. If you're building agent-first workflows from scratch, it's the most complete command center available.
 
 ### [Claude Code v2.1.233 — NTLM Leak Fixed + 50 Other Fixes](https://terminalblog.com/blog/claude-code-v2-1-233-security-fix-windows-ntlm-leak/)
 
-Claude Code patched a Windows NTLM hash leak (CVE-2026-33068) that could expose credentials on shared networks. Plus 50 other fixes including streaming crash fixes, subagent improvements, and MCP stability. The NTLM leak was critical — any Windows user on a corporate network could have their NTLM hash captured. The streaming crashes affected long-running sessions. Subagent improvements include better context isolation.
+Claude Code patched a Windows NTLM hash leak (CVE-2026-33068) that could expose credentials on shared networks. Plus 50 other fixes including streaming crash fixes, subagent improvements, and MCP stability.
+
+**The NTLM leak was critical** — any Windows user on a corporate network could have their NTLM hash captured when Claude Code made authenticated requests. The vulnerability existed in the HTTP client's credential delegation logic; it sent NTLM credentials to any server that asked, not just the intended Anthropic endpoints. On a shared corporate WiFi or compromised internal server, an attacker could harvest hashes for offline cracking.
+
+**Streaming crashes** affected long-running sessions (2+ hours) where the SSE connection would silently drop, leaving the agent in a zombie state — still consuming tokens, producing no output. The fix adds automatic reconnection with context preservation.
+
+**Subagent improvements** include better context isolation (subagents no longer leak parent context into sibling tasks) and a new `--subagent-timeout` flag for runaway tasks.
+
+**MCP stability** fixes address the "MCP server hangs on stdio" class of bugs that plagued v2.1.200-230. The root cause was a race condition in the stdio transport layer when multiple MCP servers started simultaneously.
+
+**Update command**: `npm update -g @anthropic-ai/claude-code` (or your package manager equivalent). Windows users: **update immediately** — the NTLM leak is actively exploitable on shared networks.
 
 ### [Beware: Cursor CLI Worktree Pre-Trust RCE](https://terminalblog.com/blog/beware-cursor-cli-worktree-pre-trust-rce/)
 
-Cursor's new CLI worktree feature had a pre-trust RCE vulnerability. If you used `cursor --worktree` on untrusted repos, attackers could execute arbitrary code. Patched in latest release — update immediately. The worktree feature was designed to let agents spin up isolated workspaces, but the pre-trust model meant any repo could execute code during the initial clone phase.
+Cursor's new CLI worktree feature had a pre-trust RCE vulnerability. If you used `cursor --worktree` on untrusted repos, attackers could execute arbitrary code. Patched in latest release — update immediately.
+
+**The vulnerability**: The worktree feature spins up isolated Git worktrees for agent tasks. During the initial clone phase, the CLI executed a `git config --local` command with unsanitized input from the repository's `.git/config` — specifically, the `core.sshCommand` and `core.gitCommand` fields. A malicious repo could inject arbitrary shell commands that ran with the user's privileges during `cursor --worktree <repo-url>`.
+
+**Blast radius**: Any developer who ran `cursor --worktree` on a repo they didn't fully trust (open source PRs, dependency audits, fork reviews). The fix in v0.47.3+ validates and rejects config injections before execution.
+
+**Action required**: `cursor --version` → if < 0.47.3, update via `cursor update` or re-download. Audit any worktrees created with vulnerable versions — check for unexpected files, modified `.git/config`, or unknown processes.
 
 ## What This Week Tells Us About Agent Security
 
 Three major agents, three critical security findings in one week. Cursor's worktree RCE, Claude Code's NTLM leak, and Hermes' audit findings (covered next week) all point to the same reality: **agent security is the bottleneck, not model capability**. Every new integration surface — Git, filesystem, network, subprocess — is an attack vector. The agents shipping fastest are the ones with the most untested attack surface.
+
+### The Pattern: Integration Velocity > Security Maturity
+
+| Agent | New Surface (Aug 2026) | Vulnerability Class | Time to Exploit |
+|-------|----------------------|-------------------|-----------------|
+| **Cursor** | Worktree CLI | Config injection → RCE | Hours (public PoC) |
+| **Claude Code** | NTLM delegation | Credential leak | Days (network sniff) |
+| **Hermes** | Pantheon message bus | Inter-agent spoofing | Weeks (requires access) |
+
+The correlation is clear: features that connect agents to external systems (Git, network, other agents) are where the bugs live. Model capability (reasoning, coding, planning) is comparatively well-tested.
+
+### Operator Hardening Checklist (Post-Aug-31)
+
+If you run coding agents in a team or production context:
+
+- [ ] **Pin agent versions** — don't auto-update; test in staging first
+- [ ] **Isolate worktrees** — run agent worktrees in containers/VMs, not host FS
+- [ ] **Network egress controls** — block agent processes from arbitrary outbound connections
+- [ ] **Credential hygiene** — rotate any tokens used by agents weekly; use short-lived creds
+- [ ] **Audit logging** — capture all agent CLI invocations with args, working dir, exit code
+- [ ] **Incident runbook** — define "agent went rogue" response: kill, isolate, audit, rotate
 
 ## Leaderboard
 
