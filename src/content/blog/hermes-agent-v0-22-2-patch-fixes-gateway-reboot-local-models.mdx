@@ -1,0 +1,107 @@
+---
+title: "Hermes Agent v0.22.2 Just Fixed the Two Bugs That Made v0.22.1 Unusable"
+description: "Hermes Agent v0.22.2 (October 15) patches the gateway reboot failure and local-model stalls on laptops that slipped into v0.22.1. If you skipped v0.22.1, here's why 0.22.2 is the release you should be on."
+pubDate: 2026-10-18T15:00:00Z
+updatedDate: 2026-10-18T15:00:00Z
+tags: ["hermes-agent", "release", "v0.22.2", "patch", "gateway", "local-models", "beginner"]
+tool: "hermes"
+author: "Anshad"
+image: "/api/og?title=Hermes+Agent+v0.22.2+Gateway+Fix&tool=hermes"
+---
+
+Hermes Agent v0.22.2 dropped **October 15, 2026** — three days after v0.22.1 shipped with two regressions that made it painful for daily users.
+
+The v0.22.1 release was built from the wrong commit. It included unreleased gateway work and a Microsoft Store app that could get stuck on "Connecting." v0.22.2 is the release v0.22.1 was meant to be.
+
+---
+
+## The Two Fixes You'll Actually Feel
+
+### 1. The Gateway Starts After a Reboot Again
+
+**The bug:** After a system restart, Linux could hand an early PID to an unrelated process. The gateway mistook it for a running instance and refused to start under systemd, launchd, or Docker.
+
+**The fix:** Hermes now records the boot epoch it started in. When it can't tell, it asks the host lock — which only a live gateway holds.
+
+**Why it matters:** If you run Hermes on a server, laptop, or CI machine that reboots, the gateway *just works* again. No manual cleanup. No "port already in use" mysteries.
+
+> **Known issue:** Sessions that ran under the 0.22.1 gateway can't be deleted in 0.22.2. This is a one-time migration edge case.
+
+---
+
+### 2. Long Local-Model Turns Survive on Laptops
+
+**The bug:** Local requests (llama.cpp, Ollama, etc.) would time out or stall on long conversations — especially when the laptop slept, when the model server was still reading a massive context, or on Windows unified-memory machines where memory pressure killed the launch.
+
+**The fix (four parts):**
+- Local requests **always stream with prompt-reading progress** (shown in the status line)
+- **Stall timers skip time the machine was asleep** — wake up, continue
+- A **recovered local server gets another try** instead of a breaker that failed every later message
+- **Compression no longer times out** while the server is still reading a long conversation
+- On Windows unified-memory machines, **model launch and prompt cache are sized to free memory**
+
+**Why it matters:** You can run 100-turn conversations with local models on a laptop, close the lid, open it tomorrow, and pick up where you left off. The "local models are fragile" excuse is gone.
+
+---
+
+## What Else Is in v0.22.2
+
+Everything v0.22.1 *was supposed to ship* plus the two fixes above. Highlights from the 0.22 release line:
+
+| Area | Change |
+|------|--------|
+| **Microsoft Store** | Split into its own `windows-store` lane — cleaner builds |
+| **Nemotron 3.5 Ultra** | Added as default parameters + in NVIDIA NIM model list |
+| **Model picker** | Curated list now appears at the top |
+| **Stable release lanes** | Choose what a stable release builds/tests with |
+| **Plugin catalog** | Korean & Brazilian Portuguese language packs, TeamoRouter, wait-ledger, author-feed, Hermes AAC, openinvest, hermes-agent-mixer, lightningai |
+| **Kumiho Memory** | Moved to memory catalog shelf |
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| Are on v0.22.1 | **Yes, immediately** — fixes the two regressions |
+| Are on v0.22.0 | **Yes** — gets all 0.22.1 intended fixes + the two critical patches |
+| Are on v0.21.x | **Yes** — v0.22.0 was the Threshold Release; 0.22.2 is the stable version of it |
+| Run Hermes on a machine that reboots | **Yes** — gateway restart fixed |
+| Run long local-model sessions on laptop | **Yes** — stall/sleep/recovery fixed |
+| Use Microsoft Store install | **Yes** — dedicated lane, no more "Connecting" stuck |
+
+**No rush if:** You're on v0.22.0 and never reboot / never use local models. But there's no downside — no breaking changes.
+
+---
+
+## How to Update
+
+```bash
+# Desktop app: updates itself (Microsoft Store installs update through Store)
+# CLI (git installs):
+hermes update
+
+# Docker / Hermes Cloud:
+docker pull nousresearch/hermes-agent:stable
+```
+
+---
+
+## The Bottom Line
+
+v0.22.0 crossed the threshold. v0.22.1 tripped on the doorstep. **v0.22.2 walks through cleanly.**
+
+If you've been waiting for the "stable version of the Threshold Release" — this is it. The gateway survives reboots. Local models survive long conversations and laptop sleeps. The Microsoft Store app installs cleanly.
+
+Three days from broken patch to fixed patch. That's the velocity open-source agents should have.
+
+---
+
+*This article covers Hermes Agent v0.22.2 released October 15, 2026. For the full changelog, see [v0.22.2 release](https://github.com/NousResearch/hermes-agent/releases/tag/v0.22.2).*
+
+## Related articles
+
+- [Hermes Agent Just Crossed a Threshold — v0.22.0 Changes Everything for Beginners](/blog/hermes-agent-v0-22-threshold-release-changes-everything/)
+- [Beware: Hermes Agent's Approval Gate Reports 'Blocked' While Commands Secretly Execute](/blog/beware-hermes-agent-approval-gate-bypass-commands-execute-while-blocked/)
+- [Why Hermes Agent Is the Most Underrated Open-Source AI Assistant in 2026](/blog/why-hermes-agent-is-the-most-underrated-open-source-ai-assistant-2026/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
