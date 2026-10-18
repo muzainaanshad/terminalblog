@@ -68,7 +68,7 @@ function parse(file) {
   
   // Check for structured data (Article, BlogPosting)
   const hasArticleSchema = /@type.*BlogPosting|@type.*Article|buildPostGraph/i.test(raw);
-  
+
   return {
     file,
     raw,
@@ -94,7 +94,12 @@ function parse(file) {
 }
 
 function extractFaq(body) {
-  const faqMatch = body.match(/^## FAQ\s*\n([\s\S]*?)(?:\n## |\n---|\n$)/m);
+  // Normalize line endings to \n for consistent regex matching
+  const normalizedBody = body.replace(/\r\n/g, '\n');
+  
+  // Find FAQ section - look for ## FAQ and capture until next ## heading, 
+  // or literal \n--- (escaped in text), or end of string
+  const faqMatch = normalizedBody.match(/^## FAQ\s*\n([\s\S]*?)(?:\n## |\\n---|\n---|$)/m);
   if (!faqMatch) return [];
 
   const faqContent = faqMatch[1];
