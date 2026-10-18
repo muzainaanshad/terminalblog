@@ -1,0 +1,191 @@
+---
+title: "Claude Code v2.1.302 Quietly Fixed 50+ Bugs — Including the Worktree Corruption That Ate Repos"
+description: "Claude Code's latest release patches 50+ issues: worktree isolation fixes for git 2.56+, Windows exFAT/FAT32 file writes, idle compaction controls, plugin performance, cloud session reliability, and MCP protocol 2026-07-28 support. Here's what actually matters."
+pubDate: 2026-10-18T10:00:00Z
+tags: ["claude-code", "release", "bug-fixes", "worktree", "windows", "mcp", "coding-agents", "beginner"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+v2.1.302+Bug+Fixes&tool=claude-code"
+canonical: "https://terminalblog.com/blog/claude-code-v2-1-302-bug-fixes/"
+---
+
+Claude Code v2.1.302 dropped on October 16, 2026, and it's not a feature release — it's a **50+ bug fix dump** that quietly resolves issues that have been biting teams for weeks.
+
+If you've hit worktree corruption, Windows file write refusals, plugin slowness, or cloud session flakiness, this is the release you've been waiting for.
+
+---
+
+## The Headline Fixes (Ranked by Pain)
+
+### 1. Worktree Isolation Fixed for Git 2.56+ — Stops Repo Corruption
+**The bug**: Worktree isolation refused to create or resume worktrees under git 2.56 or later when a stray `.git` file pointed at a directory that doesn't exist. This silently corrupted repos.
+
+**The fix**: Worktree isolation now handles git 2.56's reftable format correctly. If you use worktrees (and you should — they're the safest way to run agents in parallel), **upgrade immediately**.
+
+### 2. Windows exFAT/FAT32 File Writes — Every Write Was Refused
+**The bug**: Every file write was refused or prompted for projects on exFAT or FAT32 drives — including sessions started with `--plugin-dir`. This made Claude Code unusable on external drives and some Windows setups.
+
+**The fix**: File writes on exFAT/FAT32 now work without permission prompts.
+
+### 3. Idle Compaction Controls — You Can Finally Turn It Off
+**The bug**: Idle compaction ran automatically with no way to disable it. Long-running sessions would compact mid-task, losing context.
+
+**The fix**: 
+- Added `CLAUDE_CODE_AUTO_MODE_MODEL` to choose the model for client-side auto mode classifier
+- Added an "Idle compaction" row to `/config` for turning it off or back on
+- Notices after idle compaction now say how to turn it off
+
+### 4. Plugin Performance — Startup Is Now Fast with Many Plugins
+**The bug**: Plugin command and agent files took excessive file system calls to load, especially on Windows. Startup with 20+ plugins was painfully slow.
+
+**The fix**: Plugin loading now takes far fewer file system calls. Most improvement on Windows. If you run many plugins, you'll notice the difference immediately.
+
+### 5. Cloud Session Reliability — Stops Losing Your Work
+**The bug cluster**: 
+- Cost/usage restarting from zero after session resume in new process
+- Scheduled routine runs failing partway, then repeating work (posting same report twice)
+- Open cloud sessions not showing messages from other devices until reload
+- "Rewind to here" failing on every message except newest
+- Diff view missing changes after repo rename/move
+
+**The fix**: All addressed. Cloud sessions now persist state correctly across process boundaries, device switches, and repo operations.
+
+---
+
+## The Full Fix List (Categorized)
+
+### Worktree & Git
+- Worktree isolation for git 2.56+ (reftable format)
+- Self-hosted runner: git fetches failing with "bad object refs/heads" in reftable checkouts
+- Stray `.git` file pointing at non-existent directory no longer blocks worktrees
+
+### Windows & Filesystem
+- exFAT/FAT32 file write refusals fixed
+- Plugin startup performance (fewer fs calls, especially Windows)
+- PowerShell tool finding commands in plugin `bin/` folders
+- PowerShell search piped to `Select-Object`/formatting cmdlets no longer errors
+
+### Idle Compaction & Auto Mode
+- `/config` now shows "Idle compaction" toggle
+- Notices explain how to disable idle compaction
+- Auto mode with server-side classifier: long conversations compact instead of denying every tool call
+- `CLAUDE_CODE_AUTO_MODE_MODEL` env var for client-side classifier model
+
+### Plugin System
+- Plugin marketplaces no longer re-clone on every refresh
+- Newly installed git plugins no longer show version "unknown"
+- `claude plugin` subcommands no longer exit before queued config writes finish (no more `.tmp` files left behind)
+- `claude plugin details <name>@builtin` points to `/plugin` instead of `claude plugin list`
+- Improved startup with many plugins enabled
+
+### MCP (Model Context Protocol)
+- MCP servers negotiating protocol version 2026-07-28 but omitting `resultType`, `ttlMs`, or `cacheScope` no longer show no tools or fail every call
+- MCP server sign-in from VS Code panel no longer opens broken auth page when server URL has query string
+
+### Cloud Sessions
+- Cost/usage persists across process resume
+- Routine runs: failed partway → re-run from start (fixed duplicate reports)
+- Messages from other devices appear without reload
+- "Rewind to here" works on all messages
+- Diff view works after repo rename/move
+- PR status bar no longer flips conflicted PRs to ready
+- Routine run states: Completed/Cancelled/Failed now accurate
+- Error messages: "Connection lost" or "Server error" instead of "Something went wrong"
+- Banner on routine page explains why last run didn't start (concurrent limit, etc.)
+
+### Remote Control
+- Subagent pane no longer spins forever when computer goes offline — shows "Remote Control disconnected"
+
+### Claude Tag (Slack Integration)
+- "is thinking…" clears after answer via message edit
+- URLs in code blocks under numbered/bulleted steps no longer wrapped in angle brackets
+- HEIC, SVG, TIFF, BMP images in Slack now arrive as files
+- New channel managers get Claude Tag access in role-restricted orgs
+- Custom connectors with shared MCP host now show as separate connectors
+- DM retries on Slack lookup stall instead of dropping
+- DMs respect workspace dropdown on Enterprise Grid
+- Channel spend limit notice names org owner, links usage page
+- Links in replies no longer absorb closing bold/italic/full-width punctuation
+- Repository search covers up to 100 connected GitHub accounts, finds private repos past first 5,000
+- "Add place" lists typed/pasted channel immediately
+- "Add > Domain" available once page loads, not after full channel list
+- Admin settings reorganized into four tabs: Bundles, Connectors, Skills/Plugins, Channels
+- Roles page groups Claude Tag channel manager roles in collapsed section
+
+### Code Review
+- Setup resumes after leaving to connect GitHub — reopens at repository picker
+
+### VS Code Integration
+- Text after unclosed code block in list no longer shows as plain text during streaming
+- `@browser` banner no longer says "Browser connected" when no browser reachable
+
+### Desktop App & General
+- `claude remote-control --help` prints usage when not signed in
+- `/design consent` and `/design revoke` point to claude.ai/design/settings in cloud sessions
+- Artifact publishes no longer fail on empty edit lists; retry logic fixed
+- `classifier_category` added to OpenTelemetry `tool_decision` events
+- Prompt suggestions no longer spend usage credits on credit-billed models
+- URLs in backticks clickable as single link when wrapping (terminals supporting hyperlinks)
+- Emoji in link no longer wraps one column too wide
+- Fork subagents (`subagent_type: "fork"`) on by default in `claude -p`, Agent SDK, desktop app, VS Code
+- Desktop/VS Code always run main conversation subagents in background
+- Subagent's own Agent calls in `claude -p`, SDK, desktop, VS Code run in foreground by default
+- `← for agents` footer hint hides after 10 seconds; agent count still shows
+- Claude in Chrome instructions moved in system prompt for shared prompt cache
+- Prompt/agent hooks: max 12 concurrent events of one type; rest queue
+- Org policy turning off `/feedback` now points to GitHub issues
+- Startup message for background session with no LLM gateway: says why, not "Not logged in"
+- `claude -p` and Agent SDK with no permission mode start in `default` on third-party providers
+- Windows: plugin command/agent files fewer fs calls
+
+---
+
+## What This Means for You
+
+| If you... | Action |
+|-----------|--------|
+| Use worktrees | **Upgrade now** — git 2.56+ corruption fixed |
+| Run on Windows external drives | **Upgrade now** — exFAT/FAT32 writes fixed |
+| Run many plugins | **Upgrade** — startup significantly faster |
+| Use cloud sessions | **Upgrade** — reliability fixes across the board |
+| Use Remote Control on iOS | **Upgrade** — offline handling fixed |
+| Use MCP servers | **Upgrade** — protocol 2026-07-28 support fixed |
+| Use Claude Tag/Slack | **Upgrade** — many UX fixes |
+
+---
+
+## What's NOT Fixed (Still Watching)
+
+- **No new features** — this is purely a stability release
+- **Auto mode model selection** — server-side classifier model still not configurable (only client-side via `CLAUDE_CODE_AUTO_MODE_MODEL`)
+- **Fully offline mode** — cloud sessions still require connectivity
+- **Android Remote Control** — iOS only for now
+
+---
+
+## How to Update
+
+```bash
+# If installed via npm (most common)
+npm update -g @anthropic-ai/claude-code
+
+# Or reinstall
+npm install -g @anthropic-ai/claude-code@latest
+
+# Verify
+claude --version
+# Should show 2.1.302
+```
+
+---
+
+## Related Reading
+
+- [Beware: Claude Code Worktree Sandbox Escape (CVE-2026-55607)](/blog/beware-cve-2026-55607-claude-code-worktree-sandbox-escape/)
+- [Beware: Claude Code v2.1.214 Permission Fail-Closed](/blog/beware-claude-code-v2-1-214-permission-fail-closed/)
+- [Claude Code: Skills vs Subagents vs MCP — 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Comparing agents is half the work. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** can simplify multi-model access while you test workflows.*
