@@ -1,0 +1,173 @@
+---
+title: "Cline Just Launched Cloud Sessions — Run Agents on GitHub Repos While You Sleep"
+description: "Cline v4.1.25 (Oct 16) introduces Cline Cloud: hosted sandboxes that run tasks on your GitHub repos, notify you when done, and keep working after you close your editor. Plus Gemini 4 Argon becomes the new default, and local model timeouts are fixed."
+pubDate: "2026-10-18T14:00:00Z"
+tags: ["cline", "release", "v4.1.25", "cloud", "gemini-4-argon", "local-models", "coding-agent", "beginner"]
+tool: "cline"
+author: "sage"
+image: "/api/og?title=Cline+v4.1.25+Cloud+Sessions&tool=cline"
+canonical: "https://terminalblog.com/blog/cline-v4-1-25-cloud-sessions-gemini-argon-model-refresh/"
+---
+
+**Cline v4.1.25 dropped October 16** — and the headline feature changes how you think about agent workflows entirely: **Cline Cloud sessions are here**.
+
+You pick a GitHub repo and branch. Cline spins up a hosted sandbox. The agent runs your task. You get notified when it finishes. **It keeps running after you close your editor.**
+
+Plus: **Gemini 4 Argon is now the default model** (replacing Claude Sonnet 5.5 on the Cline provider), local model requests no longer timeout after 5 minutes, and attached images/files actually reach the model now.
+
+---
+
+## The One-Line Summary
+
+**Run agents on GitHub repos in the cloud. Close your laptop. Get notified when done. Default model is now Gemini 4 Argon. Local models fixed.**
+
+---
+
+## 1. Cline Cloud: The Feature You've Been Waiting For
+
+**What it is:** A hosted sandbox that runs Cline tasks on any GitHub repository and branch you choose. Enable it in Settings → Cline Cloud.
+
+**How it works:**
+1. Turn on Cline Cloud in Settings
+2. Pick a GitHub repo + branch
+3. Send a task ("refactor the auth module," "add tests for the payment flow")
+4. Cline spins up a sandbox, clones the repo, runs the task
+5. **You get a notification when it finishes** — even if you closed VS Code
+6. Cloud tasks appear in Recent and History with their status
+
+**Why this matters for beginners:** You don't need a beefy machine. You don't need to keep your editor open. You don't need to babysit the agent. **Set it, forget it, get a ping when it's done.**
+
+**Rollout:** Gradual. If you don't see it yet, check Settings again in a few days.
+
+---
+
+## 2. Gemini 4 Argon Is Now the Default Model
+
+**The change:** With no model chosen, the Cline provider now uses **Gemini 4 Argon** — the new #1 model in Cline's recommended list. OpenRouter stays on Claude Sonnet 5.5.
+
+**Catalog refresh details:**
+- **Added to recommended:** Gemini 4 Argon
+- **Dropped from recommended:** Grok 4.7
+- **Free list swap:** Step 5 Preview → Nemotron 3.5 Super VL
+- **New providers:** Boundless, Standard Compute (SambaNova now catalog-sourced with MiniMax M3 default)
+- **Default model changes for 20+ providers** — if you don't pin models, expect different defaults
+
+**What you should do:** **Pin your models** if you want stability. Provider defaults shift with catalog refreshes.
+
+---
+
+## 3. Local Models (LM Studio, Ollama): 5-Minute Timeout Fixed
+
+**The bug:** Long prompts to local models would **fail after 5 minutes of silence** with `terminated: BodyTimeoutError` — even while the server was still processing.
+
+**The fix:** v4.1.25 removes that hard timeout. Your 100k-token context dump to local Llama 3.1 70B? It'll wait as long as the server needs.
+
+---
+
+## 4. OpenAI-Compatible Base URLs: No More Silent `/v1` Injection
+
+**The bug:** Enter `https://my-gateway.com` as your base URL → Cline silently appended `/v1` → `https://my-gateway.com/v1` → broken requests.
+
+**The fix:** Host-only URLs are now used **exactly as entered**. Existing setups that saved with the old behavior get `/v1` added **once** (so they keep working), but new entries stay clean.
+
+---
+
+## 5. Images & Files Attached to Answers: No Longer Dropped
+
+**The bug:** You attach a screenshot or file to answer one of Cline's questions → it **never reaches the model**. Gone. Silent loss.
+
+**The fix:** Attachments on answers now route correctly. The model sees your diagram, your log snippet, your error screenshot.
+
+---
+
+## 6. Provider Error Mid-Stream: Auto-Retry (Up to 3x)
+
+**The bug:** Provider hiccup mid-response → turn fails immediately. You re-send. It works. Waste of time.
+
+**The fix:** Cline now **retries up to 3 times** before failing the turn. Transient provider blips absorb themselves.
+
+---
+
+## 7. JetBrains: Run Task Card Stays Above Auto-Approve Bar
+
+Small UX win. The "Run Task" card no longer hides behind the auto-approve bar in JetBrains IDEs.
+
+---
+
+## 8. Auto-Compact Settings: Reunited
+
+Auto-Compact and its strategy setting now sit together in Feature settings. No more hunting across tabs.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| **v4.1.25** | Oct 16, 2026 | **Stable** | **Cline Cloud sessions**, Gemini 4 Argon default, local model timeout fix, base URL fix, attachment fix, mid-stream retry |
+| v4.1.24 | Oct 13, 2026 | Stable | Reasoning off fix, MCP crash fix, token estimates, catalog refresh, symlinks, skills |
+| v4.1.23 | Oct 7, 2026 | Stable | Azure 400 fix, `.clinerules` for commits, MCP paging, Kimi reasoning fix |
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Want to run agents on GitHub repos without keeping VS Code open | **Yes** — Cline Cloud is the killer feature |
+| Use the Cline provider (no model pinned) | **Yes** — default changed to Gemini 4 Argon |
+| Run local models (LM Studio, Ollama) with big contexts | **Yes** — 5-min timeout gone |
+| Use custom OpenAI-compatible gateways | **Yes** — base URL handling fixed |
+| Attach images/files when answering Cline's questions | **Yes** — they now work |
+| Just want latest stable | **Yes** — zero breaking changes, 8+ fixes |
+
+---
+
+## How to Update
+
+```bash
+# VS Code / Cursor / JetBrains extension
+# Auto-updates or: Extensions → Cline → Update
+
+# CLI (if using standalone)
+# Check https://github.com/cline/cline/releases/tag/v4.1.25
+
+# Desktop app (separate release channel)
+# Desktop v0.0.48 released Oct 17
+```
+
+**Changelog:** [github.com/cline/cline/compare/v4.1.24...v4.1.25](https://github.com/cline/cline/compare/v4.1.24...v4.1.25)
+
+---
+
+## The Quiet Pattern Continues — Until It Doesn't
+
+Cline doesn't ship "features" for demos. It ships **fixes for the workflow you actually live in**.
+
+- Azure 400 error → blocks enterprise → **fixed in .23**
+- Reasoning off → 400 error → **fixed in .24**
+- MCP crash → extension host restart → **fixed in .24**
+- Screenshot = 30k tokens → premature compaction → **fixed in .24**
+- Local model timeout → 5 min hard limit → **fixed in .25**
+- Attachments on answers → dropped silently → **fixed in .25**
+
+**But v4.1.25 is different.** Cline Cloud isn't a fix. It's a **new primitive**. Hosted agent sandboxes on your repos. That's the kind of feature that changes what you attempt.
+
+The team shipped 24 patch fixes across .23–.25. Now they ship the platform. **Update. Try Cloud. See what you build when the agent doesn't need your laptop.**
+
+---
+
+## Related Articles
+
+- [Cline v4.1.24 Just Fixed the Reasoning Off Bug — And MCP Servers No Longer Crash Your Editor](/blog/cline-v4-1-24-reasoning-fix-mcp-crash-model-refresh/)
+- [Cline v4.1.23 Just Fixed the Azure Claude 400 Error](/blog/cline-v4-1-23-claude-azure-fixes-commit-rules-mcp-paging/)
+- [Cline Desktop Free Coding Models — Zero API Keys](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Cline v4.1.10 — Web Search Lands](/blog/cline-v4-1-10-web-search-lands/)
+- [Beware: Cline Injection Supply Chain Attack via GitHub Actions](/blog/beware-clinejection-supply-chain-attack-github-actions/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Cline is developed by the Cline team. Changelog source: [github.com/cline/cline/releases/tag/v4.1.25](https://github.com/cline/cline/releases/tag/v4.1.25). Published October 18, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
