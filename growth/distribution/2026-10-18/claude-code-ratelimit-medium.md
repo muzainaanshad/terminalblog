@@ -1,0 +1,105 @@
+# Medium Cross-Post Version
+
+## Title
+**Claude Code Still Hides Your Rate-Limit Headroom — and Developers Want It Exposed**
+
+## Subtitle
+GitHub issue #77018 asks Anthropic to expose utilization in headless contexts so agents can throttle before they stall
+
+## Canonical URL
+**https://terminalblog.com/blog/claude-code-rate-limit-utilization/**
+
+*(Important: Set this as the canonical URL in Medium's story settings to avoid SEO duplication)*
+
+---
+
+## Body
+
+A fresh GitHub issue in the Claude Code repository (number 77018) asks Anthropic to expose rate-limit utilization in headless contexts — through `stream-json`, `--output-format json`, or a dedicated usage subcommand. The ask is narrow but the pain is broad: when you run Claude Code non-interactively, you can't easily see how much of your quota you've burned, so you can't throttle agent loops before they stall.
+
+---
+
+### The problem with invisible limits
+
+In an interactive session, you get subtle cues — slower responses, a warning, a soft block. In a headless run — a cron job, a CI pipeline, a long background agent — those cues disappear. The agent keeps issuing requests until it hits a hard limit and stops, often mid-task, with no clean signal about how close it was to the edge.
+
+Exposing utilization (the issue proposes a `used_percentage` style field) would let automation make decisions: back off, queue work, or hand a task to a different model when one is saturated. That's exactly the kind of [silent quota burn](https://terminalblog.com/blog/beware-silent-quota-model-burn/) that bites teams running agents all day.
+
+---
+
+### Why headless matters more now
+
+Headless and background agents are no longer edge cases. The same workflows that [promote heavier weekly limits](https://terminalblog.com/blog/claude-code-50-percent-weekly-limit-promotion/) also push more work into unattended runs — and unattended runs are precisely where you can't watch the meter. The feature request is really about observability for autonomous use, not a nicety for interactive users.
+
+---
+
+### What the rate-limit headers actually contain
+
+When you hit the Anthropic API directly, the response includes `anthropic-ratelimit-requests-limit`, `anthropic-ratelimit-requests-remaining`, `anthropic-ratelimit-tokens-limit`, and `anthropic-ratelimit-tokens-remaining`. Claude Code's CLI strips these entirely — you only see them if you proxy your traffic through a tool like mitmproxy. The issue asks for these same headers (or a JSON equivalent) to surface in `--output-format json` and `stream-json` modes so headless consumers can read them programmatically.
+
+---
+
+### Workarounds that actually work today
+
+Until Anthropic ships native utilization exposure, here are the patterns teams are using in production:
+
+1. **Token-counting wrapper** — Use `tiktoken` (or Anthropic's `count_tokens` endpoint) to estimate request size before sending. Track cumulative tokens per rolling window and pause when you hit 80% of your tier limit.
+
+2. **Request pacing with jitter** — Instead of hammering the API, insert `sleep(random(500, 2000))` between agent steps. This alone prevents most burst-limit hits.
+
+3. **Circuit-breaker pattern** — Wrap the CLI call in a function that catches `429` responses, extracts `retry-after`, and backs off exponentially. Most teams already do this for API calls; the gap is doing it for the CLI wrapper.
+
+4. **Multi-model fallback** — When Claude hits limits, route to a secondary model (GPT-4o, Gemini, or a local model via Ollama). Hermes and OpenCode both support this natively; for Claude Code you need a thin orchestration layer.
+
+5. **Usage dashboard sidecar** — Run a cron that queries the Anthropic usage API (`/v1/organizations/{org_id}/usage`) and exposes a `/metrics` endpoint your agents can poll. Overkill for solo devs, standard for teams running 5+ concurrent agents.
+
+---
+
+### How other agents handle this
+
+| Agent | Headless utilization signal | Fallback strategy |
+|-------|----------------------------|-------------------|
+| **Claude Code** | None (issue 77018 open) | Manual wrapper required |
+| **OpenCode** | `--model` flag + provider routing | Built-in multi-provider |
+| **Codex** | Cloud execution = server-side limits | Per-task billing, no local quota |
+| **GitHub Copilot CLI** | `--format json` includes quota | Tied to GitHub seat |
+| **Hermes** | `hermes usage` subcommand + cron | Multi-provider routing built-in |
+
+---
+
+### The cost of silence
+
+A team running 3 parallel Claude Code agents in CI for 8 hours/day burns through a Tier 3 limit (~100k tokens/min) in under 2 hours if they don't pace. At $15/million tokens (Sonnet 4), that's ~$180/day in pure token cost — but the real cost is the 45 minutes of stalled CI runs per day when agents hit the wall mid-task. Exposing utilization would let CI pipelines queue work instead of failing.
+
+---
+
+### FAQ
+
+**Q: What does Claude Code issue 77018 ask for?**
+It requests that Claude Code expose rate-limit utilization in headless contexts, via stream-json, --output-format json, or a usage subcommand, so automation can see how much quota remains.
+
+**Q: Why does this matter more for headless runs than interactive ones?**
+Interactive sessions show soft warnings as you approach limits. Headless runs — cron jobs, CI, background agents — have no visible meter, so they can stall mid-task with no clean signal about how close they were to the limit.
+
+**Q: How can I avoid silent rate-limit stalls today?**
+Wrap agent calls with your own request counting, pace steps artificially, and make loops handle rate-limit errors gracefully. These are stopgaps until a real utilization signal ships.
+
+**Q: Does `stream-json` output include any rate-limit info currently?**
+No. The stream-json output only includes the message delta, tool calls, and final result. Rate-limit headers are stripped by the CLI layer before the JSON stream is emitted.
+
+**Q: What's the difference between request limits and token limits?**
+Request limits cap the number of API calls per minute. Token limits cap the total tokens (input + output) per minute. You hit request limits with many small calls; you hit token limits with fewer large calls. Both matter for agent loops.
+
+---
+
+### Related articles
+
+- [Claude Code Alternatives in 2026: 12 Options Compared](https://terminalblog.com/blog/claude-code-alternatives-2026/)
+- [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](https://terminalblog.com/blog/claude-code-skills-vs-subagents-vs-mcp/)
+- [Your AI Agents Config Directory Is Now the Most Dangerous Place on Your Machine](https://terminalblog.com/blog/ai-agent-config-directory-attack-surface-2026/)
+- [Beware: Silent Quota Burn — When Your AI Agent Drains Your Budget While You Sleep](https://terminalblog.com/blog/beware-silent-quota-model-burn/)
+- [Hermes Multi-Provider Model Routing Across 15+ LLMs](https://terminalblog.com/blog/hermes-multi-provider-model-routing-across-15-llms/)
+
+---
+
+*Originally published at [terminalblog.com](https://terminalblog.com/blog/claude-code-rate-limit-utilization/). Published October 15, 2026 (updated from July 13, 2026).*

@@ -37,7 +37,10 @@ const allPosts = (await getCollection('blog'))
 
 const toolName = agentData.name;
 
-// Count article types
+// Build comprehensive description for SEO
+const metaDescription = `Articles about ${toolName} (${agentData?.type || 'coding agent'}). ${allPosts.length} articles covering features, bugs, pricing, comparisons, and workflows. ${agentData?.description || ''}`.substring(0, 155);
+
+// Count article types for tag filter
 const tags: Record<string, number> = {};
 for (const p of allPosts) {
   for (const t of (p.data.tags || [])) {
@@ -51,7 +54,7 @@ function formatDate(d: Date) {
 }
 ---
 
-<Layout title={`${toolName} articles — ${SITE_TITLE}`} description={`Articles about ${toolName}, the ${agentData?.type || 'coding agent'}. ${allPosts.length} articles covering features, bugs, pricing, comparisons.`}>
+<Layout title={`${toolName} articles — ${SITE_TITLE}`} description={metaDescription}>
   <div class="content" style="max-width:900px;margin:0 auto;padding:0 1.5rem;">
 
     <!-- Agent Header -->
@@ -85,7 +88,82 @@ function formatDate(d: Date) {
       </div>
     </div>
 
-    <!-- Feature Strip -->
+        <!-- Agent Description -->
+        {agentData.description && (
+          <div class="tool-description" style="margin: 2rem 0; padding: 1.5rem; background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px;">
+            <h2 style="font-size: 1.1rem; font-family: var(--font-mono); color: var(--green); margin-bottom: 1rem;">About {toolName}</h2>
+            <p style="font-size: 0.9rem; color: var(--fg-bright); line-height: 1.7; margin: 0;">{agentData.description}</p>
+          </div>
+        )}
+
+        <!-- Recommended Use Case -->
+        {agentData.recommended && (
+          <div class="tool-recommended" style="margin: 1.5rem 0; padding: 1rem; background: var(--bg-alt); border-left: 3px solid var(--green); border-radius: 0 8px 8px 0;">
+            <h3 style="font-size: 0.85rem; font-family: var(--font-mono); color: var(--green); margin: 0 0 0.5rem;">Best for</h3>
+            <p style="font-size: 0.9rem; color: var(--fg-bright); margin: 0;">{agentData.recommended}</p>
+          </div>
+        )}
+
+        <!-- Pros & Cons -->
+        {(agentData.pros || agentData.cons) && (
+          <div class="tool-pros-cons" style="margin: 2rem 0; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            {agentData.pros && (
+              <div class="tool-pros" style="padding: 1rem; background: var(--bg-alt); border: 1px solid var(--green); border-radius: 8px;">
+                <h3 style="font-size: 0.85rem; font-family: var(--font-mono); color: var(--green); margin: 0 0 0.75rem;">Pros</h3>
+                <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.85rem; color: var(--fg-bright); line-height: 1.8;">
+                  {agentData.pros.map(pro => <li>{pro}</li>)}
+                </ul>
+              </div>
+            )}
+            {agentData.cons && (
+              <div class="tool-cons" style="padding: 1rem; background: var(--bg-alt); border: 1px solid var(--red); border-radius: 8px;">
+                <h3 style="font-size: 0.85rem; font-family: var(--font-mono); color: var(--red); margin: 0 0 0.75rem;">Cons</h3>
+                <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.85rem; color: var(--fg-bright); line-height: 1.8;">
+                  {agentData.cons.map(con => <li>{con}</li>)}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        <!-- Pricing & Type Details -->
+        <div class="tool-details" style="margin: 2rem 0; padding: 1.5rem; background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px;">
+          <h2 style="font-size: 1.1rem; font-family: var(--font-mono); color: var(--green); margin-bottom: 1rem;">Details</h2>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; font-size: 0.85rem;">
+            <div>
+              <span style="color: var(--fg-dim); font-family: var(--font-mono); font-size: 0.75rem;">Type</span>
+              <p style="color: var(--fg-bright); margin: 0.25rem 0 0;">{agentData.type}</p>
+            </div>
+            <div>
+              <span style="color: var(--fg-dim); font-family: var(--font-mono); font-size: 0.75rem;">Pricing</span>
+              <p style="color: var(--fg-bright); margin: 0.25rem 0 0;">{agentData.pricing}</p>
+            </div>
+            {agentData.sweBench && agentData.sweBench !== '-' && (
+              <div>
+                <span style="color: var(--fg-dim); font-family: var(--font-mono); font-size: 0.75rem;">SWE-bench</span>
+                <p style="color: var(--fg-bright); margin: 0.25rem 0 0;">{agentData.sweBench}</p>
+              </div>
+            )}
+            <div>
+              <span style="color: var(--fg-dim); font-family: var(--font-mono); font-size: 0.75rem;">Open Source</span>
+              <p style="color: var(--fg-bright); margin: 0.25rem 0 0;">{agentData.openSource ? 'Yes' : 'No'}</p>
+            </div>
+            {agentData.stars && (
+              <div>
+                <span style="color: var(--fg-dim); font-family: var(--font-mono); font-size: 0.75rem;">GitHub Stars</span>
+                <p style="color: var(--fg-bright); margin: 0.25rem 0 0;">{(agentData.stars / 1000).toFixed(1)}K</p>
+              </div>
+            )}
+            {agentData.license && (
+              <div>
+                <span style="color: var(--fg-dim); font-family: var(--font-mono); font-size: 0.75rem;">License</span>
+                <p style="color: var(--fg-bright); margin: 0.25rem 0 0;">{agentData.license}</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <!-- Feature Strip -->
     {agentData?.features && (
       <div class="feature-strip">
         {Object.entries(agentData.features).slice(0, 8).map(([key, val]: [string, any]) => (
