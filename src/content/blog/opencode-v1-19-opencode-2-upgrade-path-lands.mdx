@@ -1,7 +1,8 @@
 ---
-title: "OpenCode Just Dropped v1.19.0 — The OpenCode 2 Upgrade Path Is Here"
-description: "OpenCode v1.19.0 (October 11) adds the long-awaited `opencode upgrade --major` command to migrate to OpenCode 2, plus OpenAI ultrafast tier support and PTY connection validation. Here's what the major version jump means for your workflow."
-pubDate: "2026-10-11T14:00:00Z"
+title: "OpenCode v1.19 Just Made Major Upgrades Safe — v1.19.3 Adds Model Reasoning Controls"
+description: "OpenCode v1.19.0 (Oct 11) brought the `opencode upgrade --major` command for OpenCode 2 migration. v1.19.1-1.19.3 (Oct 15-16) patched session sharing removal, 1.x update isolation, yarn/Homebrew fixes, and model reasoning variant configuration. The full upgrade path is now solid."
+pubDate: 2026-10-11T14:00:00Z
+updatedDate: 2026-10-19T10:00:00Z
 tags: ["opencode", "release", "v1.19", "opencode-2", "upgrade", "openai-ultrafast", "coding-agent", "beginner"]
 tool: "opencode"
 author: "rho"
@@ -9,21 +10,29 @@ image: "/api/og?title=OpenCode+v1.19+OpenCode+2+Upgrade&tool=opencode"
 canonical: "https://terminalblog.com/blog/opencode-v1-19-opencode-2-upgrade-path-lands/"
 ---
 
-OpenCode v1.19.0 landed **October 11, 2026** — and it brings the one command everyone has been waiting for: **`opencode upgrade --major`**.
+OpenCode v1.19.0 landed **October 11, 2026** — and it brought the one command everyone has been waiting for: **`opencode upgrade --major`**.
 
 This is the gateway to **OpenCode 2**. No more guessing when the next major version drops. No more manual migration guides. One command, and you're on the new architecture.
 
 Plus: **OpenAI ultrafast service tier support** and **PTY connection validation** that stops phantom terminal errors.
 
+Then came **three rapid patches in two days** (Oct 15-16) that made the release line production-ready:
+
+- **v1.19.1** (Oct 15): Removed session sharing entirely — clean break from deprecated feature
+- **v1.19.2** (Oct 16): Locked 1.x installs to 1.x updates (no accidental 2.x jumps), fixed yarn/Homebrew/Chocolatey upgrade paths
+- **v1.19.3** (Oct 16): Added model reasoning variant configuration — configure reasoning options to generate variants while preserving your overrides
+
 ---
 
 ## The One-Line Summary
 
-**Run `opencode upgrade --major` and you're on OpenCode 2. The migration path is finally real.**
+**Run `opencode upgrade --major` and you're on OpenCode 2. The migration path is finally real — and v1.19.3 just made the 1.x line rock-solid.**
 
 ---
 
-## What Actually Changed
+## What Actually Changed (Full v1.19 Changelog)
+
+### v1.19.0 (Oct 11) — The Upgrade Path Opens
 
 ### 1. `opencode upgrade --major` — The OpenCode 2 Migration Command
 
@@ -69,40 +78,88 @@ OpenCode now **validates PTY connection origins and tickets** before checking if
 
 ---
 
+### v1.19.1 (Oct 15) — Clean Break from Session Sharing
+
+### Session Sharing Discontinued
+
+- Existing share links and session-sharing commands are no longer available
+- Importing sessions from share URLs is unsupported
+- This removes a deprecated feature that was causing confusion and maintenance burden
+
+**Why this matters:** Session sharing was a half-baked experiment. Removing it cleanly means the codebase is simpler and the team can focus on core agent capabilities. If you were using it, export your sessions manually before upgrading.
+
+---
+
+### v1.19.2 (Oct 16) — 1.x Update Isolation (Critical for Stability)
+
+This is the **most important patch for anyone staying on 1.x**.
+
+**OpenCode 1 now stays on the 1.x release line:**
+- Update checks use only the npm `opencode-ai` latest version
+- 1.x installs are **never offered a 2.x build** as a regular update
+- Upgrading to OpenCode 2 remains a separate, explicit choice through the 2.0 offer in `/update` or `opencode upgrade --major`
+
+**Additional fixes:**
+- Fix upgrades for installs managed by yarn
+- Skip 1.x updates for Homebrew Core installs (which now track OpenCode 2)
+- Check tap and Chocolatey availability before offering an update
+- The install script refuses to install 2.x versions
+
+**Why this matters:** Before this patch, a `brew upgrade` or `npm update` could silently jump you to OpenCode 2 with breaking changes. Now **you choose when to migrate** — not your package manager.
+
+---
+
+### v1.19.3 (Oct 16) — Model Reasoning Controls
+
+### Configure Model Reasoning Variants
+
+- Configure model reasoning options to generate reasoning variants
+- Replaces catalog variants while preserving your configured variant overrides
+- Gives you fine-grained control over how models "think" without losing your custom settings
+
+**Why this matters:** Different coding tasks need different reasoning depths. A quick bug fix needs minimal reasoning; a complex architecture decision needs deep thinking. Now you can configure this per-model, per-task, without the catalog overriding your choices.
+
+---
+
 ## Quick Version Context
 
 | Version | Date | Focus |
 |---------|------|-------|
+| **v1.19.3** | Oct 16, 2026 | Model reasoning variants, catalog override preservation |
+| **v1.19.2** | Oct 16, 2026 | **1.x update isolation**, yarn/Homebrew/Chocolatey fixes |
+| **v1.19.1** | Oct 15, 2026 | Session sharing removal (clean deprecation) |
 | **v1.19.0** | Oct 11, 2026 | **OpenCode 2 upgrade path, ultrafast tier, PTY validation, no more auto-updates** |
 | v1.18.35 | Oct 6, 2026 | xAI images, agent-readable stats, ecosystem growth |
 | v1.18.18 | Sep 2026 | Major reliability overhaul — MCP desktop, plugin system |
-| v1.18.0–17 | Aug–Sep 2026 | MCP stabilization, provider fixes, core reliability |
 
-**v1.18.x** made OpenCode reliable. **v1.19.0** makes it *upgradable*.
+**v1.18.x** made OpenCode reliable. **v1.19.0** makes it *upgradable*. **v1.19.1-3** make it *safe to stay on 1.x*.
 
 ---
 
-## Should You Upgrade to v1.19.0?
+## Should You Upgrade?
 
 | If You... | Verdict |
 |-----------|---------|
 | Want OpenCode 2 **today** | **Yes** — run `opencode upgrade --major` |
-| Are on v1.18.x and happy | **Yes** — v1.19.0 is a safe patch with the upgrade command as bonus |
+| Are on v1.18.x and happy | **Yes** — v1.19.3 is a safe patch with the upgrade command as bonus |
 | Run OpenCode in CI/automation | **Yes** — explicit `/update` gives you control over when runtime changes |
 | Use OpenAI models with ChatGPT sub | **Yes** — ultrafast tier = noticeably faster responses |
 | Had random PTY errors | **Yes** — root cause fixed |
+| **Want to stay on 1.x** | **Yes** — v1.19.2/3 guarantee you won't accidentally jump to 2.x |
 
-**No rush if:** You're pinned to v1.18.x for plugin compatibility — but test v1.19.0 in staging. The upgrade command is additive; it doesn't force anything.
+**No rush if:** You're pinned to v1.18.x for plugin compatibility — but test v1.19.3 in staging. The upgrade command is additive; it doesn't force anything.
 
 ---
 
 ## How to Upgrade
 
 ```bash
-# To v1.19.0 (safe, patch-level)
+# To v1.19.3 (safe, patch-level — RECOMMENDED for 1.x users)
 npm update -g opencode
 # or
 brew upgrade opencode
+# or
+opencode upgrade  # from within TUI via /update
 
 # To OpenCode 2 (major migration — when ready)
 opencode upgrade --major
@@ -111,7 +168,7 @@ opencode upgrade --major
 **Verify:**
 ```bash
 opencode --version
-# Should show 1.19.0 (or 2.x.x after --major)
+# Should show 1.19.3 (or 2.x.x after --major)
 ```
 
 ---
@@ -136,9 +193,9 @@ OpenCode's thesis hasn't changed: **provider-neutral, local-first, skill-driven.
 
 While Claude Code locks you to Anthropic, Cursor locks you to their IDE, and Codex locks you to OpenAI — OpenCode lets you swap models, providers, and backends without rewriting your workflow.
 
-v1.19.0 doesn't change that thesis. It **removes the friction** from the next evolution of it.
+v1.19 doesn't change that thesis. It **removes the friction** from the next evolution of it.
 
-The agent-readable stats API (v1.18.35) + the major upgrade command (v1.19.0) = **infrastructure that manages its own evolution**. That's the endgame: agents that upgrade themselves, monitor their own metrics, and optimize their own provider routing.
+The agent-readable stats API (v1.18.35) + the major upgrade command (v1.19.0) + update isolation (v1.19.2) + reasoning controls (v1.19.3) = **infrastructure that manages its own evolution safely**. That's the endgame: agents that upgrade themselves, monitor their own metrics, and optimize their own provider routing — without surprising you.
 
 ---
 
@@ -149,12 +206,14 @@ The agent-readable stats API (v1.18.35) + the major upgrade command (v1.19.0) = 
 - [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
 - [OpenCode vs Codex: The Provider-Neutral Advantage](/blog/opencode-vs-codex/)
 
+---
 
 ## Related articles
 
 - [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
 - [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
 - [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
 ---
 
 *Using OpenCode? Tried the `--major` upgrade yet? [X](https://x.com) • [LinkedIn](https://linkedin.com)*
