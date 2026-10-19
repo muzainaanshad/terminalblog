@@ -1,0 +1,208 @@
+---
+title: "Qwen Code Just Made Agents Collaborate Locally — v0.25.0 Adds Workspace Agents, Mem0, and A2A Sharing"
+description: "Qwen Code v0.25.0 (October 5) introduces local workspace-agent collaboration, bundles Mem0 for persistent memory, adds A2A access/sharing for workspace agents, and ships a massive managed-agent stack with durable sessions, hosted MCP, and private ACP children. The release that turns Qwen Code into a multi-agent platform."
+pubDate: 2026-10-19T10:00:00Z
+tags: ["qwen-code", "release", "v0.25", "workspace-agents", "mem0", "a2a", "managed-runtime", "multi-agent", "coding-agents", "beginner"]
+tool: "qwen-code"
+author: "sage"
+image: "/api/og?title=Qwen+Code+v0.25+Workspace+Agents+Mem0+A2A&tool=qwen-code"
+canonical: "https://terminalblog.com/blog/qwen-code-v0-25-workspace-agents-mem0-a2a-collaboration/"
+---
+
+Qwen Code **v0.25.0 dropped October 5**, and it's the release that quietly transforms Qwen Code from a single-agent CLI into a **multi-agent platform with local collaboration, persistent memory, and A2A sharing** — all without leaving your terminal.
+
+The headline features: **local workspace-agent collaboration** (multiple agents working the same repo), **Mem0 bundled in the CLI** (memory that survives restarts), **A2A access/sharing for workspace agents** (agents talking to agents), and a **managed-agent stack** that now includes durable sessions, hosted MCP, private ACP children, and failover.
+
+If you've been watching Qwen Code's managed runtime evolve since v0.24.6 — v0.25.0 is where it becomes a platform.
+
+---
+
+## The Headline Features (Ranked by Daily Impact)
+
+### 1. Local Workspace-Agent Collaboration — Multiple Agents, One Repo
+
+**PR [#11206](https://github.com/QwenLM/qwen-code/pull/11206)** introduces generic Broker provider controls with a versioned worker contract for manifest, turn preparation, tool approval, preflight, and file history.
+
+**What this means:** You can now spin up **multiple workspace agents** that collaborate on the same codebase. One agent architects, another implements, a third writes tests — all sharing context through the Broker.
+
+```bash
+# Start a managed session with workspace agents
+qwen-code --managed
+# In the web shell: add workspace agents, assign roles
+```
+
+**For beginners:** This is the first time an open-source terminal agent lets you run a *team* of agents locally without Docker Compose, Kubernetes, or a cloud account. The Broker handles coordination; you just assign tasks.
+
+---
+
+### 2. Mem0 Bundled — Persistent Memory That Just Works
+
+**PR [#12891](https://github.com/QwenLM/qwen-code/pull/12891)** bundles Mem0 with the main CLI.
+
+**Before v0.25:** You needed a separate Mem0 server, Docker, or cloud API to get persistent cross-session memory. Configuration was a separate project.
+
+**Now:** `qwen-code` **includes Mem0 out of the box**. Your agents remember:
+- Codebase patterns you've taught them
+- Project-specific conventions
+- Past debugging sessions
+- Team preferences
+
+**Opt-in selector skip** (PR [#13158](https://github.com/QwenLM/qwen-code/pull/13158)) means unique new recall hits don't re-prompt — memory feels instantaneous.
+
+---
+
+### 3. A2A Access & Sharing for Workspace Agents
+
+**PR [#12851](https://github.com/QwenLM/qwen-code/pull/12851)** adds **Agent-to-Agent (A2A) protocol** support for workspace agents.
+
+**What this enables:**
+- Workspace agents can **discover and call each other** via A2A
+- **Share context, tools, and memory** across agent boundaries
+- Build **agent swarms** where each agent specializes (researcher, coder, reviewer, documenter)
+
+**Why it matters:** A2A is the emerging standard for agent interoperability. Qwen Code baking it into workspace agents means your local agent team can eventually talk to *any* A2A-compatible agent — Claude Code, OpenCode, Pi, custom agents.
+
+---
+
+### 4. The Managed-Agent Stack: Production-Ready Infrastructure
+
+v0.25.0 doesn't just add features — it **completes the managed-agent infrastructure** that started in v0.24.6:
+
+| Capability | PR | What It Gives You |
+|------------|-----|-------------------|
+| **Durable remote Shell result delivery** | [#12894](https://github.com/QwenLM/qwen-code/pull/12894) | Shell output survives disconnects, reconnects, machine restarts |
+| **Private Hosted MCP runtime (H1)** | [#12946](https://github.com/QwenLM/qwen-code/pull/12946) | MCP servers run isolated per workspace — no cross-contamination |
+| **Verified W1a workspace cold restore** | [#13088](https://github.com/QwenLM/qwen-code/pull/13088) | Kill the machine, restart tomorrow — workspace restores exactly |
+| **Host Managed sessions in private ACP child (M2)** | [#13131](https://github.com/QwenLM/qwen-code/pull/13131) | Each managed session gets its own ACP child process — isolation by default |
+| **Hosted file history & undo** | [#13110](https://github.com/QwenLM/qwen-code/pull/13110) | Full git-like history for agent actions in managed sessions |
+| **Hosted Turn takeover & G1 failover E2E** | [#13083](https://github.com/QwenLM/qwen-code/pull/13083) | If an agent dies, another takes over mid-task — zero context loss |
+| **Durable Hosted Hooks (H2)** | [#13129](https://github.com/QwenLM/qwen-code/pull/13129] | Pre/post tool hooks that survive restarts — enforce policy always |
+| **Offline W1b recovery bundles** | [#13138](https://github.com/QwenLM/qwen-code/pull/13138) | Export/import workspace state for air-gapped or backup scenarios |
+| **Broker auth & provisioned writer credentials** | [#13210](https://github.com/QwenLM/qwen-code/pull/13210) | Secure multi-tenant: each workspace gets its own broker credentials |
+| **Default durable local-process & trusted reboot recovery ON** | [#13211](https://github.com/QwenLM/qwen-code/pull/13211) | **No config needed** — durability is the default now |
+
+---
+
+### 5. Code Mode Gets Real: Freeform Input + Concurrent Bash
+
+**PR [#13150](https://github.com/QwenLM/qwen-code/pull/13150)** adds **Freeform input in Code Mode** — you're not locked into structured prompts anymore. Type naturally; the agent understands.
+
+**PR [#13151](https://github.com/QwenLM/qwen-code/pull/13151)** allows **concurrent Bash calls in Code Mode** — independent shell commands run in parallel. No more waiting for `ls` to finish before `grep` starts.
+
+---
+
+### 6. Model Catalog from models.dev — Zero-Config Model Discovery
+
+**PR [#11959](https://github.com/QwenLM/qwen-code/pull/11959)** resolves model limits and modalities from a **models.dev catalog**.
+
+**What this means:** New models appear automatically. No more waiting for Qwen Code releases to get the latest Gemini, Claude, or GPT variants. The catalog is the source of truth.
+
+---
+
+### 7. Isolated Remote Qwen Runtime Hosts
+
+**PR [#12582](https://github.com/QwenLM/qwen-code/pull/12582)** adds **isolated remote Qwen runtime hosts** — spin up a Qwen agent on a remote GPU box, connect from your laptop. The runtime is sandboxed, the connection is secure, and the agent has full workspace access.
+
+---
+
+### 8. Java SDK: SpotBugs, CodeQL, Maven Dependabot
+
+**PR [#13216](https://github.com/QwenLM/qwen-code/pull/13216)** hardens the Java SDK with **SpotBugs high-confidence gate, CodeQL Java scan, Maven dependabot**. If you're building enterprise integrations on Qwen Code, the Java SDK is now production-grade.
+
+---
+
+### 9. Email Channels (IMAP/SMTP)
+
+**PR [#12939](https://github.com/QwenLM/qwen-code/pull/12939)** adds **IMAP and SMTP email channels** — agents can now read/send email as a native capability. Use cases: automated triage, notification routing, customer-facing agents.
+
+---
+
+### 10. The v0.24.7 Fixes Are Included
+
+All the stabilization fixes from v0.24.7 (daemon settings isolation, Enter key fix, cross-directory permissions, Code Mode text alignment, broker integer correctness, workspace reboot recovery) are **baked into v0.25.0**. You get the features *and* the reliability.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **v0.25.0** | Oct 5, 2026 | **Stable** | Workspace agents, Mem0, A2A, managed-agent stack complete, Code Mode upgrades, models.dev catalog |
+| v0.25.1-nightly | Oct 11 | Nightly | Managed-agent journal fixes, FG8 monitor gates |
+| v0.25.2-preview.0 | Oct 13 | Preview | Extension failure explorer views, SQL timestamp standardization, CSI resource retention |
+| v0.25.2 | Oct 12 | Preview/Stable | Managed-agent plan approval, FG8 fault gates, web-shell mobile composer, ACP legacy cancellation |
+| v0.24.7 | Sep 29 | Patch | Daemon settings isolation, Enter key fix, cross-dir permissions, broker hardening |
+| v0.24.6 | Sep 26 | Feature | Managed runtime, durable sessions, failover, advisor tool, Java SDK, 60% faster startup |
+
+**v0.24.6 built the infrastructure. v0.24.7 hardened it. v0.25.0 makes it a platform.**
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Want multi-agent workflows locally** | **Yes** — workspace agents + A2A = agent teams without cloud |
+| **Need persistent memory across sessions** | **Yes** — Mem0 bundled, zero config |
+| **Run managed agents in CI/production** | **Yes** — durable sessions, failover, cold restore, offline bundles |
+| **Build on Qwen Code's Java SDK** | **Yes** — SpotBugs, CodeQL, Dependabot gates |
+| **Use MCP heavily** | **Yes** — private hosted MCP per workspace |
+| **Want latest models without waiting** | **Yes** — models.dev catalog auto-updates |
+| **Are on v0.24.7 and happy** | **Yes** — zero breaking changes, pure upside |
+
+**No rush if:** You're pinned to v0.24.x for plugin compatibility — but test v0.25 in staging. The workspace agent architecture alone is worth the validation cycle.
+
+---
+
+## How to Update
+
+```bash
+# npm (recommended)
+npm i -g @qwen-code/qwen-code@latest
+
+# Verify
+qwen-code --version
+# Should show 0.25.0
+
+# Desktop app (separate channel)
+# Download from https://github.com/QwenLM/qwen-code/releases/tag/desktop-v0.25.0
+```
+
+**After upgrade:**
+1. Run `qwen-code --managed` → explore the Web Shell
+2. Settings → Agents → **Add Workspace Agent** → assign a role (architect, coder, tester)
+3. Skills → search "Mem0" → it's bundled, just enable it
+4. Try A2A: start two workspace agents → have them call each other
+
+---
+
+## The Bigger Picture: Qwen Code Is Becoming the "Linux" of Agent Platforms
+
+Qwen Code's trajectory is unique:
+
+| Release | Shift |
+|---------|-------|
+| v0.20-v0.23 | Single-agent CLI, great at coding |
+| v0.24.6 | **Managed runtime** — durable sessions, failover, advisor |
+| v0.24.7 | **Hardening** — settings isolation, permission fixes |
+| **v0.25.0** | **Platform** — workspace agents, Mem0, A2A, private MCP, cold restore, failover, broker auth, models.dev catalog |
+
+Every release fills a gap. No rewrites. No "v2 coming soon." Just **steady compounding** — and now, **a local-first multi-agent platform that rivals cloud offerings.**
+
+The question isn't "which agent should I use?" It's "why would I use a cloud agent platform when Qwen Code runs the same patterns locally, free, with my data on my machine?"
+
+---
+
+## Related Articles
+
+- [Qwen Code v0.24.7 — Daemon Settings Leak Fixed, Enter Key Restored](/blog/qwen-code-v0-24-7-daemon-settings-fix-enter-key-permissions/)
+- [Qwen Code v0.24.6 — Managed Runtime, Advisor Tool, Java SDK, 60% Faster Startup](/blog/qwen-code-v0-24-6-managed-runtime-advisor-tool-breakthrough/)
+- [Qwen Code Finally Knows When to Give Up — Now It Calls Claude Code for Help](/blog/qwen-code-v0-23-1-goals-pause-stuck-worktree-tasks/)
+- [OpenHands 1.27 Just Became the Universal Agent Platform — Pi, OpenCode, DigitalOcean](/blog/openhands-v1-27-universal-agent-platform-acp-digitalocean/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Qwen Code is open-source (Apache-2.0) and available at [github.com/QwenLM/qwen-code](https://github.com/QwenLM/qwen-code). Full changelog: [v0.25.0 release notes](https://github.com/QwenLM/qwen-code/releases/tag/v0.25.0) and [v0.25.2-preview.0](https://github.com/QwenLM/qwen-code/releases/tag/v0.25.2-preview.0). Published October 19, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
