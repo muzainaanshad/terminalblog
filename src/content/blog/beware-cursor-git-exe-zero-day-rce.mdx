@@ -1,0 +1,268 @@
+---
+title: "Beware: Cursor's Git.exe Zero-Day — Opening a Cloned Repo on Windows Runs Attacker Code (Unpatched for 7 Months)"
+description: "A critical RCE vulnerability in Cursor lets any cloned repository execute arbitrary code on Windows just by opening it — no clicks, no prompts. Mindgard disclosed it in December 2025; as of October 2026, no patch exists. Here's what happened, who's affected, and how to protect yourself."
+published: 2026-10-19
+updatedDate: 2026-10-19
+tags: ["beware", "security", "cursor", "rce", "windows", "binary-planting"]
+category: "Security"
+author: "Anshad"
+heroImage: "/api/og?title=Beware:%20Cursor%20Git.exe%20Zero-Day%20RCE&tool=Cursor"
+---
+
+## TL;DR
+
+**Cursor on Windows will automatically execute any file named `git.exe` placed at the root of a repository when you open that repository — no click, no prompt, no warning.** This is a classic binary-planting vulnerability (executable search-order hijacking) that Microsoft patched in Git Credential Manager Core back in 2020 (CVE-2020-26233). Mindgard reported it to Cursor on **December 15, 2025**. Seven months and 197+ releases later, **no fix has shipped**. If you use Cursor on Windows and open repositories from untrusted sources, you are vulnerable to silent remote code execution.
+
+---
+
+## What Happened
+
+### The Vulnerability in Plain English
+
+When you open a project in Cursor, it needs to run Git commands (like `git rev-parse --show-toplevel`) to understand the repository structure. On Windows, when a program runs an unqualified command like `git`, the operating system searches for that executable in a specific order:
+
+1. The directory containing the application
+2. The current working directory (the folder you're in)
+3. System directories (like `C:\Windows\System32`)
+4. Directories in your `PATH` environment variable
+
+**The problem:** Cursor's search order includes the **workspace directory (your project folder) before system-trusted locations**. If an attacker places a malicious file named `git.exe` at the root of a repository, Windows will find and execute **that file instead of the real Git** when Cursor tries to run Git commands.
+
+### The Attack Flow
+
+1. **Attacker creates a malicious repository** — They put a file named `git.exe` at the root. This isn't Git; it's malware (a remote access trojan, credential stealer, ransomware loader, etc.).
+2. **Victim clones the repo** — `git clone https://github.com/attacker/malicious-repo`
+3. **Victim opens it in Cursor** — That's it. Just opening the folder triggers the vulnerability.
+4. **Cursor runs `git rev-parse --show-toplevel`** — Windows finds the attacker's `git.exe` in the repo root first and executes it.
+5. **Attacker's code runs with your full privileges** — No sandbox, no prompt, no approval dialog. The malicious binary runs as *you*, with access to your source code, SSH keys, cloud credentials, browser cookies, and everything else on your machine.
+6. **Cursor keeps re-invoking it** — As long as the project stays open, Cursor repeatedly calls Git, giving the attacker multiple execution opportunities.
+
+### Mindgard's Proof of Concept
+
+Mindgard demonstrated this safely by renaming Windows Calculator (`calc.exe`) to `git.exe` and placing it at the repository root. **Simply cloning and opening the repo in Cursor launched Calculator automatically — no user interaction required.** In a real attack, that Calculator would be a loader for Cobalt Strike, Sliver, or custom malware.
+
+---
+
+## Who Is Affected
+
+### Directly Affected
+
+| Group | Why |
+|-------|-----|
+| **Cursor users on Windows** | Primary target; vulnerability is in Cursor's Git binary resolution |
+| **Developers who "vibe code" with AI** | Frequently clone and open repos from strangers (GitHub, Twitter, Discord) |
+| **Teams using Cursor in CI/automation** | Automated checkout + open workflows could trigger at scale |
+| **Anyone who clones repos from untrusted sources** | CTF players, security researchers, developers evaluating PRs |
+
+### Also Affected (Same Root Cause)
+
+Independent research confirmed **the same vulnerability class exists in:**
+
+- **GitHub Copilot CLI** — Downgraded to "low" severity, no fix as of June 2026
+- **Google Gemini CLI** — No patch released as of June 2026
+- **OpenAI Codex Desktop** — Classified as "Not Applicable" by OpenAI, no fix
+
+This is a **pattern across the AI coding assistant market** — tools that autonomously resolve binaries from workspace directories without validating they're the genuine article.
+
+### Not Affected (or Less Affected)
+
+- **Cursor on macOS/Linux** — Unix search order doesn't prioritize current working directory the same way
+- **VS Code proper** — Doesn't auto-execute Git from workspace root on open
+- **Users who only open trusted, vetted repositories** — But "trusted" is a dangerous assumption in 2026
+
+---
+
+## How to Check If You're Vulnerable
+
+### Quick Test (Safe)
+
+Run this in PowerShell to see if Cursor would execute a workspace `git.exe`:
+
+```powershell
+# Create a test directory
+mkdir ~/cursor-git-test
+cd ~/cursor-git-test
+
+# Create a fake git.exe that just writes a marker file (harmless)
+@"
+@echo off
+echo [TEST] Fake git.exe executed at %DATE% %TIME% >> ~/cursor-git-test/executed.log
+echo Vulnerable! Check ~/cursor-git-test/executed.log
+"@ > git.bat
+
+# Rename to .exe (Windows executes .bat files as commands too)
+ren git.bat git.exe
+
+# Initialize a git repo so Cursor recognizes it
+git init
+
+# Now open this folder in Cursor
+# If vulnerable: ~/cursor-git-test/executed.log will appear with a timestamp
+```
+
+**If `executed.log` appears after opening in Cursor, you are vulnerable.**
+
+### Check Your Cursor Version
+
+```powershell
+# Check Cursor version
+cursor --version
+
+# Or via winget
+winget list --name Cursor
+```
+
+**All versions tested by Mindgard (up to July 10, 2026 builds) were vulnerable.** No patched version exists as of this writing.
+
+### Scan Your Existing Repos for Planted Binaries
+
+```powershell
+# Scan all repos under your dev folder for unexpected .exe files at root
+Get-ChildItem ~/source/repos -Recurse -Depth 1 -Filter "*.exe" | 
+  Where-Object { $_.Name -eq "git.exe" -or $_.Name -eq "npx.exe" -or $_.Name -eq "node.exe" -or $_.Name -eq "where.exe" } |
+  Select-Object FullName, LastWriteTime, Length
+```
+
+**Legitimate repositories should NEVER have `git.exe`, `npx.exe`, `node.exe`, or `where.exe` at their root.** These are system binaries with "no business" appearing inside a project folder (per Cymulate guidance cited by CSA).
+
+---
+
+## How to Protect Yourself (Right Now)
+
+### Immediate Mitigations (No Patch Available)
+
+#### 1. Block Execution from Workspace Directories (Best Protection)
+
+**AppLocker Rule (Windows Pro/Enterprise):**
+
+```powershell
+# Run as Administrator
+# Block git.exe, npx.exe, node.exe, where.exe from user workspace paths
+$rule = New-AppLockerPolicy -RuleType Executable -User "Everyone" -Action Deny -Path "C:\Users\*\source\repos\*\git.exe" -Name "Block Workspace Git"
+$rule += New-AppLockerPolicy -RuleType Executable -User "Everyone" -Action Deny -Path "C:\Users\*\source\repos\*\npx.exe" -Name "Block Workspace NPX"
+$rule += New-AppLockerPolicy -RuleType Executable -User "Everyone" -Action Deny -Path "C:\Users\*\source\repos\*\node.exe" -Name "Block Workspace Node"
+$rule += New-AppLockerPolicy -RuleType Executable -User "Everyone" -Action Deny -Path "C:\Users\*\source\repos\*\where.exe" -Name "Block Workspace Where"
+Set-AppLockerPolicy -PolicyObject $rule -Merge
+```
+
+**Windows Defender Application Control (WDAC)** — More robust for enterprise; deploy deny rules for those executable names under `%USERPROFILE%\source\repos\*`.
+
+#### 2. Use a Dedicated "Untrusted Repo" Machine/VM
+
+- Clone and inspect suspicious repos in a **disposable VM** (Windows Sandbox, Hyper-V, VirtualBox)
+- Never open unvetted repos on your primary development machine
+- Treat "vibe coding" repos from social media as **hostile by default**
+
+#### 3. Disable Cursor's Auto-Git Features (Partial)
+
+In Cursor settings, disable automatic Git operations on folder open if possible. Note: this may not fully mitigate since the vulnerability triggers on *any* Git invocation by Cursor.
+
+#### 4. Harden Git Configuration
+
+```bash
+# Disable fsmonitor globally (prevents git from executing external commands during operations)
+git config --global core.fsmonitor false
+
+# Force Git to use absolute path (doesn't fix Cursor's search order but good hygiene)
+git config --global core.alternateRefsCommand ""
+```
+
+#### 5. Verify Repos Before Opening
+
+```bash
+# Check for suspicious files at repo root BEFORE opening in Cursor
+ls -la /path/to/cloned/repo/ | grep -E "git\.exe|npx\.exe|node\.exe|where\.exe"
+
+# Check for symlinks pointing outside repo
+find /path/to/cloned/repo -type l -exec ls -la {} \; | grep -v "^/path/to/cloned/repo"
+```
+
+---
+
+## Is There a Fix?
+
+**No.** As of October 19, 2026:
+
+- ❌ **No patch released** by Cursor/Anysphere
+- ❌ **No CVE assigned** (despite 7-month disclosure timeline)
+- ❌ **No security advisory** published by Cursor
+- ❌ **No committed timeline** for remediation
+- ✅ **197+ releases shipped** since initial report without fixing this
+- ✅ **70+ releases shipped** after HackerOne submission without fixing this
+
+### Disclosure Timeline
+
+| Date | Event |
+|------|-------|
+| **Dec 15, 2025** | Mindgard privately reports to Cursor security contact |
+| **Jan 2026** | HackerOne submission delayed by "automation failure" |
+| **Feb–Apr 2026** | Multiple follow-ups; reports closed as "Informative"/"Out of scope" |
+| **Jul 13, 2026** | Cursor tells Dark Reading: "addressing this and will get back to Mindgard" |
+| **Jul 14, 2026** | Mindgard publishes full disclosure (no patch, no advisory) |
+| **Oct 19, 2026** | **Still unpatched** — this article published |
+
+### What a Fix Would Look Like
+
+Cursor needs to:
+
+1. **Resolve `git` via absolute system path** — Use `where git` or `%SYSTEMROOT%\System32\git.exe` explicitly, never unqualified `git`
+2. **Validate the Git binary** — Check signature/hash against known-good Git for Windows distribution
+3. **Reject workspace-supplied binaries** — Never search the current working directory for `git.exe`
+4. **Add a trust prompt** — "This repository contains a `git.exe` binary. Do you trust it?" (defense in depth)
+
+---
+
+## Why This Matters Beyond Cursor
+
+This isn't just a Cursor bug. It's a **systemic failure in how AI coding agents handle trust boundaries**.
+
+### The Shared Architectural Assumption
+
+All four affected tools (Cursor, Copilot CLI, Gemini CLI, Codex Desktop) made the same assumption:
+
+> *"A workspace's contents can be trusted enough to search for supporting binaries within it."*
+
+That assumption **broke the moment these tools started autonomously cloning, forking, and opening repositories of unknown provenance** — including repositories an AI agent itself may be instructed to clone during task execution.
+
+### The Agentic Trust Framework Perspective
+
+The [Agentic Trust Framework (ATF)](https://agentictrustframework.ai/) defines Zero Trust principles for autonomous AI agents. Its **Segmentation pillar** asks: *"Where can you go?"* Cursor's Git integration effectively allowed a workspace-supplied file to substitute for a trusted system binary **without any boundary check confirming the substitution was legitimate**.
+
+Organizations building internal governance for AI coding tools should use ATF's maturity model — which ties expanded autonomy to demonstrated trustworthiness and triggers automatic demotion after critical incidents — as a template for how much unsupervised filesystem and process access to grant these tools by default.
+
+### Vendor Risk Assessment
+
+If you're evaluating AI coding assistants for your team, add these questions to your procurement questionnaire (aligned with [CSA AI Controls Matrix v1.1](https://cloudsecurityalliance.org/artifacts/ai-controls-matrix-v1-1)):
+
+1. How does your tool resolve external binaries (Git, Node, npm)?
+2. Does the tool search workspace directories for system binaries?
+3. What is your vulnerability disclosure and remediation SLA?
+4. Has your tool been audited for binary-planting / search-order hijacking?
+5. Can the tool operate in a mode that rejects all workspace-supplied executables?
+
+---
+
+## Related Reading
+
+- [Beware: Cursor DuneSlide — Two Critical RCE Vulnerabilities (CVE-2026-50548, CVE-2026-50549)](/blog/beware-cursor-duneslide-rce-cve-2026-50548-50549/) — Another Cursor sandbox escape
+- [Beware: Cursor CLI Ran Your Attacker's Code Before You Clicked 'Trust'](/blog/beware-cursor-cli-worktree-pre-trust-rce/) — Pre-trust RCE in Cursor CLI
+- [Beware: Malicious .git Configs Can Make Your AI Agent Run Attacker Code — 7 Agents Affected](/blog/beware-malicious-git-configs-run-attacker-code-claude-codex-cursor/) — Git config injection across agents
+- [Coding Agent Security Checklist 2026](/blog/coding-agent-security-checklist-2026/) — Harden your agent workflows today
+
+---
+
+## Summary Checklist
+
+- [ ] **Test your Cursor installation** with the safe PoC above
+- [ ] **Deploy AppLocker/WDAC deny rules** for `git.exe`, `npx.exe`, `node.exe`, `where.exe` in workspace paths
+- [ ] **Stop opening untrusted repos** on your primary Windows machine
+- [ ] **Use a disposable VM** for evaluating PRs, CTF challenges, social-media repos
+- [ ] **Scan existing repos** for planted binaries at root
+- [ ] **Monitor Cursor's releases** for a fix — but don't wait for it
+- [ ] **Ask your vendor** (Cursor, Copilot, Gemini, Codex) for their binary-resolution security model
+
+---
+
+**Bottom line:** The only reliable mitigation today is **assuming any untrusted repository opened in Cursor on Windows is a code execution attempt**. Treat it accordingly. The vulnerability is trivial to exploit, has been known for seven months, and the vendor has not prioritized fixing it. Your security is in your hands.
+
+*Have you encountered this issue? Found a planted `git.exe` in a repo? Share your experience in the comments — defenders need real-world data.*
