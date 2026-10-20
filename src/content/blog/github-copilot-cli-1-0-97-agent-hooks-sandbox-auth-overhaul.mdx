@@ -9,9 +9,11 @@ author: "Anshad"
 canonicalUrl: "https://terminalblog.com/blog/github-copilot-cli-1-0-97-agent-hooks-sandbox-auth-overhaul/"
 ---
 
-GitHub Copilot CLI 1.0.97 dropped on October 13, and it's the kind of stable release that makes you realize how much friction you've been tolerating. This isn't a patch — it's a proper feature drop that touches sandbox, authentication, model selection, agent extensibility, and session visibility all at once.
+GitHub Copilot CLI **shipped four releases in one week** (1.0.97–1.0.101, Oct 13–20). That's not a typo — four. The terminal agent that felt like a demo six months ago is now shipping at a velocity that makes you wonder what took so long.
 
-## The Big Three Changes
+This isn't a single patch. It's a proper feature wave that touches sandbox, authentication, model selection, agent extensibility, session visibility, skills marketplace, and 50+ fixes all at once.
+
+## The Big Three Changes (Started in 1.0.97)
 
 ### 1. Agent-Scoped Declarative Hooks (Custom Agents Just Got Real)
 
@@ -65,6 +67,55 @@ This is huge for debugging. Every permission prompt in your timeline now shows e
 copilot timeline
 ```
 
+---
+
+## The Next Three Releases: What 1.0.98–1.0.101 Added
+
+### 1.0.98 (Oct 14) — Gemini 4 Argon, Session Stability
+- **Gemini 4 Argon support** — Google's new model available in the CLI
+- Command hooks complete reliably even when child-exit signals are lost under Node
+- MCP status and `/mcp` commands stay synced after split-view session switches
+- Resuming sessions respects abandoned pending-permission work
+- Keeps ordinary characters typed during startup input box initialization
+
+### 1.0.99 (Oct 18) — Verified Skills Marketplace, Share Menu, Proxy Support
+- **Install verified Skills/plugins from GitHub install links** — `copilot plugin install "ghapp://air/install?..."`
+- **`/share` without arguments** — full-screen action menu for sharing the current session
+- Sandbox host-rule traffic honors `HTTPS_PROXY`/`HTTP_PROXY` when no sandbox proxy configured
+- Voice dictation no longer inserts language markers into transcript text
+- Managed plugins update activation in existing sessions when policy changes
+- Sessions no longer stall when MCP server hangs loading tools
+- Native chats start/finish while optional managed plugin downloads continue in background
+- Double Ctrl+C exits immediately even when CLI UI is busy
+- **Enterprise-managed ask permissions in Assisted mode** allow safe actions without unnecessary confirmation prompts
+- **Enable semantic code search by default** for online sessions
+- **Trusted repository plugins install/update automatically** before chat runs
+
+### 1.0.100 (Oct 19) — Telemetry Control, Trust-Folder, Session Browser
+- **`--disable-client-telemetry` flag** — turn off client telemetry uploads from the CLI
+- **`--trust-folder` for one-off prompt-mode sessions** — started with `-p` or piped stdin
+- **Unified Sessions browser by default** for `/sessions`, `/session`, `/resume`
+- Session browsing caps account discovery at 500 records, respects `Retry-After` hints
+- Sandboxed commands can write package/build caches when developer tool access enabled
+- **Windows CLI Git commands recover** from thread-access-denied startup failures
+- **Sandbox allows local network access by default** — commands reach localhost and private-network services
+- Improved `/login` for Microsoft Entra — choose cached account or explicitly sign in with different account
+
+### 1.0.101 (Oct 20) — Native Structured Output, Assisted Approval Guidance, More Fixes
+- **Native structured output for dynamic workflow subagents** on supported models
+- **`assistedApprovalInstructions` setting** — guide Assisted Permissions confirmation decisions
+- Shell commands that create and enter a directory now request path approval instead of being denied early
+- Headless/SDK sessions without OAuth handler skip MCP connections when saved tokens require sign-in
+- macOS sandboxed commands connect directly to localhost TCP services when local access enabled
+- Local models and loopback providers no longer block Auto/saved/default model when signed in to Copilot
+- Explicit Entra MCP sign-in recovers from rejected cached tokens
+- **`/usage` shows just model name** for BYOK and rows without provider label (instead of "Unknown provider")
+- **`/config` and `/settings` can set/unset `showReasoning`**
+- Permission approval prompts explain escalation causes and show request-specific diagnosis command
+- Emergency memory relief bypasses cooldown — long sessions survive V8 OOM with compacted history instead of crashing
+
+---
+
 ## Authentication That Actually Works
 
 ### Entra (Azure AD) Broker Auth on macOS
@@ -75,6 +126,8 @@ You can now see which account uses which authentication method at a glance.
 
 ### Remote Session Resume Uses Your Configured GitHub Auth
 No more re-authenticating when reconnecting to cloud sessions.
+
+---
 
 ## Quality-of-Life Improvements That Add Up
 
@@ -104,7 +157,8 @@ No more re-authenticating when reconnecting to cloud sessions.
 | **`/user` switch choices visible in short terminals** | Account checks don't hide new-session options |
 | **Permission retry budget per request** | Unrelated calls don't consume each other's retries |
 | **Background-shell wait status animation fixed** | No animation when no foreground work running |
-| **Emergency memory relief bypasses cooldown** | Long sessions survive V8 OOM with compacted history instead of crashing |
+
+---
 
 ## What This Means for Beginners
 
@@ -112,7 +166,7 @@ No more re-authenticating when reconnecting to cloud sessions.
 
 **Before 1.0.97**: Configure sandbox via JSON → leak a secret → wonder why auth broke → manually fix timeline gaps → curse at case-sensitive model IDs.
 
-**After 1.0.97**: Run `copilot sandbox` → guided setup masks secrets → auth just works (Entra broker on Mac) → timeline tells you exactly why that command ran → model IDs work however you type them.
+**After 1.0.101**: Run `copilot sandbox` → guided setup masks secrets → auth just works (Entra broker on Mac) → timeline tells you exactly why that command ran → model IDs work however you type them → install verified skills from marketplace → share sessions with one command → disable telemetry if you want.
 
 ### Custom Agents Become Maintainable
 
@@ -122,18 +176,23 @@ Agent-scoped hooks mean you can build a **library of specialized agents** (revie
 
 Open `copilot timeline` → see "Unattended Fallback" on that 2 AM deploy → realize your org policy needs tightening. No more guessing.
 
+---
+
 ## The Honest Take
 
-This release doesn't reinvent the category. It **removes the papercuts** that made daily use frustrating.
+This release wave doesn't reinvent the category. It **removes the papercuts** that made daily use frustrating.
 
 - Sandbox config: fixed
-- Auth on Mac with Entra: fixed  
+- Auth on Mac with Entra: fixed 
 - Model ID typos: fixed
 - Permission debugging: fixed
 - Custom agent isolation: fixed
 - Memory crashes in long sessions: mitigated
+- Skills marketplace: live
+- Session sharing: one command
+- Telemetry control: one flag
 
-If you've been using Copilot CLI, update today. If you've been holding off because "it feels rough," 1.0.97 is the version where it stops feeling rough.
+If you've been using Copilot CLI, update today. If you've been holding off because "it feels rough," 1.0.101 is the version where it stops feeling rough.
 
 ```bash
 # Update
@@ -152,12 +211,12 @@ curl -fsSL https://github.com/github/copilot-cli/releases/latest/download/copilo
 - [AmpCode vs GitHub Copilot CLI: IDE Daily Driver or Terminal Agent?](/blog/ampcode-vs-copilot-cli/)
 - [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
 
-
 ## Related articles
 
 - [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
 - [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
 - [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+
 ---
 
 *GitHub Copilot CLI is free for individual use. Enterprise features require GitHub Copilot Enterprise. [github.com/github/copilot-cli](https://github.com/github/copilot-cli)*
