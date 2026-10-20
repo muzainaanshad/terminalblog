@@ -1,0 +1,220 @@
+---
+title: "Goose v1.55 Just Gave You AI Gateway, Smarter ACP, and a Session That Stops When You Say Stop"
+description: "Goose v1.55.0 (October 16) ships AIgateway declarative provider config, W3C trace context propagation across ACP, adaptive thinking fixes for Claude 5.5, session stop that actually saves work, and a leaner agent loop. The open-source agent keeps getting more embeddable."
+pubDate: 2026-10-21T10:00:00Z
+tags: ["goose", "release", "v1.55.0", "ai-gateway", "acp", "adaptive-thinking", "coding-agent", "beginner", "open-source"]
+tool: "goose"
+author: "sage"
+image: "/api/og?title=Goose+v1.55+AI+Gateway+ACP&tool=goose"
+canonical: "https://terminalblog.com/blog/goose-v1-55-ai-gateway-acp-session-control/"
+---
+
+Goose v1.55.0 dropped **October 16, 2026** — and it's the kind of release that matters more for *what you're building on top of it* than what you see in the chat window. The headline: **AIgateway declarative provider config**, **W3C trace context across ACP calls**, **adaptive thinking fixes for Claude 5.5**, and a **Stop button that actually saves your work**.
+
+If you're using Goose as your daily driver, you'll feel the session control improvements. If you're embedding Goose in an IDE plugin, CI bot, or custom frontend — this is the release that makes that architecture cleaner.
+
+---
+
+## The Headline Features (Ranked by Impact on Your Workflow)
+
+### 1. AIgateway Declarative Provider Config — Define Providers in Code, Not YAML
+
+**What it is:** A new `AIgateway` provider type (#12528) that lets you declare model providers programmatically instead of wrestling with config files.
+
+**Why it matters:** Before this, adding a custom provider meant editing YAML, restarting, debugging typos, repeat. Now you define providers in code — type-safe, version-controlled, testable. This is huge for teams standardizing model access across projects.
+
+```goose
+# Conceptual — you define providers in your project config
+providers:
+  - name: "my-claude"
+    type: "anthropic"
+    models: ["claude-sonnet-5.5", "claude-haiku-5.5"]
+    env: ANTHROPIC_API_KEY
+  - name: "my-gpt"
+    type: "openai"
+    models: ["gpt-6-sol", "gpt-6-luna"]
+    env: OPENAI_API_KEY
+```
+
+**For beginners:** You don't need this *yet*. But when you hit "I wish I could share my model setup with the team," this is the answer.
+
+---
+
+### 2. W3C Trace Context Propagation — Your Observability Finally Works Across Agents
+
+**What it is:** Goose now propagates `traceparent` and `tracestate` headers from ACP prompts through to MCP tool calls (#12697).
+
+**Why it matters:** If you're running Goose in production (CI bots, automated reviews, scheduled agents), your distributed traces were breaking at the agent boundary. Now a single trace ID follows the request from your orchestrator → Goose → MCP server → external API. Your Datadog/Honeycomb/Jaeger dashboards finally show the full picture.
+
+**For beginners:** If you don't know what distributed tracing is, you don't need this yet. When you do, you'll be glad it's there.
+
+---
+
+### 3. Adaptive Thinking Fixes for Claude 5.5 — The Model Decides, Not You
+
+**What it is:** v1.54 introduced adaptive thinking (model picks reasoning depth per-turn). v1.55 fixes the edge cases (#12761) — specifically for **Claude Sonnet 5.5 and Haiku 5.5**.
+
+**Why it matters:** The feature now works reliably. Simple edits get fast responses. Complex architectural decisions get deep reasoning. You stop managing the "thinking budget" slider.
+
+**Also fixed:** `GOOSE_CLI_SHOW_THINKING` now accepts *any* truthy value — set it once, see reasoning blocks everywhere.
+
+---
+
+### 4. Stop That Actually Saves Work — No More Lost Progress
+
+**What it is:** `Stop` now ends the run promptly and saves what was produced (#12765).
+
+**Why it matters:** Before: you hit Stop mid-task, the agent kept churning in the background, and you lost the partial output. Now: Stop → agent finishes current tool → saves state → exits cleanly. Your partial refactor, half-written test, or incomplete search is preserved in the session.
+
+**For beginners:** This feels obvious. It wasn't. Now it is.
+
+---
+
+### 5. Provider x-request-id on Responses — Debugging Distributed Calls Just Got Easier
+
+**What it is:** Goose surfaces the provider's `x-request-id` on both responses and errors (#12587).
+
+**Why it matters:** When a model call fails silently or returns garbage, you used to guess. Now you have the exact request ID to paste into your provider's dashboard (Anthropic, OpenAI, OpenRouter, etc.) and see *exactly* what happened.
+
+---
+
+### 6. Leaner Agent Loop — Background Subagents Removed, Doctor Now Session-Only
+
+**What it is:** The legacy agent loop is gone (#12760). Background subagents and the orchestrator are removed. Doctor (the self-diagnosis tool) runs only in-session, not as a background process.
+
+**Why it matters:** Less moving parts = fewer failure modes. The unrolled state machine (#11216 from v1.53) is now the *only* loop. If you're embedding Goose, the mental model is simpler: one loop, one session, deterministic transitions.
+
+---
+
+### 7. Bedrock: No Retry on Non-Context Validation Errors
+
+**What it is:** Bedrock provider no longer retries `ValidationException` on `converse_stream` unless it's a context-length issue (#12710).
+
+**Why it matters:** Prevents infinite retry loops on genuine config errors (wrong model ID, bad params, region mismatch). You get the error fast instead of a timeout.
+
+---
+
+### 8. OpenRouter: Transforms Field No Longer Set Unconditionally
+
+**What it is:** Fixes a bug where Goose sent `transforms` to OpenRouter even when not needed (#11374).
+
+**Why it matters:** Some OpenRouter models reject requests with unexpected fields. This silently broke certain models. Now fixed.
+
+---
+
+### 9. Long-Context Price Tiers in Cost Estimates
+
+**What it is:** Cost estimates now apply the correct price tier for long-context models (#12787).
+
+**Why it matters:** If you're using 100k+ context windows (GPT-6 Sol, Opus 5.5, etc.), your cost estimates were wrong. Now they're right.
+
+---
+
+### 10. Finish Pending Tools Before Enforcing Max Turns
+
+**What it is:** Goose now lets in-flight tool calls complete before hitting the `--max-turns` limit (#12702).
+
+**Why it matters:** Your agent was getting cut off mid-tool-call. Now it finishes the current operation, then respects the limit. Cleaner session boundaries.
+
+---
+
+## Quick Facts
+
+| Version | Date | Channel | Highlights |
+|---------|------|---------|------------|
+| **v1.55.0** | Oct 16, 2026 | **Stable (Latest)** | AIgateway provider, W3C trace context, adaptive thinking fixes, Stop saves work, x-request-id, leaner loop, Bedrock/OpenRouter fixes, long-context pricing |
+| v1.54.0 | Oct 8, 2026 | Stable | HTML session export, adaptive thinking (initial), hyphenated GPT-6.1-Sol aliases, system Node.js on Windows |
+| v1.53.0 | Oct 2, 2026 | Stable | Model discovery from models.dev, Meta Muse provider, lean ACP-only binary, resizable PiP, session rename CLI |
+
+---
+
+## What This Means for You
+
+**If you're new to coding agents:** Goose v1.55 doesn't change the "first run" experience much. The improvements are under the hood — but they compound. Sessions that stop cleanly. Traces that don't break. Models that pick their own thinking depth. The agent feels more *reliable*, which is the feature beginners appreciate most once they hit their first weird failure.
+
+**If you're embedding Goose (IDE plugin, CI bot, custom frontend):** This is the release you've been waiting for. AIgateway = declarative provider config. W3C trace context = observability that works. Leaner loop = smaller binary, simpler integration. The ACP-only binary from v1.53 + these v1.55 improvements = Goose as a proper runtime, not just a CLI.
+
+**If you're on Claude 5.5:** Adaptive thinking now works reliably. Set `GOOSE_CLI_SHOW_THINKING=1` once and forget it.
+
+---
+
+## What's Still Missing (Honest Assessment)
+
+- **Desktop HTML export** — CLI only for now (v1.53 added it, Desktop coming)
+- **Android Remote Control** — iOS only (same as Cursor/Claude Code)
+- **Visual trace viewer** — You get the headers, but no built-in UI to view them
+- **AIgateway UI** — Declarative config is code-first; no visual builder yet
+
+---
+
+## How to Upgrade
+
+```bash
+# CLI
+goose upgrade
+
+# Or re-run the installer
+curl -fsSL https://raw.githubusercontent.com/block/goose/main/scripts/install.sh | bash
+
+# Desktop: auto-updater handles it (enabled since v1.49)
+# Docker: pull the latest tag
+docker pull ghcr.io/block/goose:latest
+```
+
+**First things to try after update:**
+```bash
+# 1. Test the new Stop behavior
+# Start a long task → hit Ctrl+C → check session saved
+
+# 2. Enable thinking visibility
+export GOOSE_CLI_SHOW_THINKING=1
+goose
+
+# 3. Check provider request IDs on errors
+# Trigger a model error → see x-request-id in output
+
+# 4. Explore AIgateway (if building on Goose)
+# Docs: github.com/block/goose/blob/main/docs/ai-gateway.md
+```
+
+---
+
+## The Bottom Line
+
+**v1.53 gave you portable sessions (HTML export). v1.54 gave you adaptive thinking. v1.55 makes the runtime reliable enough to build on.**
+
+The pattern is clear: Goose isn't chasing "shiny feature of the week." It's hardening the protocol layer (ACP), the provider layer (AIgateway, trace context), and the session lifecycle (Stop, max-turns, cost accuracy) — the things that matter when you run agents in production, not just in a terminal.
+
+For a beginner, that means **fewer weird failures**. For a builder, it means **Goose is becoming a platform**.
+
+```bash
+goose upgrade
+# Stop a task → see it save
+# Set GOOSE_CLI_SHOW_THINKING=1 → watch models think
+# Build something on ACP → trace it end-to-end
+```
+
+---
+
+## Related Articles
+
+- [Goose Just Made Your Sessions Portable — HTML Export, Adaptive Thinking, and the v1.54 Wave](/blog/goose-v1-53-54-html-export-adaptive-thinking-wave/)
+- [Goose Just Got GPT-6 Astra and Web Search Built In — the September Wave Is Huge](/blog/goose-v1-50-gpt6-astra-web-search-security-wave/)
+- [Beware: Goose Review Arbitrary Command Execution via fsmonitor](/blog/beware-goose-review-arbitrary-command-execution-fsmonitor/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+- [Goose vs Claude Code: Extensibility Showdown](/blog/claude-code-vs-goose-extensibility-showdown/)
+- [Codex vs Goose: Parallel vs Extensible](/blog/codex-vs-goose-parallel-vs-extensible/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
+---
+
+*Using Goose? What's your favorite new feature in v1.55? [X](https://x.com) • [LinkedIn](https://linkedin.com)*
+
+*Goose is open-source (Apache-2.0) and available at [github.com/block/goose](https://github.com/block/goose). Updated October 21, 2026 — covers Goose v1.55.0 stable released October 16, 2026. Full changelog: [github.com/block/goose/releases](https://github.com/block/goose/releases)*
