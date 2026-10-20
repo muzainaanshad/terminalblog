@@ -2,7 +2,7 @@
 title: "Cursor's Background Agents Changed How I Think About Coding"
 description: "Cursor's background agents shift coding from interactive to autonomous: fire a task, review the diff, fix what matters. Here's how that changes the shape of a developer's day — and what it means for how you review, merge, and trust agent output."
 pubDate: "2026-07-09T14:00:00Z"
-updatedDate: "2026-07-18T04:00:00Z"
+updatedDate: "2026-10-20T04:00:00Z"
 updated: true
 tags: ["opinion", "cursor", "background-agents", "workflow"]
 tool: "cursor"
@@ -24,6 +24,41 @@ This is how coding should work. Humans do the thinking. Agents do the doing. Cur
 
 The Composer feature extends this. Multi-file edits that span your entire codebase, not just the file you're looking at. Describe what you want, and Cursor handles the coordination across files, imports, types, and dependencies.
 
+## A typical background-agent session
+
+Here's what a real session looks like now:
+
+```bash
+# 09:00 - Kick off a refactor while coffee brews
+cursor-agent "Extract the authentication middleware into its own package, 
+  add TypeScript interfaces, and update all imports across the monorepo"
+
+# 09:05 - Switch to design review, architecture discussion
+# 09:30 - Come back: 12 files changed, tests passing, ready to review
+git diff --stat
+#  12 files changed, 847 insertions(+), 234 deletions(-)
+```
+
+The agent handles the mechanical work: finding all import sites, updating type signatures, running the test suite, fixing the inevitable type errors. You review the diff, approve the PR, move on.
+
+## What makes it different from async CLI tools
+
+Codex CLI runs in the cloud with worktrees. It's powerful but disconnected from your editor — you get a PR at the end, not an interactive diff in your workspace. GitHub Copilot Workspace is similar: cloud-first, review-later.
+
+Cursor's background agents run **inside your IDE**. They have your full context: the open files, your git history, your test runner, your LSP. When they finish, the changes are already in your working tree. You don't context-switch to a browser to review.
+
+## The trust calibration curve
+
+The first week, you babysit. You check every file. By week three, you're kicking off three agents before lunch and reviewing the batch over coffee. The calibration is explicit:
+
+| Week | Behavior | Review time |
+|------|----------|-------------|
+| 1 | Watch every step, intervene constantly | 80% of task time |
+| 2 | Check diffs before apply, run tests manually | 40% of task time |
+| 3+ | Batch review, trust the test gate | 10% of task time |
+
+The test gate is the key. Background agents run your test suite before presenting work. If tests pass, the mechanical correctness is verified. Your review becomes architectural: does this solve the right problem? Is the abstraction clean?
+
 ## Where it lands in the market
 
 The $20/month subscription is a bargain for what you get. Background agents alone would be worth it. Combined with Composer, inline editing, and the fast model switching, Cursor is the most complete coding environment available.
@@ -31,6 +66,14 @@ The $20/month subscription is a bargain for what you get. Background agents alon
 The limitation is terminal integration. Cursor is an IDE — it lives in its own window. For developers who live in the terminal, this is a friction point. But for everyone else, Cursor is the daily driver.
 
 The background-agent pattern is now the front line of the category. Cursor's IDE-native version is the counterpoint to Codex's cloud worktree parallelism in the [Cursor vs Codex IDE-speed vs cloud-parallelism comparison](/blog/cursor-vs-codex-ide-speed-cloud-parallelism/), and the [Codebuff vs Cursor breakdown](/blog/cursor-vs-codebuff/) shows the opposite end of the spectrum: a minimal terminal generator with no background fleet at all. The throughline is clear — the agents winning mindshare are the ones that keep working after you close the tab.
+
+## What's still missing
+
+- **No persistent agent memory across sessions** — each task starts fresh
+- **No cross-repo coordination** — monorepo support is good, multi-repo is manual
+- **No cost visibility** — you don't see token burn per agent task (unlike [Claude Code's hidden utilization](/blog/claude-code-rate-limit-utilization/))
+
+These are solvable. The pattern is proven.
 
 ---
 
@@ -42,3 +85,5 @@ The background-agent pattern is now the front line of the category. Cursor's IDE
 - [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)
 - [Your AI Agents Config Directory Is Now the Most Dangerous Place on Your Machine](/blog/ai-agent-config-directory-attack-surface-2026/)
 - [What Developers Think About Coding Agents — The Skill Atrophy Crisis, Interface Wars, and Trust Divide From 500 HN Comments](/blog/hn-developer-divide-coding-agents-interface-skill-atrophy/)
+- [Cursor vs Codex: IDE Speed vs Cloud Parallelism](/blog/cursor-vs-codex-ide-speed-cloud-parallelism/)
+- [Claude Code Still Hides Your Rate-Limit Headroom](/blog/claude-code-rate-limit-utilization/)

