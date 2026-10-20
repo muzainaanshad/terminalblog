@@ -1,0 +1,258 @@
+---
+title: "OpenCode v2.1 Just Broke Its Own SDK — Here's Why It Had To"
+description: "OpenCode v2.1 (October 20) ships intentional breaking changes to SDK, HTTP contracts, and plugin APIs. Persistent Windows PTYs, todo lists in TUI, reliable long-running commands, and a unified 'native' replay field. The cost of admission for a stable platform."
+pubDate: "2026-10-20T15:00:00Z"
+tags: ["opencode", "release", "v2.1", "breaking-changes", "sdk", "windows", "beginner"]
+tool: "opencode"
+author: "Anshad"
+image: "/api/og?title=OpenCode+v2.1+Breaking+Changes&tool=opencode"
+canonical: "https://terminalblog.com/blog/opencode-v2-1-breaking-changes-native-windows-pty-todo/"
+---
+
+OpenCode v2.1 dropped **October 20, 2026**. It's not a patch. It's a **deliberate breaking release** that rewrites the SDK, HTTP message/event contracts, and plugin APIs so provider replay data and compaction use consistent names and shapes.
+
+The team calls it "the cost of admission for a stable platform." Here's what actually changed and why it matters for your daily workflow.
+
+---
+
+## The Headlines (What You'll Actually Feel)
+
+| Feature | Why It Matters |
+|---------|----------------|
+| **Persistent Windows PTYs** | Windows x64 + ARM64 now get the same terminal workflow as macOS/Linux — no more session death on disconnect |
+| **Todo Lists in TUI** | Enable `{ "experimental": { "todo": true } }` and models get `todowrite` tool — task lists render in session + sidebar |
+| **Reliable Long-Running Commands** | Plugin commands, shell calls, and TUI requests survive beyond Bun's 5-minute fetch deadline |
+| **Unified `native` replay field** | One field replaces `providerState`, `providerResultState`, `state` across all surfaces — cleaner replay, easier debugging |
+| **Credential setup moves to `metadata`** | `configuration` removed from keys; setup answers go in `metadata` — consistent with rest of platform |
+| **Summary compactions reference kept messages** | No more duplicated `recent` text — compactions store `metadata.keepID` pointing to first retained message |
+| **Breaking: SDK/HTTP/plugin contracts** | Integrations **must** adopt new fields. Stored sessions/credentials import fine via compatibility decoders |
+
+---
+
+## 1. Persistent Windows PTYs: Windows Finally Catches Up
+
+**The problem:** Windows terminals died on disconnect. Background the agent, lose the session. macOS/Linux had persistent PTYs for ages.
+
+**The fix:** v2.1 brings **persistent PTY support for Windows x64 and ARM64** ([#56245](https://github.com/anomalyco/opencode/pull/56245)). Same workflow as Unix: detach, reattach, session survives.
+
+**Why beginners care:** You're on a Surface Pro or Snapdragon laptop. You close the lid. You open it tomorrow. Your agent session is *still there*. No "where was I?" reconstruction.
+
+---
+
+## 2. Todo Lists in the TUI: Models That Track Their Own Work
+
+**The problem:** Models forget what they're doing mid-session. No visible task list. You babysit.
+
+**The fix:** Enable experimental todo support:
+
+```json
+// settings.json
+{
+  "experimental": {
+    "todo": true
+  }
+}
+```
+
+Models get `todowrite` tool accepting `{ todos: [{ content, status }] }`. The TUI renders the list in-session and in the sidebar. Models *track their own work*.
+
+**Why it matters:** You give a complex task. The agent breaks it down, updates the list as it goes. You see progress at a glance. No more "what is it doing now?"
+
+---
+
+## 3. Long-Running Commands That Don't Die at 5 Minutes
+
+**The problem:** Bun's default fetch deadline kills plugin commands, shell calls, and TUI requests at 5 minutes. Long builds, test suites, migrations — all silently fail.
+
+**The fix:** v2.1 **disables Bun's fetch idle timeout for provider requests** and keeps long-running TUI/`run`/`mini` requests connected ([#55149](https://github.com/anomalyco/opencode/pull/55149)). Commands run to completion.
+
+**Why it matters:** You run `cargo test` or a 20-minute integration suite. It finishes. You get results. Not a timeout error.
+
+---
+
+## 4. The Breaking Changes: One `native` Field to Rule Them All
+
+This is the big one. **v2.1 intentionally breaks public contracts** so replay data is consistent everywhere.
+
+### What Changed
+
+| Surface | Before | After |
+|---------|--------|-------|
+| Text/reasoning parts | `state` | `native` |
+| Assistant/compaction messages | `providerState` | `native` |
+| Tool lifecycle events | `state` | `native` |
+| Step ended/failed, compaction ended | `providerState` | `native` |
+| Tool success/failed | `resultState` | `native` |
+| Exported replay schema | `SessionMessage.ProviderState` | `SessionMessage.Native` |
+| Plugin compaction hook result | `SessionCompactionResult.providerState` | `SessionCompactionResult.native` |
+
+### Tool Calls: One `native` Instead of Two Fields
+
+```diff
+ tool
+-  providerState?
+-  providerResultState?
++  native?
+   state
+```
+
+Success/failure events shallow-merge their `native` into the call's existing `native`. Missing result data preserves call data; result values win on duplicate keys.
+
+**Why this matters:** You debug a session replay. One field. Consistent keys. No more "which providerState is this?" guesswork.
+
+### Credentials: `configuration` → `metadata`
+
+```diff
+ { type: "key", key: "...",
+-  configuration: { account: "example" }
++  metadata: { account: "example" }
+ }
+```
+
+Old stored credentials and `opencode auth import` still work — legacy `configuration` merges into `metadata`. But public writes **must** use `metadata` going forward.
+
+### Compaction: References, Not Duplicates
+
+**Old:** Compaction stored full `recent` text duplicate.
+
+**New:** Compaction stores `metadata.keepID` pointing to first message retained verbatim. History reconstructs from there. Forks remap the reference. Pre-2.1 compactions keep `metadata.recent` for compatibility.
+
+**Why it matters:** Smaller storage. Cleaner forks. No drift between "what happened" and "what compaction saved."
+
+---
+
+## 5. Windows ARM64: Native Binaries, Not Emulation
+
+v2.1 bundles **native ARM64 terminal and CLI binaries** in Windows ARM64 desktop builds. Emulated x64 installations migrate to native ARM64 updates automatically ([#54689](https://github.com/anomalyco/opencode/pull/54689), [#54983](https://github.com/anomalyco/opencode/pull/54983)).
+
+If you're on Snapdragon X Elite/Plus — this is the release where Windows becomes a first-class citizen, not an emulation afterthought.
+
+---
+
+## 6. Official WinGet Packages
+
+```powershell
+winget install --id Anomaly.OpenCode -e
+# or desktop app
+winget install --id Anomaly.OpenCode.Desktop -e
+```
+
+WinGet handles upgrades. No more manual `.msi` downloads. Windows package management finally works for OpenCode.
+
+---
+
+## 7. Gemini + Vertex: Automatic Response Continuation
+
+Long Gemini/Vertex Gemini responses split by the provider now **continue automatically as one response**, including recovery from dropped streams after continuation checkpoints ([#55056](https://github.com/anomalyco/opencode/pull/55056)).
+
+No more "response truncated" — the agent stitches it back together.
+
+---
+
+## 8. Remote Pairing: Safer by Default
+
+First `opencode pair --remote` now **warns it will expose your server** and asks for confirmation. Non-interactive? Pass `--yes`/`-y` ([#54561](https://github.com/anomalyco/opencode/pull/54561)).
+
+Security hygiene baked in.
+
+---
+
+## 9. Web App Installable
+
+Chrome/Edge **Install** button works for OpenCode web app — including behind authenticating proxies ([#53905](https://github.com/anomalyco/opencode/pull/53905)). PWA-style install without the PWA hassle.
+
+---
+
+## 10. Clear Session Failures
+
+Desktop and TUI timelines now show **execution errors that happen before or between model steps** instead of ending without explanation ([#53826](https://github.com/anomalyco/opencode/pull/53826)). You see *why* it stopped.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **v2.1.0** | Oct 20, 2026 | **Breaking** | SDK/HTTP/plugin contract unification, persistent Windows PTYs, todo lists, long-running commands, native ARM64, WinGet |
+| v2.0.28 | Oct 13, 2026 | Release | Per-project auto-accept, native ARM64, WinGet, no auto-updates, worktree tools, highlights |
+| v1.19.0 | Oct 11, 2026 | Release | v2 upgrade path, ultrafast tier, PTY validation |
+| v1.18.35 | Oct 6, 2026 | Release | xAI images, agent-readable stats |
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| Build integrations/plugins/SDK consumers | **Must update** — breaking contract changes |
+| Run OpenCode on Windows (x64 or ARM64) | **Yes** — persistent PTYs = game changer |
+| Want models to track their own tasks | **Yes** — enable experimental todo |
+| Run long commands (>5 min) | **Yes** — fetch deadline fixed |
+| Use Gemini/Vertex heavily | **Yes** — auto-continuation |
+| Are on v2.0.x and happy | **Yes** — but test integrations first |
+| Have custom plugins not yet ported | **Test first** — plugin API changed |
+
+**Migration:** Stored sessions, credentials, and V1 imports remain readable via compatibility decoders. No database migration required. But **public SDK/HTTP/plugin writes must adopt new fields**.
+
+---
+
+## How to Update
+
+```bash
+# Fresh install (macOS / Linux)
+curl -fsSL https://opencode.ai/v2/install | bash
+
+# Fresh install (Windows - native ARM64 or x64)
+irm https://opencode.ai/v2/install.ps1 | iex
+
+# Windows via WinGet (recommended)
+winget install --id Anomaly.OpenCode -e
+
+# Upgrade from v2.0.x
+opencode upgrade
+# or in TUI: /update
+
+# Upgrade from v1.x
+opencode upgrade --major
+```
+
+**Verify:**
+```bash
+opencode --version
+# Should show 2.1.0+
+```
+
+---
+
+## The Bottom Line
+
+OpenCode v2.0 made the agent *yours* (per-project control, explicit updates, native platforms).
+
+**OpenCode v2.1 makes the platform *stable*.** The breaking changes aren't arbitrary — they unify replay data, credential handling, and compaction into consistent shapes so the foundation doesn't crack under scale.
+
+Persistent Windows PTYs. Todo lists models actually use. Commands that run past 5 minutes. Native ARM64. WinGet. A single `native` field replacing three inconsistent ones.
+
+This is what "open source agent infrastructure" looks like when it grows up.
+
+---
+
+*This article covers OpenCode v2.1 released October 20, 2026. For the full changelog, see [opencode.ai/changelog](https://opencode.ai/changelog) and [github.com/anomalyco/opencode/releases](https://github.com/anomalyco/opencode/releases).*
+
+## Related Articles
+
+- [OpenCode 2 Just Landed — Per-Project Auto-Accept, Native ARM64, and the End of Auto-Updates](/blog/opencode-v2-just-launched-per-project-auto-accept-windows-arm64/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+- [OpenCode vs Codex: The Provider-Neutral Advantage](/blog/opencode-vs-codex/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
+---
+
+*OpenCode is developed by Anomaly. Changelog source: [opencode.ai/changelog](https://opencode.ai/changelog) and [github.com/anomalyco/opencode/releases](https://github.com/anomalyco/opencode/releases). Published October 20, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
