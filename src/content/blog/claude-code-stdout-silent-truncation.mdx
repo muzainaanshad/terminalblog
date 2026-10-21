@@ -72,8 +72,13 @@ No. The process exits `0` even though bytes were dropped, so naive `if [ $? -eq 
 **Q3: Is 65,536 bytes an exact cutoff I can plan around?**
 Treat it as a ceiling, not a promise. The loss triggers whenever buffered data is still in flight at exit, so any large output is at risk — don't assume anything over 64 KiB is safe to pipe.
 
-*Before you buy any coding agent subscription — compare prices and find exclusive deals at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
+## The bigger picture
 
+This bug is a reminder that `claude -p` is still a thin wrapper over a streaming process, not a hardened CLI. The pipe buffer race is a known Node.js pattern, but it surfaced in production because the tool's default mode (piped output for automation) collides with its async write behavior. For teams building on Claude Code as an automation primitive, the workaround isn't optional — it's part of the contract. Redirect to files, use `tee`, or wrap with a drain-aware consumer. And track issue #77112: the fix belongs upstream, but the cost of waiting is silently corrupted downstream data.
+
+---
+
+*Before you buy any coding agent subscription — compare prices and find exclusive deals at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
 
 ## Related articles
 
