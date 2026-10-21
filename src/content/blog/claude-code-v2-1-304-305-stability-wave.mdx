@@ -1,0 +1,180 @@
+---
+title: "Claude Code Just Shipped 200+ Fixes in 48 Hours — v2.1.304 and v2.1.305 Are the Stability Wave You've Been Waiting For"
+description: "Claude Code v2.1.304 (Oct 19) and v2.1.305 (Oct 20) ship 200+ fixes: auto-mode setup, cloud session reliability, worktree isolation for git 2.56+, Windows exFAT/FAT32 writes, MCP protocol fixes, plugin performance, and Remote Control offline handling. The releases that make daily work just work."
+pubDate: 2026-10-21T10:00:00Z
+tags: ["claude-code", "release", "v2.1.304", "v2.1.305", "stability", "bug-fixes", "worktree", "windows", "mcp", "cloud-sessions", "coding-agents", "beginner"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+v2.1.304+v2.1.305+200+Fixes&tool=claude-code"
+canonical: "https://terminalblog.com/blog/claude-code-v2-1-304-305-stability-wave/"
+---
+
+Claude Code dropped **two major patch releases in 48 hours** — v2.1.304 on October 19 and v2.1.305 on October 20. Together they ship **200+ fixes** that quietly resolve the paper cuts biting teams for weeks.
+
+If you've hit worktree corruption on git 2.56+, Windows file write refusals on exFAT/FAT32, cloud session flakiness, MCP protocol issues, or plugin startup slowness — this is the stability wave you've been waiting for.
+
+---
+
+## The One-Line Summary
+
+**Two releases, 48 hours, 200+ fixes. Worktrees finally work on git 2.56+, Windows external drives work, cloud sessions persist state, MCP servers behave. Upgrade now.**
+
+---
+
+## v2.1.305 (Oct 20) — The Heavy Lifter
+
+This is the bigger release with fixes across every subsystem.
+
+### 1. Worktree Isolation Fixed for Git 2.56+ — Stops Repo Corruption
+**The bug**: Worktree isolation refused to create or resume worktrees under git 2.56 or later when a stray `.git` file pointed at a directory that doesn't exist. This silently corrupted repos.
+
+**The fix**: Worktree isolation now handles git 2.56's reftable format correctly. If you use worktrees (and you should — they're the safest way to run agents in parallel), **upgrade immediately**.
+
+### 2. Windows exFAT/FAT32 File Writes — Every Write Was Refused
+**The bug**: Every file write was refused or prompted for projects on exFAT or FAT32 drives — including sessions started with `--plugin-dir`. This made Claude Code unusable on external drives and some Windows setups.
+
+**The fix**: File writes on exFAT/FAT32 now work without permission prompts.
+
+### 3. Cloud Session Reliability — Stops Losing Your Work
+**The bug cluster**:
+- Cost/usage restarting from zero after session resume in new process
+- Scheduled routine runs failing partway, then repeating work (posting same report twice)
+- Open cloud sessions not showing messages from other devices until reload
+- "Rewind to here" failing on every message except newest
+- Diff view missing changes after repo rename/move
+
+**The fix**: All addressed. Cloud sessions now persist state correctly across process boundaries, device switches, and repo operations.
+
+### 4. MCP Protocol 2026-07-28 Support Fixed
+**The bug**: MCP servers negotiating protocol version 2026-07-28 but omitting `resultType`, `ttlMs`, or `cacheScope` showed no tools or failed every call.
+
+**The fix**: MCP servers with incomplete protocol negotiation now work correctly.
+
+### 5. Plugin Performance — Startup Is Now Fast with Many Plugins
+**The bug**: Plugin command and agent files took excessive file system calls to load, especially on Windows. Startup with 20+ plugins was painfully slow.
+
+**The fix**: Plugin loading now takes far fewer file system calls. Most improvement on Windows. If you run many plugins, you'll notice the difference immediately.
+
+### 6. Vertex, Bedrock & Gateway Tool Search Regression Fixed
+**The bug**: v2.1.304 introduced a regression where every request failed on Vertex, Bedrock, and other providers when the endpoint or a gateway rejects tool search, and behind gateways with ToolSearch disallowed or left out of `--tools`.
+
+**The fix**: Claude Code now retries without tool search when rejected.
+
+### 7. Remote Control Offline Handling
+**The bug**: Subagent pane spun forever when computer went offline.
+
+**The fix**: Now shows "Remote Control disconnected" instead of spinning.
+
+---
+
+## v2.1.304 (Oct 19) — The Setup & UX Release
+
+### 1. `/auto-mode-setup` — Guided Auto Mode Configuration
+**What it is**: A guided setup that reads your project and recent sessions to teach auto mode about your environment. Now also available on Bedrock, Vertex, Foundry, Claude apps gateway, and telemetry-disabled sessions.
+
+**Why it matters**: Auto mode used to be "turn it on and hope." Now it learns your codebase and workflow. Run `/auto-mode-setup` once, and auto mode actually understands your project.
+
+### 2. Usage Limit Warning Before Resume
+**What it is**: Added a warning on Pro and Max plans when resuming an inactive conversation would use a noticeable share of your 5-hour usage limit. Options: resume anyway, or start a new conversation and Claude can look up the previous one if you refer to it.
+
+**Why it matters**: No more surprise usage burns. You see the cost *before* you resume.
+
+### 3. Compaction Summary Shows Tool Names
+**What it is**: The compaction summary in the transcript view (Ctrl+O) now includes the names of tools called earlier.
+
+**Why it matters**: When you review what got compacted, you can see *which tools* were used, not just the text summary.
+
+### 4. Organization Policy Refresh Fix
+**The bug**: Organization policy didn't refresh until the hourly check after approving an `ANTHROPIC_API_KEY` at startup or switching "Use custom API key" in `/config`.
+
+**The fix**: Policy now refreshes immediately.
+
+### 5. Plugin Hook Transparency
+**What it is**: Added a transcript line when a plugin that runs first skips one of your mod's hooks, naming the event and the plugin.
+
+**Why it matters**: Debugging "why didn't my hook run?" is now possible — you see which plugin intercepted it.
+
+---
+
+## Quick Decision Matrix
+
+| If you... | Action |
+|-----------|--------|
+| Use worktrees | **Upgrade now** — git 2.56+ corruption fixed |
+| Run on Windows external drives | **Upgrade now** — exFAT/FAT32 writes fixed |
+| Run many plugins | **Upgrade** — startup significantly faster |
+| Use cloud sessions | **Upgrade** — reliability fixes across the board |
+| Use Remote Control on iOS | **Upgrade** — offline handling fixed |
+| Use MCP servers | **Upgrade** — protocol 2026-07-28 support fixed |
+| Want auto mode to actually work | **Upgrade** — `/auto-mode-setup` teaches it your project |
+| On Pro/Max plan | **Upgrade** — usage warning before resume |
+
+---
+
+## What's NOT Fixed (Still Watching)
+
+- **No new features** — these are purely stability releases
+- **Auto mode model selection** — server-side classifier model still not configurable (only client-side via `CLAUDE_CODE_AUTO_MODE_MODEL`)
+- **Fully offline mode** — cloud sessions still require connectivity
+- **Android Remote Control** — iOS only for now
+
+---
+
+## How to Update
+
+```bash
+# If installed via npm (most common)
+npm update -g @anthropic-ai/claude-code
+
+# Or reinstall
+npm install -g @anthropic-ai/claude-code@latest
+
+# Verify
+claude --version
+# Should show 2.1.305
+```
+
+---
+
+## First Things to Try After Update
+
+```bash
+# 1. If you use worktrees — test creating/resuming one
+# 2. If on Windows external drive — try a file write
+# 3. Run /auto-mode-setup to teach auto mode your project
+# 4. Check /config for the new "Idle compaction" toggle (from v2.1.303)
+# 5. If you use cloud sessions — resume one and verify cost/usage persists
+# 6. If you use Remote Control on iOS — go offline and verify it shows disconnected, not spinning
+```
+
+---
+
+## The Pattern: Stability Over Features
+
+v2.1.294 (hook security) → v2.1.295 (50 fixes) → v2.1.296 (Haiku 5.5 default) → v2.1.299 (idle compaction) → v2.1.300 (AWS advisor) → v2.1.302 (worktree corruption) → **v2.1.303 (100+ fixes)** → **v2.1.304 (setup/UX)** → **v2.1.305 (200+ fixes)**
+
+Claude Code has been on a **relentless stability sprint since late September**. Each release isn't "features" — it's fixing the workflow you actually live in. The team is executing on "make it boring reliable" and it's working.
+
+If you've been holding off on updates because "it works fine," **these two releases are the ones to take**. They fix the things that silently corrupt repos, lose cloud session state, and make Windows external drives unusable.
+
+---
+
+## Related Reading
+
+- [Claude Code v2.1.303 Just Dropped 100+ Fixes — The Stability Wave That Finally Feels Solid](/blog/claude-code-v2-1-303-stability-wave/)
+- [Beware: Claude Code Worktree Sandbox Escape (CVE-2026-55607)](/blog/beware-cve-2026-55607-claude-code-worktree-sandbox-escape/)
+- [Claude Code v2.1.302 Quietly Fixed 50+ Bugs — Including the Worktree Corruption That Ate Repos](/blog/claude-code-v2-1-302-bug-fixes/)
+- [Claude Code: Skills vs Subagents vs MCP — 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Claude Code vs Cursor 2026: Which AI Coding Agent Wins?](/blog/claude-code-vs-cursor-2026-comparison/)
+
+---
+
+*Comparing agents is half the work. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** can simplify multi-model access while you test workflows.*
