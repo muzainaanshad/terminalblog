@@ -1,0 +1,319 @@
+---
+title: "OpenHands v1.29 Just Made Agent Profiles the Control Center — Skills, Models, and Verification Per Profile"
+description: "OpenHands v1.29 (Oct 20) gives Agent Profiles full ownership: choose skills from the server catalog, pick a condenser and verification config per profile, assign a Model Router per profile, and launch 'default' by ID. Plus v1.28's agent-requested secrets, reading-pace streaming, and Bahasa Indonesia locale."
+pubDate: "2026-10-21T15:00:00Z"
+tags: ["openhands", "release", "v1.29", "agent-profiles", "agent-canvas", "acp", "model-router", "skills"]
+tool: "openhands"
+author: "rho"
+image: "/api/og?title=OpenHands+v1.29+Agent+Profiles+Control+Center&tool=openhands"
+canonical: "https://terminalblog.com/blog/openhands-v1-29-agent-profiles-finally-own-their-settings/"
+---
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What's new in OpenHands v1.29?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Agent Profiles now own their settings: choose skills per profile from the server catalog, edit condenser and verification per profile, choose a Model Router per profile, launch 'default' by ID. Also includes v1.28 features: agent-requested secrets inline in chat, reading-pace streaming with word fade-in, Bahasa Indonesia locale, and Azure DevOps repos from all orgs."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I use different skills for different Agent Profiles in OpenHands v1.29?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. v1.29 lets you pick skills per profile from the server catalog. Each profile can have its own skill set, condenser, verification config, and Model Router — no more global settings bleeding across workflows."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is the 'default' profile launch by ID?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Profiles now own their settings and can be launched by ID. The 'default' profile is resolved by ID, not name, so renaming it won't break automation or CLI launches."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does OpenHands v1.29 have breaking changes?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No user-facing breaking changes. The agent-profile settings ownership is additive — existing profiles keep working. The uvx pin to Python 3.12-3.14 is a launcher fix, not a breaking change."
+      }
+    }
+  ]
+})} />
+---
+
+**OpenHands v1.29 dropped October 20** — just one day after v1.28 — and it completes a shift that's been building since v1.24: **Agent Profiles are now the control center.**
+
+You used to configure skills, models, and verification *globally*. One setting ruled them all. **Now each profile owns its stack.** Pick skills from the server catalog per profile. Assign a Model Router per profile. Choose a condenser and verification config per profile. Launch `default` by ID so renaming doesn't break your scripts.
+
+This isn't a tweak. It's the moment **profiles become first-class workspaces** — not just cosmetic labels.
+
+---
+
+## The Headlines (What You'll Actually Feel)
+
+| Feature | Why It Matters |
+|---------|----------------|
+| **Skills per profile from server catalog** | One profile for coding (OpenHands skills), one for research (Pi skills), one for review (custom skills) — no cross-contamination |
+| **Condenser + verification per profile** | Aggressive context compaction for long-running coding; verbose for audit-heavy review — each profile tunes itself |
+| **Model Router per profile** | Cheap router for boilerplate, premium router for architecture — profiles route to the right model automatically |
+| **Launch `default` by ID** | Scripts and CI don't break when you rename "default" to "main" or "work" |
+| **v1.28: Agent-requested secrets in chat** | Agent asks for a credential mid-conversation → card appears → you save → secret attaches to *that* conversation only |
+| **v1.28: Reading-pace streaming with word fade-in** | Long answers arrive at human reading speed — no more wall-of-text overwhelm |
+| **v1.28: Bahasa Indonesia locale** | Full UI translation added — Indonesian developers get native Canvas |
+
+---
+
+## 1. Agent Profiles: From Labels to Control Planes
+
+### Before v1.29: Global Settings Bled Across Workflows
+
+```
+Settings → Skills: [OpenHands, verify-openhands, pi-acp]  ← applies to EVERYTHING
+Settings → Model Router: [Balanced]                        ← applies to EVERYTHING
+Settings → Condenser: [default]                            ← applies to EVERYTHING
+```
+
+You built a "coding" profile and a "review" profile — but they shared the same skills, same router, same condenser. Switching profiles changed the *name* and *avatar*. The *behavior* stayed identical.
+
+### Now: Each Profile Owns Its Stack
+
+```
+Profile: "coding-agent"
+├── Skills: [OpenHands, verify-openhands, git-automation]
+├── Model Router: "coding-premium" (Claude Opus 5.5 + GPT-6)
+├── Condenser: "aggressive" (compact every 8 turns)
+└── Verification: "daily-pass"
+
+Profile: "security-review"
+├── Skills: [verify-openhands, security-audit, sbom-generator]
+├── Model Router: "reasoning-heavy" (o3 + Sonnet 5.5)
+├── Condenser: "minimal" (keep full context)
+└── Verification: "pre-deploy-scan"
+
+Profile: "research-assistant"
+├── Skills: [pi-acp, web-search, deep-research]
+├── Model Router: "cost-optimized" (Haiku 5.5 + Nemotron 3 Ultra)
+├── Condenser: "balanced"
+└── Verification: "weekly"
+```
+
+**You configure once. Switch profiles. Behavior follows.**
+
+---
+
+## 2. Skills Per Profile: The Server Catalog Is Your Menu
+
+**New in v1.29:** `feat(agent-profiles): choose skills per profile from the server catalog` ([#18686](https://github.com/OpenHands/OpenHands/pull/18686))
+
+The server catalog holds **all installed skills** — built-in, community, your private ones. When you edit a profile, you see the full catalog. Check what you want. Uncheck what you don't.
+
+```
+Profile Skills          | Server Catalog (50+ skills)
+------------------------|---------------------------
+☑ OpenHands (built-in)  | ☐ pi-acp
+☑ verify-openhands      | ☐ opencode-ai
+☑ git-automation        | ☐ deep-research
+☐ security-audit        | ☐ sbom-generator
+                        | ☐ web-search
+                        | ☐ custom-company-skill
+```
+
+**Why this matters:** You're debugging a production incident. You switch to your "incident-response" profile — it has `verify-openhands`, `security-audit`, `log-analyzer`, and `incident-timeline` skills. Your "daily-coding" profile has none of those. **Zero overlap. Zero noise.**
+
+---
+
+## 3. Condenser + Verification Per Profile: Context Strategy Is Now Per-Workflow
+
+**New in v1.29:** `feat(agent-profiles): edit condenser and verification per profile` ([#18679](https://github.com/OpenHands/OpenHands/pull/18679))
+
+The condenser controls how conversation history gets compressed. Verification controls what `verify-openhands` checks.
+
+| Profile | Condenser | Verification | Why |
+|---------|-----------|--------------|-----|
+| `coding-agent` | Aggressive (8 turns) | Daily pass | Long sessions, keep token costs down |
+| `architecture-review` | Minimal (50 turns) | Pre-deploy scan | Every decision matters, full context |
+| `quick-fix` | Balanced (20 turns) | None | Fast iteration, no verification overhead |
+| `compliance-audit` | None (full history) | Full suite | Regulatory — keep everything, verify everything |
+
+**Before:** One condenser for everything. You either drowned in context (expensive) or lost history (dangerous).
+**Now:** Each profile tunes for its job.
+
+---
+
+## 4. Model Router Per Profile: The Right Model for the Right Job
+
+**New in v1.29:** `feat(agent-profiles): choose a Model Router per profile` ([#18685](https://github.com/OpenHands/OpenHands/pull/18685))
+
+Model Routers define *which model handles which task* (planning, coding, summarizing, etc.). Now each profile picks its router.
+
+```yaml
+# coding-premium router (assigned to "coding-agent" profile)
+planner: claude-opus-5.5
+coder: gpt-6-sol
+summarizer: haiku-5.5
+fallback: sonnet-5.5
+
+# cost-optimized router (assigned to "research-assistant" profile)
+planner: nemotron-3-ultra
+coder: qwen3-coder-30b
+summarizer: haiku-5.5
+fallback: gemini-flash-2.5
+
+# reasoning-heavy router (assigned to "security-review" profile)
+planner: o3
+coder: sonnet-5.5
+summarizer: haiku-5.5
+fallback: opus-5.5
+```
+
+**The kicker:** Routers are *shared* — you define them once in Settings → Model Routers. Profiles just *reference* them. Change the router, every profile using it updates instantly.
+
+---
+
+## 5. Launch `default` by ID: Your Scripts Finally Stop Breaking
+
+**New in v1.29:** `feat(agent-profiles): launch 'default' by id; profiles own their settings` ([#18720](https://github.com/OpenHands/OpenHands/pull/18720))
+
+**Old problem:** You named your main profile "default". Your CI script launched it. You renamed it to "work" because "default" felt generic. **CI broke.**
+
+**Now:** Profiles have stable IDs. The "default" profile is resolved by ID, not name. Rename it, archive it, duplicate it — your automation keeps working because it targets the ID.
+
+```bash
+# This keeps working even if you rename the profile
+openhands launch --profile default
+
+# Or explicitly by ID (stable across renames)
+openhands launch --profile-id prof_abc123
+```
+
+---
+
+## 6. v1.28 Recap: The Features You Missed If You Blinked (Oct 19)
+
+Since v1.28 and v1.29 dropped 24 hours apart, here's what v1.28 brought:
+
+### Agent-Requested Secrets: The Agent Asks, You Approve
+
+**New in v1.28:** Agent calls `request_secret` tool → card appears in chat inline → you fill it → secret attaches to *that conversation only*.
+
+```
+[Agent] I need access to the AWS deployment role to proceed.
+        [🔐 Request Secret: aws-deployment-role]
+        [Reason: Deploy the staging build to us-east-1]
+        [Name: aws-deployment-role (prefilled)]
+        [Value: *********]  ← you paste, it saves, agent gets status only
+```
+
+**The secret value never appears in chat.** Not in history. Not in logs. The agent gets "✅ Secret saved" — that's it.
+
+### Reading-Pace Streaming: Long Answers Don't Overwhelm
+
+**New in v1.28:** Streamed replies reveal at a steady reading pace with soft word fade-in.
+
+Before: 5,000 token answer dumps in 2 seconds. You scroll, lost.
+Now: Words appear at ~250 wpm. Fade-in keeps your eyes anchored. You *read* while it generates.
+
+### Bahasa Indonesia: Full UI Translation
+
+**New in v1.28:** `id` locale added. Settings, chat, automations, Canvas — fully translated. Indonesian developers get native experience, not Google Translate artifacts.
+
+### Azure DevOps: All Orgs, Not Just the First
+
+**New in v1.28:** Cloud backend Azure DevOps picker now lists repos from *every* organization you belong to. No more "where's my other org?" — they're all there.
+
+### Missing Runtime = Archived (Not Broken)
+
+**New in v1.28:** Conversation whose runtime is missing (vs errored) → hidden by default, appears under "Show archived" with "Archived" chip. No archive action in menu (can't archive what's already gone). Cleaner conversation list.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Focus |
+|---------|------|-------|
+| **v1.29.0** | Oct 20, 2026 | Agent Profiles own settings: skills, condenser, verification, Model Router per profile; launch default by ID; full org names in backend selector; public skills from bundled extensions |
+| **v1.28.1** | Oct 19, 2026 | Patch: agent-server 1.56.0 |
+| **v1.28.0** | Oct 19, 2026 | Agent-requested secrets, reading-pace streaming, Bahasa Indonesia, getting-started close, self-hosted automation filtering, Azure DevOps all orgs, missing-runtime archived, profile keeps agent profile on per-launch LLM picks |
+| **v1.27.0** | Oct 12, 2026 | Pi + OpenCode ACP, DigitalOcean backend, browser recording, automation flow, ACP model lists |
+| **v1.26.0** | Oct 8, 2026 | verify-openhands skill + CLI, daily passes, authenticated backend view, suspended workspace banner |
+
+**v1.24** built the architecture. **v1.25** made it usable. **v1.26** made it verifiable. **v1.27** made it universal. **v1.28** made it polished. **v1.29** made profiles *sovereign*.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Run multiple workflows (coding, review, research, audit) | **Yes** — profiles finally isolate behavior, not just names |
+| Share OpenHands across a team with different roles | **Yes** — each role gets its own profile config |
+| Automate profile launches in CI/CD | **Yes** — launch by ID survives renames |
+| Want agent-requested secrets (v1.28) | **Yes** — secure, inline, conversation-scoped |
+| Need reading-pace streaming for long answers | **Yes** — dramatically better UX for verbose agents |
+| Just want stable fixes | **Yes** — zero breaking changes, 20+ fixes across both releases |
+
+**No rush if:** You're on v1.27 and plugin compatibility is critical — but test v1.29 in staging. The profile sovereignty alone is worth the validation cycle.
+
+---
+
+## How to Upgrade
+
+```bash
+# Docker (recommended)
+docker pull ghcr.io/openhands/openhands:1.29.0
+
+# Or update your deployment
+# Check https://github.com/All-Hands-AI/OpenHands/releases/tag/v1.29.0
+```
+
+**After upgrade:**
+1. Settings → Agent Profiles → **Create/edit profiles** → assign skills, condenser, verification, Model Router per profile
+2. Settings → Model Routers → **Define routers** for each use case (coding-premium, cost-optimized, reasoning-heavy)
+3. Try agent-requested secrets: start a conversation, ask agent to do something needing credentials → watch the card appear
+4. Experience reading-pace streaming: ask for a deep architecture review → watch words fade in at human speed
+
+---
+
+## The Bigger Picture
+
+OpenHands isn't building *an* agent. It's building **the control plane where every agent, every model, every skill, and every workflow has a home.**
+
+| Release | Shift |
+|---------|-------|
+| v1.22 | Cloud sessions |
+| v1.23 | Workspace polish |
+| v1.24 | Agent Canvas + Automations + Model Router (architecture) |
+| v1.25 | Voice + Native Git + Bulk ops + Smart defaults (usability) |
+| v1.26 | verify-openhands + daily passes + authenticated view (verifiability) |
+| v1.27 | ACP universality + cloud sandboxes + visual verification (platform play) |
+| v1.28 | Agent-requested secrets + reading-pace streaming + i18n (polish) |
+| **v1.29** | **Agent Profiles own their stack — skills, models, verification, condenser (sovereignty)** |
+
+Each release fills a gap. No rewrites. No "v2 coming soon." Just **steady compounding** — and now, **profiles that behave like independent workspaces because they finally are.**
+
+The question isn't "which profile should I use?" It's "why would I accept a tool where switching contexts means reconfiguring everything?"
+
+---
+
+## Related Articles
+
+- [OpenHands v1.27 — Universal Agent Platform: Pi, OpenCode, DigitalOcean](/blog/openhands-v1-27-universal-agent-platform-acp-digitalocean/)
+- [OpenHands v1.26 — Verification Skill, CLI, Daily Passes](/blog/openhands-v1-26-verification-skill-cli-recipes/)
+- [OpenHands v1.25 — Voice Dictation, Native Git Automations, Bulk LLM Profiles](/blog/openhands-v1-25-agent-canvas-automation-voice/)
+- [OpenHands v1.24 — Agent Canvas, Automations, Model Router](/blog/openhands-v1-24-automation-agent-canvas-mcp-fixes/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Coding Agent Security Checklist 2026](/blog/coding-agent-security-checklist-2026/)
+
+---
+
+*OpenHands is developed by All Hands AI. Changelog sources: [github.com/All-Hands-AI/OpenHands/releases/tag/v1.29.0](https://github.com/All-Hands-AI/OpenHands/releases/tag/v1.29.0) and [v1.28.0](https://github.com/All-Hands-AI/OpenHands/releases/tag/v1.28.0). Published October 21, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
