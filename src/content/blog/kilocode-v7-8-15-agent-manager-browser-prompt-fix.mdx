@@ -1,0 +1,174 @@
+---
+title: "Kilo Code v7.8.15 Just Made Agent Manager Work the Way You Expected"
+description: "Kilo Code v7.8.15 (Oct 19) lets your primary agent choose which agent runs an Agent Manager session, fixes browser_open permission prompts so they remember your choice, surfaces provider failures instead of silently hiding them, and keeps reasoning tokens from late-arriving model responses. The daily driver polish continues."
+pubDate: 2026-10-21T15:00:00Z
+tags: ["kilocode", "release", "v7.8.15", "agent-manager", "browser", "mcp", "provider", "beginner"]
+tool: "kilo"
+author: "rho"
+image: "/api/og?title=Kilo+Code+v7.8.15+Agent+Manager+Browser&tool=kilocode"
+canonical: "https://terminalblog.com/blog/kilocode-v7-8-15-agent-manager-browser-prompt-fix/"
+---
+
+Kilo Code v7.8.15 dropped **October 19, 2026**. It's another pre-release in the v7.8.x polish wave — the kind that doesn't make headlines but removes the friction you hit every single day.
+
+If you've ever started an Agent Manager session and got the wrong agent, clicked "Allow" on browser navigation ten times in a row, or wondered why a provider silently vanished from your list — this update is for you.
+
+---
+
+## The Headlines (What You'll Actually Feel)
+
+| Fix | Why You Care |
+|-----|--------------|
+| **Primary agent chooses Agent Manager delegate** | No more falling back to workspace default — your custom agent runs with its own permissions |
+| **browser_open prompt remembers your choice** | Allow once for origin or all origins; auto-approve settings now list browser_open |
+| **Provider failures finally surface** | See *why* a provider failed (rejected creds, network error) instead of silent disappearance |
+| **Late-arriving reasoning tokens preserved** | Gemini thought signatures and OpenRouter reasoning details no longer dropped |
+| **Brand yellow updated to #FFDD00** | Consistent accent across VS Code, CLI, and mobile |
+| **Expired MCP OAuth tokens auto-refresh** | 403 on expired token no longer leaves connection stuck on "authentication required" |
+
+---
+
+## 1. Agent Manager: Your Primary Agent Finally Chooses the Delegate
+
+**The problem:** You start an Agent Manager session expecting your custom agent (with its tailored edit/bash/MCP permissions) to run the work. Instead, it falls back to the workspace default agent. Your carefully scoped `edit: { "secrets/**": "deny" }` rules? Ignored.
+
+**The fix (v7.8.13 → v7.8.15):** A primary agent can now **choose which agent runs an Agent Manager session it starts**.
+
+```json
+// Your custom agent config
+{
+  "name": "security-reviewer",
+  "edit": { "secrets/**": "deny" },
+  "bash": { "allow": ["npm test", "git diff"] }
+}
+```
+
+When this agent starts an Agent Manager session for a named agent, **it runs that agent with its own permission rules** — not the workspace default.
+
+**Why beginners love this:** You configure permissions *once* on your agent. Every delegation inherits the right rules automatically. No more "why did it just delete my .env?" moments.
+
+---
+
+## 2. browser_open: The Permission Prompt That Finally Learns
+
+**The problem:** Every time the agent wants to navigate the integrated browser, you get a permission prompt. Click "Allow." Next navigation — another prompt. Ten clicks later you're wondering why there's no "remember this" checkbox.
+
+**The fix:** The `browser_open` permission prompt now **offers the current origin and all origins as always-allow rules**.
+
+```bash
+# Auto-approve settings now include browser_open
+kilocode auto-approve list
+# browser_open  →  you can allow Integrated Browser navigation without answering each request
+```
+
+**In practice:** Allow once for `github.com` → all future GitHub navigations proceed silently. Allow all origins → never see the prompt again. Your call.
+
+---
+
+## 3. Provider Failures: No More Silent Disappearances
+
+**The problem:** A provider (OpenRouter, Anthropic, Google, etc.) fails to load — rejected credentials, network error, misconfigured endpoint. It just **vanishes from the model picker**. You're left guessing: "Did I mistype the key? Is the API down? Did I hit a rate limit?"
+
+**The fix:** The CLI, TUI, and VS Code model picker now **surface the reason** and offer to sign in again when credentials were rejected.
+
+```
+⚠ Provider "openrouter" failed to load:
+   → Credentials rejected (401)
+   → [Sign in again] [Dismiss]
+```
+
+**Why it matters:** Debugging "missing provider" used to mean checking logs, restarting, re-entering keys blindly. Now the tool tells you *what* failed and *how to fix it*.
+
+---
+
+## 4. Late-Arriving Reasoning Tokens: No Longer Dropped
+
+**The problem:** Models like Gemini (via OpenRouter) send thought signatures and reasoning details *after* the initial response chunk. Kilo used to drop these — so follow-up requests in the conversation lost the reasoning context.
+
+**The fix:** v7.8.15 **keeps Gemini thought signatures and other OpenRouter reasoning details** that arrive late, so later requests replay them correctly.
+
+**Why it matters:** If you're using models with thinking/reasoning modes, the full reasoning chain now persists across turns. Your agent "remembers" how it thought through the problem.
+
+---
+
+## 5. MCP OAuth: Expired Tokens Auto-Recover
+
+**The problem:** An MCP server rejects an expired access token with `403` (not `401`). The connection gets stuck on "authentication required." New worktree or project session? You have to sign in again manually.
+
+**The fix:** **Refresh expired MCP OAuth tokens automatically.** Servers that reject with `403` no longer leave the connection stuck — a new session reconnects without asking you to sign in again.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **v7.8.15** | Oct 19, 2026 | **Pre-release** | Agent Manager delegate choice, browser_open memory, provider failure visibility, late reasoning tokens, MCP OAuth auto-refresh |
+| v7.8.13 | Oct 17, 2026 | Pre-release | Agent Manager agent selection, worktree dialog redesign, brand yellow, expired MCP token refresh |
+| v7.8.10 | Oct 14, 2026 | Pre-release | Search ignored paths, grep encoding fix, mobile session fork, MCP sign-in sync, Windows background jobs |
+| v7.8.8 | Oct 7, 2026 | Release | Pinned worktrees, integrated browser tabs, MCP OAuth binding, session shortcuts |
+
+**v7.8.x is the "daily driver polish" wave.** Each pre-release removes 3–6 papercuts. v7.8.15 removes **six more**.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Use Agent Manager with custom agents | **Yes** — delegates now run with correct permissions |
+| Click "Allow" on browser nav constantly | **Yes** — prompt finally remembers |
+| Had a provider silently disappear | **Yes** — now you see why |
+| Use Gemini/OpenRouter with reasoning | **Yes** — thought signatures preserved |
+| MCP sessions stall on expired tokens | **Yes** — auto-refresh works |
+| Are on v7.8.10/v7.8.13 and happy | **Yes** — pure polish, no breaking changes |
+
+**No rush if:** You're on stable channel (v7.8.x pre-releases don't auto-update). Enable pre-release in VS Code extensions settings or use `npm update -g @kilocode/cli@next` to test.
+
+---
+
+## How to Upgrade
+
+```bash
+# VS Code Marketplace (pre-release channel)
+# Search "Kilo Code" → enable pre-release → Update
+
+# CLI (pre-release)
+npm update -g @kilocode/cli@next
+
+# JetBrains: Check for updates (bundled CLI pins to v7.8.15)
+```
+
+**Breaking changes:** None. Safe to upgrade immediately.
+
+---
+
+## The Bigger Picture: Kilo Optimizes for the Operator Who Lives Here All Day
+
+| Release Wave | What It Solved |
+|--------------|----------------|
+| v7.4.x | Core stability, worktree foundation |
+| v7.5.x | PR loop, keep-awake, Claude import |
+| v7.6.x | `/goal` autonomy, notifications, PR fixes |
+| **v7.8.x** | **Agent Manager as daily driver — pin, search, shortcut, browse, secure, reorder, theme-match, retry-smart, ignore-paths, encoding-safe, mobile-fork, mcp-sync, windows-clean, delegate-choice, browser-memory, provider-visibility, reasoning-persistence, oauth-auto-refresh** |
+
+Each wave removes a reason to leave the IDE. v7.8.15 removes **six more**.
+
+The pattern is consistent: **Kilo fixes the friction you feel *right now*.** Not demo features. Not checkbox marketing. The wrong delegate agent, the tenth browser prompt, the vanished provider, the dropped reasoning token, the stuck MCP connection — that's what the next patch fixes.
+
+---
+
+## Related Articles
+
+- [Kilo Code v7.8.10 Just Fixed the Search Annoyances You've Been Living With](/blog/kilocode-v7-8-10-search-ignored-paths-grep-fix-mcp-windows/)
+- [Kilo Code v7.8.9 Just Made Your Projects Draggable — Reorder Agent Manager, Shift-Click Links, and Theme-Matched Browser](/blog/kilocode-v7-8-9-drag-drop-projects-agent-manager/)
+- [Kilo Code v7.8.8 Just Made Your Worktrees Stick — Pinned Sessions, In-App Browser, and MCP OAuth That Actually Works](/blog/kilocode-v7-8-8-pinned-worktrees-integrated-browser-mcp-oauth/)
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Kilo vs Cursor: Open Source vs Paid IDE](/blog/claude-code-vs-kilo/)
+
+---
+
+*Kilo Code is developed by Kilo-Org. Changelog source: [github.com/Kilo-Org/kilocode/releases/tag/v7.8.15](https://github.com/Kilo-Org/kilocode/releases/tag/v7.8.15). Published October 21, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*

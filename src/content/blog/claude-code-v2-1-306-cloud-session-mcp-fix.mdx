@@ -1,0 +1,116 @@
+---
+title: "Claude Code v2.1.306 Just Fixed the Cloud Session Login Loop"
+description: "Claude Code v2.1.306 (Oct 21) fixes two annoying bugs: `claude -p` inside cloud sessions falsely reporting \"Not logged in\" when started without session env vars, and an API error being replaced by \"prompt is too long\" with unneeded compaction in sessions with many MCP tools. Small fixes, big relief for daily drivers."
+pubDate: 2026-10-21T15:30:00Z
+tags: ["claude-code", "release", "v2.1.306", "cloud-sessions", "mcp", "beginner"]
+tool: "claude-code"
+author: "rho"
+image: "/api/og?title=Claude+Code+v2.1.306+Cloud+Session+Fix&tool=claude-code"
+canonical: "https://terminalblog.com/blog/claude-code-v2-1-306-cloud-session-mcp-fix/"
+---
+
+Claude Code v2.1.306 dropped **October 21, 2026**. It's a tiny patch — two fixes — but they hit workflows that daily drivers hit constantly.
+
+If you've ever run `claude -p` in a cloud session and got "Not logged in" despite being logged in, or watched an MCP-heavy session compact unnecessarily because an API error got masked as "prompt too long" — this update is for you.
+
+---
+
+## The Two Fixes (That's It — Two)
+
+| Bug | Symptom | Fixed |
+|-----|---------|-------|
+| `claude -p` in cloud sessions | Reports "Not logged in" when started without the session's environment variables | ✅ Fixed |
+| API error masked as "prompt too long" | Sessions with many MCP tools get unneeded compaction | ✅ Fixed |
+
+That's the whole changelog. But here's why each matters.
+
+---
+
+## Fix 1: `claude -p` in Cloud Sessions — The False "Not Logged In"
+
+**The scenario:** You're using cloud sessions (GitHub Actions, CI, remote runner). You run `claude -p "your prompt"` to execute a quick task. It fails with **"Not logged in"** — but you *are* logged in. The session has valid credentials.
+
+**The root cause:** When `claude -p` starts *without* the cloud session's environment variables (which carry auth context), it couldn't find the session's credentials and incorrectly reported "Not logged in."
+
+**The fix:** v2.1.306 now properly detects the cloud session context even when launched via `-p` without inherited env vars. It finds the session's credentials. The command works.
+
+**Why it matters:** Cloud session users (CI, automation, remote runners) no longer hit false auth failures on quick `-p` invocations. Your scripts just work.
+
+---
+
+## Fix 2: API Error → "Prompt Too Long" → Unneeded Compaction
+
+**The scenario:** You're in a session with **many MCP tools** configured (10, 20, 50+). An API call fails — maybe a timeout, a rate limit, a transient network blip. Instead of showing the real error, Claude Code replaces it with **"prompt is too long"** and triggers a **compaction** (summarizing conversation history to fit context).
+
+**The problem:** The prompt *wasn't* too long. The API just errored. But the compaction runs anyway — dropping context you needed, wasting tokens, breaking your flow.
+
+**The fix:** v2.1.306 stops masking API errors as "prompt too long" in MCP-heavy sessions. Real errors surface. Compaction only triggers when *actually* needed.
+
+**Why it matters:** If you run many MCP servers (common in agentic workflows), you stop losing context to phantom "prompt too long" compactions. Your session history stays intact unless it *genuinely* exceeds limits.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **v2.1.306** | Oct 21, 2026 | **Patch** | Cloud session `-p` auth fix, MCP-heavy session error masking fix |
+| v2.1.305 | Oct 20, 2026 | Patch | 20+ fixes: nested namespaces, usage limit retry, provider gateway retries, worktree fixes, disk full errors, MCP server replacement, subagent model naming, cloud session compaction, workflow resume, remote control, usage display, screen reader, self-hosted runner, /usage improvements, MCP consent, mod image rendering, remote control messages, allowedMcpServers, plugin managed settings, artifact deletion, docked pane width, VS Code spinners, cloud sessions, Claude Tag, Code Review |
+| v2.1.304 | Oct 18, 2026 | Patch | Plugin hook skip notification, person decider, read-only tool check, auto-mode-setup, managed agents secure, compaction tool names, usage limit warning, sandbox fixes, plugin reload, mod button clicks, mod sharing, scheduled cowork, file path display, claude.ai directory skills, VS Code, cloud sessions |
+
+**v2.1.30x is the "stability wave"** — each patch removes 10–50 papercuts. v2.1.306 removes **two high-impact ones**.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Use `claude -p` in cloud sessions/CI | **Yes** — false auth failures fixed |
+| Run many MCP tools (10+) | **Yes** — phantom compactions stopped |
+| Are on v2.1.305 and happy | **Yes** — two targeted fixes, no risk |
+| Don't use cloud sessions or many MCPs | Optional — but zero-risk patch |
+
+**No breaking changes.** Safe to upgrade immediately.
+
+---
+
+## How to Upgrade
+
+```bash
+# npm (global)
+npm update -g @anthropic-ai/claude-code
+
+# Or if installed via other method, check your package manager
+# The auto-updater will also prompt on next launch
+```
+
+---
+
+## The Bigger Picture: Anthropic Is Polishing the Daily Driver
+
+| Wave | What It Solved |
+|------|----------------|
+| v2.1.28x–29x | Opus 5.5 default, massive fix waves, plugin system, stability |
+| v2.1.300–303 | AWS Advisor, OpenTelemetry, mod power, bug fixes, stability waves |
+| v2.1.304–305 | 40+ fixes: plugins, auto-mode, sandbox, MCP, worktrees, cloud, VS Code |
+| **v2.1.306** | **Cloud session auth, MCP error masking — the last two papercuts you feel daily** |
+
+Each patch removes friction you *actually hit*. Not demo features. The false "not logged in" on `claude -p`. The phantom compaction with 20 MCP servers. That's what gets fixed.
+
+---
+
+## Related Articles
+
+- [Claude Code v2.1.304–305 Stability Wave: 40+ Fixes You'll Actually Feel](/blog/claude-code-v2-1-304-305-stability-wave/)
+- [Claude Code v2.1.303 Stability Wave: The Fixes That Finally Stick](/blog/claude-code-v2-1-303-stability-wave/)
+- [Claude Code v2.1.300: AWS Advisor, OpenTelemetry, and Mod Power](/blog/claude-code-v2-1-300-aws-advisor-opentelemetry-mod-power/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release You've Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Claude Code is developed by Anthropic. Changelog source: [github.com/anthropics/claude-code/blob/main/CHANGELOG.md#21306](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md#21306). Published October 21, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
