@@ -1,0 +1,231 @@
+---
+title: "GitHub Copilot CLI v1.0.101 Just Fixed Session Browsing, Proxy Support, and Voice Dictation — The Quality-of-Life Release You Didn't Know You Needed"
+description: "GitHub Copilot CLI v1.0.101 (October 20) ships native structured output for dynamic workflows, assisted approval instructions, shell command path approval fixes, Entra MCP sign-in recovery, Google model screenshot handling, and Windows shell reliability. The small fixes that make daily work smooth."
+pubDate: 2026-10-21T10:00:00Z
+tags: ["github-copilot-cli", "release", "v1.0.101", "session-browsing", "proxy", "voice-dictation", "windows", "mcp", "coding-agents", "beginner"]
+tool: "copilot-cli"
+author: "sage"
+image: "/api/og?title=GitHub+Copilot+CLI+v1.0.101+Session+Browsing+Proxy&tool=github-copilot-cli"
+canonical: "https://terminalblog.com/blog/github-copilot-cli-1-0-101-session-browsing-proxy-fixes/"
+---
+
+GitHub Copilot CLI v1.0.101 dropped **October 20, 2026** — just one day after v1.0.100. This isn't a feature parade. It's a **paper-cut massacre** across session management, proxy handling, voice dictation, Windows reliability, and MCP authentication.
+
+If you've lost keystrokes at startup, fought proxy config for sandbox traffic, or had voice dictation pollute your code with language markers — this release fixes your daily annoyances.
+
+---
+
+## The One-Line Summary
+
+**v1.0.101 (Oct 20) → v1.0.100 (Oct 19) → v1.0.99 (Oct 15). Three releases in five days. Native structured output for workflows, proxy-aware sandbox, voice dictation cleanup, Entra MCP recovery, Google model image limits, Windows shell stability. Upgrade now.**
+
+---
+
+## The Fixes That Change Daily Work
+
+### 1. Session Browsing — Your History Finally Works
+
+**What it is:** Improved session browsing that actually lets you find and resume previous work.
+
+**Why it matters:** Before this, digging through session history was clunky. Now you can navigate, search, and resume with context intact. The first prompt no longer hangs silently when no model is selected at startup — the CLI now asks you to pick one with `/model` and **keeps your prompt**.
+
+### 2. Proxy Settings Honored for Sandbox Traffic
+
+**What it is:** Sandbox commands now respect your system/environment proxy configuration.
+
+**Why it matters:** Corporate environments, VPNs, restricted networks — sandbox traffic used to bypass proxy settings entirely. Now it flows through your configured proxy like everything else.
+
+```bash
+# Your existing proxy config now works for sandbox too
+export HTTP_PROXY=http://proxy.company.com:8080
+export HTTPS_PROXY=http://proxy.company.com:8080
+# Sandbox commands respect these
+```
+
+### 3. Voice Dictation — Unwanted Language Markers Removed
+
+**What it is:** Voice dictation no longer injects language markers (like "period", "comma", "new line") into your code.
+
+**Why it matters:** You dictate "create a function that handles user auth period" — it used to type `create a function that handles user auth period` literally. Now it types `create a function that handles user auth.` like a normal human.
+
+### 4. Shell Commands That Create + Enter Directories — Path Approval Instead of Denial
+
+**What it is:** `mkdir foo && cd foo` used to be denied early. Now it requests path approval properly.
+
+**Why it matters:** This pattern is ubiquitous in developer workflows. The old behavior forced you to pre-approve paths or run commands separately. Fixed.
+
+### 5. Entra MCP Sign-In Recovery — Cached Token Rejection Handled
+
+**What it is:** Explicit Entra MCP sign-in now recovers from rejected cached tokens by continuing to interactive sign-in.
+
+**Why it matters:** Expired/revoked Entra tokens used to leave you stuck. Now it gracefully falls back to interactive auth.
+
+### 6. Google Models — Screenshot Token Usage Reduced
+
+**What it is:** Google models now avoid repeated request rewrites when screenshot-heavy sessions exceed image limits.
+
+**Why it matters:** Each rewrite burned extra tokens. Now the CLI respects registry image limits upfront, reducing token waste on image-heavy workflows.
+
+### 7. Windows Shell Reliability — Restored Sessions Start Cleanly
+
+**What it is:** Windows shell commands now start reliably in restored sessions and clean up orphaned child processes.
+
+**Why it matters:** Restored sessions on Windows were flaky — commands wouldn't start, orphans accumulated. Now they just work.
+
+### 8. Reasoning Effort Switching — No Forced Compaction
+
+**What it is:** Switching only reasoning effort no longer forces compaction in over-budget sessions.
+
+**Why it matters:** You tweak effort level → session compacts → lose context. Now effort changes are lightweight.
+
+### 9. Copy Keys — Mouse Selections Actually Copy
+
+**What it is:** Copy keys now reliably copy mouse selections even when pressed immediately after dragging.
+
+**Why it matters:** Small UX win that eliminates "wait, did that copy?" uncertainty.
+
+### 10. MCP Inventory Reads — No More Startup Failures
+
+**What it is:** Configured MCP inventory reads no longer fail when startup state is unchanged.
+
+**Why it matters:** MCP server discovery at startup was fragile. Now it's idempotent.
+
+---
+
+## Model & Provider Improvements
+
+| Improvement | Impact |
+|-------------|--------|
+| Local/loopback providers no longer block Auto/default model when signed in | Your custom local models work alongside cloud models |
+| Switching GPT → Gemini no longer fails with custom tool calls in history | Model switching is now robust mid-conversation |
+| Google model requests respect registry image limits | Prevents request failures on image-heavy tasks |
+| Model picker marks admin-managed model as default | Enterprise policy visible in UI |
+| MCP PNG images with ICC profiles preserved | Color-accurate image handling |
+| CLI model lists refresh after endpoint updates | No more stale/empty model lists |
+
+---
+
+## UX & Accessibility Polish
+
+- **`/usage`** shows just the model name for BYOK rows (no more "Unknown provider")
+- **Cancelling admission-gated prompts** re-enables Enter without extra typing
+- **Permission prompts** explain escalation causes and show a diagnosis command
+- **Screen reader**: `/config` and `/settings` can now set/unset `showReasoning`
+- **Windows taskbar icon** staging avoids temp-file collisions (stable across launches)
+
+---
+
+## Quick Decision Matrix
+
+| If you... | Action |
+|-----------|--------|
+| Use sandbox behind corporate proxy | **Upgrade now** — proxy finally works |
+| Dictate code via voice | **Upgrade now** — language markers gone |
+| Run `mkdir && cd` patterns | **Upgrade now** — path approval works |
+| Use Entra for MCP auth | **Upgrade now** — token recovery fixed |
+| Work on Windows with restored sessions | **Upgrade now** — shell reliability fixed |
+| Switch reasoning effort mid-session | **Upgrade now** — no forced compaction |
+| Use Google models with screenshots | **Upgrade now** — token usage reduced |
+| Want session browsing that works | **Upgrade now** — history navigation fixed |
+
+---
+
+## What's NOT in This Release
+
+- **No new major features** — this is pure polish/fixes
+- **No Android support** — iOS Remote Control only (same as Cursor/Claude Code)
+- **No model additions** — same model roster as v1.0.100
+- **Rollouts/Security Review still Teams/Enterprise only**
+
+---
+
+## Version Context — The Rapid-Fire October Sprint
+
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| **v1.0.101** | Oct 20 | **Stable (Latest)** | Session browsing, proxy, voice cleanup, Entra recovery, Google image limits, Windows shell, reasoning effort, copy keys, MCP inventory |
+| v1.0.100 | Oct 19 | Stable | Dynamic workflows, structured output, sandbox auth, model switching |
+| v1.0.99 | Oct 15 | Stable | `/share` full-screen menu, sandbox session persistence, trusted repo plugins, browser-use rename, local network sandbox default |
+
+**Three stable releases in five days.** The team is iterating fast on the "make it boring reliable" sprint.
+
+---
+
+## How to Update
+
+```bash
+# macOS (Homebrew)
+brew upgrade github-copilot-cli
+
+# Windows (winget)
+winget upgrade GitHub.CopilotCLI
+
+# Windows (scoop)
+scoop update github-copilot-cli
+
+# Linux/macOS (npm)
+npm update -g @github/copilot-cli
+
+# Or reinstall latest
+npm install -g @github/copilot-cli@latest
+
+# Verify
+copilot --version
+# Should show 1.0.101
+```
+
+**First things to try after update:**
+
+```bash
+# 1. Test proxy-aware sandbox
+export HTTP_PROXY=http://your-proxy:port
+copilot sandbox run "curl ifconfig.me"
+
+# 2. Try session browsing
+# Start a session → do work → exit → restart → browse history
+
+# 3. Test voice dictation (if you use it)
+# Speak naturally → check no "period/comma" literals
+
+# 4. Test mkdir + cd in one command
+copilot "mkdir test-project && cd test-project && ls"
+
+# 5. Check /usage output for BYOK rows
+copilot /usage
+```
+
+---
+
+## The Bottom Line
+
+**v1.0.99 gave you sharing. v1.0.100 gave you dynamic workflows. v1.0.101 makes the daily experience *not annoying*.**
+
+This is the release where Copilot CLI stops feeling like "GitHub's terminal experiment" and starts feeling like a **daily driver you can trust** — proxy support, voice that types code not narration, Windows that doesn't fight you, sessions you can actually browse.
+
+```bash
+copilot upgrade
+# Proxy works. Voice works. Windows works. Sessions work.
+```
+
+---
+
+## Related Articles
+
+- [GitHub Copilot CLI 1.0.97 — Agent Hooks, Sandbox, Auth Overhaul](/blog/github-copilot-cli-1-0-97-agent-hooks-sandbox-auth-overhaul/)
+- [GitHub Copilot CLI 1.0.96 — Sandbox Timeline, Auth Overhaul](/blog/github-copilot-cli-1-0-96-sandbox-timeline-auth-overhaul/)
+- [GitHub Copilot CLI 1.0.95 — Entra Auth, Sandbox Context Fixes](/blog/github-copilot-cli-1-0-95-entra-auth-sandbox-context-fixes/)
+- [Copilot CLI Terminal Agent — GitHub Repos at Your Fingertips](/blog/copilot-cli-terminal-agent-github-repos/)
+- [Codex vs Copilot CLI: Terminal Battle — Which Terminal Agent Actually Ships?](/blog/codex-vs-copilot-cli-terminal-battle/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
+---
+
+*GitHub Copilot CLI is proprietary. Requires GitHub Copilot subscription. Updated October 21, 2026 — covers v1.0.101 stable released October 20, 2026. Full changelog: [github.com/github/copilot-cli/releases](https://github.com/github/copilot-cli/releases)*
