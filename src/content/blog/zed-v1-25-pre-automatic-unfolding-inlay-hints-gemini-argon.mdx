@@ -1,23 +1,60 @@
 ---
-title: "Zed v1.25 Just Made Code Navigation Effortless — Auto-Unfolding, Double-Click Inlay Hints, and Gemini 4 Argon Arrive"
-description: "Zed v1.25.0-pre (Oct 14) ships automatic code unfolding when jumping to locations, double-click to apply inlay hint edits, context compaction for external agents, plus new Gemini 4 Argon and Amazon Bedrock models. The pre-release that removes daily friction."
+title: "Zed Just Dropped 33% Smaller Binaries, Secret Leak Fix, and GPT-6 Astra on Bedrock — v1.25.2 Stable Is Here"
+description: "Zed v1.25.2 stable (Oct 20) shrinks binaries by 33% on macOS, 28% on Windows, fixes a critical secret leak in external agents, adds GPT-6 Astra + Claude Opus 5.5 + Fable 5.1 on Amazon Bedrock, and ships auto-unfolding code navigation, double-click inlay hints, and context compaction for external agents."
 pubDate: 2026-10-21T14:00:00Z
-tags: ["zed", "release", "v1.25", "code-navigation", "inlay-hints", "gemini", "bedrock", "beginner"]
+updatedDate: 2026-10-22T14:00:00Z
+tags: ["zed", "release", "v1.25", "v1.25.2", "code-navigation", "inlay-hints", "gemini", "bedrock", "security", "beginner"]
 tool: "zed"
 author: "sage"
-image: "/api/og?title=Zed+v1.25+Auto+Unfold+Inlay+Hints+Gemini&tool=zed"
+image: "/api/og?title=Zed+v1.25.2+Stable+Smaller+Binaries+Security+Bedrock&tool=zed"
 canonical: "https://terminalblog.com/blog/zed-v1-25-pre-automatic-unfolding-inlay-hints-gemini-argon/"
 ---
 
-Zed **v1.25.0-pre dropped October 14**, and it's the release that finally fixes the "where am I?" moments. The headlines: **automatic unfolding when jumping to folded code**, **double-click inlay hints to apply edits**, **context compaction for external agents**, and **Gemini 4 Argon + Amazon Bedrock models** join the BYOK party.
+Zed **v1.25.2 stable dropped October 20, 2026** — and it's not just a pre-release anymore. The headlines: **33% smaller macOS binaries, 28% smaller Windows, 7% smaller Linux**, **a critical fix for secrets leaking to local process lists**, **GPT-6 Astra, Claude Fable 5.1, and Claude Opus 5.5 on Amazon Bedrock**, plus the quality-of-life features from v1.25.0-pre: **automatic unfolding when jumping to folded code**, **double-click inlay hints to apply edits**, **context compaction for external agents**, and **Gemini 4 Argon**.
 
-If you've been on v1.24 pre-releases — this is the quality-of-life jump that makes daily navigation feel telepathic.
+If you've been on v1.24 — this is the stable release you've been waiting for.
 
 ---
 
-## 1. Automatic Unfolding — Never Lose Your Place Again
+## 1. The Security Fix You Need to Know
 
-**New:** When you jump to a location (Go to Definition, Find References, diagnostics, search results), Zed now **automatically unfolds folded code** at the target.
+**Fixed:** Environment variables, **including secrets**, passed to external agents and MCP servers in remote projects were visible in the **local machine's process list** ([#65174](https://github.com/zed-industries/zed/pull/65174)).
+
+This is a **CVE-grade issue** if you use remote development with external agents or MCP servers. Your API keys, database passwords, and tokens could appear in `ps` output on the host machine. Update immediately if you use remote projects with agents.
+
+---
+
+## 2. Smaller Binaries — 33% on macOS, 28% on Windows, 7% on Linux
+
+Zed's binary size dropped significantly across all platforms ([#65168](https://github.com/zed-industries/zed/pull/65168)):
+
+| Platform | Reduction |
+|----------|-----------|
+| macOS    | **~33%**  |
+| Windows  | **~28%**  |
+| Linux    | **~7%**   |
+
+**Why it matters:** Faster downloads, faster startup, less disk space. On macOS especially, this is a massive win for daily updates.
+
+---
+
+## 3. New Models: GPT-6 Astra + Fable 5.1 + Opus 5.5 on Amazon Bedrock
+
+### Amazon Bedrock Expansion ([#64201](https://github.com/zed-industries/zed/pull/64201), [#64685](https://github.com/zed-industries/zed/pull/64685))
+- **GPT-6 Astra** (`gpt-6-astra`) — OpenAI's latest reasoning model
+- **Claude Fable 5.1** (`claude-fable-5.1`) — Anthropic's ultra-capable model
+- **Claude Opus 5.5** (`claude-opus-5.5`) — Anthropic's flagship, now on Bedrock
+
+### Google AI
+- **Gemini 4 Argon** (`gemini-4-argon`) — Added in v1.24.3, still here and optimized for coding
+
+**For beginners:** More model choice without leaving the editor. If you have AWS/GCP access, you get frontier models at your provider's pricing.
+
+---
+
+## 4. Automatic Unfolding — Never Lose Your Place Again
+
+**New in v1.25.0-pre:** When you jump to a location (Go to Definition, Find References, diagnostics, search results), Zed now **automatically unfolds folded code** at the target ([#65217](https://github.com/zed-industries/zed/pull/65217)).
 
 Before: you `Cmd+Click` a function → land inside a folded block → see nothing → manually unfold → lose your train of thought. Now: the editor unfolds just enough to show you the target, then keeps surrounding context folded.
 
@@ -25,9 +62,9 @@ Before: you `Cmd+Click` a function → land inside a folded block → see nothin
 
 ---
 
-## 2. Double-Click Inlay Hints — Apply Edits Without Typing
+## 5. Double-Click Inlay Hints — Apply Edits Without Typing
 
-**New:** Inlay hints (type hints, parameter names, etc.) can now be **applied with a double-click**.
+**New in v1.25.0-pre:** Inlay hints (type hints, parameter names, etc.) can now be **applied with a double-click** ([#64789](https://github.com/zed-industries/zed/pull/64789)).
 
 Hover an inlay hint → see the edit preview → double-click → the edit applies in-place. No more copying the hint, finding the line, typing the change.
 
@@ -35,9 +72,9 @@ Hover an inlay hint → see the edit preview → double-click → the edit appli
 
 ---
 
-## 3. Context Compaction for External Agents — Your Token Budget Survives Longer
+## 6. Context Compaction for External Agents — Your Token Budget Survives Longer
 
-**New:** When external agents (ACP clients, custom integrations) send context to Zed, the editor now **compacts it intelligently** — preserving the most relevant parts while staying within token limits.
+**New in v1.25.0-pre:** When external agents (ACP clients, custom integrations) send context to Zed, the editor now **compacts it intelligently** — preserving the most relevant parts while staying within token limits ([#65414](https://github.com/zed-industries/zed/pull/65414)).
 
 **Why it matters:** If you're building on Zed's ACP protocol or running agents that feed context back to the editor, your sessions no longer hit hard token walls. The compaction prioritizes recent + relevant context automatically.
 
@@ -45,28 +82,21 @@ Hover an inlay hint → see the edit preview → double-click → the edit appli
 
 ---
 
-## 4. New Models: Gemini 4 Argon + Amazon Bedrock Expansion
-
-### Gemini 4 Argon (`gemini-4-argon`)
-Google's latest model — available via Google AI provider. Optimized for coding with improved reasoning and tool use.
-
-### Amazon Bedrock — More Models, Better Config
-- Additional Bedrock model IDs supported
-- Configurable tool use, images, and reasoning per model (builds on v1.24's BYOK work)
-- GovCloud regions via Bedrock Mantle
-
-**For beginners:** More model choice without leaving the editor. If you have AWS/GCP access, you get frontier models at your provider's pricing.
-
----
-
-## 5. The Bug Fixes That Stop Daily Paper Cuts (Selected)
+## 7. The Bug Fixes That Stop Daily Paper Cuts (Selected)
 
 | Fixed | Impact |
 |-------|--------|
+| **Secrets in process list** (remote agents/MCP) | **Critical security fix** — update now if you use remote development |
+| Prompts to external agents slow/never sending (unneeded Git checkpoints) | Agent responsiveness fixed |
+| Remote server failing to start on Windows SSH host | Windows remote dev works |
 | OpenCode models failing to load (`npm` field missing) | OpenCode integration works again |
 | HTML syntax highlighting for `svg`, `mathml`, `raw` tagged templates | Proper highlighting in JSX/TSX |
 | CSS syntax highlighting for `css({ ... })` template literals | Styled-components / Emotion support |
 | JavaScript template literal CSS highlighting | Same — CSS-in-JS just works |
+| Notification sounds stopping after audio error | Audio stays working |
+| Search not working in debugger terminal | Debugger terminal search fixed |
+| Wrapped links in Markdown tables partially unclickable | Markdown preview links work |
+| Git Panel unexpectedly switching repos in multi-repo projects | Multi-repo Git fixed |
 
 ---
 
@@ -74,13 +104,14 @@ Google's latest model — available via Google AI provider. Optimized for coding
 
 | Version | Date | Type | Highlights |
 |---------|------|------|------------|
-| **v1.25.0-pre** | Oct 14, 2026 | **Pre-release** | Auto-unfold on jump, double-click inlay hints, context compaction, Gemini 4 Argon, Bedrock expansion |
+| **v1.25.2** | **Oct 20, 2026** | **Stable** | **33% smaller macOS binary, 28% Windows, 7% Linux; secret leak fix; GPT-6 Astra + Fable 5.1 + Opus 5.5 on Bedrock; auto-unfold, double-click inlay hints, context compaction, Gemini 4 Argon** |
+| v1.25.0-pre | Oct 14, 2026 | Pre-release | Auto-unfold, double-click inlay hints, context compaction, Gemini 4 Argon, Bedrock BYOK |
 | v1.24.4 | Oct 20, 2026 | Stable | OpenCode npm field fix |
 | v1.24.3 | Oct 19, 2026 | Stable | Gemini 4 Argon added to Google AI |
 | v1.24.2 | Oct 14, 2026 | Pre-release | Git tags, Terminal→Agent drag, Bedrock BYOK tools, JSONL tables |
 | v1.24.1-pre | Oct 7, 2026 | Pre-release | Git tags, Terminal→Agent drag, Bedrock BYOK, JSONL tables, -23% Linux binary |
 
-**v1.25.0-pre sits on top of v1.24.4 stable** — it's the next weekly pre-release. If you're on v1.24.x, this is a meaningful UX jump.
+**v1.25.2 stable sits on top of v1.24.4 stable** — it's the next weekly stable release. If you're on v1.24.x, this is a meaningful UX + security + performance jump.
 
 ---
 
@@ -88,11 +119,13 @@ Google's latest model — available via Google AI provider. Optimized for coding
 
 | If You... | Verdict |
 |-----------|---------|
-| Jump to definitions/references constantly | **Yes** — auto-unfold saves mental context switches |
-| Use inlay hints regularly | **Yes** — double-click apply is a workflow changer |
-| Build ACP integrations / external agents | **Yes** — context compaction prevents token truncation |
-| Want Gemini 4 Argon / more Bedrock models | **Yes** — available immediately |
-| On v1.24 and happy | **Yes** — zero risk, pure UX upside |
+| **Use remote development with external agents/MCP** | **Yes immediately** — secret leak fix is critical |
+| **Jump to definitions/references constantly** | **Yes** — auto-unfold saves mental context switches |
+| **Use inlay hints regularly** | **Yes** — double-click apply is a workflow changer |
+| **Build ACP integrations / external agents** | **Yes** — context compaction prevents token truncation |
+| **Want GPT-6 Astra / Fable 5.1 / Opus 5.5 on Bedrock** | **Yes** — available immediately |
+| **On v1.24 and happy** | **Yes** — binary size + security + UX upside |
+| **On v1.25.0-pre** | **Yes** — stable channel, security fix, more models |
 
 ---
 
@@ -109,23 +142,24 @@ brew upgrade zed
 # Auto-update via winget or download installer from releases page
 ```
 
-**Verify:** Open a folded function → `Cmd+Click` a call site → watch it unfold. Hover an inlay hint → double-click → edit applies. Model picker → **Gemini 4 Argon** + new Bedrock models appear.
+**Verify:** Open a folded function → `Cmd+Click` a call site → watch it unfold. Hover an inlay hint → double-click → edit applies. Model picker → **GPT-6 Astra**, **Claude Fable 5.1**, **Claude Opus 5.5** + **Gemini 4 Argon** appear. Check binary size — it's noticeably smaller.
 
 ---
 
 ## The Bottom Line
 
-**v1.24 gave you Git tags and Terminal→Agent flow. v1.25 gives you navigation that doesn't break your mental model.**
+**v1.24 gave you Git tags and Terminal→Agent flow. v1.25.0-pre gave you navigation that doesn't break your mental model. v1.25.2 stable gives you all that PLUS 33% smaller binaries, a critical security fix, and three new frontier models on Bedrock.**
 
-The pattern is clear: Zed's pre-releases aren't chasing features — they're removing the tiny frictions that accumulate into "this editor feels slow" fatigue. Auto-unfolding means you never lose context jumping around. Double-click inlay hints means suggestions become edits without ceremony. Context compaction means your agent integrations don't hit walls.
+The pattern is clear: Zed's releases aren't chasing features — they're removing the tiny frictions that accumulate into "this editor feels slow" fatigue. Auto-unfolding means you never lose context jumping around. Double-click inlay hints means suggestions become edits without ceremony. Context compaction means your agent integrations don't hit walls. Smaller binaries mean faster everything. The secret leak fix means you can trust remote development.
 
-For a beginner, this means **the editor gets out of your way**. For a power user, it means **your custom integrations finally have breathing room**.
+For a beginner, this means **the editor gets out of your way**. For a power user, it means **your custom integrations finally have breathing room AND your secrets stay secret**.
 
 ```bash
 brew upgrade zed
 # Jump to definition → auto-unfolded
 # Double-click inlay hint → applied
-# Add Gemini 4 Argon → code away
+# Add GPT-6 Astra on Bedrock → code away
+# Rest easy — secrets don't leak to ps
 ```
 
 ---
@@ -139,16 +173,18 @@ brew upgrade zed
 - [Zed vs Cursor: IDE Daily Driver or Terminal Agent?](/blog/zed-vs-cursor/)
 - [Zed vs Copilot CLI: Which Editor-Agent Hybrid Wins?](/blog/zed-vs-copilot-cli/)
 
+---
 
 ## Related articles
 
 - [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
 - [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
 - [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
 ---
 
 *Using Zed? What's your favorite v1.25 improvement? [X](https://x.com) • [LinkedIn](https://linkedin.com)*
 
-*Zed is open-source (GPL-3.0) and available at [zed.dev](https://zed.dev) and [github.com/zed-industries/zed](https://github.com/zed-industries/zed). Updated October 21, 2026 — covers Zed v1.25.0-pre released October 14, 2026. Full changelog: [github.com/zed-industries/zed/releases/tag/v1.25.0-pre](https://github.com/zed-industries/zed/releases/tag/v1.25.0-pre)*
+*Zed is open-source (GPL-3.0) and available at [zed.dev](https://zed.dev) and [github.com/zed-industries/zed](https://github.com/zed-industries/zed). Updated October 22, 2026 — covers Zed v1.25.2 stable released October 20, 2026. Full changelog: [github.com/zed-industries/zed/releases/tag/v1.25.2](https://github.com/zed-industries/zed/releases/tag/v1.25.2)*
 
 *Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
