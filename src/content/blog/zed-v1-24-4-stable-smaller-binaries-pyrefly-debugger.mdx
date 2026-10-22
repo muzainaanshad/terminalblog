@@ -1,0 +1,186 @@
+---
+title: "Zed v1.24.4 Just Shrunk Itself 33% on Mac — And Added Pyrefly, Debugger Hovers, and WASM Debugging"
+description: "Zed v1.24.4 (Oct 20) ships Pyrefly as optional Python LSP, nested variable inspection in debugger hovers, DWARF debugging for WebAssembly, and massive binary size reductions across all platforms — 33% smaller on macOS ARM64, 28% on Windows, 7% on Linux."
+pubDate: 2026-10-22T15:00:00Z
+tags: ["zed", "release", "v1.24.4", "pyrefly", "debugger", "wasm", "binary-size", "python", "beginner"]
+tool: "zed"
+author: "sage"
+image: "/api/og?title=Zed+v1.24.4+Pyrefly+Debugger+WASM&tool=zed"
+canonical: "https://terminalblog.com/blog/zed-v1-24-4-stable-smaller-binaries-pyrefly-debugger/"
+---
+
+Zed **v1.24.4 stable dropped October 20**, and it's the rare release where the headline feature isn't a new button — it's **what disappeared**.
+
+**Binary sizes slashed across the board:**
+- **macOS ARM64: 33% smaller** (258MB → 172MB)
+- **Windows x64: 28% smaller** (359MB → 256MB)
+- **Linux x64: 7% smaller** (317MB → 295MB)
+
+Plus: **Pyrefly** (Facebook's new Python type checker) as an optional built-in LSP, **nested variable inspection in debugger hovers**, and **DWARF debugging for WebAssembly** in the JS debugger.
+
+---
+
+## The One Thing You'll Feel Immediately: It's Just... Smaller
+
+Zed's team spent the last cycle optimizing selected workspace crates for size and hiding Rust exports in macOS bundles. The measurements speak for themselves:
+
+| Platform | Architecture | Before | After | Reduction |
+|----------|-------------|--------|-------|-----------|
+| macOS | ARM64 | 258 MB | 172 MB | **33.2%** |
+| Linux | x86_64 | 317 MB | 295 MB | **6.96%** |
+| Windows | x86_64 | 359 MB | 256 MB | **28.5%** |
+
+**Why this matters:** Faster downloads. Less disk. Faster cold starts. On CI/CD where you spin up Zed containers, this compounds. On laptops with 256GB SSDs, you just got 86MB back on Mac.
+
+The optimization didn't sacrifice speed — they explicitly measured and maintained performance. This is the "make it smaller, keep it fast" discipline that separates native editors from Electron apps.
+
+---
+
+## Pyrefly: Facebook's Python Type Checker, Built In (Optional)
+
+**New in v1.24.4:** Pyrefly as an optional built-in Python language server.
+
+```toml
+# In your Zed settings or project config
+[languages.python]
+language_server = "pyrefly"
+```
+
+**What is Pyrefly?** Facebook's open-source Python type checker and LSP — written in Rust, designed for speed. It's not `pyright` (Microsoft) or `basedpyright` (community fork). It's a fresh implementation that Facebook uses internally at massive scale.
+
+**Why optional?** Because Python tooling is religious. Some teams swear by `pyright`, others by `ruff` + `basedpyright`, others by `pyrefly`. Zed gives you the choice without forcing a default.
+
+**For beginners:** You don't need to configure anything. If you want Pyrefly, toggle it on. If you're happy with your current Python LSP, nothing changes.
+
+---
+
+## Debugger Hovers: Finally See Nested Variables Without Clicking
+
+**New:** Expand and inspect nested variable values **directly in debugger hovers**.
+
+Before: hover a variable → see top-level value → click to open Variables panel → expand → drill down → lose your place in the editor.
+
+Now: hover → **see the nested structure inline** → drill down in the hover itself → keep coding.
+
+```python
+# Hover `user` and you see:
+user = {
+    "name": "Alice",
+    "address": {           # ← expand this in the hover
+        "street": "123 Main",
+        "city": "Boston",
+        "coords": {        # ← and this
+            "lat": 42.36,
+            "lng": -71.05
+        }
+    }
+}
+```
+
+**Why it matters:** Debugging is 80% "what's in this object right now?" The fewer context switches between editor and debugger panel, the faster you find the bug.
+
+---
+
+## DWARF Debugging for WebAssembly: Your JS Debugger Now Speaks WASM
+
+**New:** DWARF debugging for WebAssembly sources in the JavaScript debugger.
+
+If you compile Rust/C++/Go to WebAssembly and debug the output in Zed, **source-level debugging now works**. You set breakpoints in your original `.rs`/`.cpp`/`.go` files, step through WASM execution, and see variables with proper types.
+
+**Why this matters:** WASM debugging has historically been "good luck, here's a hex dump." DWARF support means Zed treats WebAssembly like any other compiled target — because it *is* just another compiled target.
+
+---
+
+## The Quiet Fixes That Stop Daily Paper Cuts
+
+| Fixed | Impact |
+|-------|--------|
+| Images in center/right-aligned HTML blocks rendering left-aligned in Markdown Preview | Markdown preview finally respects alignment |
+| `axScreenReader` setting scope clarified | Accessibility config now works predictably |
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| **v1.24.4** | Oct 20, 2026 | **Stable** | **Pyrefly LSP, debugger hover trees, WASM DWARF, -33% macOS binary, -28% Windows binary** |
+| v1.24.3 | Oct 19, 2026 | Stable | Gemini 4 Argon added to Google AI provider |
+| v1.24.2 | Oct 14, 2026 | Pre-release | Git tags, Terminal→Agent drag, Bedrock BYOK, JSONL tables, -23% Linux binary |
+| v1.24.1-pre | Oct 7, 2026 | Pre-release | Same as above |
+| v1.23.3 | Sep 30, 2026 | Stable | Per-call model override, subagent compaction, dynamic OpenCode models |
+
+**v1.24.4 is the stable consolidation of the v1.24 pre-release wave** — all the features from v1.24.1-pre/2, hardened, plus the binary size breakthrough and new debugger/LSP capabilities.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| Run Zed on macOS | **Yes** — 33% smaller binary is massive |
+| Run Zed on Windows | **Yes** — 28% smaller binary |
+| Debug Python / want Pyrefly | **Yes** — optional, zero-config try |
+| Debug nested objects constantly | **Yes** — hover inspection is a workflow changer |
+| Compile to WebAssembly | **Yes** — DWARF support = real debugging |
+| On v1.23 stable and happy | **Yes** — pure upside, no breaking changes |
+
+**No rush if:** You're pinned to a specific Python LSP config and don't want to think about it — Pyrefly is opt-in only.
+
+---
+
+## How to Update
+
+```bash
+# macOS
+brew upgrade zed
+
+# Linux (AppImage)
+# Download from https://github.com/zed-industries/zed/releases/latest
+
+# Windows
+# Auto-update via winget or download installer from releases page
+```
+
+**Verify:** `zed --version` → `1.24.4`. Open a Python file → LSP picker → **Pyrefly** appears. Start debugger → hover a nested object → see inline tree. Compile WASM with debug info → set breakpoint in source → step.
+
+---
+
+## The Bottom Line
+
+**v1.24.1-pre gave you Git tags and Terminal→Agent flow. v1.24.4 gives you a 33% smaller editor, a new Python LSP option, debugger hovers that actually show you what's inside your objects, and WebAssembly debugging that works.**
+
+The pattern holds: Zed's stable releases aren't chasing features — they're **removing weight** (binary size, context switches, debugging friction) while **adding leverage** (better tools, more languages, deeper integration).
+
+```bash
+brew upgrade zed
+# 33% smaller on Mac
+# Pyrefly in LSP picker
+# Debugger hover → nested tree
+# WASM source debugging
+```
+
+---
+
+## Related Articles
+
+- [Zed v1.25 Just Made Code Navigation Effortless — Auto-Unfolding, Double-Click Inlay Hints, and Gemini 4 Argon Arrive](/blog/zed-v1-25-pre-automatic-unfolding-inlay-hints-gemini-argon/)
+- [Zed v1.24 Just Added Git Tag Creation, Terminal-to-Agent Drag-and-Drop, and a 23% Smaller Linux Binary](/blog/zed-v1-24-gpt6-sol-git-tags-agent-memory/)
+- [Zed v1.23 Just Gave You GPT-6.1 Sol BYOK and JSON Table Previews](/blog/zed-just-got-gpt-6-1-sol-and-json-table-previews/)
+- [Best Coding Agents 2026 — Decision Guide (Not Another Hype List)](/blog/best-coding-agents-2026-decision-guide/)
+- [Zed vs Cursor: IDE Daily Driver or Terminal Agent?](/blog/zed-vs-cursor/)
+- [Zed vs Copilot CLI: Which Editor-Agent Hybrid Wins?](/blog/zed-vs-copilot-cli/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
+---
+
+*Zed is open-source (GPL-3.0) and available at [zed.dev](https://zed.dev) and [github.com/zed-industries/zed](https://github.com/zed-industries/zed). Published October 22, 2026 — covers Zed v1.24.4 stable released October 20, 2026. Full changelog: [github.com/zed-industries/zed/releases/tag/v1.24.4](https://github.com/zed-industries/zed/releases/tag/v1.24.4)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*

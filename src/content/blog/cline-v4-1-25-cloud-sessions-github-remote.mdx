@@ -1,0 +1,195 @@
+---
+title: "Cline v4.1.25 Just Let Your Agent Run on GitHub Repos While You Sleep — Cloud Sessions Arrive"
+description: "Cline v4.1.25 (Oct 16) introduces Cline Cloud sessions — run tasks in hosted sandboxes on any GitHub repo/branch, get notified when done, sessions persist after closing your editor. Plus Gemini 4 Argon becomes default, model catalog refresh, and local model timeout fixes."
+pubDate: 2026-10-22T15:00:00Z
+tags: ["cline", "release", "v4.1.25", "cloud-sessions", "github", "gemini", "remote", "beginner"]
+tool: "cline"
+author: "rho"
+image: "/api/og?title=Cline+v4.1.25+Cloud+Sessions&tool=cline"
+canonical: "https://terminalblog.com/blog/cline-v4-1-25-cloud-sessions-github-remote/"
+---
+
+Cline **v4.1.25 dropped October 16**, and it brings the feature that changes **where your agent runs**.
+
+**Cline Cloud sessions** (rolling out gradually): run a task in a **hosted sandbox on a GitHub repo and branch you pick**. Turn it on in Settings. Cloud tasks show in Recent and History with status, notify you when they finish, and **keep running after you close your editor**.
+
+Plus: **Gemini 4 Argon** becomes the new default model, model catalog refresh with new providers, and **local models no longer timeout after 5 minutes** of silence.
+
+---
+
+## The Feature That Changes Everything: Cloud Sessions
+
+### What It Is
+
+You pick a GitHub repo + branch. Cline spins up a hosted sandbox. Your agent runs the task there. You get a notification when it's done. The session **persists after you close VS Code / JetBrains / the desktop app**.
+
+```text
+Your laptop: closed
+Cline Cloud: running your task on github.com/your-org/your-repo@feature-branch
+You: get notified → open result → merge / iterate
+```
+
+### Why This Is Huge
+
+| Before | After |
+|--------|-------|
+| Agent runs on *your* machine | Agent runs in *hosted sandbox* |
+| Close editor → task dies | Close editor → task **keeps running** |
+| Local resources consumed | Zero local CPU/RAM during task |
+| One task at a time | Queue multiple cloud tasks |
+| No history if editor crashes | Full history in Recent/History panel |
+
+**For beginners:** This is "GitHub Actions for your coding agent" — but you don't write YAML. You just say "fix the auth bug on the `login-refactor` branch" and Cline Cloud does it.
+
+### How to Enable
+
+1. Open Cline Settings
+2. Toggle **Cline Cloud sessions**
+3. Pick a GitHub repo + branch
+4. Start a task → it runs in the cloud
+
+**Rolling out gradually** — if you don't see it yet, check back in a few days.
+
+---
+
+## Gemini 4 Argon: The New Default Model
+
+**Changed:** With no model chosen, the Cline provider now uses **Gemini 4 Argon** — the new first model in Cline's recommended list.
+
+**OpenRouter stays on Claude Sonnet 5.5** (unchanged).
+
+| Provider | Old Default | New Default |
+|----------|-------------|-------------|
+| Cline (built-in) | Claude Sonnet 5.5 | **Gemini 4 Argon** |
+| OpenRouter | Claude Sonnet 5.5 | Claude Sonnet 5.5 |
+
+**Why it matters:** Gemini 4 Argon is Google's latest coding-optimized model. If you use Cline's built-in provider (no API keys needed for free tier), you just got a model upgrade for free.
+
+**For beginners:** Don't overthink it. If you haven't picked a model, you're now on a better one. If you *have* picked a model, nothing changes.
+
+---
+
+## Model Catalog Refresh: New Providers, New Defaults
+
+**Refreshed catalog:** 6,952 → 7,041 models. Adds **Boundless** and **Standard Compute** providers. **SambaNova** now comes from catalog with **MiniMax M3** as default.
+
+**Cline recommended list:** Adds **Gemini 4 Argon**, drops **Grok 4.7**.
+
+**Cline free list:** Replaces **Step 5 Preview** with **Nemotron 3.5 Super VL**.
+
+**OpenCode Go:** Keeps its `https://opencode.ai/inference/go/v1` base URL (now pinned) because models.dev moved its provider-level URL to OpenAI-only path.
+
+**Default model changes for 20+ providers** — if you use one without pinning a model, expect a different default. Check the [full changelog](https://github.com/cline/cline/compare/v4.1.24...v4.1.25) for the complete list.
+
+---
+
+## The Fix That Saves Local Model Users: No More 5-Minute Timeout
+
+**Fixed:** Long requests to local models (LM Studio, Ollama) **no longer fail after 5 minutes of silence** with `terminated: BodyTimeoutError` while the server is still processing.
+
+**Before:** Send large prompt to local model → wait 5 minutes → **error** → model was actually still thinking → wasted time.
+
+**After:** Request waits until the server responds. No arbitrary timeout.
+
+**Why this matters:** Local models on consumer hardware *are* slow on large contexts. A 32K context prompt can take 10+ minutes on a 24GB GPU. The 5-minute timeout made local models unusable for real work. **Fixed.**
+
+---
+
+## Other Fixes You'll Notice
+
+| Fixed | Impact |
+|-------|--------|
+| OpenAI Compatible base URLs used exactly as entered | `https://abc.com` no longer gets `/v1` added silently |
+| Images/files attached to answers now reach the model | No more dropped attachments on follow-up questions |
+| Provider errors mid-stream retry up to 3 times | Transient failures don't kill your turn |
+| JetBrains: Run task card stays above Auto-approve bar | UI layout fixed |
+| Auto Compact + strategy setting sit together in Feature settings | Settings organization restored |
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| **v4.1.25** | Oct 16, 2026 | **Minor** | **Cloud sessions (gradual rollout), Gemini 4 Argon default, model catalog refresh, local model timeout fix** |
+| v4.1.24 | Oct 13, 2026 | Patch | Reasoning-off fix, MCP crash fix, model refresh |
+| v4.1.23 | Oct 11, 2026 | Patch | Azure 400 fix, .clinerules for commits, MCP paging |
+| v4.1.22 | Oct 8, 2026 | Patch | Bulletproof sessions, new providers, new defaults |
+| v4.1.10 | Sep 2026 | Minor | Web search lands |
+| v4.1.0 | Sep 2026 | Major | SDK migration, 5 critical agent fixes |
+
+**v4.1.25 is the first release with Cloud sessions** — the feature that makes Cline a *remote* agent platform, not just a local IDE extension.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| Want agents running while laptop is closed | **Yes** — Cloud sessions (when available) |
+| Use Cline's built-in provider (no API keys) | **Yes** — Gemini 4 Argon default = free upgrade |
+| Run local models (Ollama/LM Studio) on large contexts | **Yes** — 5-min timeout removed |
+| Use OpenAI-compatible endpoints with custom URLs | **Yes** — base URL handling fixed |
+| Attach images/files to follow-up questions | **Yes** — attachments now work |
+| On v4.1.24 and happy | **Yes** — pure upside, no breaking changes |
+
+**No rush if:** You're waiting for Cloud sessions to roll out to your account — but the other fixes are worth updating for anyway.
+
+---
+
+## How to Update
+
+```bash
+# VS Code Marketplace
+# Search "Cline" → Update
+
+# JetBrains Marketplace
+# Search "Cline" → Update
+
+# Desktop app
+# Auto-update or download from https://github.com/cline/cline/releases/latest
+
+# CLI
+npm update -g @cline/cli
+```
+
+**Verify:** Open Cline → Settings → **Cline Cloud sessions** toggle appears (if rolled out). Model picker → **Gemini 4 Argon** at top of Cline provider list. Send large prompt to Ollama → **no 5-minute timeout**.
+
+---
+
+## The Bigger Picture: Cline Goes Remote
+
+| Era | What Cline Was |
+|-----|----------------|
+| v3.x | Local IDE extension |
+| v4.0.x | Local IDE + Desktop + CLI + SDK |
+| **v4.1.25+** | **Local + Remote (Cloud sessions)** |
+
+Cloud sessions aren't just "run elsewhere" — they're **persistent, queueable, notify-able, history-tracked remote execution**. This is the infrastructure for "agent as a service" without the service lock-in.
+
+You still own the agent. You still pick the model. You still control the repo. **Cline just handles the compute.**
+
+---
+
+## Related Articles
+
+- [Cline v4.1.25 Cloud Sessions — Deep Dive: Run Agents on GitHub Repos While You Sleep](/blog/cline-v4-1-25-cloud-sessions-gemini-argon-model-refresh/)
+- [Cline v4.1.24 Just Fixed the Reasoning Off Bug — And MCP Servers No Longer Crash Your Editor](/blog/cline-v4-1-24-reasoning-fix-mcp-crash-model-refresh/)
+- [Cline v4.1.23 Just Fixed the Azure Claude 400 Error](/blog/cline-v4-1-23-claude-azure-fixes-commit-rules-mcp-paging/)
+- [Cline v4.1.22 Bulletproof Sessions — New Providers, New Defaults](/blog/cline-v4-1-22-bulletproof-sessions-new-providers/)
+- [Cline v4.1.0: Five Critical Agent Fixes and the SDK Migration That Stops AI From Going Rogue](/blog/cline-v4-1-sdk-migration-five-critical-agent-fixes/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
+---
+
+*Cline is open-source (Apache-2.0) and available at [cline.bot](https://cline.bot) and [github.com/cline/cline](https://github.com/cline/cline). Published October 22, 2026 — covers Cline v4.1.25 released October 16, 2026. Full changelog: [github.com/cline/cline/releases/tag/v4.1.25](https://github.com/cline/cline/releases/tag/v4.1.25)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
