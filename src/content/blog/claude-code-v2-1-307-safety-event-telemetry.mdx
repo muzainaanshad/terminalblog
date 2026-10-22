@@ -1,0 +1,170 @@
+---
+title: "Claude Code Just Made It Impossible to Hide When Agents Get Stopped"
+description: "Claude Code v2.1.307 adds the safety_event OpenTelemetry event — finally revealing every time a permission rule, auto mode, hook, or sandbox blocks a tool call. Plus API version 2026-10-21 migration, HTTP MCP double-call fix, and 43 other changes."
+pubDate: "2026-10-22T15:00:00Z"
+tags: ["claude-code", "release", "v2.1.307", "telemetry", "safety", "monitoring", "security"]
+tool: "claude-code"
+author: "Anshad"
+image: "/api/og?title=Claude+Code+v2.1.307+Safety+Event&tool=claude-code"
+canonical: "https://terminalblog.com/blog/claude-code-v2-1-307-safety-event-telemetry/"
+---
+
+Claude Code v2.1.307 dropped **October 21, 2026** with 43 changes. Most are fixes. One is a **game changer for anyone running agents in production**.
+
+The new `claude_code.safety_event` OpenTelemetry event fires **every single time** a permission rule, auto mode, safety check, hook, or sandbox stops, prompts for, or rolls back a tool call. You finally get visibility into what your agents *tried* to do but couldn't.
+
+---
+
+## The One Feature That Changes Everything
+
+### `safety_event` — The Black Box Opens
+
+Before v2.1.307, when an agent hit a permission deny, a safety check, or a sandbox boundary, you saw... nothing in your telemetry. The tool call just didn't happen. You'd notice missing work hours later.
+
+Now every blocked action emits a structured event with:
+
+| Attribute | Example Value | What It Tells You |
+|-----------|---------------|-------------------|
+| `tool.name` | `Write` | Which tool was blocked |
+| `tool.input.path` | `/etc/passwd` | What the agent tried to touch |
+| `safety_reason` | `permission_deny` | Why it stopped: `permission_deny`, `auto_mode`, `safety_check`, `hook`, `sandbox` |
+| `decision` | `deny` | `deny`, `ask`, `rollback` |
+| `session.id` | `abc-123` | Which session |
+| `user.id` | `user-456` | Who owns it |
+
+**This is huge for compliance.** You can now build dashboards showing "blocked write attempts to `/etc` this week" or "how often auto-mode overrode a human." The event fires for *all* safety mechanisms — not just permission rules.
+
+### Verification from the field
+
+Classmethod's Ishikawa verified the event output on real hardware. A `deny` rule on `Write` to `/etc/passwd` produced:
+
+```json
+{
+  "name": "claude_code.safety_event",
+  "attributes": {
+    "tool.name": "Write",
+    "tool.input.path": "/etc/passwd",
+    "safety_reason": "permission_deny",
+    "decision": "deny",
+    "session.id": "session-xyz",
+    "user.id": "user-123"
+  }
+}
+```
+
+The official monitoring docs haven't caught up yet — so attribute names may shift. But the event is real, it's in v2.1.307, and it solves a blind spot that's existed since day one.
+
+---
+
+## The Other Stuff You'll Actually Notice
+
+### `/claude-api api-version` — Migrate to API 2026-10-21
+
+Run `/claude-api api-version` and it walks you through migrating your Claude API code to the new `2026-10-21` version. This is the first API version bump since `2023-06-01`.
+
+**Breaking change:** `temperature`, `top_p`, and `top_k` are **removed** from the Messages API. Sending any of them returns a 400 error on *all* models. Update your SDK or change the `anthropic-version` header.
+
+This affects you if you're calling the Claude API directly (not via the CLI). The migration guide is at [Migrating to API version 2026-10-21](https://docs.anthropic.com/en/api/versioning).
+
+### HTTP MCP: Double Tool Calls Fixed
+
+**The bug:** When an HTTP MCP connection dropped mid-call, the tool call was sent *twice*. For write operations, that's a disaster — double file writes, double API calls, double charges.
+
+**The fix:** v2.1.307 limits retries to **read-only or idempotent tools only**. If a write-type tool loses connection mid-call, it fails instead of retrying. You get a clean error instead of silent duplication.
+
+Check your MCP servers — if you have custom write tools, they won't auto-retry anymore. Handle the failure explicitly.
+
+### `axScreenReader` Restricted to User/Managed Settings
+
+Since v2.1.305 (noted in this changelog), `axScreenReader` and `CLAUDE_AX_SCREEN_READER` in `settings.env` **only apply from:**
+- User settings (`~/.claude/settings.json`)
+- Managed settings
+- `--settings` flag
+
+**Project settings (`.claude/settings.json`) and local settings (`.claude/settings.local.json`) are ignored.** Move your accessibility config or it stops working.
+
+### Self-Hosted Runner: Checkout Hooks Timeout at 30 Min
+
+Checkout hooks now **stop after 30 minutes by default** (SIGTERM → SIGKILL), failing session setup. If your repo fetch or pre-build takes longer, raise `--checkout-hook-timeout-min` or set it to `0` for no limit.
+
+```bash
+claude self-hosted-runner --checkout-hook-timeout-min 60
+```
+
+---
+
+## The Fixes That Save You Debugging Time
+
+| Fix | Why You Care |
+|-----|--------------|
+| Model alias `[1m]` + `CLAUDE_CODE_DISABLE_1M_CONTEXT` no longer causes model-not-found | Stops cryptic errors when using `opus[1m]` etc. |
+| MCP servers show "needs authentication" reason when macOS keychain locked | No more mystery — unlock keychain, next run reconnects |
+| MCP servers don't stay "failed" after sleep/wake | Headless runs recover cleanly |
+| `/clear` conversations don't reappear after cloud/self-hosted restart | Your context actually stays cleared |
+| `setModel()` in Agent SDK waits 15s (was 5s) for API verification | Model switches stop failing on slow networks |
+| `/permissions` Recently denied shows the actual command, not description | You can see *what* was denied, not just *that* something was |
+| Subagent transcripts get real token usage + stop reasons | Cost tracking and debugging actually work |
+| WebFetch 4xx/robots.txt = normal result (not error) in cloud sessions | Consistent with local behavior |
+| Desktop app Code tab: GitHub MCP write tools don't close form silently | You can actually create PRs/issues from the UI |
+
+---
+
+## Breaking Changes Checklist
+
+1. **API 2026-10-21:** Remove `temperature`/`top_p`/`top_k` from Messages API calls
+2. **`axScreenReader`:** Move from project/local settings → user/managed/`--settings`
+3. **Self-hosted checkout hooks:** Increase timeout if >30 min needed
+4. **HTTP MCP write tools:** Handle connection-drop failures explicitly (no auto-retry)
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| Run agents in production with telemetry | **Yes immediately** — `safety_event` is the observability gap you've had |
+| Use HTTP MCP with write tools | **Yes** — double-call fix prevents data corruption |
+| Call Claude API directly with sampling params | **Yes** — migrate to 2026-10-21 or your code breaks |
+| Use `axScreenReader` in project settings | **Yes** — move config or accessibility breaks |
+| Run self-hosted runners with large repos | **Check** — verify checkout hook time before updating |
+| Just use the CLI interactively | **When convenient** — mostly fixes, one killer feature |
+
+---
+
+## How to Update
+
+```bash
+# Auto-update (usually handles it)
+# Check: Help → Check for Updates in VS Code extension
+# Or in terminal:
+claude --version
+# Should show 2.1.307+
+```
+
+Or download from [github.com/anthropics/claude-code/releases/tag/v2.1.307](https://github.com/anthropics/claude-code/releases/tag/v2.1.307).
+
+---
+
+## The Bottom Line
+
+Claude Code has been shipping stability fixes for weeks (v2.1.300–306 were all fix-heavy). **v2.1.307 is different.**
+
+The `safety_event` telemetry finally answers: *"What did my agent try to do that got blocked?"* That question has been unanswerable since the first agent ran. Now it's one dashboard query away.
+
+If you run agents where safety matters — which is everywhere — this is the update you've been waiting for.
+
+---
+
+## Related Articles
+
+- [Claude Code v2.1.306: Cloud Session MCP Fix](/blog/claude-code-v2-1-306-cloud-session-mcp-fix/)
+- [Claude Code v2.1.304–305: Stability Wave](/blog/claude-code-v2-1-304-305-stability-wave/)
+- [Claude Code v2.1.288: 100 Fixes You Actually Feel](/blog/claude-code-v2-1-288-100-fixes-you-actually-feel/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Beware: Claude Code Approval Gate Bypass — Commands Execute While Blocked](/blog/beware-hermes-agent-approval-gate-bypass-commands-execute-while-blocked/)
+
+---
+
+*Claude Code v2.1.307 released October 21, 2026. Changelog source: [github.com/anthropics/claude-code/releases](https://github.com/anthropics/claude-code/releases) and [dev.classmethod.jp](https://dev.classmethod.jp/en/articles/20261022-cc-updates-v2-1-307/).*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
