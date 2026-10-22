@@ -1,7 +1,8 @@
 ---
 title: "OpenCode v2.1 Just Broke Its Own SDK — Here's Why It Had To"
-description: "OpenCode v2.1 (October 20) ships intentional breaking changes to SDK, HTTP contracts, and plugin APIs. Persistent Windows PTYs, todo lists in TUI, reliable long-running commands, and a unified 'native' replay field. The cost of admission for a stable platform."
+description: "OpenCode v2.1 (October 20) ships intentional breaking changes to SDK, HTTP contracts, and plugin APIs. Persistent Windows PTYs, todo lists in TUI, reliable long-running commands, and a unified 'native' replay field. v2.1.2 adds Clear Free-Limit Recovery, Hide Free Models, and Configurable Location Unloading. The cost of admission for a stable platform."
 pubDate: "2026-10-20T15:00:00Z"
+updatedDate: "2026-10-21T15:00:00Z"
 tags: ["opencode", "release", "v2.1", "breaking-changes", "sdk", "windows", "beginner"]
 tool: "opencode"
 author: "Anshad"
@@ -173,10 +174,66 @@ Desktop and TUI timelines now show **execution errors that happen before or betw
 
 | Version | Date | Type | Focus |
 |---------|------|------|-------|
+| **v2.1.2** | Oct 21, 2026 | Patch | Clear Free-Limit Recovery, Hide Free Models, Configurable Location Unloading, Reliable Fresh Installs |
 | **v2.1.0** | Oct 20, 2026 | **Breaking** | SDK/HTTP/plugin contract unification, persistent Windows PTYs, todo lists, long-running commands, native ARM64, WinGet |
 | v2.0.28 | Oct 13, 2026 | Release | Per-project auto-accept, native ARM64, WinGet, no auto-updates, worktree tools, highlights |
-| v1.19.0 | Oct 11, 2026 | Release | v2 upgrade path, ultrafast tier, PTY validation |
-| v1.18.35 | Oct 6, 2026 | Release | xAI images, agent-readable stats |
+| v1.19.0 | Oct 11, 2026 | Release | OpenCode 2 upgrade path (`upgrade --major`), ultrafast tier, PTY validation |
+| v1.18.35 | Oct 6, 2026 | Release | xAI images, agent-readable stats, ecosystem growth |
+
+---
+
+## v2.1.2 (October 21): Free-Limit Recovery, Hide Free Models, Fresh Install Fixes
+
+**v2.1.2 dropped October 21** — a focused patch that polishes the v2.1 breaking release with quality-of-life fixes you'll actually notice.
+
+### Clear Free-Limit Recovery (Desktop + TUI)
+
+**The problem:** You hit your free message limit. The agent just errors out. You lose your prompt. You don't know when it resets.
+
+**The fix:** Desktop and TUI now show the **reset time inline**, **restore your submitted prompt**, and offer direct **Upgrade** or **Switch Model** actions instead of a generic error ([#57466](https://github.com/anomalyco/opencode/pull/57466), [#57467](https://github.com/anomalyco/opencode/pull/57467), [#57471](https://github.com/anomalyco/opencode/pull/57471)).
+
+The TUI shows an animated "Free limit reached" dialog with **Subscribe**, **Dismiss**, and **Don't show again** buttons. Subscribing to OpenCode Go now updates the current session's model instead of opening another draft.
+
+### Hide Free Models: `OPENCODE_DISABLE_FREE_MODELS=1`
+
+**The problem:** Free models clutter the catalog. You want only paid/pro models visible.
+
+**The fix:** Set `OPENCODE_DISABLE_FREE_MODELS=1` or `true` to remove zero-cost models from OpenCode and OpenCode Go catalogs, defaults, and fallbacks ([#57478](https://github.com/anomalyco/opencode/pull/57478)).
+
+```bash
+# In your shell config or before launch
+export OPENCODE_DISABLE_FREE_MODELS=1
+```
+
+### Configurable Location Unloading
+
+**The problem:** Inactive location services (language servers, MCP connections) stay loaded forever, consuming memory.
+
+**The fix:** Set `experimental.location_idle_timeout` to a duration like `"4 hours"` or `false` to disable unloading entirely ([#57476](https://github.com/anomalyco/opencode/pull/57476)).
+
+```json
+// settings.json
+{
+  "experimental": {
+    "location_idle_timeout": "4 hours"
+  }
+}
+```
+
+Locations now stay loaded while sessions wait for input, run long tools, or own background jobs ([#57416](https://github.com/anomalyco/opencode/pull/57416)).
+
+### Reliable Fresh Installs (zsh + Fish)
+
+**The problem:** Fresh installs on machines without `~/.zshrc` or `config.fish` failed to add OpenCode to `PATH`. You got "command not found."
+
+**The fix:** The installer now creates the shell config file when missing, adds OpenCode to `PATH`, and tells you to run `exec $SHELL` ([#57348](https://github.com/anomalyco/opencode/pull/57348)).
+
+### Other v2.1.2 Fixes
+
+- **Legacy console credentials forwarded** — Old `console.opencode.ai` credentials now forward to `opencode.ai/console` ([#57588](https://github.com/anomalyco/opencode/pull/57588))
+- **SDK: `retryAfterMs` on session errors** — Clients can display provider-supplied retry timing ([#57146](https://github.com/anomalyco/opencode/pull/57146))
+- **Code Mode async jobs fixed** — No more interleaving writes mid-statement while preserving concurrent tool calls ([#54276](https://github.com/anomalyco/opencode/pull/54276))
+- **TUI: Only shows "location unavailable" when server explicitly reports it** ([#57594](https://github.com/anomalyco/opencode/pull/57594))
 
 ---
 
