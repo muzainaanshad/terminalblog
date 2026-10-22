@@ -96,18 +96,18 @@ function parse(file) {
 function extractFaq(body) {
   // Normalize line endings to \n for consistent regex matching
   const normalizedBody = body.replace(/\r\n/g, '\n');
-  
+
   // Find FAQ section - look for ## FAQ and capture until next ## heading, 
-  // or literal \n--- (escaped in text), or end of string
-  const faqMatch = normalizedBody.match(/^## FAQ\s*\n([\s\S]*?)(?:\n## |\\n---|\n---|$)/m);
+  // or \n---, or end of string
+  const faqMatch = normalizedBody.match(/(?:^|\n)## FAQ\s*\n([\s\S]*?)(?:\n## |\n---|$)/);
   if (!faqMatch) return [];
 
   const faqContent = faqMatch[1];
   const faqs = [];
 
-  // Pattern 1: **What is...?** or **How do...?** ... (bolded question followed by answer on next line)
-  // Matches: **Question?**\n\nAnswer or **Question?**\nAnswer
-  const pattern1 = /\*\*([^*?]+(?:\?|:))\*\*\s*\n\s*\n?([\s\S]*?)(?=\n\*\*[^*?]+(?:\?|:)\*\*|$)/gi;
+  // Pattern 1: **Q1: Question?** ... (numbered Q format with bold)
+  // Matches: **Q1: Question?**\n\nAnswer or **Q1: Question?**\nAnswer
+  const pattern1 = /\*\*Q\d*:\s*([^*]+?)\*\*\s*\n\s*\n?([\s\S]*?)(?=\n\s*\*\*Q\d*:|$)/gi;
   let match;
   while ((match = pattern1.exec(faqContent)) !== null) {
     const q = match[1].trim().replace(/^["']|["']$/g, '');
@@ -115,13 +115,13 @@ function extractFaq(body) {
     if (q && a && q.length > 3) faqs.push({ q, a });
   }
 
-  // Pattern 2: **Q1: What is...?** ... (numbered Q format)
+  // Pattern 2: **Question?** ... (bolded question ending with ? or :)
   if (faqs.length === 0) {
-    const pattern2 = /\*\*Q\d*:\s*([^*]+?)\*\*\s*\n\s*\n?([\s\S]*?)(?=\n\s*\*\*Q\d*:|$)/gi;
+    const pattern2 = /\*\*([^*?]+(?:\?|:))\*\*\s*\n\s*\n?([\s\S]*?)(?=\n\*\*[^*?]+(?:\?|:)\*\*|$)/gi;
     while ((match = pattern2.exec(faqContent)) !== null) {
       const q = match[1].trim().replace(/^["']|["']$/g, '');
       const a = match[2].trim().replace(/^["']|["']$/g, '');
-      if (q && a) faqs.push({ q, a });
+      if (q && a && q.length > 3) faqs.push({ q, a });
     }
   }
 
