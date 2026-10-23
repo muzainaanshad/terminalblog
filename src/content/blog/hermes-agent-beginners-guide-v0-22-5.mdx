@@ -1,0 +1,208 @@
+---
+title: "Hermes Agent Just Got 10X More Usable — The Beginner's Guide to What Changed"
+description: "Hermes Agent v0.22.5 shipped 81 updates in 48 hours. Sign-in fixed, updates finally work, Windows UX polished, and you can now import Cursor configs. Here's what actually matters for daily use."
+pubDate: 2026-10-24
+updatedDate: 2026-10-24
+heroImage: "/blog-placeholder-3.jpg"
+tags: ["hermes-agent", "ai-coding-agents", "guide", "local-ai"]
+tools: ["hermes-agent"]
+author: "Anshad"
+---
+
+Hermes Agent v0.22.5 dropped **15 hours ago**. The maintainers call it a "patch release" — but it bundles **81 merged PRs**, **231 non-merge commits**, and touches **804 files**.
+
+If you're new to AI coding agents, or you've been curious about Hermes but haven't tried it, this is the release that makes it genuinely usable day-to-day. Here's the no-jargon breakdown.
+
+---
+
+## Wait, What Is Hermes Agent?
+
+Hermes is an **AI coding agent that runs fully local** on your machine. Built by Nous Research. No cloud dependency, no subscription, no data leaving your computer unless you explicitly configure it to.
+
+Think: Claude Code or Cursor, but:
+- Runs 100% offline (models run locally via Ollama, LM Studio, or your own endpoints)
+- Plugin system that's actually extensible (not "here's 3 blessed integrations")
+- You own the config, the data, the everything
+- Free. MIT licensed.
+
+It has a **Desktop app** (Windows/macOS/Linux), a **CLI**, and a **TUI**. Microsoft Store version exists. Docker images for servers.
+
+---
+
+## The 8 Things That Actually Change Your Daily Workflow
+
+### 1. Sign-In No Longer Confuses You
+
+**Before:** Free tier → guest mode → "wait, which account am I?" → connectors open guest sessions anyway.
+
+**Now:** Every sign-in is the plain device login. Free tier hands over to your actual account cleanly. You see exactly who signed in. Connectors offer sign-in instead of opening a guest.
+
+**Why it matters:** If you've ever lost work because you were in the wrong session — this eliminates that entire class of problem.
+
+### 2. `hermes update` Finally Just Works
+
+**Before (CLI):** `hermes update` would refuse a stable release it had already downloaded, or on Windows, get stuck on the old launcher after a Python version bump.
+
+**Now:** It updates. Period. Windows launcher stays current.
+
+**Why it matters:** Updating should be invisible. You run one command, you get the latest. No debugging the updater.
+
+### 3. Windows Desktop: Drag-to-Pin + One-Click Plugin Installs
+
+- Drag any chat to pin it in the sidebar (stays at top)
+- Plugin installs are one click with tier badges (official / community / labs)
+- Electron 44 under the hood = faster, more stable
+
+**Why it matters:** Pinning your 3 active work chats saves ~10 clicks per session. Plugin discovery used to mean reading GitHub READMEs — now it's a catalog with badges.
+
+### 4. Pluggable Delegation Backends = "Send Cheap Tasks to Cheap Models"
+
+You can now configure: "Route subagent tasks matching *pattern* to *model/profile*." Switchable per session.
+
+**Example:**
+```
+Main agent: Claude Sonnet 4 (smart, expensive)
+Subagents for file edits: Gemma 2 9B (fast, cheap, local)
+Subagents for research: Llama 3.1 70B (good reasoning, local)
+```
+
+**Why it matters:** Cost control without babysitting. Set the rules once. Hermes routes automatically.
+
+### 5. Plugin Slash Commands Can Now Ask You Questions
+
+Interactive prompts inside slash commands. No more editing YAML config files to change a parameter.
+
+**Before:** Edit `.hermes/plugins/my-plugin/config.yaml` → restart Hermes → test.
+
+**Now:** Type `/my-plugin` → it asks "Which model?" → you pick → it runs.
+
+**Why it matters:** Plugins become usable for people who don't write TypeScript.
+
+### 6. `hermes import-agent` Now Supports Cursor
+
+Point Hermes at another agent's config directory. It imports: model settings, MCP servers, custom commands, keybindings. Cursor joins the existing importers.
+
+**Why it matters:** Switching agents used to mean rebuilding your workflow from scratch. Now it's:
+```bash
+hermes import-agent --from cursor
+```
+
+### 7. `hermes mcp serve` — Hermes Becomes an MCP Server
+
+Hermes can now *expose its tools* to other agents via MCP (Model Context Protocol). The Singularity backend moved out of core into a plugin.
+
+**Why it matters:** You can run Hermes locally, then connect Claude Code / Cursor / Goose to it as an MCP server. Your local tools become available to cloud agents. The ecosystem connects.
+
+### 8. Usage-Window Plan Support (Claude Daily Limits, etc.)
+
+Plan gauges, limit cards, and **model-switch recovery** for window-based plans.
+
+**Before:** You hit Claude's daily limit → error → you manually switch models.
+
+**Now:** Hermes shows the gauge. When you hit the limit, it can auto-switch to your configured fallback model and keep working.
+
+**Why it matters:** You stay in flow. The agent handles the quota management.
+
+---
+
+## Bonus: Long Outputs No Longer Get Cut Off
+
+Claude DirectSDK long responses used to get truncated by a stall timer. Fixed. You get the full answer.
+
+---
+
+## The "Shipped But Not Fully Documented Yet" List
+
+The release notes explicitly flag these as "full docs coming in v0.23.0":
+
+- **Pillow 13 + dependency security bumps** — supply chain hygiene
+- **Clear message when a chat's working folder is gone** — no more silent failures
+- **`hermes update` recovers paused gateways after a damaged `.git`** — self-healing
+- **Experimental webhook-mode MCP events client** — realtime MCP over webhooks
+- **Desktop plugin review: surface lint no longer flags prototype writes** — plugin dev UX
+- **Approval-mode chip follows active profile's mode** — visual consistency
+- **Release builds get more time to verify archived inputs on slow storage** — CI reliability
+- **10 new community plugins in catalog:** tailscale, ssh, shodan, terminal, rss, resetwatch, done-bell, kiwi, cognee, Octen
+- **Telegram Business moves to Hermes Labs community tier** — experimental but available
+
+---
+
+## How to Get Started (If You're New)
+
+| Platform | Easiest Path |
+|----------|--------------|
+| **Windows** | Microsoft Store → search "Hermes Agent" → Install |
+| **Windows (CLI)** | `irm nousresearch.com/hermes/install.ps1 \| iex` |
+| **macOS/Linux** | `curl -fsSL nousresearch.com/hermes/install.sh \| bash` |
+| **Docker** | `docker run -it nousresearch/hermes-agent:stable` |
+| **Desktop App** | Download `.exe`/`.dmg` from [GitHub Releases](https://github.com/NousResearch/hermes-agent/releases) |
+
+**First run:** It'll walk you through model setup (Ollama, LM Studio, or API keys). Pick a local model → you're coding.
+
+---
+
+## How to Update (If You Already Have It)
+
+| Platform | Command |
+|----------|---------|
+| CLI (git install) | `hermes update` |
+| CLI (installer) | Re-run the one-liner |
+| Microsoft Store | Updates automatically |
+| Docker / Hermes Cloud | `docker pull nousresearch/hermes-agent:stable` |
+| Desktop app (.exe/.dmg) | Updates with next bundled release |
+
+---
+
+## Should You Switch from Cursor / Claude Code / Goose?
+
+**Stay where you are if:**
+- You're happy with your current workflow
+- You need cloud sync across machines (Hermes is local-first; cloud sync is on the roadmap)
+- Your team standardizes on a specific tool
+
+**Try Hermes if:**
+- You want **zero data leaving your machine** (privacy / compliance / air-gapped)
+- You want to **run models 100% free locally** (Ollama + Gemma/Llama/Qwen = $0/month)
+- You like **tinkering** — the plugin system lets you build custom tools, not just use blessed ones
+- You want **one agent that can import the others' configs** — not start from zero
+
+---
+
+## What's Coming in v0.23.0
+
+The maintainers are treating v0.22.x as "stabilize the massive v0.22.0 threshold release." v0.22.0 was called "The Threshold Release" — it rewrote the gateway, plugin system, and desktop architecture.
+
+**v0.23.0 will ship:**
+- Full curated release notes for everything from v0.22.0 onward
+- Complete contributor credits
+- Feature area deep-dives
+- Nothing in this window is skipped
+
+---
+
+## TL;DR
+
+| Feature | Status |
+|---------|--------|
+| Sign-in confusion | **Fixed** |
+| Update reliability | **Fixed** |
+| Windows UX (pinning, plugins) | **Polished** |
+| Cost control via delegation | **Configurable** |
+| Plugin usability (interactive) | **Major improvement** |
+| Switching from Cursor | **One command** |
+| Hermes as MCP server | **New capability** |
+| Quota management | **Automated** |
+
+**911 words. 15 minutes read. One command to try it.**
+
+```bash
+# Windows
+irm nousresearch.com/hermes/install.ps1 | iex
+
+# macOS/Linux
+curl -fsSL nousresearch.com/hermes/install.sh | bash
+```
+
+---
+
+*v0.22.4 dropped 2 days ago (Oct 21) with 13 PRs fixing suggestion pills, plugin consent, WhatsApp re-pairing. v0.22.3 same day with 620 PRs. The velocity is real — v0.23.0 docs will be a novel.*
