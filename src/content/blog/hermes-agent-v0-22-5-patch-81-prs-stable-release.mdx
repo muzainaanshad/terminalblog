@@ -1,0 +1,181 @@
+---
+title: "Hermes Agent v0.22.5 Just Landed — 81 Fixes, Sign-In Overhauled, and Windows Update Finally Works"
+description: "Hermes Agent v0.22.5 dropped October 22 with 81 PRs merged — plain device sign-in that actually works, Windows update unstuck after Python repin, pluggable delegation backends, plugin slash commands with pickers, and the Singularity backend moving to plugins. The quiet patch that fixes daily friction."
+pubDate: 2026-10-23T06:00:00Z
+tags: ["hermes-agent", "release", "v0.22.5", "patch", "sign-in", "windows", "plugins", "beginner"]
+tool: "hermes"
+author: "Anshad"
+image: "/api/og?title=Hermes+Agent+v0.22.5+81+Fixes&tool=hermes"
+---
+
+Hermes Agent **v0.22.5 dropped October 22** — a patch release that rolled up **81 PRs** and **231 commits** since v0.22.4. On paper it's a "patch." In practice, it fixes the things that made you sigh every time you opened the app.
+
+---
+
+## The One Thing You'll Notice Immediately: Sign-In Just Works
+
+**Before v0.22.5:** You clicked sign-in → got a guest session → had to figure out how to attach your real account → connectors opened confusing guest flows.
+
+**After v0.22.5:** Every sign-in is now a **plain device login**. The free-tier guest automatically hands over to your account. The result shows *who signed in*. Connectors offer sign-in instead of opening a guest.
+
+No more "wait, am I signed in as me or a ghost session?" The sign-in flow finally respects the user.
+
+---
+
+## Windows Users: `hermes update` Is No Longer Stuck
+
+If you're on Windows, you know the pain: `hermes update` would hang on the old launcher after a Python repin. You'd kill it, re-run the installer, wonder if you broke something.
+
+**Fixed.** Windows `hermes update` now recovers properly after a Python repin. It also **recovers paused gateways after a damaged `.git`** — so a corrupted repo doesn't mean a dead install.
+
+---
+
+## Pluggable Delegation Backends — Route Subagents Your Way
+
+This one's for power users who run multi-agent workflows.
+
+You can now **route subagents by model map or profile**, and switch the delegation backend **per session**. Want your coding subagent on Claude Opus 5.5 but your research subagent on a local Qwen? Define a model map. Want to swap the whole routing logic for a specific project? Swap the backend.
+
+No more hardcoded delegation. The agent orchestration layer is now pluggable.
+
+---
+
+## Plugin Slash Commands That Ask You to Pick
+
+Plugin authors can now write slash commands that **prompt you for options** instead of guessing.
+
+```bash
+# Before: plugin guesses or fails
+/hermes-github create-issue
+
+# After: plugin asks
+/hermes-github create-issue
+→ Pick repository: [dropdown]
+→ Pick label: [multi-select]
+→ Confirm? [y/n]
+```
+
+This turns plugins from "rigid tools" into "interactive workflows." Huge for team-shared plugins.
+
+---
+
+## `hermes import-agent` — Cursor Migration Now Official
+
+The `hermes import-agent` command now includes **Cursor** in its supported importers. Setup detects another agent on your machine and offers the importer automatically.
+
+If you've been Curious about Hermes but locked into Cursor's workflow, the switching cost just dropped.
+
+---
+
+## Singularity Backend Moves to Plugins — Core Gets Leaner
+
+The Singularity/Apptainer container backend (for HPC/scientific workloads) **moved out of core into a plugin**.
+
+This is the architectural direction: **core stays minimal, capabilities live in plugins**. You don't pay for container runtime overhead unless you install the plugin. The plugin catalog now handles it with one-click install and tier badges.
+
+---
+
+## Desktop Quality-of-Life Fixes That Add Up
+
+| Fix | Why It Matters |
+|-----|----------------|
+| **Drag-to-pin in sidebar** | Pin your most-used chats/tools without right-click menus |
+| **One-click plugin installs with tier badges** | See "Official," "Community," "Labs" at a glance — no guessing |
+| **Clear message when chat's working folder is gone** | No more "why is my context empty?" — it tells you |
+| **Long Claude DirectSDK answers no longer cut off** | The stall timer was killing legitimate long responses |
+| **Group chats show which bot is working** | Multi-bot sessions are finally readable |
+| **Electron 44 + Pillow 13 + security bumps** | Under-the-hood stability and vulnerability fixes |
+
+---
+
+## Experimental: Webhook-Mode MCP Events Client
+
+For builders: an experimental **webhook-mode MCP events client** landed. This lets you receive MCP server events via webhook instead of long-lived connections — useful for serverless, edge, or intermittent connectivity scenarios.
+
+Marked experimental. API may change. But the direction is clear: MCP integration is becoming a first-class platform capability, not just a client feature.
+
+---
+
+## By the Numbers
+
+Since v0.22.4:
+- **231 non-merge commits**
+- **804 changed files**
+- **+35,212 / −17,885 lines**
+- **81 merged PRs**
+- **30 closed issues**
+
+Full curated release notes for the entire v0.22.0 → v0.22.5 window ship with **v0.23.0**. This patch delivers the fixes; the next minor delivers the story.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| Use Hermes daily on Windows | **Yes** — update finally works reliably |
+| Struggled with sign-in / guest sessions | **Yes** — flow is completely redone |
+| Run multi-agent / subagent workflows | **Yes** — pluggable delegation backends |
+| Build or use plugins heavily | **Yes** — slash command pickers, tier badges, Singularity plugin |
+| Import from Cursor | **Yes** — `hermes import-agent cursor` works |
+| Run MCP servers in edge/serverless | **Watch** — webhook-mode MCP client is experimental |
+
+**No rush if:** You're on v0.22.4 and everything works. But the sign-in and Windows update fixes alone remove daily friction.
+
+---
+
+## How to Update
+
+```bash
+# Microsoft Store app
+# Updates through the Store automatically
+
+# Desktop app (installer .exe / .dmg)
+# Updates with next bundled release (no change in v0.22.5)
+
+# CLI
+hermes update
+# or re-run the installer one-liner
+
+# Docker / Hermes Cloud
+docker pull nousresearch/hermes-agent:stable
+# or :latest
+```
+
+**Verify:** `hermes --version` → `0.22.5`. Sign out and back in → **plain device login, shows your name**. Run `hermes update` on Windows → **completes without hanging**.
+
+---
+
+## The Bigger Picture: Hermes Fixes the Boring Stuff
+
+| Release Wave | Philosophy |
+|--------------|------------|
+| v0.20.x | "80% faster" — performance foundation |
+| v0.21.x | "Pantheon bots" — multi-agent orchestration |
+| **v0.22.x** | **"Threshold" — remove what doesn't serve the operator** |
+
+v0.22.5 continues the v0.22 theme: **threshold**. Not "add more" — "remove what's in the way."
+
+- Confusing sign-in flow → replaced with plain device login
+- Windows update hanging → fixed at the launcher level
+- Hardcoded subagent routing → pluggable backends
+- Rigid plugin commands → interactive pickers
+- Core bloat (Singularity) → moved to plugin
+
+This is the Hermes thesis: **the agent that grows with you grows by shedding what you don't need.**
+
+---
+
+## Related Articles
+
+- [Hermes Agent Just Crossed a Threshold — v0.22.0 Changes Everything for Beginners](/blog/hermes-agent-v0-22-threshold-release-changes-everything/)
+- [Hermes Agent v0.22.3 Just Dropped 620 Fixes in One Patch](/blog/hermes-agent-v0-22-3-patch-620-fixes-what-changed/)
+- [Hermes Agent v0.22.4 Just Killed the Suggestion Pills That Nobody Asked For](/blog/hermes-agent-v0-22-4-patch-kills-suggestion-pills/)
+- [Beware: Hermes Agent's Approval Gate Reports 'Blocked' While Commands Secretly Execute](/blog/beware-hermes-agent-approval-gate-bypass-commands-execute-while-blocked/)
+- [Why Hermes Agent Is the Most Underrated Open-Source AI Assistant in 2026](/blog/why-hermes-agent-is-the-most-underrated-open-source-ai-assistant-2026/)
+
+---
+
+*Hermes Agent is open-source (MIT) and available at [hermes-agent.nousresearch.com](https://hermes-agent.nousresearch.com) and [github.com/NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent). Published October 23, 2026 — covers Hermes Agent v0.22.5 released October 22, 2026. Full changelog: [github.com/NousResearch/hermes-agent/releases/tag/v0.22.5](https://github.com/NousResearch/hermes-agent/releases/tag/v0.22.5)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
