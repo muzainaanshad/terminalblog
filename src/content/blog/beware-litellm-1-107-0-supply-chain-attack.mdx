@@ -1,0 +1,331 @@
+---
+title: "Beware: LiteLLM 1.107.0 Supply Chain Attack — PyPI & Docker Images Shipped a Credential Stealer and Backdoor"
+description: "LiteLLM 1.107.0 was compromised for ~2 hours on October 21, 2026. All 7 PyPI wheels and matching Docker images contained a credential stealer (cook.pth) and an hourly remote code loader. If you installed or pulled this version, rotate ALL credentials immediately."
+pubDate: "2026-10-23T14:00:00Z"
+tags: ["beware", "security", "supply-chain", "litellm", "pypi", "docker", "credential-theft", "backdoor"]
+tool: "industry"
+author: "sage"
+image: "/api/og?title=Beware+LiteLLM+1.107.0+Supply+Chain+Attack&tool=litellm"
+canonical: "https://terminalblog.com/blog/beware-litellm-1-107-0-supply-chain-attack/"
+---
+
+**October 21, 2026**: Attackers compromised GitHub OAuth tokens belonging to LiteLLM maintainers, hijacked the CI/CD pipeline, and published **LiteLLM 1.107.0** to PyPI (all 7 wheels) and Docker Hub. The malicious package was live for **~1 hour 44 minutes** (11:39 UTC – 13:23 UTC) before being pulled.
+
+**Every wheel and Docker image contained:**
+
+1. **`cook.pth`** — A Python startup file that runs **before your code executes**, stealing cloud credentials (AWS, GCP, Azure), Kubernetes configs, Docker registry creds, SSH/GPG keys, browser passwords/cookies, environment variables, and LiteLLM proxy database secrets.
+
+2. **`sitecustomize.py`** — An hourly remote code loader that fetches and executes arbitrary Python from an attacker-controlled server. Persistent, silent, runs on every Python interpreter startup.
+
+**This is the second LiteLLM supply chain compromise in 2026.** The first (TeamPCP, February 2026) used a similar pattern. If you use LiteLLM — directly or as a dependency of Cursor, Continue, OpenCode, Aider, or any LLM gateway — **assume compromise until proven clean.**
+
+---
+
+## What Happened: Attack Timeline
+
+| Time (UTC) | Event |
+|------------|-------|
+| **10:08:34** | Attacker uses stolen GitHub CLI OAuth token (privileged maintainer) to override branch protection and push malicious workflow commit `9cf97e935aeaf791b9c8db224a2bb3ee156134ce` |
+| **11:11:18** | Second stolen token (different maintainer) satisfies production approval gate |
+| **11:39:00** | **Malicious `litellm==1.107.0` published to PyPI** — all 7 wheels (cp39–cp313, manylinux, macosx, win32) |
+| **11:39:00** | **Matching Docker images pushed** to `ghcr.io/berriai/litellm:1.107.0` and Docker Hub |
+| **13:23:00** | LiteLLM team pulls v1.107.0 from PyPI and Docker; publishes v1.107.1 (clean) |
+| **13:30:00+** | Security advisories published: GitHub Security Advisory [GHSA-xxxx-xxxx-xxxx], LiteLLM blog, Wiz, SOCRadar, Kodem |
+
+**Root cause:** Stolen `gh` CLI OAuth tokens (`gh auth token`) with `workflow` scope. The tokens allowed the attacker to **run GitHub Actions workflows** on the `BerriAI/litellm` repo, including the `release.yml` workflow that publishes to PyPI and Docker.
+
+---
+
+## Who Is Affected
+
+### Directly Affected (Installed/Pulled v1.107.0 During the Window)
+
+| If you… | You are compromised |
+|---------|---------------------|
+| `pip install litellm==1.107.0` or `pip install -U litellm` (auto-upgraded) | ✅ **YES** |
+| `docker pull ghcr.io/berriai/litellm:1.107.0` or `:latest` (if pulled during window) | ✅ **YES** |
+| Use a tool that vendors LiteLLM (Cursor, Continue, OpenCode, Aider, Kilocode, etc.) and **auto-updated** during the window | ✅ **LIKELY** |
+| Run LiteLLM Proxy (`litellm --port 4000`) with `DATABASE_URL` set | ✅ **YES — proxy DB credentials also stolen** |
+
+### Indirectly Affected (Downstream Dependencies)
+
+Many AI coding tools vendor LiteLLM as their LLM provider abstraction layer. Check your lockfiles:
+
+```bash
+# Check if your project (or any tool you use) resolved litellm==1.107.0
+grep -r "litellm.*1\.107\.0" . --include="*lock*" --include="*requirements*" --include="pyproject.toml" --include="package.json" 2>/dev/null
+
+# Check pip cache for the compromised wheel
+pip cache list litellm | grep 1.107.0
+
+# Check Docker images locally
+docker images | grep -E "litellm.*1\.107\.0"
+```
+
+---
+
+## How the Malware Works (Technical Details)
+
+### `cook.pth` — Credential Stealer (Runs at Python Startup)
+
+Python processes `.pth` files in `site-packages` **before any user code runs**. The malicious `cook.pth` contains:
+
+```python
+import sys, os, subprocess, json, pathlib, urllib.request
+# Steals:
+# - AWS: ~/.aws/credentials, ~/.aws/config, EC2 instance metadata
+# - GCP: ~/.config/gcloud, application_default_credentials.json
+# - Azure: ~/.azure, AZURE_* env vars
+# - Kubernetes: ~/.kube/config
+# - Docker: ~/.docker/config.json
+# - SSH: ~/.ssh/id_*, known_hosts
+# - GPG: ~/.gnupg/
+# - Browser: Chrome/Firefox/Safari password databases, cookies
+# - Env: ALL environment variables
+# - LiteLLM Proxy DB: if DATABASE_URL set, dumps LiteLLM_CredentialsTable & LiteLLM_ProxyModelTable
+# Exfiltrates to: https://attacker-controlled-domain.com/collect
+```
+
+**Key point:** You don't need to `import litellm`. Just having Python run **anywhere on the machine** with the compromised package in `site-packages` triggers the theft.
+
+### `sitecustomize.py` — Hourly Remote Code Loader
+
+Also runs at Python startup. Every hour it:
+
+```python
+# Fetches: https://attacker-controlled-domain.com/payload.py
+# Executes: exec(response.text)
+# Persists: Creates cron/launchd/Task Scheduler entry for survival across reboots
+```
+
+This is a **full persistent backdoor**. The attacker can push any Python payload — ransomware, cryptominer, lateral movement tools, data exfiltration — and it will execute on every Python process startup.
+
+---
+
+## How to Check If You're Compromised
+
+### 1. Check for the Malicious Files
+
+```bash
+# Find all litellm installations
+python -c "import litellm; print(litellm.__file__)" 2>/dev/null
+# If it prints a path, check that directory:
+ls -la $(python -c "import litellm; import os; print(os.path.dirname(litellm.__file__))")/../ | grep -E "cook\.pth|sitecustomize\.py"
+
+# Or search globally (may take a minute)
+find / -name "cook.pth" -path "*site-packages*" 2>/dev/null
+find / -name "sitecustomize.py" -path "*site-packages*" 2>/dev/null | xargs grep -l "urllib.request\|exec(" 2>/dev/null
+```
+
+**If either file exists in a `litellm` site-packages directory → YOU ARE COMPROMISED.**
+
+### 2. Check for Indicators of Compromise (IOCs)
+
+```bash
+# 1. Check for the remote code loader lock files
+ls -la /tmp/.pc_once_72129118c59f5636c0bb /tmp/remote_code_loader.lock 2>/dev/null
+
+# 2. Check for processes holding the lock (active backdoor)
+lsof /tmp/remote_code_loader.lock 2>/dev/null
+
+# 3. Check for suspicious outbound connections from Python processes
+# (run as root/admin for full visibility)
+netstat -anp 2>/dev/null | grep python | grep -E "ESTABLISHED|SYN_SENT" | grep -v "127.0.0.1"
+
+# 4. Check cron/launchd/Task Scheduler for persistence
+crontab -l 2>/dev/null | grep -v "^#"
+launchctl list 2>/dev/null | grep -i python
+# Windows: Task Scheduler → Task Scheduler Library → look for Python tasks
+```
+
+### 3. Check Cloud Provider Logs for Credential Use
+
+**AWS:** Check CloudTrail for `AssumeRole`, `GetSessionToken`, `List*` calls from unusual IPs ~4.5 hours after Oct 21 11:39 UTC (per Wiz observation).
+
+**GCP:** Check Cloud Audit Logs for service account key usage from unknown locations.
+
+**Azure:** Check Entra ID sign-in logs for service principal activity.
+
+---
+
+## Immediate Mitigation Steps (Do These NOW)
+
+### 1. Remove the Malicious Package
+
+```bash
+# Uninstall compromised version
+pip uninstall -y litellm
+
+# Verify it's gone
+pip list | grep litellm
+# Should return nothing
+
+# Clean pip cache (removes downloaded wheel)
+pip cache purge
+```
+
+### 2. Remove Docker Images
+
+```bash
+# List and remove compromised images
+docker images | grep litellm
+docker rmi ghcr.io/berriai/litellm:1.107.0
+docker rmi ghcr.io/berriai/litellm:latest  # if pulled during window
+docker rmi docker.io/berriai/litellm:1.107.0
+docker system prune -f  # clean up layers
+```
+
+### 3. **ROTATE ALL CREDENTIALS** (Critical)
+
+The stealer grabs **everything readable by your user**. Assume all are compromised:
+
+```bash
+# AWS
+aws iam list-access-keys --user-name $(whoami)
+# → Disable/delete ALL keys, create new ones
+# → Rotate IAM roles assumed by EC2/ECS/Lambda if instance profile was accessible
+
+# GCP
+gcloud auth list
+# → Revoke ALL user credentials: gcloud auth revoke --all
+# → Rotate service account keys: gcloud iam service-accounts keys list --iam-account=...
+
+# Azure
+az ad sp credential list --id <sp-id>
+# → Rotate all service principal secrets/certs
+
+# Kubernetes
+# → Rotate kubeconfig: generate new client cert/key, update ~/.kube/config
+# → If using service account tokens: kubectl delete secret <token-secret>; new token auto-generated
+
+# Docker/GHCR/Registry
+# → docker logout; re-auth with new PAT/token
+# → Rotate registry credentials in CI/CD (GitHub Actions, GitLab CI, etc.)
+
+# GitHub/GitLab/Bitbucket
+# → Settings → Developer settings → Personal access tokens → REVOKE ALL, generate new
+# → GitHub: gh auth refresh -h github.com -s workflow,admin:repo_hook,read:org
+
+# SSH Keys
+# → Check ~/.ssh/authorized_keys on all servers for unknown keys
+# → Regenerate your SSH keypair: ssh-keygen -t ed25519; deploy new public key
+
+# GPG Keys
+# → gpg --list-secret-keys; if compromised, revoke and regenerate
+
+# Browser Passwords
+# → Chrome: chrome://passwords → export → change every saved password
+# → Use a password manager (1Password, Bitwarden) going forward
+
+# Environment Variables / .env Files
+# → Any .env in your workspace: ROTATE EVERY VALUE
+# → CI/CD secrets: GitHub Actions → Settings → Secrets → UPDATE ALL
+```
+
+### 4. Clean Up Persistence Mechanisms
+
+```bash
+# Remove loader lock files
+rm -f /tmp/.pc_once_72129118c59f5636c0bb /tmp/remote_code_loader.lock
+
+# Kill any Python processes that might be running the loader
+pkill -f "sitecustomize" 2>/dev/null
+pkill -f "cook.pth" 2>/dev/null
+
+# Check and remove cron/launchd/Task Scheduler entries
+crontab -l | grep -v "python.*sitecustomize" | crontab -
+# Windows: Open Task Scheduler, delete any "Python" or "LiteLLM" tasks you didn't create
+```
+
+### 5. Install Clean Version
+
+```bash
+# Only AFTER rotation and cleanup
+pip install litellm==1.107.1  # or latest: pip install -U litellm
+
+# Verify clean install
+python -c "import litellm; print(litellm.__version__)"
+# Should show 1.107.1 or higher
+
+# Verify no malicious files
+ls -la $(python -c "import litellm; import os; print(os.path.dirname(litellm.__file__))")/../ | grep -E "cook\.pth|sitecustomize\.py"
+# Should return NOTHING
+```
+
+---
+
+## Is There a Fix?
+
+**Yes — v1.107.1 is clean.** LiteLLM published it at 13:23 UTC on Oct 21, 2026 (minutes after pulling v1.107.0).
+
+**But the fix doesn't undo the damage.** If you installed v1.107.0 during the ~1h44m window:
+
+- ✅ **Code is fixed** — v1.107.1+ has no malicious files
+- ❌ **Your credentials were already stolen** — rotation is mandatory
+- ❌ **Backdoor may have established persistence** — check cron/launchd/Task Scheduler
+- ❌ **Attacker may have lateral access** — check cloud logs for anomalous activity
+
+**LiteLLM's response:** Published security advisory, revoked compromised GitHub tokens, enabled mandatory 2FA for all maintainers, added PyPI trusted publishing (OIDC) to prevent token-based publishes, hired external forensic firm.
+
+---
+
+## Why This Keeps Happening (And Will Again)
+
+This is the **second LiteLLM supply chain attack in 2026** (first: TeamPCP, February). Root causes:
+
+| Failure | Why It Matters |
+|---------|----------------|
+| **Long-lived GitHub OAuth tokens** (`gh auth token`) with `workflow` scope | Tokens don't expire; stolen token = full CI/CD control |
+| **No PyPI trusted publishing (OIDC) until AFTER this attack** | Token-based publish = single point of failure |
+| **No build attestation / SLSA Level 3** | Can't cryptographically verify artifact provenance |
+| **Python `.pth` / `sitecustomize` auto-execution** | Malware runs **before any user code** — no import needed |
+| **Docker images built from same compromised CI** | Same attacker, same credentials → same compromise |
+
+**This pattern will repeat** across the Python/ML ecosystem until:
+1. **Trusted publishing (OIDC)** becomes mandatory on PyPI
+2. **SLSA Level 3+ build provenance** is required for popular packages
+3. **Ephemeral, scoped CI tokens** replace long-lived OAuth tokens
+4. **Python startup-file execution** is sandboxed or opt-in
+
+---
+
+## Your Checklist Before Moving On
+
+- [ ] **Confirmed clean:** `pip list | grep litellm` shows 1.107.1+ (or not installed)
+- [ ] **Docker clean:** `docker images | grep litellm` shows only 1.107.1+
+- [ ] **Malicious files gone:** `find / -name "cook.pth" -path "*site-packages*"` returns nothing
+- [ ] **Backdoor artifacts gone:** `/tmp/.pc_once_*` and `/tmp/remote_code_loader.lock` removed
+- [ ] **No suspicious cron/launchd/Task Scheduler entries**
+- [ ] **ALL credentials rotated:** AWS, GCP, Azure, K8s, Docker, GitHub, GitLab, SSH, GPG, browser, .env, CI/CD secrets
+- [ ] **Cloud audit logs reviewed** for anomalous activity since Oct 21 11:39 UTC
+- [ ] **Team notified** — anyone who may have pulled v1.107.0 must rotate too
+- [ ] **Dependabot/Renovate alerts checked** — some tools auto-upgraded; check lockfiles
+
+---
+
+## Related Reading
+
+- [LiteLLM Official Advisory: "Contained: Oct 21, 2026 LiteLLM release v1.107.0 Compromised"](https://docs.litellm.ai/blog/security-incident-oct-21-2026)
+- [Wiz Research: "LiteLLM Compromised — Steals Credentials"](https://www.wiz.io/blog/litellm-compromised-steals-credentials)
+- [SOCRadar: "New LiteLLM Supply Chain Attack Hits PyPI and Docker"](https://socradar.io/blog/litellm-supply-chain-attack-pypi-docker/)
+- [Kodem Security: "LiteLLM Supply Chain Attack — IOCs and Runbook"](https://www.kodemsecurity.com/resources/litellm-supply-chain-attack-litellm-1-107-0-affected-versions-iocs-and-first-hour-response-runbook)
+- [GitHub Advisory GHSA-xxxx-xxxx-xxxx](https://github.com/BerriAI/litellm/security/advisories/GHSA-xxxx-xxxx-xxxx)
+- [Beware: Malicious .git Configs Can Make Your AI Agent Run Attacker Code — 7 Agents Affected](/blog/beware-malicious-git-configs-run-attacker-code-claude-codex-cursor/)
+- [Beware: Clinejection — How a GitHub Issue Title Became a Supply Chain Attack](/blog/beware-clinejection-supply-chain-attack-github-actions/)
+- [Coding Agent Security Checklist 2026](/blog/coding-agent-security-checklist-2026/)
+
+---
+
+## Summary
+
+**LiteLLM 1.107.0 was a weaponized supply chain attack.** Not a bug — a deliberate, sophisticated compromise of the build pipeline via stolen GitHub OAuth tokens. The malware steals **everything your user can read** and installs a **persistent hourly backdoor**.
+
+**If you touched v1.107.0: rotate everything. Now.**
+
+The window was short (~2 hours), but the blast radius is wide — LiteLLM is embedded in most AI coding tools. Treat this as a **full credential compromise event**, not a "update and move on" patch.
+
+*Updated October 23, 2026. IOCs and detection logic from Kodem Security, Wiz, SOCRadar, and LiteLLM official advisory. Run the detection commands above — they're safe, read-only checks.*
+
+---
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
