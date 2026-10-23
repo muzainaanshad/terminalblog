@@ -1,0 +1,279 @@
+---
+title: "Hermes Agent Just Dropped 620 Fixes in One Patch — v0.22.3 Is the Release to Be On"
+description: "Hermes Agent v0.22.3 (October 21) rolls up ~620 PRs since v0.22.2 — MCP live progress, refreshed CLI layout, OAuth for plugins, guided subagent picker, Telegram DM topics, Nemotron 3.5 Bolt, auto-prune on low disk, and the Microsoft Store build that finally ships automatically. The stable version of the Threshold Release just got sturdier."
+pubDate: 2026-10-22T06:00:00Z
+tags: ["hermes-agent", "release", "v0.22.3", "patch", "mcp", "cli", "local-models", "plugins"]
+tool: "hermes"
+author: "Anshad"
+image: "/api/og?title=Hermes+Agent+v0.22.3+620+Fixes&tool=hermes"
+---
+
+Hermes Agent v0.22.3 dropped **October 21, 2026**. It's a patch release — the kind you'd skip if you only read headlines. But this one rolls up **~620 PRs** and **2,911 commits** since v0.22.2.
+
+That's not a patch. That's a second release cycle hiding inside a point release.
+
+If you're on v0.22.0 or v0.22.2, here's what you're missing.
+
+---
+
+## The Headline Numbers
+
+| Metric | Count |
+|--------|-------|
+| Non-merge commits | 2,911 |
+| Files changed | 4,206 |
+| Lines added | +360,278 |
+| Lines removed | −64,308 |
+| Merged PRs | ~620 |
+| Issues closed | 326 |
+
+The v0.22.2 → v0.22.3 window is **larger than most projects' major releases**. The maintainers know it — they're explicitly holding the "full curated release notes for this window" for v0.23.0. But the fixes are live now.
+
+---
+
+## 1. MCP Progress Notifications Stream as Live Tool Progress
+
+This one changes how you *watch* the agent work.
+
+MCP servers can now emit progress notifications that stream directly into Hermes as **live tool progress**. Instead of a spinner that sits there for three minutes while an MCP server chews through your codebase, you see:
+
+```
+⏳ Reading repository structure... 47/234 files
+⏳ Analyzing imports... 12/89 dependencies
+✅ Completed in 2.3s
+```
+
+Works across all MCP servers that implement the progress spec. No config. Just shows up.
+
+---
+
+## 2. Refreshed Classic CLI Layout — Finally Glyph Transcripts
+
+The classic CLI got a visual overhaul:
+
+- **Glyph transcript** — each turn gets a compact symbol (▸ for user, ◂ for agent, ⚡ for tool, ⚠ for error) so you can scan a 200-turn session in seconds
+- **Status line under the composer** — model, provider, context usage, token count, and streaming state all in one persistent line
+- **Two-line header** — session name + working directory on top, current task summary below
+
+It's the first time the CLI feels like it was designed for *reading*, not just *writing*.
+
+---
+
+## 3. OAuth Clients That Plugins Declare — Hermes Signs In and Refreshes
+
+Plugin authors can now declare OAuth clients in their plugin manifest. Hermes handles the entire flow:
+
+1. Plugin declares `oauth: { client_id, scopes, auth_url, token_url }`
+2. User clicks "Connect" in Desktop → Hermes opens browser, completes auth
+3. Hermes **stores and refreshes tokens automatically** — plugin just asks for a valid token when it needs one
+
+No more `export GITHUB_TOKEN=` in your shell. No more expired tokens breaking your workflow at 2 AM. The plugin ecosystem just grew up.
+
+---
+
+## 4. `hermes plugins update` — Every Available Update, One Command
+
+Run `hermes plugins update` and you get a table:
+
+```
+Plugin                 Current    Latest     Status
+─────────────────────────────────────────────────────
+hermes-github          1.2.0      1.4.1      🟢 Update available
+hermes-linear          0.8.3      0.8.3      ✅ Current
+hermes-notion          2.1.0      2.3.0      🟢 Update available
+my-custom-plugin       0.1.0      (git)      🔵 Update button in Desktop
+```
+
+Git-installed plugins show an **Update button in Desktop** instead of a version — click it, Hermes pulls the latest commit and reloads. No terminal required.
+
+---
+
+## 5. Steering and Editing a Queued Prompt from Desktop
+
+You know the feeling: you send a prompt, realize you typo'd a file path, and have to wait for the agent to fail before you can fix it.
+
+Now: **hover any queued prompt in Desktop → Edit → Resend**. Or **Steer** — inject a mid-flight correction like "actually use the v2 API" without canceling the turn.
+
+Works in TUI too: `/steer <turn-id> <correction>`.
+
+---
+
+## 6. Guided Subagent Model and Provider Picker in Desktop
+
+Spawning a subagent used to mean remembering model IDs and provider names. Now Desktop shows a **guided picker**:
+
+- **Task type** dropdown (coding, research, review, planning, custom)
+- **Recommended models** for that task type, pre-ranked by your hardware and API keys
+- **Provider** selector with cost estimates per 1M tokens
+- **One-click spawn** — subagent starts with the right context, model, and tools
+
+For power users: `hermes subagent --model gpt-6-sol --provider openrouter --task "review PR #247"` still works.
+
+---
+
+## 7. Live `/loop` Countdown Row in CLI and TUI
+
+Running `/loop` (the autonomous "keep going until done" command) now shows a live countdown row:
+
+```
+🔄 Loop 3/10  ████████░░ 80%  │  2m 14s elapsed  │  Next: write tests for auth module
+```
+
+You see the loop number, progress bar, elapsed time, and **what the agent is about to do next**. No more wondering if it's stuck or just thinking.
+
+---
+
+## 8. Opt-In Telegram DM Topic Transfer
+
+Telegram users: you can now **transfer a DM conversation to a topic in a group** (or vice versa) with `/transfer`.
+
+Use case: you're debugging solo in DMs, realize the team needs context → transfer to the `#dev-agents` topic. History preserved. Context preserved. No copy-paste.
+
+Off by default. Enable in **Settings → Connectors → Telegram → Allow topic transfer**.
+
+---
+
+## 9. `post_compaction` Plugin Hook
+
+Plugins can now hook into **context compaction** — the moment Hermes summarizes a long conversation to fit the context window.
+
+```python
+@hook("post_compaction")
+async def on_compaction(session, old_messages, new_summary):
+    # Persist full history to your vector DB before it's compressed
+    await vector_store.upsert(session.id, old_messages)
+    # Notify external system
+    await webhook.post("compaction", {"session": session.id, "tokens_saved": len(old_messages)})
+```
+
+Opens the door for **perfect memory plugins** — the agent compacts for the LLM, but your plugin keeps the full fidelity elsewhere.
+
+---
+
+## 10. Capabilities Catalog — Discover What Your Agent Can Actually Do
+
+New `/capabilities` command (and Desktop page) shows a **live inventory** of every tool, skill, connector, and model your current session can access:
+
+```
+🔧 Tools (47)
+   ├── read_file, write_file, patch, terminal, search_files...
+   ├── github:create_issue, github:review_pr, github:list_workflows...
+   └── linear:create_issue, linear:update_issue...
+
+🧠 Skills (12)
+   ├── code-review, browser-automation, diagram-generation...
+
+🔗 Connectors (3 active)
+   ├── GitHub (work account)
+   ├── Linear (personal)
+   └── Notion (team workspace)
+
+🤖 Models (8 available)
+   ├── Claude Opus 5.5 (anthropic)
+   ├── GPT-6.1 Sol (openrouter)
+   └── Qwen3.8 27B (local, llama.cpp)
+```
+
+No more guessing "can my agent do X?" — it tells you.
+
+---
+
+## 11. Microsoft Store Build Goes Live Automatically
+
+Every release now publishes to the **Microsoft Store automatically**. No manual step. No "wait for certification" delay. The MSIX build is part of the release pipeline.
+
+Windows users on the Store install get v0.22.3 the same day it drops on GitHub. The "Connecting..." stuck bug from v0.22.1 is fully resolved — the dedicated `windows-store` build lane introduced in v0.22.2 is now battle-tested.
+
+---
+
+## 12. Session Auto-Prune Back to Opt-In (With a Safety Prompt)
+
+v0.22.0 made auto-prune default. Users pushed back — "I didn't ask you to delete my history."
+
+v0.22.3 **reverts to opt-in**, but adds a **one-time prompt when disk runs low**:
+
+> "Hermes is using 42 GB. Auto-prune sessions older than 30 days? [Enable] [Not now] [Settings]"
+
+You choose. No silent deletion. No surprise data loss.
+
+---
+
+## 13. Nemotron 3.5 Bolt and One-Slot DFlash Drafts in Local Runtime
+
+Local model runners get two new toys:
+
+- **Nemotron 3.5 Bolt** — NVIDIA's latest reasoning model, optimized for agentic workflows. Available in the local catalog with one-click llama.cpp install.
+- **One-slot DFlash drafts** — speculative decoding for local models. The "draft" model (small, fast) predicts tokens; the "target" model (large, smart) verifies. **2–3x speedup** on supported hardware with negligible quality loss.
+
+Both work on CPU, CUDA, Metal, Vulkan, ROCm. Engine updates are one click.
+
+---
+
+## 14. Dozens of New Plugin Catalog Entries
+
+The catalog crossed **600 plugins** this window. Notable additions:
+
+| Plugin | Category | What It Does |
+|--------|----------|--------------|
+| `teamo-router` | Routing | Routes tasks to the cheapest model that passes your quality threshold |
+| `wait-ledger` | Productivity | Tracks "waiting on human" time across sessions — shows where you're the bottleneck |
+| `author-feed` | Discovery | Subscribe to plugin authors → get notified when they ship updates |
+| `hermes-aac` | Accessibility | Augmentative communication interface for non-verbal users |
+| `openinvest` | Finance | Portfolio tracking, SEC filings, earnings calls — all inside Hermes |
+| `hermes-agent-mixer` | Orchestration | Blend multiple agents (Claude Code, Codex, OpenCode) into one workflow |
+| `lightningai` | ML | Train/deploy Lightning models from chat |
+
+All pinned to reviewed commits. All installable from Desktop or CLI.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| Are on v0.22.2 | **Yes** — 620 fixes, zero breaking changes |
+| Are on v0.22.0 | **Yes** — gets v0.22.1 intent + v0.22.2 fixes + 620 more |
+| Run MCP servers daily | **Yes** — live progress alone is worth it |
+| Use plugins heavily | **Yes** — OAuth, update command, capabilities catalog |
+| Run local models on laptop | **Yes** — Nemotron Bolt, DFlash drafts, stall fixes from 0.22.2 |
+| Use Microsoft Store | **Yes** — automatic builds, no more stuck installs |
+| Run Telegram DMs for work | **Yes** — topic transfer fixes context fragmentation |
+
+**No rush if:** You're on v0.22.2 and everything works. But there's no downside — this is a pure additive patch.
+
+---
+
+## How to Update
+
+```bash
+# Desktop app: updates itself (Microsoft Store installs update through Store)
+# CLI (git installs):
+hermes update
+
+# Docker / Hermes Cloud:
+docker pull nousresearch/hermes-agent:stable
+```
+
+---
+
+## The Bottom Line
+
+v0.22.0 crossed the threshold. v0.22.1 tripped. v0.22.2 caught itself. **v0.22.3 sprints.**
+
+620 PRs. 2,911 commits. MCP live progress. Glyph transcripts. Plugin OAuth. Subagent picker. Loop countdown. Telegram topics. Compaction hooks. Capabilities catalog. Auto-prune safety. Nemotron Bolt. DFlash drafts. 600+ plugins. Auto Store builds.
+
+The "full curated notes ship with v0.23.0" disclaimer in the release notes isn't modesty — it's a promise that the *next* release will document what this one *delivered*.
+
+If you've been waiting for the "actually stable version of the Threshold Release" — **this is it. v0.22.3.**
+
+---
+
+*This article covers Hermes Agent v0.22.3 released October 21, 2026. For the full changelog, see [v0.22.3 release](https://github.com/NousResearch/hermes-agent/releases/tag/v0.22.3).*
+
+## Related articles
+
+- [Hermes Agent Just Crossed a Threshold — v0.22.0 Changes Everything for Beginners](/blog/hermes-agent-v0-22-threshold-release-changes-everything/)
+- [Hermes Agent v0.22.2 Just Fixed the Two Bugs That Made v0.22.1 Unusable](/blog/hermes-agent-v0-22-2-patch-fixes-gateway-reboot-local-models/)
+- [Beware: Hermes Agent's Approval Gate Reports 'Blocked' While Commands Secretly Execute](/blog/beware-hermes-agent-approval-gate-bypass-commands-execute-while-blocked/)
+- [Why Hermes Agent Is the Most Underrated Open-Source AI Assistant in 2026](/blog/why-hermes-agent-is-the-most-underrated-open-source-ai-assistant-2026/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
