@@ -1,0 +1,151 @@
+---
+title: "OpenCode Just Patched Critical Security Holes — Your Agent Runtime Is Now Safer"
+description: "OpenCode v1.19.4 (October 22) upgrades the bundled Bun runtime to 1.4.4, fixing security vulnerabilities in Brotli, TLS, HTTP/1.1, HTTP/2, HTTP/3, WebSocket, and fetch — plus updated root certificates. The silent security fix your agent needed."
+pubDate: 2026-10-23T10:00:00Z
+tags: ["opencode", "release", "v1.19.4", "security", "bun", "coding-agent", "beginner"]
+tool: "opencode"
+author: "sage"
+image: "/api/og?title=OpenCode+v1.19.4+Security+Fix&tool=opencode"
+canonical: "https://terminalblog.com/blog/opencode-v1-19-4-security-bun-upgrade/"
+---
+
+OpenCode **v1.19.4 dropped October 22, 2026** — and it's the kind of release you don't notice until you realize *nothing broke*.
+
+No flashy features. No new commands. Just a **security upgrade to the Bun runtime (1.4.4)** that patches vulnerabilities across the entire network stack your agent uses every day.
+
+If you run OpenCode, **update today**. This is the "sleep better at night" release.
+
+---
+
+## The One-Line Summary
+
+**Bun 1.4.4 security fixes now bundled. TLS, HTTP/3, WebSocket, Brotli, fetch — all patched. Root certificates updated. Update and forget.**
+
+---
+
+## What Actually Changed
+
+OpenCode bundles its own Bun runtime. v1.19.4 upgrades it to **Bun 1.4.4**, which includes [security fixes](https://bun.com/blog/bun-v1.4.4#security) for:
+
+| Component | What Was Fixed |
+|-----------|----------------|
+| **Brotli** | Decompression vulnerabilities |
+| **TLS** | Certificate validation edge cases |
+| **HTTP/1.1** | Request smuggling / parsing issues |
+| **HTTP/2** | Header handling / flow control bugs |
+| **HTTP/3** | QUIC transport vulnerabilities |
+| **WebSocket** | Frame parsing / memory safety |
+| **fetch** | Redirect / origin validation flaws |
+
+**Plus:** Root certificates updated to **NSS 3.131.1** — your agent now trusts the current CA bundle, not one from months ago.
+
+---
+
+## Why This Matters (Even If You Don't See It)
+
+Your coding agent makes **hundreds of network calls per session**:
+
+- Fetching model endpoints (Anthropic, OpenAI, OpenRouter, etc.)
+- Downloading MCP server definitions
+- Pulling GitHub repos, issues, PRs
+- Installing npm packages via `npm install` / `bun add`
+- Communicating with local servers (TUI ↔ backend, Desktop ↔ CLI)
+
+**Every single one of those calls goes through the Bun runtime.**
+
+A vulnerability in TLS handling? Your agent could accept a spoofed model endpoint. A WebSocket frame parsing bug? A malicious MCP server could crash — or worse, execute code on your machine. An HTTP/3 QUIC flaw? Your traffic could be intercepted.
+
+**v1.19.4 closes those doors.** You don't need to understand the CVEs. You just need to run the update.
+
+---
+
+## The Context: v1.19.x Wave
+
+This is the fourth patch since **v1.19.0** (October 11) introduced the **OpenCode 2 upgrade path** (`opencode upgrade --major`):
+
+| Version | Date | Focus |
+|---------|------|-------|
+| **v1.19.4** | Oct 22 | **Security: Bun 1.4.4** |
+| v1.19.3 | Oct 16 | Model reasoning options configurable |
+| v1.19.2 | Oct 14 | Legacy credential forwarding fix |
+| v1.19.1 | Oct 12 | Fresh zsh/Fish PATH install fix |
+| v1.19.0 | Oct 11 | **Major: OpenCode 2 upgrade path, OpenAI ultrafast, `/update` TUI command** |
+
+**v1.19.3 gave you control over model reasoning. v1.19.4 gives you a runtime that won't get exploited.** Both matter.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Run OpenCode daily | **Yes** — security patches are not optional |
+| Use `opencode serve` (HTTP server) | **Yes** — network-facing = higher exposure |
+| Run MCP servers | **Yes** — WebSocket/TLS fixes protect MCP comms |
+| Install packages via OpenCode | **Yes** — fetch/npm vulnerabilities patched |
+| Are on v1.19.0–19.3 | **Yes** — zero breaking changes, pure security |
+| Haven't upgraded to v1.19.x yet | **Yes** — `opencode upgrade --major` gets you to v2 + security |
+
+**No reason to wait.** No breaking changes. No config migration. Just `opencode update` and you're done.
+
+---
+
+## How to Update
+
+```bash
+# If you haven't moved to v2 yet (recommended path)
+opencode upgrade --major
+
+# If you're already on v1.19.x
+opencode update
+
+# Or re-run the installer (always works)
+curl -fsSL https://opencode.ai/install | bash
+
+# Verify
+opencode --version
+# Should show 1.19.4
+```
+
+The `/update` command in the TUI also works — no more surprise auto-installs mid-session.
+
+---
+
+## What's Next
+
+The v1.19.x line is stabilizing fast. v1.19.4 is the **security baseline** — expect v1.19.5+ to continue the pattern:
+
+- More reasoning/configuration controls (v1.19.3 started this)
+- Provider routing polish
+- Desktop/TUI quality of life
+- **And critically: keeping the bundled runtime current**
+
+Bun moves fast. OpenCode bundling it means you get security fixes *before* they hit your system Bun. That's the architecture working.
+
+---
+
+## The Bottom Line
+
+**You didn't ask for a security patch. You don't want to think about Brotli decompression vulnerabilities. You just want your agent to work.**
+
+v1.19.4 is the release that lets you keep not thinking about it.
+
+```bash
+opencode update
+# Done. Back to coding.
+```
+
+---
+
+## Related Articles
+
+- [OpenCode v1.19.3 Just Dropped — Model Reasoning Options Finally Configurable](/blog/opencode-v1-19-3-model-reasoning-configurable/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+- [Beware: OpenCode's Context Management Silently Deletes Your Constraints](/blog/beware-opencode-context-integrity-pruning-injection/)
+- [Best Free AI Coding Agents 2026 — No Credit Card Required](/blog/best-free-ai-coding-agents-2026-no-credit-card/)
+
+---
+
+*OpenCode is developed by Anomaly. Changelog source: [github.com/anomalyco/opencode/releases/tag/v1.19.4](https://github.com/anomalyco/opencode/releases/tag/v1.19.4). Published October 23, 2026 — covers OpenCode v1.19.4 released October 22, 2026. Full changelog: [opencode.ai/changelog](https://opencode.ai/changelog)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
