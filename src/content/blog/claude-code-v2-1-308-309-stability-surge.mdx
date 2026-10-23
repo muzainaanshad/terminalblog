@@ -1,0 +1,178 @@
+---
+title: "Claude Code Just Dropped 100+ Fixes in Two Days — The Stability Wave You've Been Waiting For"
+description: "Claude Code v2.1.308 and v2.1.309 landed back-to-back with 100+ fixes — sandbox escapes, MCP double-calls, PowerShell hooks, git performance, and the dangerous rm/rmdir prompt finally fixed. Here's what actually matters."
+pubDate: 2026-10-23T10:00:00Z
+tags: ["claude-code", "release", "v2.1.308", "v2.1.309", "stability", "security", "beginner"]
+tool: "claude-code"
+author: "Anshad"
+image: "/api/og?title=Claude+Code+v2.1.308+309+Stability&tool=claude-code"
+canonical: "https://terminalblog.com/blog/claude-code-v2-1-308-309-stability-surge/"
+---
+
+Claude Code v2.1.307 gave us the `safety_event` telemetry — the observability breakthrough. **Two days later, v2.1.308 and v2.1.309 dropped 100+ fixes** that plug the holes `safety_event` was built to expose.
+
+If you run agents in production, this is the update cycle that actually matters.
+
+---
+
+## The Two-Day Stability Surge
+
+| Release | Date | Commits | Focus |
+|---------|------|---------|-------|
+| v2.1.308 | Oct 22, 04:34 UTC | 1 | "Bug fixes and reliability improvements" |
+| v2.1.309 | Oct 22, 22:18 UTC | 1 | 80+ fixes across sandbox, MCP, git, hooks, VS Code, cloud sessions |
+
+**v2.1.308** was a quiet drop — one commit, minimal notes. **v2.1.309** is the payload: 80+ itemized fixes that read like a "greatest hits" of everything that's been annoying operators for months.
+
+---
+
+## The Fixes You'll Actually Feel
+
+### Sandbox Escapes Finally Plugged
+
+- **Bash startup files**: Sandboxed commands on macOS/Linux were running shell startup files *outside* the sandbox before each command. Fixed.
+- **Symlink `denyWrite` bypass**: macOS sandbox glob patterns didn't apply at a path's real location when reached through a symlink. Fixed.
+- **MCP config modification**: Auto-accepted edits and sandboxed commands could modify the MCP config file passed with `--mcp-config`. Fixed.
+- **Profile store symlink bypass**: Write protection didn't apply when config directory reached through symlink. Fixed.
+- **Background command write-deny lift**: Linux sandbox write denies lifted when background command outlived session. Fixed.
+
+**Translation**: The sandbox is actually a sandbox now. Not "mostly a sandbox with creative workarounds."
+
+### The Dangerous `rm`/`rmdir` Prompt — Fixed
+
+In bypass-permissions mode (Desktop app and VS Code), the dangerous `rm` and `rmdir` prompt now **denies the command at once with a rewrite hint** instead of prompting. Unattended sessions keep going instead of hanging on a delete confirmation.
+
+This is the kind of fix that prevents "I came back and my agent deleted the wrong folder" stories.
+
+### HTTP MCP Double-Call Fix (From v2.1.307, Reinforced)
+
+When an HTTP MCP connection dropped mid-call, write tools were sent **twice**. Double file writes, double API calls, double charges. v2.1.307 limited retries to read-only/idempotent tools. v2.1.309 reinforces: write-type tools that lose connection **fail instead of retrying**. Handle the failure explicitly in your MCP servers.
+
+### PowerShell Hooks — No More Silent Fail-Open
+
+`PreToolUse` and `PermissionRequest` hooks with `"shell": "powershell"` were **failing open when Git for Windows isn't installed**. Now they block properly (exit code 2 respected). If you run hooks on Windows, verify Git for Windows is present or they'll silently approve everything.
+
+### Git Performance on Windows — Actually Fast Now
+
+"Improved the speed of many git commands Claude Code runs for itself on Windows; on every platform, errors from those commands now show in English even when git is set to another language."
+
+If you've watched Claude Code sit on `git status` for 30 seconds on Windows — this is for you.
+
+### VS Code Extension — The Quality-of-Life Wave
+
+- **Blank panel recovery**: Cached incomplete files no longer leave the Claude panel blank — it recovers or tells you what went wrong
+- **Empty session spam**: "Untitled" sessions no longer fill history when starting without sending a message
+- **Long message folding**: Slash commands like `/goal` now fold behind "Show more" like other prompts
+- **Edit/Write speed**: Wait for new problems after each edit dropped from 1–1.5s to **0.75s in most cases**
+- **Ctrl+J behavior**: No longer always inserts newline — respects keybindings.json
+- **Plugin label overlap**: "From the … plugin" label no longer draws over slash command/@-mention menus
+
+### Model Alias `[1m]` — No More Cryptic Errors
+
+Using `opus[1m]` or similar aliases with `CLAUDE_CODE_DISABLE_1M_CONTEXT` no longer causes "model not found" errors. The alias resolves correctly.
+
+### MCP Server "Needs Authentication" — No More Mystery
+
+When macOS keychain is locked, MCP servers now show **"needs authentication"** reason instead of generic failure. Unlock keychain, next run reconnects.
+
+### MCP Servers Don't Stay "Failed" After Sleep/Wake
+
+Headless runs recover cleanly. No more manual restarts after laptop sleep.
+
+### `/clear` Conversations Stay Cleared
+
+Cloud/self-hosted restarts no longer resurrect cleared conversations. Your context actually stays cleared.
+
+### Subagent Transcripts — Real Token Usage + Stop Reasons
+
+Cost tracking and debugging actually work now. You get real numbers, not estimates.
+
+### Self-Hosted Runner Checkout Hooks — 30 Min Timeout
+
+Default 30 min (SIGTERM → SIGKILL). If your repo fetch takes longer:
+
+```bash
+claude self-hosted-runner --checkout-hook-timeout-min 60
+```
+
+Or `0` for no limit.
+
+### `axScreenReader` Settings Location Changed (Breaking)
+
+Since v2.1.305, `axScreenReader` and `CLAUDE_AX_SCREEN_READER` in `settings.env` **only apply from**:
+- User settings (`~/.claude/settings.json`)
+- Managed settings
+- `--settings` flag
+
+**Project settings (`.claude/settings.json`) and local settings (`.claude/settings.local.json`) are ignored.** Move your accessibility config or it stops working.
+
+---
+
+## Breaking Changes Checklist
+
+1. **`axScreenReader`**: Move from project/local settings → user/managed/`--settings`
+2. **Self-hosted checkout hooks**: Increase timeout if >30 min needed
+3. **HTTP MCP write tools**: Handle connection-drop failures explicitly (no auto-retry)
+4. **API 2026-10-21** (from v2.1.307): Remove `temperature`/`top_p`/`top_k` from Messages API calls
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| Run agents in production with telemetry | **Yes** — v2.1.307 `safety_event` + v2.1.309 sandbox fixes = actual observability |
+| Use HTTP MCP with write tools | **Yes** — double-call fix prevents data corruption |
+| Run on Windows | **Yes** — git speed, PowerShell hooks, sandbox fixes |
+| Use bypass-permissions mode | **Yes** — `rm`/`rmdir` no longer hangs unattended sessions |
+| Use MCP servers on macOS with symlinks | **Yes** — sandbox bypasses fixed |
+| Just use CLI interactively | **When convenient** — mostly fixes, but the cumulative stability is real |
+
+---
+
+## How to Update
+
+```bash
+# Check current version
+claude --version
+# Should show 2.1.309+
+
+# Auto-update usually handles it
+# Or: Help → Check for Updates in VS Code extension
+
+# Manual: download from releases
+# https://github.com/anthropics/claude-code/releases/tag/v2.1.309
+```
+
+---
+
+## The Bottom Line
+
+v2.1.307 opened the black box with `safety_event`. **v2.1.308 and v2.1.309 welded the box shut.**
+
+- Sandbox escapes: plugged
+- Double MCP calls: eliminated
+- PowerShell silent fail-open: fixed
+- Git on Windows: fast
+- `rm`/`rmdir` in bypass mode: safe
+- VS Code extension: actually pleasant
+
+This isn't a feature release. It's the **stability release you've been waiting for** — the one that makes the observability from v2.1.307 meaningful because the underlying surface is finally solid.
+
+If you run agents where reliability matters, update this week.
+
+---
+
+## Related Articles
+
+- [Claude Code v2.1.307: Safety Event Telemetry — The Black Box Opens](/blog/claude-code-v2-1-307-safety-event-telemetry/)
+- [Claude Code v2.1.306: Cloud Session MCP Fix](/blog/claude-code-v2-1-306-cloud-session-mcp-fix/)
+- [Claude Code v2.1.288: 100 Fixes You Actually Feel](/blog/claude-code-v2-1-288-100-fixes-you-actually-feel/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Beware: Claude Code Approval Gate Bypass — Commands Execute While Blocked](/blog/beware-hermes-agent-approval-gate-bypass-commands-execute-while-blocked/)
+
+---
+
+*Claude Code v2.1.308 released October 22, 2026 (04:34 UTC). v2.1.309 released October 22, 2026 (22:18 UTC). Changelog source: [github.com/anthropics/claude-code/releases](https://github.com/anthropics/claude-code/releases).*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
