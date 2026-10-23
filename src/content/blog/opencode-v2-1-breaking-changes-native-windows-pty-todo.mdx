@@ -1,9 +1,9 @@
 ---
 title: "OpenCode v2.1 Just Broke Its Own SDK — Here's Why It Had To"
-description: "OpenCode v2.1 (October 20) ships intentional breaking changes to SDK, HTTP contracts, and plugin APIs. Persistent Windows PTYs, todo lists in TUI, reliable long-running commands, and a unified 'native' replay field. v2.1.2 adds Clear Free-Limit Recovery, Hide Free Models, and Configurable Location Unloading. The cost of admission for a stable platform."
+description: "OpenCode v2.1 (October 20) ships intentional breaking changes to SDK, HTTP contracts, and plugin APIs. Persistent Windows PTYs, todo lists in TUI, reliable long-running commands, and a unified 'native' replay field. v2.1.2 adds Clear Free-Limit Recovery, Hide Free Models, and Configurable Location Unloading. v2.1.3 adds MCP Input Forms, Background Compaction, and Pierre Highlights. The cost of admission for a stable platform."
 pubDate: "2026-10-20T15:00:00Z"
-updatedDate: "2026-10-21T15:00:00Z"
-tags: ["opencode", "release", "v2.1", "breaking-changes", "sdk", "windows", "beginner"]
+updatedDate: "2026-10-23T15:00:00Z"
+tags: ["opencode", "release", "v2.1", "breaking-changes", "sdk", "windows", "mcp", "beginner"]
 tool: "opencode"
 author: "Anshad"
 image: "/api/og?title=OpenCode+v2.1+Breaking+Changes&tool=opencode"
@@ -172,13 +172,79 @@ Desktop and TUI timelines now show **execution errors that happen before or betw
 
 ## Quick Version Context
 
-| Version | Date | Type | Focus |
+|| Version | Date | Type | Focus ||
 |---------|------|------|-------|
-| **v2.1.2** | Oct 21, 2026 | Patch | Clear Free-Limit Recovery, Hide Free Models, Configurable Location Unloading, Reliable Fresh Installs |
-| **v2.1.0** | Oct 20, 2026 | **Breaking** | SDK/HTTP/plugin contract unification, persistent Windows PTYs, todo lists, long-running commands, native ARM64, WinGet |
-| v2.0.28 | Oct 13, 2026 | Release | Per-project auto-accept, native ARM64, WinGet, no auto-updates, worktree tools, highlights |
-| v1.19.0 | Oct 11, 2026 | Release | OpenCode 2 upgrade path (`upgrade --major`), ultrafast tier, PTY validation |
-| v1.18.35 | Oct 6, 2026 | Release | xAI images, agent-readable stats, ecosystem growth |
+|| **v2.1.4** | Oct 23, 2026 | Patch | Dependency updates, stability ||
+|| **v2.1.3** | Oct 22, 2026 | Patch | MCP Input Forms, Background Compaction, faster code display, Bun 1.4.4 security ||
+|| **v2.1.2** | Oct 21, 2026 | Patch | Clear Free-Limit Recovery, Hide Free Models, Configurable Location Unloading, Reliable Fresh Installs ||
+|| **v2.1.0** | Oct 20, 2026 | **Breaking** | SDK/HTTP/plugin contract unification, persistent Windows PTYs, todo lists, long-running commands, native ARM64, WinGet ||
+|| v2.0.28 | Oct 13, 2026 | Release | Per-project auto-accept, native ARM64, WinGet, no auto-updates, worktree tools, highlights ||
+|| v1.19.0 | Oct 11, 2026 | Release | OpenCode 2 upgrade path (`upgrade --major`), ultrafast tier, PTY validation ||
+|| v1.18.35 | Oct 6, 2026 | Release | xAI images, agent-readable stats, ecosystem growth ||
+
+---
+
+## v2.1.4 (October 23): Dependency & Stability Patch
+
+Quick security/stability update. Updated dependencies across the stack. No user-facing features — just a safer, more stable runtime.
+
+---
+
+## v2.1.3 (October 22): MCP Input Forms, Background Compaction, Faster Code Display
+
+### MCP Input Forms Finally Appear
+
+**The problem:** When an MCP server asked for input during a tool call, the call would just wait until it timed out. No form, no prompt, no way to respond.
+
+**The fix:** MCP elicitation forms now render in **Desktop, Web, and TUI** — text, number, choice, multiselect, boolean, and URL requests all work ([#58184](https://github.com/anomalyco/opencode/pull/58184), [#58305](https://github.com/anomalyco/opencode/pull/58305)).
+
+**Why beginners care:** You connect an MCP server that needs a parameter (e.g., "which database?" "confirm deploy?"). Instead of a silent hang, a form pops up. You answer. The agent continues. This makes MCP actually usable for interactive workflows.
+
+---
+
+### Background Compaction — No More Waiting for Summaries
+
+**The problem:** When a session neared its context limit, compaction ran synchronously. The agent paused. You waited.
+
+**The fix:** Set `experimental.background_compaction: true` in settings. The summary prepares **in the background** as you approach the threshold. When compaction triggers, it's instant ([#57444](https://github.com/anomalyco/opencode/pull/57444), [#58294](https://github.com/anomalyco/opencode/pull/58294)).
+
+```json
+// settings.json
+{
+  "experimental": {
+    "background_compaction": true
+  }
+}
+```
+
+**Trade-off:** Summaries that are never used still cost tokens. Enable if you hit context limits often; disable if you're token-sensitive.
+
+---
+
+### Faster Code Display — Pierre Highlights
+
+Code blocks, file views, and review diffs in **Desktop** now use **Pierre Highlights**, cutting highlighting time and memory for large files/diffs ([#57937](https://github.com/anomalyco/opencode/pull/57937)).
+
+---
+
+### Bun 1.4.4 Security Fixes
+
+Bundled Bun upgraded to **1.4.4** — patches for Brotli, TLS, HTTP/3, WebSocket, `fetch`, and updated root certificates (NSS 3.131.1) ([#58087](https://github.com/anomalyco/opencode/pull/58087)).
+
+---
+
+### Other v2.1.3 Fixes
+
+- Compaction buffers that leave the model no room are now ignored; more provider context-overflow errors recognized ([#58313](https://github.com/anomalyco/opencode/pull/58313))
+- Sessions without their own model now use the selected agent's model ([#58355](https://github.com/anomalyco/opencode/pull/58355))
+- Agent files using V2-only fields now read as V2 agents ([#58218](https://github.com/anomalyco/opencode/pull/58218))
+- Codex models that ChatGPT accounts reject are now hidden ([#58180](https://github.com/anomalyco/opencode/pull/58180))
+- `opencode debug heap-dump [--server <url>]` captures a running server's heap without restarting ([#58252](https://github.com/anomalyco/opencode/pull/58252))
+- TUI: Added experimental **TUI tools** option — agents can open/type into session terminal via `tui_open_terminal` / `tui_write_terminal` without stealing keyboard focus ([#57506](https://github.com/anomalyco/opencode/pull/57506))
+- TUI no longer crashes when file watchers are unavailable or system limits exhausted ([#51536](https://github.com/anomalyco/opencode/pull/51536))
+- Desktop: **Capture heap snapshots** in command palette — saves app-window, main-process, server snapshots with native-memory, GPU, page diagnostics ([#58259](https://github.com/anomalyco/opencode/pull/58259))
+- MCP OAuth login keeps waiting after unrelated requests hit its callback ([#58342](https://github.com/anomalyco/opencode/pull/58342))
+- Remote MCP requests stay open past Bun's fetch idle timeout ([#58341](https://github.com/anomalyco/opencode/pull/58341))
 
 ---
 
