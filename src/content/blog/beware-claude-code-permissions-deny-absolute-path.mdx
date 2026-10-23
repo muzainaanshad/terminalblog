@@ -10,6 +10,53 @@ image: "/api/og?title=Beware:%20permissions.deny%20Silent%20No-Op&tool=Claude%20
 canonical: "https://terminalblog.com/blog/beware-claude-code-permissions-deny-absolute-path/"
 
 ---
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is the permissions.deny absolute path bug in Claude Code?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "When you write a `permissions.deny` rule with a single leading slash (e.g., `Read(/Users/me/.ssh/**)`), Claude Code interprets it as project-relative rather than absolute. The rule resolves to something like `/your/project/Users/me/.ssh/**` which matches nothing — so the deny rule silently does nothing. No error, no warning."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I write a correct absolute path deny rule?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Use double leading slashes for absolute paths: `Read(//Users/me/.ssh/**)` — or use tilde for home-relative: `Read(~/.ssh/**)`. Both resolve correctly."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does `sandbox.credentials` protect me from this?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. `sandbox.credentials` guards the Bash sandbox surface only, not the Read/Edit/Write tools. A project can have both guards present and the Read tool still returns the credential file."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I test if my deny rule actually works?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "In a throwaway session, ask the agent to read a file you believe is denied. If it returns contents, your rule is a no-op. Make this a standing check before trusting any deny list."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is this unique to Claude Code?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No — every agent permission system that layers a matcher over POSIX-style paths inherits the same trap: a deny rule that fails to parse correctly silently becomes allow. Gitlawb Zero and GitHub Copilot CLI have similar documented gaps."
+      }
+    }
+  ]
+})} />
+
 
 You wrote a `permissions.deny` rule to stop Claude Code from ever reading your `~/.ssh`, `~/.aws`, or `.env`. You tested nothing, because the rule *looks* like it does the job. It doesn't — and Claude Code will not tell you.
 

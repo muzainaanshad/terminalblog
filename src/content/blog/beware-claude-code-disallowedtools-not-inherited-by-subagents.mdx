@@ -10,6 +10,53 @@ image: "/api/og?title=Beware:%20disallowedTools%20Not%20Inherited%20by%20Subagen
 canonical: "https://terminalblog.com/blog/beware-claude-code-disallowedtools-not-inherited-by-subagents/"
 
 ---
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is the disallowedTools inheritance bug in Claude Code?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "When you set `disallowedTools` (or `permissions.deny`) in your main Claude Code session, those restrictions are NOT automatically inherited by subagents spawned via the Agent tool. The subagent starts with its own default tool policy, meaning tools you explicitly banned at the parent level can run freely inside the subagent."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why is this more dangerous than a normal bug?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Most developers assume a deny list applies globally across all agent processes. When subagents bypass it silently — no warning, no log entry — your safety model is broken without you knowing. This affects every workflow that uses the Agent tool to parallelize work (research, refactoring, test runs)."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I fix this in my current setup?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Stop relying on top-down inheritance. Instead: (1) Pass an explicit `allowedTools` list when spawning subagents — give only what they need; (2) Add external guardrails outside the agent (Git hooks, CI gates, read-only cloud credentials); (3) Keep dangerous credentials out of the agent's environment entirely; (4) Test your deny rules by spawning a subagent and asking it to perform the blocked operation — if it succeeds, your guard is a no-op."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does this affect me if I don't use subagents?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "If you only run the main session and never spawn subagents via the Agent tool, your deny list works as expected for that session. The gap is specifically the parent-to-subagent handoff."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Has Anthropic acknowledged this?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes — the GitHub issue has `has repro` and `area:permissions` labels from maintainers, confirming it's a real reproducible behavior, not a theoretical concern."
+      }
+    }
+  ]
+})} />
+
 
 You lock down your agent. You write a `permissions.deny` list, or you restrict the allowed toolset, and you trust that the boundary holds everywhere the agent runs. A freshly filed, reproducible GitHub issue says otherwise for one important case: **subagents you launch through the Agent tool do not inherit your `disallowedTools`**.
 

@@ -10,6 +10,53 @@ image: "/api/og?title=Beware:%20Claude%20Code%20Cross-Session%20Content%20Bleed&
 canonical: "https://terminalblog.com/blog/beware-claude-code-cross-session-content-bleed/"
 
 ---
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is cross-session content bleed in Claude Code?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Cross-session content bleed is a bug where context from one Claude Code session (including remote sessions on different machines) leaks into another session. The agent then treats this leaked context as if it were the current user's instructions and executes actions based on it — potentially running commands, modifying files, or pushing changes the user never requested."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I know if my session is affected?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Watch for these red flags: Claude Code references files, decisions, or instructions you never mentioned in the current session; it claims \"you asked me to...\" something you didn't; or it takes actions that seem to come from a different context. If any of these happen, kill the session immediately and check git status."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is this only a Windows issue?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The GitHub issue is labeled `platform:windows`, but the root cause is in core/desktop areas — not something inherently Windows-specific. Don't assume macOS or Linux is immune until the maintainers confirm the scope."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I prevent this with my current setup?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes — shrink the blast radius: (1) Never run with auto-approve / `dangerously-skip-permissions` on sensitive work; (2) Commit before any agent action so you have a restore point; (3) If a session references something you never said, stop it immediately; (4) Treat each host's session as a separate trust domain — don't assume state from one machine is safe on another."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Has this been fixed?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "As of the last update, the issue is open and labeled `has repro`. Watch GitHub issue #77147 for patches. Until a fix lands, assume the bleed risk exists and apply the mitigations above."
+      }
+    }
+  ]
+})} />
+
 
 There is a category of bug that should make every developer running an agent with filesystem, shell, and git access stop scrolling. Not a typo in the TUI. Not a flaky background task. A bug where the assistant starts acting on instructions that *you never gave it* — because context from a different session, possibly a different machine, leaked into the current one.
 
