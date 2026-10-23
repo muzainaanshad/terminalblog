@@ -1,0 +1,208 @@
+---
+title: "Zed Just Added Pyrefly, DWARF WASM Debugging, and Expandable Variable Hovers — v1.26.1-pre Is Here"
+description: "Zed v1.26.1-pre (Oct 21) adds Pyrefly as optional Python language server, DWARF debugging for WebAssembly in JS debugger, expandable keyboard-accessible variable tree in debugger hovers, improved OpenCode compatibility, and Display P3 color space on macOS."
+pubDate: 2026-10-23T10:00:00Z
+tags: ["zed", "release", "v1.26", "pre-release", "pyrefly", "debugger", "webassembly", "open-code", "display-p3", "beginner"]
+tool: "zed"
+author: "Anshad"
+image: "/api/og?title=Zed+v1.26.1+pre+Pyrefly+Debugger&tool=zed"
+canonical: "https://terminalblog.com/blog/zed-v1-26-1-pre-pyrefly-dwarf-debugging/"
+---
+
+Zed **v1.26.1-pre dropped October 21, 2026** — the first pre-release on the 1.26 line, hot on the heels of v1.25.2 stable. The highlights: **Pyrefly as optional Python LSP**, **DWARF debugging for WebAssembly**, **expandable variable hovers in the debugger**, **OpenCode reasoning compatibility**, and **Display P3 color space on macOS**.
+
+If you live in Python, debug WASM, or want wider-gamut colors on Mac — this pre-release is for you.
+
+---
+
+## The Headline Features
+
+### 1. Pyrefly — Optional Built-in Python Language Server
+
+**New:** Pyrefly (from Meta/Instagram) is now available as an **optional built-in Python language server** — enable it in `language_servers` setting for Python ([#44262](https://github.com/zed-industries/zed/pull/44262)).
+
+```json
+{
+  "language_servers": {
+    "python": {
+      "settings": {
+        "language_server": "pyrefly"
+      }
+    }
+  }
+}
+```
+
+**Why it matters:** Pyrefly is fast, type-aware, and designed for large codebases. Previously you needed external setup. Now it's one setting flip.
+
+**For beginners:** If Pyright/Pylance felt slow or Jedi missed types — try Pyrefly. No install, no config file, just works.
+
+---
+
+### 2. DWARF Debugging for WebAssembly (JS Debugger)
+
+**New:** The JavaScript debugger now supports **DWARF debugging for WebAssembly sources** ([#65371](https://github.com/zed-industries/zed/pull/65371)).
+
+- Step through `.wasm` files with source maps
+- Inspect WASM locals and stack frames
+- Works with Rust→WASM, C++→WASM, AssemblyScript, any DWARF-emitting toolchain
+
+**Why it matters:** WASM debugging used to mean `console.log` in the browser. Now it's a first-class Zed debugger experience — breakpoints, watches, call stacks, the works.
+
+---
+
+### 3. Expandable, Keyboard-Accessible Variable Tree in Debugger Hovers
+
+**New:** Debugger hovers now show an **expandable, keyboard-accessible variable tree** ([#53198](https://github.com/zed-industries/zed/pull/53198)).
+
+Before: hover a variable → see truncated value → click to expand in side panel.
+
+Now: hover → **nested tree appears inline** → arrow keys navigate → `Enter` expands/collapses → `Escape` dismisses.
+
+**Why it matters:** Deeply nested objects (React props, GraphQL responses, config trees) are now explorable without leaving the editor or reaching for the mouse.
+
+---
+
+### 4. Improved OpenCode Compatibility
+
+**Fixed:** OpenCode integration now properly handles:
+- **DeepSeek reasoning replay** — reasoning blocks render correctly
+- **Google models thinking disable** — `thinking: false` actually works ([#65922](https://github.com/zed-industries/zed/pull/65922))
+- **Thinking controls explain when thinking can't be disabled** at selected effort level ([#62480](https://github.com/zed-industries/zed/pull/62480))
+
+If you use OpenCode via Zed's ACP support, these were daily paper cuts. Now fixed.
+
+---
+
+### 5. Display P3 Color Space on macOS
+
+**New:** `use_display_p3` setting enables **Display P3 wide color gamut** on supported Macs ([#64394](https://github.com/zed-industries/zed/pull/64394)).
+
+```json
+{
+  "use_display_p3": true
+}
+```
+
+**Why it matters:** P3 covers ~45% more colors than sRGB. If you do UI work, design tokens, or just want your syntax highlighting to pop on M-series Macs — toggle it on.
+
+---
+
+## Quality-of-Life Improvements (Selected)
+
+| Feature | What Changed |
+|---------|--------------|
+| **Fuzzy search in agent/model pickers** | Off-UI-thread preparation, faster filtering ([#64147](https://github.com/zed-industries/zed/pull/64147)) |
+| **SSH reconnection resync timeout** | Starts *after* handshake completes — fewer false disconnects ([#65457](https://github.com/zed-industries/zed/pull/65457)) |
+| **LSP restart after stop** | Language servers restart cleanly from LSP button ([#65387](https://github.com/zed-industries/zed/pull/65387)) |
+| **SQL highlighting in Rust `sql!` macros** | Proper syntax highlighting in sqlx/diesel macros ([#58778](https://github.com/zed-industries/zed/pull/58778)) |
+| **File Finder fuzzy ranking** | Better relevance scoring ([#59224](https://github.com/zed-industries/zed/pull/59224)) |
+| **Project panel `sort_order: "extension"`** | Group files by extension ([#65776](https://github.com/zed-industries/zed/pull/65776)) |
+
+---
+
+## Bug Fixes That Stop Daily Paper Cuts (Selected)
+
+| Fixed | Impact |
+|-------|--------|
+| **Discarding unstaged changes also discarding staged** | Git Panel data loss fixed ([#65559](https://github.com/zed-industries/zed/pull/65559)) |
+| **Hangs restoring agent threads with subagents** | Agent panel responsiveness fixed ([#65177](https://github.com/zed-industries/zed/pull/65177)) |
+| **Agent auth overwriting drafts** | Your in-progress prompt survives auth refresh ([#65844](https://github.com/zed-industries/zed/pull/65844)) |
+| **Agent config defaults saved before acceptance** | Config changes only apply on explicit accept ([#65849](https://github.com/zed-industries/zed/pull/65849)) |
+| **Duplicated thinking text from OpenAI-compat providers** | `reasoning` + `reasoning_content` no longer double-renders ([#65926](https://github.com/zed-industries/zed/pull/65926)) |
+| **Google AI invalid keys classified as invalid requests** | Proper auth error surfacing ([#65885](https://github.com/zed-industries/zed/pull/65885)) |
+| **OpenCode requests failing for adaptive thinking Claude models** | OpenCode + Claude thinking works ([#65925](https://github.com/zed-industries/zed/pull/65925)) |
+| **Pasting screenshot inserting twice** | Agent panel / inline assistant image paste fixed ([#65626](https://github.com/zed-industries/zed/pull/65626)) |
+| **Queued messages unreadable in narrow panel** | Horizontal scroll / wrapping fixed ([#65638](https://github.com/zed-industries/zed/pull/65638)) |
+
+---
+
+## Breaking Change Notice
+
+> **ACP configuration defaults now apply only to new conversations** — existing conversations preserve their session settings when reopened ([#65850](https://github.com/zed-industries/zed/pull/65850)).
+
+If you tweak ACP agent config mid-session, your changes stick to *that* session. New sessions get the updated defaults. Sensible.
+
+---
+
+## Version Context
+
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| **v1.26.1-pre** | **Oct 21, 2026** | **Pre-release** | **Pyrefly Python LSP, DWARF WASM debugging, expandable debugger hovers, OpenCode reasoning fixes, Display P3 macOS** |
+| v1.25.2 | Oct 20, 2026 | Stable | 33% smaller macOS binary, secret leak fix, GPT-6 Astra/Fable 5.1/Opus 5.5 on Bedrock, auto-unfold, double-click inlay hints |
+| v1.25.0-pre | Oct 14, 2026 | Pre-release | Auto-unfold, double-click inlay hints, context compaction, Gemini 4 Argon, Bedrock BYOK |
+| v1.24.4 | Oct 20, 2026 | Stable | OpenCode npm field fix |
+
+**v1.26.1-pre branches from v1.25.2 stable** — it's the first pre-release of the next weekly cycle. If you're on stable v1.25.2, this is a *preview* of what's coming. If you're on v1.25.0-pre, this supersedes it.
+
+---
+
+## Should You Try the Pre-Release?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Write Python daily** | **Yes** — Pyrefly is a legit Pyright alternative |
+| **Debug WebAssembly (Rust/C++/AssemblyScript)** | **Yes** — DWARF support is a game-changer |
+| **Live in the debugger** | **Yes** — expandable hover tree changes the inspection flow |
+| **Use OpenCode via Zed** | **Yes** — reasoning/thinking fixes are real |
+| **Do UI/design work on M-series Mac** | **Try** — Display P3 is a nice-to-have |
+| **Prefer rock-solid stable** | **Wait** — v1.25.2 is excellent; v1.26 stable drops next week |
+
+---
+
+## How to Try Pre-Release
+
+```bash
+# macOS (auto-updates to pre if you're on pre channel)
+# Or download from: https://github.com/zed-industries/zed/releases/tag/v1.26.1-pre
+
+# Linux (AppImage)
+# Download from releases page above
+
+# Windows
+# Auto-update via winget (pre channel) or download installer
+```
+
+**Verify it works:**
+1. Python file → `Cmd+Shift+P` → "Language Server: Select" → Pyrefly → type hints appear
+2. WASM project → set breakpoint in `.wasm` source → debug → hover variable → expand tree
+3. Settings → `use_display_p3: true` → syntax highlighting looks richer (M-series Mac)
+
+---
+
+## The Bottom Line
+
+**v1.25.2 gave you stability + security + smaller binaries. v1.26.1-pre gives you new *capabilities*: Python LSP choice, WASM debugging parity, debugger UX that doesn't fight you, and OpenCode that actually works.**
+
+The pattern holds: Zed doesn't chase flashy AI demos. It builds the **editor substrate** that makes AI agents feel native — better language support, better debugging, better remote dev, better color fidelity.
+
+For a Python dev: **Pyrefly in one setting.**
+For a WASM dev: **Native debugging, finally.**
+For an OpenCode user: **Reasoning that renders right.**
+
+```bash
+# If you're curious
+zed --version
+# 1.26.1-pre
+
+# Python file → Pyrefly → fast types
+# WASM → breakpoint → hover → expand tree → debug
+# Settings → use_display_p3: true → wider colors
+```
+
+---
+
+## Related Reading
+
+- [Zed v1.25.2 Stable: 33% Smaller Binaries, Secret Leak Fix, GPT-6 Astra on Bedrock](/blog/zed-v1-25-pre-automatic-unfolding-inlay-hints-gemini-argon/)
+- [Zed v1.24: Git Tags, Terminal-to-Agent Drag, 23% Smaller Linux Binary](/blog/zed-v1-24-gpt6-sol-git-tags-agent-memory/)
+- [Zed v1.23: GPT-6.1 Sol BYOK and JSON Table Previews](/blog/zed-just-got-gpt-6-1-sol-and-json-table-previews/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Zed vs Cursor: IDE Daily Driver or Terminal Agent?](/blog/zed-vs-cursor/)
+
+---
+
+*Zed v1.26.1-pre released October 21, 2026. Source: [github.com/zed-industries/zed/releases/tag/v1.26.1-pre](https://github.com/zed-industries/zed/releases/tag/v1.26.1-pre) · Zed is open-source (GPL-3.0) at [zed.dev](https://zed.dev) and [github.com/zed-industries/zed](https://github.com/zed-industries/zed)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
