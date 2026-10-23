@@ -1,0 +1,181 @@
+---
+title: "OpenClaw Just Patched the eMudhra Certificate Compromise — Update Node Before You Start"
+description: "OpenClaw 2026.10.6 (Oct 22) is a security patch release requiring Node 24.22.1+ or 26.12.1+ to remediate the eMudhra certificate compromise. Plus 233 PRs fixing Windows installs, Linux services, update recovery, and Gateway stability."
+pubDate: 2026-10-23T10:00:00Z
+tags: ["openclaw", "release", "v2026.10.6", "security", "emudhra", "nodejs", "patch", "beginner"]
+tool: "openclaw"
+author: "Anshad"
+image: "/api/og?title=OpenClaw+2026.10.6+Security+Patch&tool=openclaw"
+canonical: "https://terminalblog.com/blog/openclaw-2026-10-6-security-patch/"
+---
+
+OpenClaw **2026.10.6 dropped October 22, 2026** — and it's a **security patch release** you should not skip.
+
+**The headline:** OpenClaw now **requires Node 24.22.1+ (Node 24 line) or 26.12.1+ (Node 26 line)** to remediate the **eMudhra certificate compromise** from the October 2026 Node.js security releases.
+
+If you manage Node yourself: **upgrade before you start OpenClaw.** If you use the standalone installers (npm, Docker, desktop apps), they bundle the patched runtime — just update.
+
+---
+
+## The One-Line Summary
+
+**eMudhra certificate compromise patched. Node 24.22.1+ / 26.12.1+ required. 233 PRs fixing installs, updates, Gateway stability, and Windows/Linux edge cases. Update today.**
+
+---
+
+## The Security Fix: eMudhra Certificate Compromise
+
+**What happened:** eMudhra (a certificate authority) had its signing keys compromised. The October 2026 Node.js security releases (24.22.1, 26.12.1) revoke trust in certificates signed by those keys.
+
+**What OpenClaw did:** v2026.10.6 **requires** the patched Node versions. The installer validates this on startup.
+
+| Node Line | Minimum Version | Why |
+|-----------|-----------------|-----|
+| **Node 24** | **24.22.1+** | Revokes eMudhra trust |
+| **Node 26** | **26.12.1+** | Revokes eMudhra trust |
+
+**If you use standalone installers** (npm global, Docker, desktop apps): They bundle the fixed runtime. Just update.
+
+**If you manage Node manually** (nvm, fnm, system package manager): `nvm install 24.22.1` or `nvm install 26.12.1` before running OpenClaw.
+
+---
+
+## The 233 PR Patch Wave (No New Features, Just Reliability)
+
+This release is **233 pull requests, 30 direct commits, 149 contributors** — all fixes. Here's what matters for daily operators:
+
+### Windows Installs Finally Work Reliably
+- **False "offline maintenance" / database errors** on fresh Windows setup, Doctor, or Gateway start — **fixed** ([#176174](https://github.com/openclaw/openclaw/pull/176174), [#176194](https://github.com/openclaw/openclaw/pull/176194))
+- **Bun installs failing on optional cleanup step** — installation now finishes ([#169286](https://github.com/openclaw/openclaw/pull/169286))
+- **Windows service commands dropping empty arguments** — fixed ([e75f1fc9](https://github.com/openclaw/openclaw/commit/e75f1fc9d46461bb07b0392182d8e15dab7a77e5))
+
+### Update & Recovery Hardening
+- **Update failures now tell you which backup-retention link was unsafe** — keep backup, repair link, retry ([#169280](https://github.com/openclaw/openclaw/pull/169280))
+- **btrfs filesystem repair** — backup cleanup continues after repair ([#169893](https://github.com/openclaw/openclaw/pull/169893))
+- **Update recovery unblocked** after pre-start command failures ([#169936](https://github.com/openclaw/openclaw/pull/169936))
+- **Manual upgrade** — `openclaw status` no longer suggests outdated rollback ([#170063](https://github.com/openclaw/openclaw/pull/170063))
+- **Package-update identity errors** point to correct repair command ([#170385](https://github.com/openclaw/openclaw/pull/170385))
+- **Deeply nested folder backups** no longer run out of path room ([#170867](https://github.com/openclaw/openclaw/pull/170867))
+- **Session-history cleanup** resumes after temporary DB lock ([#170913](https://github.com/openclaw/openclaw/pull/170913))
+
+### Gateway Stability Under Load
+- **Graceful shutdown** waits for pending cleanup, gives Windows more stop-confirmation time ([#171308](https://github.com/openclaw/openclaw/pull/171308), [#174807](https://github.com/openclaw/openclaw/pull/174807))
+- **Stop stuck Gateway** — can now stop Gateway stuck starting >5 min without opening port ([#171678](https://github.com/openclaw/openclaw/pull/171678))
+- **Settings changes no longer hang** when Gateway started with messaging channels off ([050eab7e](https://github.com/openclaw/openclaw/commit/050eab7e2008d9d0e2d9712181defd72e722bc01))
+- **Dead workers unblocked** after confirmed machine reboot — interrupted turn not resumed, slots released ([#168863](https://github.com/openclaw/openclaw/pull/168863))
+- **Worktree GC retry** after missing remote restored — `openclaw worktrees gc --retry-deferred` ([#168864](https://github.com/openclaw/openclaw/pull/168864))
+- **Control UI off** frees files from Gateway memory; in-flight requests finish ([#177042](https://github.com/openclaw/openclaw/pull/177042))
+- **Slow Stop request** stays accepted even if reply times out; repeated cancels don't undo confirmed stop ([#176206](https://github.com/openclaw/openclaw/pull/176206), [#176603](https://github.com/openclaw/openclaw/pull/176603))
+- **`gateway suspend --json`** always prints valid JSON, even under load ([#176795](https://github.com/openclaw/openclaw/pull/176795))
+
+### Web UI & Session Fixes
+- **Settings tells you why refresh failed** after switching to incompatible Gateway ([#176039](https://github.com/openclaw/openclaw/pull/176039))
+- **Canvas no longer replaces doc** when old removal fails — stops instead ([#175343](https://github.com/openclaw/openclaw/pull/175343))
+- **Sessions view shows helper runtime** while follow-up work continues ([#168666](https://github.com/openclaw/openclaw/pull/168666))
+- **Gateway warnings explain** why background PR updates couldn't be received ([#177038](https://github.com/openclaw/openclaw/pull/177038))
+
+### Import & Migration Fixes
+- **Hermes / Claude imports** skip non-UTF-8 instruction files — convert copy to UTF-8, re-import ([#172742](https://github.com/openclaw/openclaw/pull/172742), [#172953](https://github.com/openclaw/openclaw/pull/172953))
+- **Hermes migration previews** now list unreadable files — fix access, re-run preview ([#175452](https://github.com/openclaw/openclaw/pull/175452))
+- **Codex setup imports** fixed for clock-change edge cases ([#168735](https://github.com/openclaw/openclaw/pull/168735))
+- **Old password settings** (`CLAWDBOT_GATEWAY_PASSWORD`) blocked Gateway credential setup — switch to `OPENCLAW_GATEWAY_PASSWORD` ([#175416](https://github.com/openclaw/openclaw/pull/175416))
+
+### Plugin & Skill Setup
+- **Skill setup checks only installers** your selected deps actually need ([#170967](https://github.com/openclaw/openclaw/pull/170967))
+- **Plugin setup lets you fix invalid number** without closing prompt ([#176787](https://github.com/openclaw/openclaw/pull/176787))
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **2026.10.6** | **Oct 22, 2026** | **Stable (Security)** | **eMudhra cert patch, Node 24.22.1+/26.12.1+ required, 233 PRs: Windows installs, update recovery, Gateway stability, imports, UI** |
+| 2026.10.5 | Oct 19, 2026 | Stable | Sidebar refresh, Skill Workshop 2.0, public conversation links |
+| 2026.10.10-beta.1 | Oct 15, 2026 | Beta | Cloud sessions, local Gateway, Gemini 4 Argon, Muse Code, Bun runtime |
+| 2026.10.5-beta.1 | Oct 11, 2026 | Beta | Safer updates, restart-safe conversations, faster Gateway |
+
+**2026.10.6 sits on top of 2026.10.5 stable** — it's the next weekly stable with a security mandate.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Run OpenClaw in production** | **Yes immediately** — security fix + update reliability |
+| **Use Windows** | **Yes** — install/Doctor/Gateway startup fixes are significant |
+| **Run on Linux with systemd services** | **Yes** — empty-arg service command fix |
+| **Manage Node manually (nvm/fnm)** | **Yes** — upgrade Node first, then OpenClaw |
+| **Use standalone installers (npm/Docker/desktop)** | **Yes** — bundled runtime patched, just update |
+| **Import from Hermes / Codex / Claude** | **Yes** — UTF-8 handling, clock-skew, migration preview fixes |
+| **Run high-traffic Gateway / many agents** | **Yes** — shutdown, stop, worker-thread, memory fixes |
+| **On 2026.10.5 and happy** | **Yes** — zero breaking changes, pure reliability + security |
+
+**No reason to wait.** This is a security patch with zero breaking changes.
+
+---
+
+## How to Update
+
+```bash
+# npm (Global CLI) — bundles patched Node
+npm install -g openclaw@latest
+# or specific version
+npm install -g openclaw@2026.10.6
+
+# Docker — pulls patched image
+docker pull openclaw/openclaw:latest
+# or
+docker pull openclaw/openclaw:2026.10.6
+
+# Desktop apps — auto-updater handles it
+# Or download from: https://github.com/openclaw/openclaw/releases/tag/v2026.10.6
+
+# Verify
+openclaw --version
+# Should show 2026.10.6
+
+# If you manage Node manually — CHECK FIRST
+node --version
+# Must be v24.22.1+ or v26.12.1+
+# If not: nvm install 24.22.1  (or 26.12.1)
+```
+
+---
+
+## The Bottom Line
+
+**2026.10.5 made the platform reliable. 2026.10.6 makes it secure.**
+
+The eMudhra compromise was real — certificates signed by compromised keys could be used for MITM, impersonation, or trust bypass. Node.js revoked them. OpenClaw enforces the patched runtime.
+
+Beyond security: **233 PRs of pure reliability.** Windows installs that don't lie about "offline maintenance." Updates that tell you exactly what's wrong and how to fix it. Gateways that shut down gracefully instead of leaving dead workers. Imports that survive encoding edge cases.
+
+For a beginner: **update and forget.** The installer handles Node. The fixes prevent the weird failures that make you think "is it me or the tool?"
+
+For a production operator: **this is the release that lets you sleep.** Update recovery that works. Gateway stability under load. Security baseline current.
+
+```bash
+npm install -g openclaw@latest
+# or: docker pull openclaw/openclaw:latest
+# Verify: openclaw --version → 2026.10.6
+# Node check: node --version → v24.22.1+ or v26.12.1+
+# Done.
+```
+
+---
+
+## Related Reading
+
+- [OpenClaw 2026.10.10-beta.1: Cloud Sessions, Local Gateway, Gemini 4 Argon](/blog/openclaw-v2026-10-10-beta1-cloud-sessions-local-gateway-new-models/)
+- [OpenClaw 2026.10.5-beta.1: Updates That Survive Everything](/blog/openclaw-v2026-10-5-beta1-safer-updates-restart-safe-conversations/)
+- [OpenClaw 2026.10.1: Agent Memory Survives Everything](/blog/openclaw-v2026-10-1-memory-workboard-mcp-apps/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [OpenClaw vs Hermes: The Managed Codex Runtime Showdown](/blog/hermes-vs-openclaw/)
+
+---
+
+*OpenClaw 2026.10.6 released October 22, 2026. Source: [github.com/openclaw/openclaw/releases/tag/v2026.10.6](https://github.com/openclaw/openclaw/releases/tag/v2026.10.6) · Docs: [docs.openclaw.ai/releases/2026.10.6](https://docs.openclaw.ai/releases/2026.10.6) · OpenClaw is open-source (MIT) at [github.com/openclaw/openclaw](https://github.com/openclaw/openclaw)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
