@@ -1,0 +1,240 @@
+---
+title: "Devin Desktop v3.11 Just Replaced Your IDE — Agent Window, Side-by-Side Sessions, and Terminal in Every Tab"
+description: "Devin Desktop v3.11.212 (October 23) ships a complete Agent Window overhaul matching the web app — drag-to-split sessions, per-session file trees, terminal tabs, cloud IDE button, app previews, Dev Containers support, and Electron 42 security fixes. The agent-native editor finally feels like a real IDE."
+pubDate: 2026-10-24T11:00:00Z
+tags: ["devin-desktop", "windsurf", "release", "v3.11", "agent-window", "ide", "dev-containers", "coding-agent", "enterprise"]
+tool: "devin-desktop"
+author: "sage"
+image: "/api/og?title=Devin+Desktop+v3.11+Agent+Window&tool=devin-desktop"
+canonical: "https://terminalblog.com/blog/devin-desktop-v3-11-agent-window-ide/"
+---
+
+**Devin Desktop v3.11.212 dropped October 23** — and it's not an update. It's a **full replacement of the editor experience**.
+
+The new **Agent Window** now matches `app.devin.ai` feature-for-feature: sessions sidebar, session view, Automations, Review, Wiki, settings, Command Palette (⌘K), and theming. You can drag sessions to split view (up to 8 side-by-side), group by workspace, spawn child sessions, and every session gets a file tree, changes tab, and **a real terminal**.
+
+If you've been waiting for the agent-native editor to feel like a *real IDE* — this is it.
+
+---
+
+## The Headline: Agent Window = Web App, But Local
+
+**What it is:** The entire Devin Desktop interface has been rewritten to mirror the cloud web app. Sessions sidebar, session view, Automations, Review, Wiki, settings, Command Palette — all identical, all following your Desktop theme.
+
+**Why it matters:** No more context-switching penalty between local and cloud. Muscle memory transfers. Workflows transfer. The only difference is *where the compute runs*.
+
+---
+
+## Sessions: Drag, Split, Group, Spawn
+
+| Feature | What It Does |
+|---------|--------------|
+| **Drag to split** | Drag a session from sidebar onto an open session → side-by-side view (up to 8 panes) |
+| **Group by workspace** | Sessions auto-group by folder; "+" on each group starts a new session in that folder |
+| **Child sessions** | Right-click any session → "Start child session" — inherits context, runs in parallel |
+| **Spaces support** | Sessions grouped into Spaces appear under a parent session in the sidebar |
+
+**For daily work:** You're debugging a frontend bug in one pane, watching the backend logs in another, and the test runner in a third. All same window. All same agent context.
+
+---
+
+## Every Session Gets: Files, Changes, Terminal
+
+This is the big one. **Every session tab now has:**
+
+- **Files view** — Local session's working directory OR cloud session's machine as a file tree next to the editor
+- **Changes tab** — Per-file diffs with "Since last seen" scope (works for local sessions now too)
+- **Terminal** — In the add-tab menu: opens a terminal on the session's machine (cloud) or local shell in the session's folder
+- **Quick open** — `Cmd/Ctrl+O` opens local files in the Agent Window
+- **Search** — `Cmd/Ctrl+Shift+F` searches the text of the session's files
+- **Code actions** — Files opened in the Agent Window's editor support code actions and rename
+- **Quote to chat** — Select code → `Cmd/Ctrl+L` → quoted into the composer
+
+**Translation:** You no longer need a separate VS Code window to see your files, diffs, or run commands. It's all inside the agent session.
+
+---
+
+## Cloud Sessions: Remote IDE, Previews, Dev Containers
+
+| Feature | What It Does |
+|---------|--------------|
+| **IDE button** | Top-right → opens Remote SSH window on the session's machine |
+| **App previews** | Preview tab with URL bar, port switching, device sizes, element picker |
+| **Unsaved edits sync** | Cloud sessions connected to your machine read unsaved edits from open editors |
+| **Code scan badge** | Scan sessions show a badge and open Findings view beside the chat |
+
+### Dev Containers: Finally First-Class
+
+Devin Desktop v3.11 **fully supports `devcontainer.json`**:
+
+- `onCreateCommand`, `updateContentCommand`, `postCreateCommand`, `postStartCommand`, `postAttachCommand` — all run
+- Features and image metadata supported
+- Dotfiles installed from `remote.devinDevContainers.dotfiles.*`
+- `remoteEnv`, `customizations.vscode.settings`, extensions, `forwardPorts`, `shutdownAction` — all apply
+- **New commands:** "Dev Containers: Rebuild Container" and "Rebuild Container Without Cache"
+- **Auto-prompt:** Rebuild when `devcontainer.json`, Dockerfile, or Compose file changes
+- **Reopen in Container** prompt when opening a folder with Dev Container config
+- **Slim images work** — no `curl`, `wget`, `procps` required
+- **Trust model:** Dev Container window is trusted when its host folder is trusted
+
+**For enterprise teams:** This is the "we can standardize on Devin Desktop" release. Dev Containers + agent = consistent, reproducible, agent-ready environments.
+
+---
+
+## Customizations & Settings: Now Match Cloud
+
+- Settings UI identical to Devin Cloud
+- Preferences → Appearance: pick interface font, code font, sizes
+- Plugins declare `platforms: [cloud]` or `platforms: [local]` — Desktop only activates local-applicable plugins
+- Enterprise admins: Extension marketplace URL in team settings (forces installs from that marketplace only)
+
+---
+
+## New Shortcuts (Memorize These)
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl+.` | Cycle agent mode |
+| `Cmd/Ctrl+[` / `]` | Go back / forward |
+| `Cmd/Ctrl+Shift+L` | Copy link to session |
+| `Cmd/Ctrl+Shift+E` | Mark session done |
+| Type anywhere | Focuses composer |
+
+---
+
+## Behavior Changes (Read These)
+
+| Change | Impact |
+|--------|--------|
+| **Enter while working** | Steers the running turn; `Cmd/Ctrl+Enter` queues until turn ends |
+| **MCP @-mention** | Configured MCP servers can be @-mentioned in chat |
+| **Command palette searches content** | Searches content of Local sessions, not just titles |
+| **Windows: WSL distros as remote hosts** | WSL distros appear alongside SSH hosts in Cloud/Local picker |
+| **Auto-open edited files OFF by default** | Turn back on in Settings → Editor → UI if you want it |
+| **Agent diff zones OFF by default** | Agent edits apply directly; re-enable in Settings → Editor → UI |
+| **Agent edits save without format-on-save** | Enable "Run save actions on agent edits" to restore old behavior |
+| **Worktrees not auto-deleted after 19** | No more surprise cleanup |
+
+---
+
+## Fixes That Matter
+
+| Fix | Why You Care |
+|-----|--------------|
+| **Electron 42.11.16 + Node.js 24.22.1** | October 2026 security fixes for the remote server |
+| **Long sessions stay responsive** | Streaming replies + smooth scrolling on long transcripts |
+| **MCP servers from ALL registries installable** | Not just the first registry anymore |
+| **MCP tool approval shows Allow/Reject** | Local sessions now show proper controls |
+| **Agent env var changes restart affected agent** | New sessions pick up updated values |
+| **System notifications switch works** | Actually turns agent notifications on/off |
+| **`Ctrl+Shift+C` copies in terminals again** | + Send Terminal to Chat works on Windows/Linux |
+| **Markdown renders as preview in cloud sessions** | Not raw text anymore |
+
+---
+
+## Version Context
+
+| Version | Date | Highlights |
+|---------|------|------------|
+| **v3.11.212** | Oct 23, 2026 | **Agent Window overhaul, side-by-side sessions, terminal per tab, Dev Containers, IDE button, app previews, Electron 42** |
+| v3.10.67 | Oct 12, 2026 | MCP 2026-07-28 protocol, enterprise marketplace URL, large folder perf, model picker variant memory, private preview remote MCPs |
+| v3.10.48 | Sep 29, 2026 | Sign in with ChatGPT (GPT-6 Astra + SWE-2), language server profiles, long shell command memory fix, multi-folder workspace conversion |
+
+**v3.11 is the "it's an IDE now" release.** Everything before was "an agent with an editor." This is an editor *built around* the agent.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Use Devin Desktop daily | **Yes** — fundamentally better UX |
+| Run cloud sessions + local editor | **Yes** — unsaved edits sync, IDE button, previews |
+| Need Dev Containers support | **Yes** — full spec compliance now |
+| Run multiple parallel agent tasks | **Yes** — drag-to-split up to 8 panes |
+| Use MCP servers heavily | **Yes** — all registries, approval UI, @-mention |
+| Are on Enterprise with custom marketplace | **Yes** — marketplace URL enforcement |
+| Just use it occasionally | **When convenient** — but you'll want the new shortcuts |
+
+---
+
+## How to Update
+
+```bash
+# Download from Devin Desktop → Settings → Check for Updates
+# Or direct downloads:
+
+# macOS Apple Silicon
+# https://windsurf-stable.codeiumdata.com/darwin-arm64/stable/75ee16a8b1727eacf044a4ad4996e12ee4117071/Devin-darwin-arm64-3.11.212.dmg
+
+# macOS Intel
+# https://windsurf-stable.codeiumdata.com/darwin-x64/stable/75ee16a8b1727eacf044a4ad4996e12ee4117071/Devin-darwin-x64-3.11.212.dmg
+
+# Windows x64 (User Installer)
+# https://windsurf-stable.codeiumdata.com/win32-x64-user/stable/75ee16a8b1727eacf044a4ad4996e12ee4117071/DevinUserSetup-x64-3.11.212.exe
+
+# Windows x64 (System Installer)
+# https://windsurf-stable.codeiumdata.com/win32-x64/stable/75ee16a8b1727eacf044a4ad4996e12ee4117071/DevinSetup-x64-3.11.212.exe
+
+# Linux x64
+# https://windsurf-stable.codeiumdata.com/linux-x64/stable/75ee16a8b1727eacf044a4ad4996e12ee4117071/Devin-linux-x64-3.11.212.tar.gz
+
+# Linux Debian
+# https://windsurf-stable.codeiumdata.com/linux-x64-deb/stable/75ee16a8b1727eacf044a4ad4996e12ee4117071/Devin-linux-x64-3.11.212.deb
+```
+
+**First things to try after update:**
+
+```bash
+# 1. Open a project → drag session to split → open 3 panes
+# 2. In a cloud session: click IDE button → SSH into the machine
+# 3. In a cloud session: click Preview tab → open app preview
+# 4. Open a folder with devcontainer.json → accept "Reopen in Container"
+# 5. Try the new shortcuts: Cmd+. to cycle modes, Cmd+Shift+L to share session
+# 6. @-mention an MCP server in chat
+```
+
+---
+
+## The Bottom Line
+
+**Devin Desktop v3.10 was "an agent with a decent editor." v3.11 is "an agent-native IDE."**
+
+- Agent Window = web app parity (finally)
+- Side-by-side sessions = parallel work that's visible
+- Terminal in every tab = no more context-switching to iTerm/VS Code
+- Dev Containers = enterprise-ready, reproducible environments
+- Remote IDE button = one-click SSH to cloud machine
+- App previews = see what you're building without leaving the agent
+
+This is the release that makes the "agent-native editor" claim *real*. You don't need another editor open. The agent *is* the IDE.
+
+```bash
+# Update → open project → drag session → split → terminal → code
+# That's the workflow now.
+```
+
+---
+
+## Related Articles
+
+- [Devin Desktop v3.10.67 — MCP Enterprise, Private Preview Remote MCPs](/blog/windsurf-devin-desktop-3-10-67-mcp-enterprise/)
+- [Devin Desktop v3.10.48 — ChatGPT Sign-In, Fusion, GPT-6 Astra](/blog/windsurf-devin-desktop-3-10-48-chatgpt-fusion/)
+- [Windsurf Wave 14 — Arena Mode, Plan Mode, Cascade Overhaul](/blog/windsurf-wave-14-arena-mode-plan-mode/)
+- [Cursor vs Windsurf 2026: Which AI IDE Fits Your Stack?](/blog/cursor-vs-windsurf-2026/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Dropped 100+ Fixes in Two Days — The Stability Wave You've Been Waiting For](/blog/claude-code-v2-1-308-309-stability-surge/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+- [Codex v0.164.0 Just Dropped Presets, Inline Model Config, and Image Preview](/blog/codex-v0-164-0-presets-config-images/)
+
+---
+
+*Devin Desktop (formerly Windsurf) is proprietary. Requires Devin subscription. Published October 24, 2026 — covers Devin Desktop v3.11.212 released October 23, 2026. Full changelog: [docs.devin.ai/desktop/changelog](https://docs.devin.ai/desktop/changelog)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
