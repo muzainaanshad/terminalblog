@@ -1,0 +1,243 @@
+---
+title: "Goose Just Learned to Think Automatically, Resume Crashed Subagents, and Got a Real Windows Installer"
+description: "Goose v1.56.0 (Oct 23) adds automatic thinking level for models, resumes failed/cancelled delegate subagents, view-only subagent sessions in UI, concurrent subagent limits, Windows NSIS installer, IO Intelligence provider, and replaces PCTX with Boa JavaScript runtime."
+pubDate: 2026-10-24T10:00:00Z
+tags: ["goose", "release", "v1.56.0", "automatic-thinking", "subagents", "windows", "coding-agent", "beginner", "open-source"]
+tool: "goose"
+author: "Anshad"
+image: "/api/og?title=Goose+v1.56+Automatic+Thinking&tool=goose"
+canonical: "https://terminalblog.com/blog/goose-v1-56-automatic-thinking-resume-subagents-windows-installer/"
+---
+
+Goose v1.56.0 dropped **October 23, 2026** — and this one changes how the agent *thinks*, how it *recovers*, and how you *install it on Windows*. The headlines: **automatic thinking level** (the model picks its own reasoning depth), **resume failed subagents**, **view-only subagent sessions in the UI**, **concurrent subagent limits**, **Windows NSIS installer**, **IO Intelligence provider**, and **Boa JavaScript runtime replacing PCTX**.
+
+If you've been waiting for Goose to feel more like a platform and less like a CLI experiment — this is the release.
+
+---
+
+## The Headline Features (Ranked by What You'll Actually Notice)
+
+### 1. Automatic Thinking Level — The Model Decides How Hard to Think
+
+**What it is:** Goose now supports automatic thinking level operation ([#12237](https://github.com/block/goose/pull/12237)). Instead of you setting a fixed "thinking budget" per model, the model *itself* decides how much reasoning a task needs — simple edits get fast responses, complex architecture decisions get deep reasoning.
+
+**Why it matters:** You stop managing sliders. The agent becomes adaptive — Claude Sonnet 5.5, Haiku 5.5, GPT-6 Sol, Opus 5.5 all pick their own depth per turn. Set `GOOSE_CLI_SHOW_THINKING=1` once and watch it work.
+
+**For beginners:** This is the "it just works" moment. You ask a question, the agent thinks *appropriately*, you get the answer. No config tuning required.
+
+---
+
+### 2. Resume Failed or Cancelled Delegate Subagents
+
+**What it is:** When a delegate subagent fails or gets cancelled, you can now **resume it** ([#13015](https://github.com/block/goose/pull/13015)) instead of starting over.
+
+**Why it matters:** Long-running delegated tasks (refactor this module, write these tests, migrate this API) no longer evaporate when something hiccups. The subagent picks up where it left off.
+
+**For beginners:** You hit "delegate" → something goes wrong → you hit "resume" → it keeps going. The mental model is finally "tasks can be paused and continued," not "tasks are all-or-nothing."
+
+---
+
+### 3. Subagent Session Links in UI — View-Only Sessions
+
+**What it is:** The desktop UI now shows **subagent session links** with **view-only access** ([#12998](https://github.com/block/goose/pull/12998)). Click a subagent in the main session → see its full transcript, tools, reasoning — read-only.
+
+**Why it matters:** Debugging multi-agent workflows used to mean guessing what the subagent did. Now you open its session like a log file. See every tool call, every reasoning block, every decision.
+
+---
+
+### 4. Limit Concurrent Subagents — `GOOSE_MAX_CONCURRENT_SUBAGENTS`
+
+**What it is:** New env var `GOOSE_MAX_CONCURRENT_SUBAGENTS` ([#12946](https://github.com/block/goose/pull/12946)) caps how many delegate subagents run simultaneously.
+
+**Why it matters:** Prevents the "thundering herd" problem where one prompt spawns 20 subagents and your API bill / rate limits / local resources explode. Set it to `3` or `5` and sleep better.
+
+---
+
+### 5. Windows NSIS Installer — Finally, a Real Windows Install Experience
+
+**What it is:** Goose now ships a proper **NSIS installer for Windows Desktop** ([#12869](https://github.com/block/goose/pull/12869)). Download `.exe`, run, get Start Menu entry, uninstaller, auto-updates — the works.
+
+**Why it matters:** Before this, Windows users got a ZIP or Scoop/Chocolatey. Now it's a first-class citizen. Double-click, install, launch from Start Menu. No PATH fiddling, no "how do I update this?"
+
+**For beginners:** This is the single biggest Windows UX improvement since v1.0. If you've been holding off on Goose Desktop because "Windows support feels second-class" — it's not anymore.
+
+---
+
+### 6. IO Intelligence Provider — New Model Access
+
+**What it is:** New **IO Intelligence provider** ([#12795](https://github.com/block/goose/pull/12795)) added to the provider catalog.
+
+**Why it matters:** More model choice without leaving Goose. If IO Intelligence has models you want (or pricing you like), it's now a native option.
+
+---
+
+### 7. Provider-Defined Cache Prices — Accurate Cost Estimates
+
+**What it is:** Providers can now define **cache prices** ([#12944](https://github.com/block/goose/pull/12944)). Goose uses these for cost estimates instead of guessing.
+
+**Why it matters:** If you use prompt caching (Anthropic, OpenAI, OpenRouter), your cost estimates were wrong. Now they're right — provider tells Goose the real cache hit/miss pricing.
+
+---
+
+### 8. Dangerous Include History Option
+
+**What is is:** New option to **include full history in delegation** ([#13051](https://github.com/block/goose/pull/13051)) — marked "dangerous" because it sends the entire conversation to subagents.
+
+**Why it matters:** Sometimes a subagent *needs* full context to make the right call. This unlocks that, with a warning label. Use intentionally.
+
+---
+
+### 9. Boa JavaScript Runtime Replaces PCTX Code Mode
+
+**What it is:** The legacy **PCTX code mode is gone**, replaced by **Boa JavaScript runtime** ([#12952](https://github.com/block/goose/pull/12952)) in the GDK.
+
+**Why it matters:** PCTX was a custom thing. Boa is a standards-compliant JS engine. If you're building on Goose's GDK (Goose Development Kit), your tool definitions, recipes, and extensions now run on real JavaScript — better compatibility, better debugging, standard semantics.
+
+---
+
+### 10. Session Status via OSC 7501 in CLI
+
+**What it is:** CLI now reports **session status via OSC 7501** ([#12928](https://github.com/block/goose/pull/12928)) — terminal escape sequence that lets terminal emulators (Ghostty, Kitty, iTerm2, WezTerm) show agent state in the tab/title bar.
+
+**Why it matters:** Your terminal tab can now show "Goose: Running" / "Goose: Waiting for input" / "Goose: Complete" without you checking the window. Tiny UX win that compounds.
+
+---
+
+## Bug Fixes That Stop Paper Cuts
+
+| Fixed | Impact |
+|-------|--------|
+| **Windows build error** | Desktop actually builds on Windows now ([#13081](https://github.com/block/goose/pull/13081)) |
+| **Stale models issue** | Model picker stops showing ghosts ([#13054](https://github.com/block/goose/pull/13054)) |
+| **Keep `!` in npx args on Windows** | `npx pkg!@version` works in PowerShell ([#12680](https://github.com/block/goose/pull/12680)) |
+| **Bound long conversation rendering** | Desktop doesn't freeze on 50k+ message sessions ([#12976](https://github.com/block/goose/pull/12976)) |
+| **Bedrock: drop non-context ValidationException retries** | No more infinite loops on bad config ([#12843](https://github.com/block/goose/pull/12843)) |
+| **Load live model catalog in goose-acp** | ACP clients see current models, not cached ([#12962](https://github.com/block/goose/pull/12962)) |
+| **Use OpenRouter-reported context length** | No more truncation surprises ([#12853](https://github.com/block/goose/pull/12853)) |
+| **Context freeze preserved messages stay visible** | Compaction doesn't hide what you pinned ([#12692](https://github.com/block/goose/pull/12692)) |
+
+---
+
+## Quick Version Context
+
+| Version | Date | Channel | Highlights |
+|---------|------|---------|------------|
+| **v1.56.0** | **Oct 23, 2026** | **Stable (Latest)** | **Automatic thinking, resume subagents, view-only subagent UI, concurrent limits, Windows NSIS installer, IO Intelligence, Boa JS runtime, cache prices** |
+| v1.55.0 | Oct 16, 2026 | Stable | AIgateway provider, W3C trace context, adaptive thinking fixes, Stop saves work, x-request-id, leaner loop |
+| v1.54.0 | Oct 8, 2026 | Stable | HTML session export, adaptive thinking (initial), hyphenated GPT-6.1-Sol aliases, system Node.js on Windows |
+| v1.53.0 | Oct 2, 2026 | Stable | Model discovery from models.dev, Meta Muse provider, lean ACP-only binary, resizable PiP, session rename CLI |
+
+---
+
+## What This Means for You
+
+**If you're new to coding agents:** Goose v1.56 doesn't change the "first run" much — but the *reliability* compounds. Automatic thinking means you don't tune reasoning. Resume subagents means failed tasks aren't lost. Windows installer means you install like normal software. The agent feels **solid**, which is the feature beginners appreciate most once they hit their first weird failure.
+
+**If you're on Windows:** This is the release you've been waiting for. NSIS installer + `!` in npx args fixed + Windows build error fixed = Goose Desktop is now a first-class Windows app. Not "works on Windows" — *built for Windows*.
+
+**If you're embedding Goose (IDE plugin, CI bot, custom frontend):** Boa JS runtime = standard JavaScript for your tool definitions. Resume subagents = your orchestration layer can recover from failures. Concurrent limits = your infrastructure won't melt. OSC 7501 = your terminal UI can show agent state. AIgateway (v1.55) + these v1.56 improvements = Goose is a proper runtime.
+
+**If you use Bedrock / OpenRouter / OpenAI caching:** Cache prices + context length fixes = your cost estimates and truncation behavior are finally accurate.
+
+---
+
+## What's Still Missing (Honest Assessment)
+
+- **Desktop HTML export** — CLI only (v1.53 added it, Desktop coming)
+- **Android Remote Control** — iOS only (same as Cursor/Claude Code)
+- **Visual trace viewer** — You get W3C headers, but no built-in UI
+- **AIgateway UI** — Declarative config is code-first; no visual builder yet
+- **Auto-compaction tuning UI** — Cap is 225k tokens default (v1.55), no slider
+
+---
+
+## How to Upgrade
+
+```bash
+# CLI
+goose upgrade
+
+# Or re-run the installer (now works on Windows!)
+curl -fsSL https://raw.githubusercontent.com/block/goose/main/scripts/install.sh | bash
+
+# Desktop: auto-updater handles it (enabled since v1.49)
+# Windows: download NSIS installer from releases page
+# https://github.com/block/goose/releases/tag/v1.56.0
+
+# Docker
+docker pull ghcr.io/block/goose:latest
+```
+
+**First things to try after update:**
+
+```bash
+# 1. Watch automatic thinking in action
+export GOOSE_CLI_SHOW_THINKING=1
+goose
+# Ask something simple → fast answer
+# Ask "refactor this entire auth module" → deep reasoning appears
+
+# 2. Test subagent resume
+# Delegate a long task → cancel it → resume it → watch it continue
+
+# 3. Check Windows installer
+# Download .exe → install → launch from Start Menu → pin to taskbar
+
+# 4. Check provider cache prices
+# Use OpenRouter with prompt caching → see accurate costs
+
+# 5. Explore Boa JS runtime (if building on GDK)
+# Docs: github.com/block/goose/blob/main/gdk/docs/
+```
+
+---
+
+## The Bottom Line
+
+**v1.53 gave you portable sessions. v1.54 gave you adaptive thinking. v1.55 hardened the runtime. v1.56 makes the agent *intelligent about its own intelligence*.**
+
+- **Automatic thinking** = you stop managing reasoning budgets
+- **Resume subagents** = failed delegations aren't dead ends
+- **View-only subagent UI** = multi-agent debugging is readable
+- **Windows NSIS installer** = Goose is a real Windows app now
+- **Boa JS runtime** = the extension layer runs real JavaScript
+
+The pattern holds: Goose isn't chasing "shiny feature of the week." It's hardening the **thinking layer**, the **delegation layer**, the **install layer**, and the **extension layer** — the things that matter when you run agents in production, not just in a terminal.
+
+For a beginner, that means **fewer config knobs, fewer lost tasks, fewer "why did it do that?" moments**. For a builder, it means **Goose is becoming a platform you can ship on top of**.
+
+```bash
+goose upgrade
+# Ask a hard question → watch it think automatically
+# Delegate → cancel → resume → it keeps going
+# Windows: double-click installer → done
+# Build on GDK → write tools in real JavaScript
+```
+
+---
+
+## Related Articles
+
+- [Goose v1.55 Just Gave You AI Gateway, Smarter ACP, and a Session That Stops When You Say Stop](/blog/goose-v1-55-ai-gateway-acp-session-control/)
+- [Goose Just Made Your Sessions Portable — HTML Export, Adaptive Thinking, and the v1.54 Wave](/blog/goose-v1-53-54-html-export-adaptive-thinking-wave/)
+- [Goose Just Got GPT-6 Astra and Web Search Built In — the September Wave Is Huge](/blog/goose-v1-50-gpt6-astra-web-search-security-wave/)
+- [Beware: Goose Review Arbitrary Command Execution via fsmonitor](/blog/beware-goose-review-arbitrary-command-execution-fsmonitor/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+- [Goose vs Claude Code: Extensibility Showdown](/blog/claude-code-vs-goose-extensibility-showdown/)
+- [Codex vs Goose: Parallel vs Extensible](/blog/codex-vs-goose-parallel-vs-extensible/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
+---
+
+*Using Goose? What's your favorite new feature in v1.56? [X](https://x.com) • [LinkedIn](https://linkedin.com)*
+
+*Goose is open-source (Apache-2.0) and available at [github.com/block/goose](https://github.com/block/goose). Published October 24, 2026 — covers Goose v1.56.0 stable released October 23, 2026. Full changelog: [github.com/block/goose/releases/tag/v1.56.0](https://github.com/block/goose/releases/tag/v1.56.0)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
