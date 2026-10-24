@@ -1,0 +1,271 @@
+---
+title: "Qwen Code v0.26 Just Became a Full Multi-Agent Platform — Local, Remote, and Everything In Between"
+description: "Qwen Code v0.26.0 (October 21) transforms the CLI into a multi-agent platform: managed agent sessions with durable state, desktop app v0.26, local and SSH workspace references, session-targeted skill refresh, and a read-only --check preflight. The release that makes 'agent teams' real for everyday developers."
+pubDate: 2026-10-24T10:00:00Z
+tags: ["qwen-code", "release", "v0.26", "managed-agent", "desktop", "multi-agent", "workspace-agents", "coding-agents", "beginner"]
+tool: "qwen-code"
+author: "sage"
+image: "/api/og?title=Qwen+Code+v0.26+Managed+Agent+Platform&tool=qwen-code"
+canonical: "https://terminalblog.com/blog/qwen-code-v0-26-managed-agent-desktop-local-ssh/"
+---
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What's new in Qwen Code v0.26.0?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Qwen Code v0.26.0 adds managed agent sessions with durable state and failover, Desktop app v0.26, local and SSH workspace file references, session-targeted skill/extension refresh, a read-only --check preflight for deployment validation, systemd units for single-host managed-agent deployments, 8 MiB attachment support, and a models.dev catalog for zero-config model discovery."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I run Qwen Code managed agents on my own server?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. v0.26.0 adds systemd units and setup guidance for single-host managed-agent deployments so Runtime workers stay running when Broker restarts. You can run the full managed-agent stack locally or on your own infrastructure — no cloud account required."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What does 'local and SSH workspace references' mean?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Managed agents can now reference workspace files via local paths or SSH — you point the agent at a repo on your laptop or a remote server, and it works with those files directly. No more copying code into the agent's sandbox."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is Qwen Code v0.26.0 a breaking change?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No known breaking changes. The release notes explicitly state 'No known breaking changes.' All v0.25.x features (workspace agents, Mem0, A2A, managed-agent stack) carry forward and v0.26.0 adds the production infrastructure on top."
+      }
+    }
+  ]
+})} />
+---
+
+**Qwen Code v0.26.0 dropped October 21, 2026** — and it's the release that takes the managed-agent stack from "impressive demo" to **"I can run this in production on my own server."**
+
+If v0.25.0 gave you **workspace agents, Mem0, and A2A** (the multi-agent platform), v0.26.0 gives you **the infrastructure to actually operate it**: durable managed sessions that survive restarts, a desktop app, SSH workspace access, deployment preflight checks, and systemd units for self-hosting.
+
+For a beginner: this is the first time an open-source terminal agent lets you run **persistent, multi-agent workflows on your own hardware** with the same reliability guarantees as cloud platforms.
+
+---
+
+## The Headline Features (Ranked by "I Can Actually Use This")
+
+### 1. Managed Agent Sessions — Now Durable, Failover-Ready, and Self-Hostable
+
+The managed-agent stack (introduced in v0.24.6, hardened in v0.24.7, platform-ized in v0.25.0) gets **production infrastructure** in v0.26.0:
+
+| Capability | PR | What It Means for You |
+|------------|-----|------------------------|
+| **Durable remote Shell result delivery** | [#12894](https://github.com/QwenLM/qwen-code/pull/12894) | Shell output survives disconnects, reconnects, machine restarts |
+| **Private Hosted MCP runtime (H1)** | [#12946](https://github.com/QwenLM/qwen-code/pull/12946) | MCP servers run isolated per workspace — no cross-contamination |
+| **Verified W1a workspace cold restore** | [#13088](https://github.com/QwenLM/qwen-code/pull/13088) | Kill the machine, restart tomorrow — workspace restores exactly |
+| **Host Managed sessions in private ACP child (M2)** | [#13131](https://github.com/QwenLM/qwen-code/pull/13131) | Each managed session gets its own ACP child process — isolation by default |
+| **Hosted file history & undo** | [#13110](https://github.com/QwenLM/qwen-code/pull/13110) | Full git-like history for agent actions in managed sessions |
+| **Hosted Turn takeover & G1 failover E2E** | [#13083](https://github.com/QwenLM/qwen-code/pull/13083) | If an agent dies, another takes over mid-task — zero context loss |
+| **Durable Hosted Hooks (H2)** | [#13129](https://github.com/QwenLM/qwen-code/pull/13129) | Pre/post tool hooks that survive restarts — enforce policy always |
+| **Offline W1b recovery bundles** | [#13138](https://github.com/QwenLM/qwen-code/pull/13138) | Export/import workspace state for air-gapped or backup scenarios |
+| **Broker auth & provisioned writer credentials** | [#13210](https://github.com/QwenLM/qwen-code/pull/13210) | Secure multi-tenant: each workspace gets its own broker credentials |
+| **Default durable local-process & trusted reboot recovery ON** | [#13211](https://github.com/QwenLM/qwen-code/pull/13211) | **No config needed** — durability is the default now |
+
+**The kicker:** v0.26.0 adds **systemd units and setup guidance for single-host managed-agent deployments** ([#14633](https://github.com/QwenLM/qwen-code/pull/14633)). Runtime workers stay running when Broker restarts. You can run the **entire managed-agent stack on your own Linux box** — no cloud, no account, no subscription.
+
+---
+
+### 2. Desktop App v0.26 — Native GUI for the Platform
+
+**New in v0.26.0:** `desktop-v0.26.0` release ([release notes](https://github.com/QwenLM/qwen-code/releases/tag/desktop-v0.26.0))
+
+- Native desktop application (Electron/Tauri-style wrapper around the CLI)
+- Full access to managed-agent features, workspace agents, Mem0, A2A
+- System tray integration, native notifications, window management
+- Separate release channel from CLI — update independently
+
+```bash
+# Download desktop app
+# https://github.com/QwenLM/qwen-code/releases/tag/desktop-v0.26.0
+# Available for macOS, Linux, Windows
+```
+
+---
+
+### 3. Local and SSH Workspace References — Your Code, Wherever It Lives
+
+**New in v0.26.0:** `feat(managed-agent): support local and SSH workspace file references` ([#14639](https://github.com/QwenLM/qwen-code/pull/14639))
+
+**Before:** Managed agents worked in a sandbox. You had to copy/sync code into their workspace.
+
+**Now:** Point a managed agent at **any local path** or **any SSH host** — it works with those files directly.
+
+```bash
+# Local workspace
+qwen-code --managed --workspace /home/user/my-project
+
+# Remote workspace via SSH
+qwen-code --managed --workspace ssh://user@server:/home/user/my-project
+
+# In the web shell: add workspace → choose "Local" or "SSH" → enter path
+```
+
+**For beginners:** This means your agent can work on code that lives on your laptop, your home server, your VPS, or your company's internal git server — all from the same interface. No `scp`, no `rsync`, no Docker volumes.
+
+---
+
+### 4. Session-Targeted Skill & Extension Refresh
+
+**New in v0.26.0:** `feat(daemon): support session-targeted Skill and Extension refresh` ([#14050](https://github.com/QwenLM/qwen-code/pull/14050))
+
+**Before:** Updating a skill or extension meant restarting the daemon — all sessions lost their loaded skills.
+
+**Now:** Refresh skills/extensions **per session** without touching other sessions.
+
+```bash
+# In web shell: Session → Skills → "Refresh for this session"
+# Or via API: target a specific session ID
+```
+
+**Why it matters:** You're running a long coding session and a security-review session. The security team pushes a new `security-audit` skill. You refresh *only* the security session. Your coding session keeps running uninterrupted.
+
+---
+
+### 5. Read-Only `--check` Preflight — "Will This Deploy?" Before You Deploy
+
+**New in v0.26.0:** Adds a **read-only `--check` preflight** that prints `PASS`, `WARN`, `FAIL`, or `SKIP` for managed-agent deployment checks and exits nonzero on failure ([#14632](https://github.com/QwenLM/qwen-code/pull/14632)).
+
+```bash
+# Run preflight before deploying managed agents
+qwen-code --managed --check
+
+# Output example:
+# ✅ PASS  Broker reachable
+# ✅ PASS  Runtime workers healthy
+# ⚠️ WARN  MCP server 'github' not configured
+# ❌ FAIL  Systemd unit 'qwen-runtime' not installed
+# Exit code: 1
+```
+
+**Use in CI/CD:** Gate your deployment pipeline on `qwen-code --managed --check` — if it fails, the deploy stops before anything breaks.
+
+---
+
+### 6. 8 MiB Attachment Support & Durable Turn Recovery
+
+**New in v0.26.0:**
+- Managed Agent submissions accept **up to 8 MiB of attachment input** ([#14628](https://github.com/QwenLM/qwen-code/pull/14628)) — large logs, screenshots, binary data
+- Preserves large pending requests across refresh
+- Lets users discard unrecoverable drafts
+- **Hosted Turn recovery** asks Runtime Broker for execution evidence and treats unprovable outcomes as unknown instead of transient faults ([#14669](https://github.com/QwenLM/qwen-code/pull/14669))
+
+---
+
+### 7. Models.dev Catalog — Zero-Config Model Discovery
+
+**Carried forward from v0.25.0** (PR [#11959](https://github.com/QwenLM/qwen-code/pull/11959)): Model limits and modalities resolved from a **models.dev catalog**.
+
+**What this means:** New models (Gemini 4, Claude Opus 5.5, GPT-6, Nemotron 3 Ultra, etc.) appear **automatically**. No more waiting for Qwen Code releases to get the latest models. The catalog is the source of truth.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **v0.26.0** | **Oct 21, 2026** | **Stable** | **Managed agent platform: durable sessions, failover, desktop, local/SSH workspaces, --check preflight, systemd units, 8 MiB attachments, models.dev catalog** |
+| v0.25.2 | Oct 12 | Preview/Stable | Managed-agent plan approval, FG8 fault gates, web-shell mobile composer |
+| v0.25.1-nightly | Oct 11 | Nightly | Managed-agent journal fixes, FG8 monitor gates |
+| **v0.25.0** | Oct 5 | Stable | Workspace agents, Mem0, A2A, managed-agent stack complete, Code Mode upgrades |
+| v0.24.7 | Sep 29 | Patch | Daemon settings isolation, Enter key fix, cross-dir permissions, broker hardening |
+| v0.24.6 | Sep 26 | Feature | Managed runtime, durable sessions, failover, advisor tool, Java SDK, 60% faster startup |
+
+**v0.24.6 built the infrastructure. v0.24.7 hardened it. v0.25.0 made it a platform. v0.26.0 makes it operable.**
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Want multi-agent workflows on your own hardware** | **Yes** — systemd units + durable sessions = self-hosted agent platform |
+| **Run managed agents in CI/production** | **Yes** — `--check` preflight, failover, cold restore, offline bundles |
+| **Need agents to work on remote servers via SSH** | **Yes** — SSH workspace references, no sync needed |
+| **Use the desktop app** | **Yes** — v0.26.0 desktop release with full platform features |
+| **Want latest models without waiting** | **Yes** — models.dev catalog auto-updates |
+| **Are on v0.25.x and happy** | **Yes** — zero breaking changes, pure infrastructure upside |
+
+**No rush if:** You're pinned to v0.24.x for plugin compatibility — but test v0.26 in staging. The self-hosted managed-agent stack alone is worth the validation cycle.
+
+---
+
+## How to Update
+
+```bash
+# CLI (npm - recommended)
+npm i -g @qwen-code/qwen-code@latest
+
+# Verify
+qwen-code --version
+# Should show 0.26.0
+
+# Desktop app (separate channel)
+# Download from https://github.com/QwenLM/qwen-code/releases/tag/desktop-v0.26.0
+
+# For self-hosted managed agents:
+# 1. Check https://github.com/QwenLM/qwen-code/releases/tag/v0.26.0 for systemd units
+# 2. Run: qwen-code --managed --check  (validates your setup)
+# 3. Follow setup guidance in release notes for single-host deployment
+```
+
+**After upgrade:**
+1. Run `qwen-code --managed` → explore the Web Shell
+2. Settings → Workspaces → **Add Local or SSH Workspace** → point at your code
+3. Skills → search "Mem0" → it's bundled, just enable it
+4. Try `--check`: `qwen-code --managed --check` → see your deployment readiness
+5. Desktop: launch the app → sign in → same workspaces, same agents
+
+---
+
+## The Bigger Picture: Qwen Code Is Becoming the "Linux" of Agent Platforms
+
+Qwen Code's trajectory is unique:
+
+| Release | Shift |
+|---------|-------|
+| v0.20-v0.23 | Single-agent CLI, great at coding |
+| v0.24.6 | **Managed runtime** — durable sessions, failover, advisor |
+| v0.24.7 | **Hardening** — settings isolation, permission fixes |
+| **v0.25.0** | **Platform** — workspace agents, Mem0, A2A, private MCP, cold restore, failover, broker auth, models.dev catalog |
+| **v0.26.0** | **Operable platform** — desktop, SSH workspaces, --check preflight, systemd units, 8 MiB attachments, turn recovery evidence |
+
+Every release fills a gap. No rewrites. No "v2 coming soon." Just **steady compounding** — and now, **a local-first multi-agent platform you can run on your own server with production-grade reliability.**
+
+The question isn't "which agent should I use?" It's **"why would I pay for a cloud agent platform when Qwen Code runs the same patterns locally, free, with my data on my machine, and now with the infrastructure to operate it at scale?"**
+
+---
+
+## Related Articles
+
+- [Qwen Code v0.25.0 — Workspace Agents, Mem0, A2A Collaboration](/blog/qwen-code-v0-25-workspace-agents-mem0-a2a-collaboration/)
+- [Qwen Code v0.24.7 — Daemon Settings Leak Fixed, Enter Key Restored](/blog/qwen-code-v0-24-7-daemon-settings-fix-enter-key-permissions/)
+- [Qwen Code v0.24.6 — Managed Runtime, Advisor Tool, Java SDK, 60% Faster Startup](/blog/qwen-code-v0-24-6-managed-runtime-advisor-tool-breakthrough/)
+- [OpenHands v1.29 — Agent Profiles Finally Own Their Settings](/blog/openhands-v1-29-agent-profiles-finally-own-their-settings/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
+---
+
+*Qwen Code is open-source (Apache-2.0) and available at [github.com/QwenLM/qwen-code](https://github.com/QwenLM/qwen-code). Full changelog: [v0.26.0 release notes](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.0) and [desktop-v0.26.0](https://github.com/QwenLM/qwen-code/releases/tag/desktop-v0.26.0). Published October 24, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
