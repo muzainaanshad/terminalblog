@@ -1,28 +1,30 @@
 ---
-title: "Claude Code Just Dropped 100+ Fixes in Two Days — The Stability Wave You've Been Waiting For"
-description: "Claude Code v2.1.308 and v2.1.309 landed back-to-back with 100+ fixes — sandbox escapes, MCP double-calls, PowerShell hooks, git performance, and the dangerous rm/rmdir prompt finally fixed. Here's what actually matters."
+title: "Claude Code Just Dropped 100+ Fixes in Three Days — Sandbox Escapes, MCP Safety, Git Speed, and Monitor Tool"
+description: "Claude Code v2.1.308, v2.1.309, and v2.1.310 delivered 100+ fixes: sandbox escapes plugged, MCP double-calls eliminated, PowerShell hooks fixed, git on Windows finally fast, rm/rmdir prompt safe, plus new Monitor tool for Bedrock/Vertex/Foundry. The stability wave you've been waiting for."
 pubDate: 2026-10-23T10:00:00Z
-tags: ["claude-code", "release", "v2.1.308", "v2.1.309", "stability", "security", "beginner"]
+updatedDate: 2026-10-24T04:00:00Z
+tags: ["claude-code", "release", "v2.1.308", "v2.1.309", "v2.1.310", "stability", "security", "monitor-tool", "beginner"]
 tool: "claude-code"
 author: "Anshad"
-image: "/api/og?title=Claude+Code+v2.1.308+309+Stability&tool=claude-code"
+image: "/api/og?title=Claude+Code+Stability+Wave+310&tool=claude-code"
 canonical: "https://terminalblog.com/blog/claude-code-v2-1-308-309-stability-surge/"
 ---
 
-Claude Code v2.1.307 gave us the `safety_event` telemetry — the observability breakthrough. **Two days later, v2.1.308 and v2.1.309 dropped 100+ fixes** that plug the holes `safety_event` was built to expose.
+Claude Code v2.1.307 gave us the `safety_event` telemetry — the observability breakthrough. **Three days later, v2.1.308, v2.1.309, and v2.1.310 dropped 100+ fixes** that plug the holes `safety_event` was built to expose — plus a new Monitor tool for enterprise runtimes.
 
 If you run agents in production, this is the update cycle that actually matters.
 
 ---
 
-## The Two-Day Stability Surge
+## The Three-Day Stability Surge
 
 | Release | Date | Commits | Focus |
 |---------|------|---------|-------|
 | v2.1.308 | Oct 22, 04:34 UTC | 1 | "Bug fixes and reliability improvements" |
 | v2.1.309 | Oct 22, 22:18 UTC | 1 | 80+ fixes across sandbox, MCP, git, hooks, VS Code, cloud sessions |
+| v2.1.310 | Oct 23, 23:39 UTC | 1 | Monitor tool, gateway retries, compaction fixes, Windows hooks, cloud sessions enterprise |
 
-**v2.1.308** was a quiet drop — one commit, minimal notes. **v2.1.309** is the payload: 80+ itemized fixes that read like a "greatest hits" of everything that's been annoying operators for months.
+**v2.1.308** was a quiet drop — one commit, minimal notes. **v2.1.309** is the payload: 80+ itemized fixes that read like a "greatest hits" of everything that's been annoying operators for months. **v2.1.310** adds the Monitor tool for Bedrock/Vertex/Foundry, fixes gateway compatibility, compaction memory issues, and Windows hook reliability.
 
 ---
 
@@ -108,6 +110,62 @@ Since v2.1.305, `axScreenReader` and `CLAUDE_AX_SCREEN_READER` in `settings.env`
 
 ---
 
+## v2.1.310 (Oct 23): Monitor Tool + Gateway + Compaction + Enterprise
+
+### New: Monitor Tool for Bedrock, Vertex, Foundry
+
+The **Monitor tool** is now available on Anthropic Bedrock, Google Vertex AI, and AWS Foundry — and when telemetry or nonessential traffic is disabled. Long foreground sleeps are also blocked on those platforms now. This gives enterprise operators visibility into agent activity where they couldn't see it before.
+
+### Gateway Compatibility Fixed
+
+- Requests failing behind gateways/compatible servers that reject the `effort-2025-11-24` beta value or mid-conversation system messages now **retry automatically without them**.
+- No more mysterious failures when your corporate proxy or gateway strips headers.
+
+### Compaction Memory Fixes
+
+- Fixed compaction after "Prompt is too long" errors keeping too much dense conversation (base64, SVG) — next request would fail again.
+- Improved memory use of non-interactive sessions (`-p`, Agent SDK) during compaction with very large transcript files.
+
+### Background Cleanup Fix
+
+- Fixed background cleanup deleting recent files (like pasted images) when `cleanupPeriodDays` is set to a very large value.
+
+### Windows: Hook Reliability
+
+- Fixed `PreToolUse` and `PermissionRequest` hooks letting a tool call through when Git Bash is missing and the hook's command is only quoted strings (e.g., a quoted path).
+
+### Auto Mode Prompt Improvement
+
+- Auto mode's prompt before the first read outside working directories now **says when blocking those reads makes shell commands ask for permission** — clearer context for the user.
+
+### VS Code Fixes
+
+- Fixed pressing Enter on the plan review card's "Send feedback and keep planning" button approving the plan instead of sending comments back.
+- Fixed panel showing "Something went wrong" after "Switch branch & continue" on a cloud session opened from Session history's Web tab.
+
+### Cloud Sessions: Enterprise Controls
+
+- Cloud sessions and Remote Control permissions added to **Enterprise custom roles** — Owners can control access by role.
+- Choose file button to load cloud environment's setup script from a file.
+- Failed saves/archives in cloud environment edit dialog now show errors inside the dialog.
+- Failed routine API token actions show error in the routine edit dialog (not just a toast).
+- Session start checklist shows cloud environment's setup script output in a scrolling box.
+- Turning on Cloud sessions or Remote Control in admin settings now asks for confirmation and lists custom roles with that permission.
+- Cloud environment dialog opens network access, setup script, and env vars from rows instead of listing every editor at once.
+
+### Claude Tag Fixes
+
+- Fixed treating `!` commands (`!restart`, `!help`) as ordinary messages when sent in bold/italic/strikethrough.
+- Fixed admin channel/workspace pages replaced by load error when background bundle list refresh fails.
+- Fixed spend limits page reporting "no channels match filter" while channel names still loading.
+
+### Code Review Fixes
+
+- Fixed admin section hiding repositories/switches after failed repository list refresh.
+- Improved admin section to retry first load and show one "Try again" banner when it still fails.
+
+---
+
 ## Breaking Changes Checklist
 
 1. **`axScreenReader`**: Move from project/local settings → user/managed/`--settings`
@@ -121,11 +179,14 @@ Since v2.1.305, `axScreenReader` and `CLAUDE_AX_SCREEN_READER` in `settings.env`
 
 | If You... | Verdict |
 |-----------|---------|
-| Run agents in production with telemetry | **Yes** — v2.1.307 `safety_event` + v2.1.309 sandbox fixes = actual observability |
+| Run agents in production with telemetry | **Yes** — v2.1.307 `safety_event` + v2.1.309 sandbox fixes + v2.1.310 Monitor = actual observability |
 | Use HTTP MCP with write tools | **Yes** — double-call fix prevents data corruption |
-| Run on Windows | **Yes** — git speed, PowerShell hooks, sandbox fixes |
+| Run on Windows | **Yes** — git speed, PowerShell hooks, sandbox fixes, hook reliability |
 | Use bypass-permissions mode | **Yes** — `rm`/`rmdir` no longer hangs unattended sessions |
 | Use MCP servers on macOS with symlinks | **Yes** — sandbox bypasses fixed |
+| Run on Bedrock/Vertex/Foundry | **Yes** — Monitor tool now available, long sleeps blocked |
+| Hit gateway compatibility issues | **Yes** — auto-retry without problematic headers |
+| Have large transcript compaction issues | **Yes** — memory use improved, dense content handled |
 | Just use CLI interactively | **When convenient** — mostly fixes, but the cumulative stability is real |
 
 ---
@@ -135,20 +196,20 @@ Since v2.1.305, `axScreenReader` and `CLAUDE_AX_SCREEN_READER` in `settings.env`
 ```bash
 # Check current version
 claude --version
-# Should show 2.1.309+
+# Should show 2.1.310+
 
 # Auto-update usually handles it
 # Or: Help → Check for Updates in VS Code extension
 
 # Manual: download from releases
-# https://github.com/anthropics/claude-code/releases/tag/v2.1.309
+# https://github.com/anthropics/claude-code/releases/tag/v2.1.310
 ```
 
 ---
 
 ## The Bottom Line
 
-v2.1.307 opened the black box with `safety_event`. **v2.1.308 and v2.1.309 welded the box shut.**
+v2.1.307 opened the black box with `safety_event`. **v2.1.308, v2.1.309, and v2.1.310 welded the box shut.**
 
 - Sandbox escapes: plugged
 - Double MCP calls: eliminated
@@ -156,8 +217,11 @@ v2.1.307 opened the black box with `safety_event`. **v2.1.308 and v2.1.309 welde
 - Git on Windows: fast
 - `rm`/`rmdir` in bypass mode: safe
 - VS Code extension: actually pleasant
+- **Monitor tool on Bedrock/Vertex/Foundry: enterprise visibility**
+- **Gateway compatibility: auto-retry without bad headers**
+- **Compaction memory: dense content handled, non-interactive sessions optimized**
 
-This isn't a feature release. It's the **stability release you've been waiting for** — the one that makes the observability from v2.1.307 meaningful because the underlying surface is finally solid.
+This isn't a feature release. It's the **stability release you've been waiting for** — the one that makes the observability from v2.1.307 meaningful because the underlying surface is finally solid. And v2.1.310 adds the enterprise monitoring piece.
 
 If you run agents where reliability matters, update this week.
 
@@ -179,6 +243,6 @@ If you run agents where reliability matters, update this week.
 - [Coding Agent Security Checklist 2026 — The Operators Hardening Guide](/blog/coding-agent-security-checklist-2026/)
 ---
 
-*Claude Code v2.1.308 released October 22, 2026 (04:34 UTC). v2.1.309 released October 22, 2026 (22:18 UTC). Changelog source: [github.com/anthropics/claude-code/releases](https://github.com/anthropics/claude-code/releases).*
+*Claude Code v2.1.308 released October 22, 2026 (04:34 UTC). v2.1.309 released October 22, 2026 (22:18 UTC). v2.1.310 released October 23, 2026 (23:39 UTC). Changelog source: [github.com/anthropics/claude-code/releases](https://github.com/anthropics/claude-code/releases).*
 
 *Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
