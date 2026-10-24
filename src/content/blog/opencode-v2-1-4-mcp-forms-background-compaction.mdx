@@ -1,0 +1,226 @@
+---
+title: "OpenCode Just Made MCP Actually Usable — The v2.1.4 Release Developers Have Been Waiting For"
+description: "OpenCode v2.1.4 (October 23) fixes the biggest MCP pain point: forms now appear instead of timing out. Plus background compaction, Bun 1.4.4 security fixes, faster code display, and voice model discovery. Here's what actually matters."
+pubDate: 2026-10-24T10:00:00Z
+tags: ["opencode", "release", "v2.1.4", "mcp", "background-compaction", "security", "coding-agent", "beginner"]
+tool: "opencode"
+author: "sage"
+image: "/api/og?title=OpenCode+v2.1.4+MCP+Forms&tool=opencode"
+canonical: "https://terminalblog.com/blog/opencode-v2-1-4-mcp-forms-background-compaction/"
+faq:
+  - q: "What is the biggest change in OpenCode v2.1.4?"
+    a: "MCP elicitation forms now appear during tool calls instead of waiting until timeout. This works in Desktop, Web, and TUI — no more silent failures when an MCP server needs input."
+  - q: "How does background compaction work?"
+    a: "Set experimental.background_compaction to true. OpenCode prepares a summary in the background as you approach the compaction threshold, so automatic compaction doesn't pause your session. Unused summaries still cost tokens."
+  - q: "What security fixes come with Bun 1.4.4?"
+    a: "Fixes for Brotli decompression, TLS certificate validation, HTTP/1.1 request smuggling, HTTP/2 header handling, HTTP/3 QUIC transport, WebSocket frame parsing, and fetch redirect validation. Root certificates updated to NSS 3.131.1."
+  - q: "Does v2.1.4 work on Windows?"
+    a: "Yes — Windows managed services now use port 28894 to avoid WSL mirrored networking conflicts. The installer also creates ~/.zshrc or Fish config.fish when missing and adds OpenCode to PATH."
+  - q: "Can I hide free models in OpenCode now?"
+    a: "Yes — set OPENCODE_DISABLE_FREE_MODELS=1 or true to remove zero-cost models from catalogs, defaults, and fallbacks entirely."
+---
+
+OpenCode **v2.1.4 dropped October 23, 2026** — and it's the release that finally makes MCP (Model Context Protocol) work the way you expected it to.
+
+For months, the biggest frustration with MCP in OpenCode was silent failure: an MCP server would ask for input, and the tool call would just... hang. Until it timed out. No form, no prompt, no way to respond.
+
+**That's fixed.** Forms now appear. In Desktop, Web, *and* TUI.
+
+Plus: background compaction so your session doesn't freeze, Bun 1.4.4 security patches across the entire network stack, faster code highlighting, and voice model discovery for the experimental voice features.
+
+If you've been holding off on OpenCode because MCP felt half-baked — this is the release to try.
+
+---
+
+## The One-Line Summary
+
+**MCP forms finally appear. Background compaction stops session freezes. Bun 1.4.4 patches TLS/HTTP/3/WebSocket. Voice models discoverable. Free models hideable. Installer just works.**
+
+---
+
+## The Headlines (What You'll Actually Feel)
+
+| Feature | Why It Matters |
+|---------|----------------|
+| **MCP forms appear** | No more silent timeouts — text, number, choice, multiselect, boolean, URL prompts show up instantly |
+| **Background compaction** | Set `experimental.background_compaction: true` — summaries prep in background, no mid-session pause |
+| **Bun 1.4.4 security** | Full network stack patched: Brotli, TLS, HTTP/1.1, HTTP/2, HTTP/3, WebSocket, fetch + fresh root certs |
+| **Faster code display** | Pierre Highlights replaces old highlighter — large files and diffs render faster, use less memory |
+| **Voice model discovery** | `client.voice.models()` finds experimental voice models + transports; Console workspaces can host GPT-Live |
+| **Clear free-limit recovery** | Desktop/TUI show reset time, restore your prompt, offer upgrade/model-switch instead of generic error |
+| **Hide free models** | `OPENCODE_DISABLE_FREE_MODELS=1` removes zero-cost models from catalogs/fallbacks entirely |
+| **Reliable fresh installs** | Creates `~/.zshrc`/`config.fish`, adds to PATH, tells you to `exec $SHELL` — no manual setup |
+
+---
+
+## MCP Forms: The Fix You've Been Waiting For
+
+Here's the problem that drove everyone crazy: you're using an MCP server (say, a database tool or GitHub integration), it needs you to confirm something or pick an option, and... nothing happens. The tool call spins. Eventually it times out. You have no idea what it wanted.
+
+**v2.1.4 fixes this completely.**
+
+When an MCP server sends an elicitation request during a tool call, OpenCode now renders the form immediately:
+
+- **Text input** — free-form response
+- **Number** — numeric values with validation
+- **Choice** — single-select from options
+- **Multiselect** — pick multiple
+- **Boolean** — yes/no confirmation
+- **URL** — link input with validation
+
+This works in **Desktop app**, **Web UI**, and **TUI**. The extension ecosystem also got the fix — MCP elicitation forms now appear during tool calls instead of timing out (thanks to contributors @dimitriskourg and @chrischall).
+
+If you've avoided MCP because it felt unreliable, this release changes that.
+
+---
+
+## Background Compaction: No More Session Freezes
+
+Long sessions hit a compaction threshold. Historically, OpenCode would pause, summarize, then continue — a noticeable stall.
+
+**Now you can opt into background compaction:**
+
+```json
+{
+  "experimental": {
+    "background_compaction": true
+  }
+}
+```
+
+As your session nears the compaction threshold, OpenCode prepares the summary *in the background* on a separate model call. When compaction triggers, the summary is ready — no wait.
+
+**Tradeoff:** Summaries that are never used still cost tokens. But for long-running sessions, the smoothness is worth it.
+
+Other compaction improvements in this release:
+- When a compaction request exceeds the provider limit, older tool output and exchanges are shortened *first* — more useful history survives
+- More provider context-overflow errors are recognized and handled gracefully
+
+---
+
+## Security: Bun 1.4.4 Is a Big Deal
+
+OpenCode bundles its own Bun runtime. v2.1.4 upgrades to **Bun 1.4.4**, which includes security fixes across the entire network stack your agent uses every single session:
+
+| Component | Vulnerabilities Fixed |
+|-----------|----------------------|
+| **Brotli** | Decompression vulnerabilities |
+| **TLS** | Certificate validation edge cases |
+| **HTTP/1.1** | Request smuggling / parsing issues |
+| **HTTP/2** | Header handling / flow control bugs |
+| **HTTP/3** | QUIC transport vulnerabilities |
+| **WebSocket** | Frame parsing / memory safety |
+| **fetch** | Redirect / origin validation flaws |
+
+**Plus:** Root certificates updated to **NSS 3.131.1** — your agent now trusts the current CA bundle, not one from months ago.
+
+Your coding agent makes hundreds of network calls per session: model endpoints, MCP server definitions, GitHub repos, package registries. This update patches the plumbing underneath all of it.
+
+---
+
+## Faster Code Display: Pierre Highlights
+
+Code blocks, streaming output, file views, and review diffs in Desktop now use **Pierre Highlights** instead of the previous highlighter.
+
+**Result:** Significantly faster highlighting and lower memory use on large files and diffs.
+
+If you've ever opened a 2000-line file in OpenCode Desktop and felt the UI chug — this should feel snappier.
+
+---
+
+## Voice Models: Experimental but Discoverable
+
+OpenCode's voice features are still experimental, but v2.1.4 makes them discoverable:
+
+- **SDK:** `client.voice.models()` lists available experimental voice models, their availability, and supported WebRTC or WebSocket transports
+- **Console workspaces:** Connected OpenCode Console workspaces can host GPT-Live sessions through `client.voice.session()` — sessions expose an ID and support instruction updates via `client.voice.instructions()`
+
+This is groundwork for voice-driven coding agents. If you're building on the OpenCode SDK, it's worth exploring.
+
+---
+
+## Quality of Life: Free Limits, Free Models, Fresh Installs
+
+### Clear Free-Limit Recovery
+When your free messages run out, Desktop and TUI now show:
+- **Reset time** — exactly when you get more messages
+- **Your prompt restored** — nothing lost, just re-submit
+- **Direct actions** — upgrade or switch models from the error screen
+
+No more generic "limit reached" errors that leave you guessing.
+
+### Hide Free Models Entirely
+Set `OPENCODE_DISABLE_FREE_MODELS=1` (or `true`) and zero-cost models disappear from:
+- OpenCode catalog
+- OpenCode Go catalog
+- Defaults
+- Fallbacks
+
+Useful if you only want paid models in your workflow (or you're managing a team and want to prevent accidental free-tier usage).
+
+### Installer That Just Works
+Fresh installs now:
+- Create `~/.zshrc` or Fish's `config.fish` if missing
+- Add OpenCode to `PATH`
+- Tell you to run `exec $SHELL`
+
+No more "command not found" after install. Windows managed services also now use port `28894`, avoiding ranges reserved by Windows and WSL mirrored networking.
+
+---
+
+## Other Notable Fixes
+
+**Core:**
+- Sessions without their own model now use the selected agent's model
+- Compaction buffers that leave the model no room are ignored
+- ChatGPT sign-in context caps are now a documented built-in plugin (disable with `-opencode.provider.openai-context-caps` in plugins)
+- Added `opencode debug heap-dump [--server <url>]` to capture running server heap without restart
+- Custom provider `baseURL` settings now override catalog model endpoints correctly
+- Legacy `apply_patch` permissions migrate to `edit` permission
+- V1 sessions with relative working directories migrate using their project worktree
+
+**TUI:**
+- No longer crashes when file watchers are unavailable or system watch limits exhausted
+- Unicode direction marks (Hebrew/Arabic text) no longer shift columns on redraw
+- After update restart, TUI tells you to start OpenCode again
+
+**Desktop:**
+- File change counts appear before labels in review/summaries
+- Renaming session tabs pastes plain text (not formatted)
+- Dragging scrollbar no longer forces timeline to end
+- Linux AppImage executable names no longer end in `.desktop`
+- RPM packages no longer conflict with other Electron apps' build-ID links
+
+**SDK:**
+- Added `connectClientMcp()` for hosting MCP tools in a client over experimental client MCP WebSocket transport
+- MCP OAuth login keeps waiting after unrelated requests hit its callback
+- Remote MCP requests stay open past Bun's fetch idle timeout
+- MCP servers started during initial reconciliation no longer duplicated; MCP servers stop in parallel on shutdown
+- MCP tools with non-root-object output schemas now accepted
+- MCP results keep supported media inline, decode textual resources, save unsupported binary resources to files
+- MCP instructions/skills/project references send only changed entries (not full list repeats)
+
+---
+
+## Should You Update?
+
+**Yes.** This is a quality-of-life release that fixes the single biggest MCP usability issue, adds a genuinely useful background compaction feature, and patches the entire network stack.
+
+**Update command:**
+```bash
+opencode update
+```
+
+Or download from [GitHub Releases](https://github.com/anomalyco/opencode/releases/tag/v2.1.4).
+
+---
+
+## The Bottom Line
+
+OpenCode v2.1.4 isn't flashy — it's *solid*. It fixes the MCP form timeout that made integrations feel broken, adds background compaction for smooth long sessions, patches security across the board, and makes the installer foolproof.
+
+If you tried OpenCode months ago and bounced off because MCP was unreliable — **try again**. This is the release where it works.
+
+---
+
+*Update: OpenCode v2.1.4 released October 23, 2026. [View full changelog](https://opencode.ai/changelog) or [GitHub release](https://github.com/anomalyco/opencode/releases/tag/v2.1.4).*
