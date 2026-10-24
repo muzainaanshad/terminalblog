@@ -1,0 +1,182 @@
+---
+title: "KiloCode Just Patched the eMudhra Certificate Compromise — Browser Links and MCP OAuth Now Locked Down"
+description: "KiloCode v7.8.17 (Oct 23) is a security patch release that blocks compromised eMudhra certificate chains with a pinned Bun runtime, restricts browser links and MCP OAuth URLs to HTTPS only, and treats shell expressions in MCP prompts as literal text. Plus session PR badges restored and Kilo Cloud provider added."
+pubDate: 2026-10-24T06:00:00Z
+tags: ["kilocode", "release", "v7.8.17", "security", "emudhra", "mcp", "browser", "beginner"]
+tool: "kilocode"
+author: "Anshad"
+image: "/api/og?title=KiloCode+v7.8.17+Security+Patch&tool=kilocode"
+canonical: "https://terminalblog.com/blog/kilocode-v7-8-17-security-patch-browser-mcp-fixes/"
+---
+
+KiloCode **v7.8.17 dropped October 23, 2026** — and it's a **security patch release** you should not skip.
+
+**The headline:** KiloCode now **blocks compromised eMudhra certificate chains** with a fixed, pinned Bun runtime across all CLI platforms. Browser links and MCP OAuth authorization URLs are restricted to HTTPS. Shell expressions in MCP prompts are treated as literal text instead of executing locally.
+
+If you run KiloCode in production, update today.
+
+---
+
+## The One-Line Summary
+
+**eMudhra certificate compromise patched. Browser/MCP OAuth locked to HTTPS. Shell injection in MCP prompts blocked. Session PR badges restored. Kilo Cloud provider added. Update now.**
+
+---
+
+## The Security Fix: eMudhra Certificate Compromise
+
+**What happened:** eMudhra (a certificate authority) had its signing keys compromised. The October 2026 Node.js/Bun security releases revoke trust in certificates signed by those keys.
+
+**What KiloCode did:** v7.8.16 (pre-release) and v7.8.17 **pin the Bun runtime** across all CLI platforms to block compromised certificate chains. This is enforced at the runtime level — no configuration needed.
+
+| Platform | Runtime | Protection |
+|----------|---------|------------|
+| **All CLI platforms** | **Pinned Bun runtime** | eMudhra cert chains blocked |
+| **Nix CLI builds** | Compatible with pinned runtime | No regression |
+
+**If you use the CLI distributions:** They bundle the patched runtime. Just update.
+
+---
+
+## Browser Links & MCP OAuth: HTTPS Only
+
+**Before:** Browser links and MCP OAuth authorization URLs could be any scheme — including `file://`, `data://`, or custom schemes that could leak local paths or trigger unwanted behavior.
+
+**Now:** **Restricted to HTTP(S) only.** Any non-HTTPS URL in these contexts is rejected.
+
+```bash
+# What this blocks:
+# - file:///etc/passwd in browser links
+# - custom-scheme://oauth-callback in MCP
+# - javascript: URLs anywhere
+
+# What still works:
+# - https://github.com/login/oauth/authorize ✓
+# - http://localhost:3000/callback ✓ (for local dev)
+```
+
+This is a defense-in-depth measure: even if an attacker compromises an MCP server or injects a malicious link, they can't escape the HTTPS boundary.
+
+---
+
+## MCP Prompt Shell Injection: Blocked
+
+**The vulnerability:** MCP servers can send prompts that contain shell expressions like `$(rm -rf /)` or \`cat /etc/passwd\`. If the client treats these as executable, you have remote code execution.
+
+**The fix:** KiloCode now **treats shell expressions in MCP prompts as literal text** — they display as written, never execute.
+
+This is the same class of fix that Claude Code, OpenCode, and Hermes Agent have shipped recently. The pattern is clear: **MCP prompts are data, not code.** Never execute them.
+
+---
+
+## Quality-of-Life Fixes That Matter
+
+### Session PR Badges Restored When Remote Control Disabled
+
+**The bug:** If you disabled Remote Control in settings, session pull request badges (the little indicators showing PR status in the session list) disappeared entirely — even for local sessions.
+
+**The fix:** Badges now show correctly regardless of Remote Control setting. Your local workflow isn't penalized for a cloud feature you don't use.
+
+### Kilo Cloud Provider: Built-In Session Host Registry
+
+**New:** An internal **Session Host registry** and the **built-in Kilo Cloud provider** that lists, reads, starts, and describes cloud-hosted sessions.
+
+This is the foundation for:
+- Cloud session management from the CLI
+- Mobile app session forking (introduced in v7.8.15)
+- Future: distributed agent fleets across your infrastructure
+
+The provider is opt-in — you enable it when you want cloud sessions. Local-first remains the default.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **v7.8.17** | **Oct 23, 2026** | **Stable (Security)** | **eMudhra cert patch, pinned Bun runtime, HTTPS-only browser/MCP, shell injection block, PR badges, Kilo Cloud provider** |
+| v7.8.16 | Oct 22, 2026 | Pre-release | Same security fixes (first release with them) |
+| v7.8.15 | Oct 19, 2026 | Stable | Browser prompt remember choice, search ignored paths, mobile session fork, grep fixes, MCP sign-in fix, Windows background jobs |
+| v7.8.10 | Oct 16, 2026 | Pre-release | Pinned worktrees, integrated browser, MCP OAuth |
+
+**v7.8.17 is the stable release of the v7.8.16 security fixes.** No new features — pure security and reliability.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Run KiloCode in production** | **Yes immediately** — security fix + HTTPS enforcement |
+| **Use MCP servers** | **Yes** — shell injection in prompts blocked |
+| **Use browser integration / OAuth flows** | **Yes** — non-HTTPS URLs now rejected |
+| **Disabled Remote Control but want PR badges** | **Yes** — badges restored |
+| **Use CLI distributions (npm, standalone, Docker)** | **Yes** — bundled runtime patched |
+| **On v7.8.15 and happy** | **Yes** — zero breaking changes, pure security |
+
+**No reason to wait.** This is a security patch with zero breaking changes.
+
+---
+
+## How to Update
+
+```bash
+# VS Code / Cursor / JetBrains extension
+# Auto-updates or: Extensions → Kilo Code → Update
+
+# CLI (standalone)
+# Download from: https://github.com/Kilo-Org/kilocode/releases/tag/v7.8.17
+
+# npm (if using CLI package)
+npm install -g @kilocode/cli@latest
+
+# Verify
+kilocode --version
+# Should show 7.8.17
+```
+
+**For Nix users:** The Nix CLI builds are kept compatible with the pinned runtime — no action needed beyond updating the flake/input.
+
+---
+
+## The Bottom Line
+
+**v7.8.15 made the platform capable. v7.8.17 makes it secure.**
+
+The eMudhra compromise was real — certificates signed by compromised keys could enable MITM, impersonation, or trust bypass. The pinned Bun runtime enforces the revocation.
+
+Beyond the certificate fix: **HTTPS-only enforcement for browser and MCP OAuth** closes a class of redirect and scheme-confusion attacks. **Shell expressions in MCP prompts treated as literal text** eliminates an RCE vector that affects every MCP client.
+
+For a beginner: **update and forget.** The extension auto-updates. The fixes prevent the weird failures and security surprises that make you question your tools.
+
+For a production operator: **this is the release that lets you sleep.** Certificate trust current. MCP prompt injection blocked. OAuth schemes locked down. Cloud session infrastructure ready when you are.
+
+```bash
+# Update command (pick your platform)
+# VS Code: Extensions → Kilo Code → Update
+# CLI: npm install -g @kilocode/cli@latest
+# Verify: kilocode --version → 7.8.17
+# Done.
+```
+
+---
+
+## Related Reading
+
+- [KiloCode v7.8.15: Browser Prompt Memory, Search Ignored Paths, Mobile Session Fork](/blog/kilocode-v7-8-15-agent-manager-browser-prompt-fix/)
+- [KiloCode v7.8.10: Pinned Worktrees, Integrated Browser, MCP OAuth](/blog/kilocode-v7-8-10-search-ignored-paths-grep-fix-mcp-windows/)
+- [KiloCode v7.8.8: Pinned Worktrees, MCP OAuth, Integrated Browser](/blog/kilocode-v7-8-8-pinned-worktrees-integrated-browser-mcp-oauth/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [OpenClaw Just Patched the eMudhra Certificate Compromise](/blog/openclaw-2026-10-6-security-patch/)
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
+---
+
+*KiloCode v7.8.17 released October 23, 2026. Source: [github.com/Kilo-Org/kilocode/releases/tag/v7.8.17](https://github.com/Kilo-Org/kilocode/releases/tag/v7.8.17) · KiloCode is open-source (Apache 2.0) at [kilo.ai](https://kilo.ai) and [github.com/Kilo-Org/kilocode](https://github.com/Kilo-Org/kilocode)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*

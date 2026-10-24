@@ -32,6 +32,7 @@ const CODING_AGENT_TOOLS = new Set([
   'aider', 'cline', 'qwen-code', 'zed', 'openhands',
   'groq-code', 'kimi-cli', 'grok-build',
   'windsurf', 'devin-desktop',
+  'kilocode',
   ]);
 
 const OFF_NICHE_HINTS = [
