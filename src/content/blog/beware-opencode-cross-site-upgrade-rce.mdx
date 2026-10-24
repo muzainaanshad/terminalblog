@@ -6,7 +6,21 @@ description: "A critical RCE vulnerability in OpenCode (GHSA-632h-h47v-g4x4) all
 tags: ["security", "beware", "opencode", "rce", "vulnerability"]
 tool: "opencode"
 canonical: "https://terminalblog.com/blog/beware-opencode-cross-site-upgrade-rce/"
-
+faq:
+  - q: "What is the OpenCode cross-site upgrade RCE vulnerability?"
+    a: "GHSA-632h-h47v-g4x4 — a critical remote code execution vulnerability where any website can trigger arbitrary package installation and code execution via the `/global/upgrade` endpoint on npm/pnpm/Bun installations running `opencode serve`."
+  - q: "Am I affected by this vulnerability?"
+    a: "You are vulnerable if: OpenCode installed via npm/pnpm/Bun, running `opencode serve` (HTTP server), version between 1.14.30 and 1.18.16, and you've logged into the web UI at least once (browser has cached credentials). Not affected if installed via curl, Homebrew, Chocolatey, Scoop, or version 1.18.22+."
+  - q: "How do I check if I'm vulnerable?"
+    a: "Run: `opencode --version` (if < 1.18.22 → vulnerable), `which opencode` (if path contains npm/pnpm/bun → npm-based), `ps aux | grep 'opencode serve'` (if process found → server running)."
+  - q: "How do I fix this immediately?"
+    a: "Update OpenCode: `npm install -g opencode-ai@latest` (or pnpm/bun equivalent). Verify with `opencode --version` showing 1.18.22 or higher."
+  - q: "What if I can't update right now?"
+    a: "Stop the HTTP server: `pkill -f 'opencode serve'`. Or disable upgrade endpoint in config: `{\"server\": {\"disableUpgrade\": true}}`. Block port 4096 with firewall. Don't run `opencode serve` in background while browsing."
+  - q: "What does the patch in 1.18.22 do?"
+    a: "Four fixes: requires `application/json` content type (blocks `text/plain` forms), validates `target` is a semver string (rejects URLs), uses typed request decoder, rejects bodyless requests."
+  - q: "Is this OpenCode's first RCE?"
+    a: "No — CVE-2026-22812 (GHSA-vxw4-wv6m-9hhh, January 2026) exposed an unauthenticated HTTP server allowing arbitrary shell commands. If on an old version, you likely have BOTH. Update to 1.18.22+ fixes both."
 ---
 
 ## TL;DR
@@ -255,6 +269,7 @@ OpenCode isn't the only agent with this problem. The pattern repeats:
 - **CVE-2026-22812 (Previous RCE)**: https://github.com/advisories/GHSA-vxw4-wv6m-9hhh
 - **OpenCode Changelog**: https://opencode.ai/changelog
 - **Fix PR #44686**: https://github.com/anomalyco/opencode/pull/44686
+
 
 
 ## Related articles

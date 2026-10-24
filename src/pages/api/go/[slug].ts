@@ -7,10 +7,10 @@
  * Stats dashboard: /admin/stats
  */
 
-export const prerender = false;
-
 import type { APIRoute } from 'astro';
 import affiliates from '../../../data/affiliates.json';
+
+export const prerender = false;
 
 export const GET: APIRoute = async ({ params, request, clientAddress }) => {
   const slug = params?.slug;
