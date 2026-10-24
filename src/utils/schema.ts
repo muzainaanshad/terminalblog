@@ -71,21 +71,21 @@ export function buildPostGraph(opts: {
   const articleImage = image || `${DEFAULT_ARTICLE_IMAGE}?title=${encodeURIComponent(title)}`;
 
   const article = buildArticle(
-    {
-      url,
-      isPartOf: { '@id': ids.webPage(url) },
-      author: { '@id': ids.person },
-      publisher: { '@id': ids.person },
-      headline: title,
-      description,
-      datePublished: publishDate,
-      dateModified: updateDate || publishDate,
-      keywords: tags?.join(', '),
-      image: articleImage,
-    },
-    ids,
-    'BlogPosting',
-  );
+      {
+        url,
+        isPartOf: { '@id': ids.webPage(url) },
+        author: { '@id': ids.person },
+        publisher: { '@id': ids.person },
+        headline: title,
+        description,
+        datePublished: publishDate,
+        dateModified: updateDate || publishDate,
+        keywords: tags?.join(', '),
+        image: articleImage ? { '@id': articleImage } : undefined,
+      },
+      ids,
+      'BlogPosting',
+    );
 
   const webPage = buildWebPage(
     {
