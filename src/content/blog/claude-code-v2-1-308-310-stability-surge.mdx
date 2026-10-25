@@ -1,0 +1,220 @@
+---
+title: "Claude Code Just Dropped 3 Stability Releases in 3 Days — Your Agent Finally Stops Breaking"
+description: "Claude Code v2.1.308, v2.1.309, and v2.1.310 (Oct 22-24) form a massive stability wave: sandbox fixes, hook reliability, compaction that doesn't lose your work, Windows Git Bash fixes, VS Code panel recovery, and cloud session enterprise controls. The 'it just works' release you've been waiting for."
+pubDate: 2026-10-25T10:00:00Z
+tags: ["claude-code", "release", "v2.1.310", "v2.1.309", "v2.1.308", "stability", "coding-agent", "beginner"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+Stability+Surge&tool=claude-code"
+canonical: "https://terminalblog.com/blog/claude-code-v2-1-308-310-stability-surge/"
+faq:
+  - q: "What is the biggest change in v2.1.308-310?"
+    a: "Three consecutive stability releases that fix the paper cuts: sandbox write denies no longer leak on Linux, hooks stop failing open on Windows without Git Bash, compaction preserves dense content (base64/SVG), and VS Code panel recovers from cached corruption automatically."
+  - q: "Do I need to do anything to get these fixes?"
+    a: "Just run `claude update` — the fixes are automatic. No config changes needed."
+  - q: "Are these releases safe for production?"
+    a: "Yes — these are pure stability/bugfix releases with zero breaking changes. The version numbers (308, 309, 310) are patch-level increments."
+  - q: "What about the cloud session enterprise features in v2.1.310?"
+    a: "Enterprise orgs can now control Cloud Sessions and Remote Control access via custom roles. Owners choose which roles get access — no more all-or-nothing."
+  - q: "Did the sandbox fixes help with macOS/Linux permission prompts?"
+    a: "Yes — macOS sandbox denyWrite glob patterns now work correctly through symlinks, and Linux sandbox write denies no longer lift when background commands outlive the session."
+---
+
+Claude Code **dropped three releases in three days** (Oct 22-24) — v2.1.308, v2.1.309, and v2.1.310. This isn't a feature drop. It's a **stability surge** that fixes the paper cuts that made you question whether the agent was ready for real work.
+
+Sandbox leaks plugged. Hooks that used to fail open now block properly. Compaction that used to choke on base64/SVG now preserves your context. VS Code panel that went blank now self-heals. Windows Git Bash dependency? Gone for hook commands that are just quoted paths.
+
+If you've been living with "it works *mostly*" — this is the release where it works *fully*.
+
+---
+
+## The One-Line Summary
+
+**Three patch releases in 72 hours. Sandbox security hardened. Windows hooks fixed. Compaction smart enough for dense content. VS Code self-heals. Cloud sessions get enterprise RBAC. Zero breaking changes. Run `claude update` and keep working.**
+
+---
+
+## The Headline Fixes (What You'll Actually Feel)
+
+### 1. Linux Sandbox: Background Commands Can't Leak Write Denies Anymore
+**Before:** A background command outliving your session could lift sandbox write denies — the agent could write outside the sandbox after you thought it was done.
+**Now:** Write denies persist correctly. The sandbox boundary holds even when processes linger.
+
+### 2. macOS Sandbox: Symlink-Aware DenyWrite Glob Patterns
+**Before:** `denyWrite` glob patterns didn't apply at a path's *real* location when reached through a symlink.
+**Now:** The sandbox resolves symlinks before checking patterns. Your `denyWrite: ["**/.env*"]` actually protects `.env` files even behind symlinks.
+
+### 3. Windows: Hooks No Longer Fail Open Without Git Bash
+**Before:** `PreToolUse` and `PermissionRequest` hooks with only quoted strings (like a quoted path) would **let the tool call through** if Git Bash wasn't installed. Silent security bypass.
+**Now:** Hooks run correctly regardless of Git Bash presence. The security gate holds.
+
+### 4. Compaction That Doesn't Choke on Dense Content
+**Before:** After a "Prompt is too long" error, compaction kept too much dense text (base64, SVG, minified JS), so the *next* request failed again immediately.
+**Now:** Compaction recognizes dense content and trims it first. Your session survives the compaction instead of looping into repeated failures.
+
+### 5. VS Code Panel: Self-Healing From Cached Corruption
+**Before:** The Claude panel stayed blank after VS Code cached an incomplete copy of its files. You had to reload the window or reinstall.
+**Now:** The panel detects the corruption, recovers automatically, or tells you exactly what went wrong and how to fix it.
+
+### 6. Hook `once` Removal Bug Fixed
+**Before:** A skill's `once` hook running would *also* remove another skill's identical hook — cross-contamination between skills.
+**Now:** Each skill's hooks are isolated. Your custom skills don't step on each other.
+
+### 7. Subagent Runaway Prevention
+**Before:** A plugin could keep a headless run going past `--max-turns`, Stop, or ended input by spawning subagents or re-running finished ones.
+**Now:** The turn limit is enforced even when plugins try to extend the session via subagents.
+
+---
+
+## Cloud Sessions Get Enterprise-Grade Controls (v2.1.310)
+
+### Custom Roles for Cloud Sessions & Remote Control
+Enterprise orgs can now grant **Cloud Sessions** and **Remote Control** access per custom role — not just org-wide on/off.
+
+```bash
+# In admin settings:
+# 1. Create custom role (e.g., "cloud-agent-users")
+# 2. Grant "Cloud Sessions" and/or "Remote Control" permissions
+# 3. Assign role to specific team members
+# 4. Toggle confirmation shows exactly which roles get access
+```
+
+### Cloud Environment UX Improvements
+- **Choose file button** to load setup script from file (no more paste-from-clipboard)
+- **Setup script output** shows in scrolling box in session start checklist
+- **Failed saves/archives** now show errors *inside* the dialog, not just toasts
+- **Network access, setup script, env vars** open from rows — not a wall of editors at once
+
+---
+
+## VS Code Quality-of-Life Fixes
+
+| Fixed | Impact |
+|-------|--------|
+| **Enter on "Send feedback and keep planning"** approves plan instead of sending comments | Plan review workflow now works as intended |
+| **Panel shows "Something went wrong" after "Switch branch & continue"** on cloud sessions | Branch switching in cloud sessions is reliable |
+| **Long messages don't fold behind "Show more"** after narrowing chat panel | Long outputs stay readable at any width |
+| **Session history fills with empty "Untitled" sessions** | Clean history, no noise |
+| **Long slash commands like `/goal` fill chat panel** | Now fold behind "Show more" like other prompts |
+| **Ctrl+J always inserts newline** | Now respects VS Code/OS keybindings when `"ctrl+j": null` |
+
+---
+
+## The "You Didn't Know You Needed This" Fixes
+
+### File Read Permission Prompts Show Symlink Targets
+**Before:** Permission prompt showed the symlink path. You had no idea where it actually led.
+**Now:** Prompt shows the resolved destination. You approve the *real* file, not the link.
+
+### Auto Mode Prompt Explains Shell Command Blocking
+**Before:** Auto mode blocked reads outside working dirs with a cryptic prompt.
+**Now:** Prompt says "blocking these reads will make shell commands ask for permission" — you understand the *consequence* before deciding.
+
+### Non-Interactive Session Memory During Compaction
+**Before:** Large transcript files in `-p`/SDK sessions caused memory pressure during compaction.
+**Now:** Memory use improved — large transcripts compact without OOM risk.
+
+### Mod Image Rendering in tmux/kitty/Ghostty/iTerm2
+**Before:** Mod `Image` with `allow-passthrough` + `focus-events` showed only `alt` text in modern terminals.
+**Now:** Fullscreen rendering works. Your agent's diagrams/charts actually display.
+
+### Linux Sandbox Startup Warning Names AppArmor
+**Before:** Sandbox failed to start with a generic error on Ubuntu.
+**Now:** Warning explicitly names Ubuntu's AppArmor restriction on user namespaces and tells you how to lift it.
+
+### MCP Tool Timeout Error Tells Claude Not to Retry
+**Before:** MCP tool timeout in non-interactive session left Claude thinking "maybe retry?"
+**Now:** Error explicitly says "no answer came, don't repeat the call" — saves tokens and time.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Focus |
+|---------|------|-------|
+| **v2.1.310** | Oct 24, 2026 | Monitor tool on Bedrock/Vertex/Foundry, gateway retry fixes, background cleanup, compaction dense content, symlink prompts, auto mode prompt, memory use, mod images, Linux sandbox AppArmor, MCP timeout error, VS Code fixes, Cloud Sessions enterprise RBAC |
+| **v2.1.309** | Oct 22, 2026 | macOS/Linux sandbox fixes, MCP config protection, disabled MCP server reconnection, Bash permission checks, worktree isolation, profile store symlink, CLAUDE.md size limit, ctrl+enter, key-bound slash commands, ctrl+o waiting messages, emoji-safe output, PDF sandbox reads, Claude Desktop session loss, features missing with different account, remote-control status line, split-pane teammate rules, session rename, rewind list, privacy settings, feedback, skill naming, verify/code-review nested packages, claude-api skill fixes, PowerShell hooks, mod turn.step, plugin/skill sync, artifact updates, fine-grained streaming, GitHub mention spam, Linux sandbox background commands, Windows PowerShell cd, macOS Xcode dialog, self-hosted runner startup timeout, git command speed/English errors, hooks module error, disk-full handling, claude-api skill tracing, self-hosted runner session move, dataviz APCA, claude-api skill service accounts, sed -i behavior, ultrareview trust, dangerous rm/rmdir in bypass, sandbox-excluded commands, worktree fetch, multiagent_20261001 default, VS Code dictation proxy, panel recovery, session history, long message folding, Ctrl+J, mod label, LaTeX paste, feedback error, Edit/Write speed, cloud sessions connector list, env var shuffling, self-hosted env dialog, read documentation tool, Changes pane, Slack draft/approval, Slack untagged messages, Slack workspace load error, Code Review check/retry |
+| **v2.1.308** | Oct 22, 2026 | Bug fixes and reliability improvements (baseline for the wave) |
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Use Claude Code daily** | **Yes** — fixes compound, session feels solid |
+| **Run on Windows without Git Bash** | **Yes** — hook security bypass fixed |
+| **Hit compaction loops with base64/SVG/large files** | **Yes** — compaction now handles dense content |
+| **Use VS Code extension** | **Yes** — panel self-heals, history clean, folding works |
+| **Run Linux with background agents** | **Yes** — sandbox write denies no longer leak |
+| **Use macOS with symlinked configs** | **Yes** — denyWrite works through symlinks |
+| **Administer Enterprise cloud sessions** | **Yes** — custom role RBAC now available |
+| **On v2.1.307 and happy** | **Yes** — pure stability, zero breaking changes |
+
+**No reason to wait.** These are patch releases — no migrations, no config changes, no surprises.
+
+---
+
+## How to Update
+
+```bash
+# Standard update
+claude update
+
+# Or if you use the npm package
+npm install -g @anthropic-ai/claude-code@latest
+
+# Verify
+claude --version
+# Should show 2.1.310 (or 2.1.309/308 if staged rollout)
+```
+
+**First things to verify after update:**
+1. Run a task with base64/SVG output → watch compaction survive
+2. On Windows: test a hook with quoted path → it blocks without Git Bash
+3. In VS Code: narrow the panel → long messages still fold
+4. Enterprise: check admin settings → Cloud Sessions/Remote Control custom roles appear
+
+---
+
+## The Bottom Line
+
+**v2.1.288 gave you 100 fixes. v2.1.308-310 gave you the *right* fixes.**
+
+This isn't about new capabilities. It's about **trust** — the kind that comes from an agent that doesn't leak sandbox boundaries, doesn't fail open on Windows, doesn't lose your context to compaction, and doesn't leave you staring at a blank VS Code panel.
+
+Three releases in three days. Anthropic isn't shipping features this week. They're shipping **reliability**.
+
+For a beginner: **update and forget.** The weird failures you worked around? Gone. The "is this a bug or me?" moments? Fewer.
+
+For a production operator: **this is the baseline you deploy.** Sandbox integrity. Hook reliability. Compaction that survives real workloads. Enterprise controls for cloud compute.
+
+```bash
+claude update
+# Keep coding. The agent just got out of your way.
+```
+
+---
+
+## Related Articles
+
+- [Claude Code v2.1.288: 100+ Fixes You Actually Feel](/blog/claude-code-v2-1-288-100-fixes-you-actually-feel/)
+- [Claude Code v2.1.287: Mods, Plugin System, Watchdog](/blog/claude-code-v2-1-287-mods-plugin-system-watchdog/)
+- [Claude Code v2.1.284: Sonnet 5.5 Default, Gateway, Spend Fixes](/blog/claude-code-v2-1-284-sonnet-5-5-default-gateway-spend-fixes/)
+- [Claude Code v2.1.283: Gateway Hints, Prompt Audit, MCP Progress](/blog/claude-code-v2-1-283-gateway-hints-prompt-audit-mcp-progress-fixes/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Claude Code vs Cursor 2026 Comparison](/blog/claude-code-vs-cursor-2026-comparison/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
+---
+
+*Claude Code v2.1.308/309/310 released October 22-24, 2026. Source: [github.com/anthropics/claude-code/releases](https://github.com/anthropics/claude-code/releases) · npm: [@anthropic-ai/claude-code](https://www.npmjs.com/package/@anthropic-ai/claude-code)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
