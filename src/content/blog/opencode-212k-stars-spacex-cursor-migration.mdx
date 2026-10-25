@@ -1,0 +1,196 @@
+---
+title: "OpenCode Just Hit 212K Stars — Developers Are Fleeing Cursor for It"
+description: "After SpaceX bought Cursor for $60B, 212K developers voted with their stars. OpenCode became the #1 open-source coding agent overnight. Here's why the migration isn't stopping."
+pubDate: 2026-10-25
+updatedDate: 2026-10-25
+author: "Anshad"
+tags: ["opencode", "cursor", "spacex", "open-source", "vendor-lockin", "migration", "anomaly"]
+tool: "opencode"
+canonicalURL: "https://terminalblog.com/blog/opencode-212k-stars-spacex-cursor-migration"
+---
+
+The number that should terrify every closed-source AI coding company: **212,000 GitHub stars.**
+
+That's where OpenCode sits as of October 2026. For context — Cursor, the most widely adopted paid AI IDE, has roughly 40K stars. GitHub Copilot's CLI repo? ~15K. OpenCode didn't just pass them. It lapped them.
+
+And the growth curve didn't bend organically. It **spiked** the week SpaceX closed its $60 billion acquisition of Cursor.
+
+## The Catalyst Wasn't a Feature Release
+
+Developers didn't suddenly discover OpenCode in July 2026. They discovered **fear**.
+
+When SpaceX acquired Anysphere (Cursor's parent) for $60 billion in stock, it placed the most popular AI coding tool under the ownership of an aerospace conglomerate that also owns xAI — a direct competitor to the very models Cursor integrates (Claude, GPT). The same week, OpenAI [publicly distanced itself](https://openai.com/index/our-decision-on-cursor-following-its-acquisition-by-spacex/) from Cursor, citing broken contract terms from the Twitter/X acquisition.
+
+The message was unmistakable: **your coding agent's roadmap is now subject to Elon Musk's strategic whims.**
+
+> "I've used Cursor for two years. I love it. But I'm not building my workflow on a tool owned by a rocket company that also sells a competing model." — Senior engineer, fintech (HN thread, 842 upvotes)
+
+That sentiment triggered a migration that GitHub stars merely measure.
+
+## What 212K Stars Actually Means
+
+Stars aren't users. But in open-source, they're the **leading indicator** of community gravity.
+
+| Metric | OpenCode (Oct 2026) | Cursor | Copilot CLI | Cline |
+|--------|---------------------|--------|-------------|-------|
+| GitHub Stars | **212,000+** | ~40,000 | ~15,000 | ~69,000 |
+| License | MIT | Proprietary | MIT | Apache-2.0 |
+| Model Providers | 75+ (any OpenAI-compatible) | Anthropic primary | OpenAI only | 30+ |
+| Local Model Support | First-class (Ollama, llama.cpp, vLLM) | No | No | Yes |
+| Monthly Active Devs (est.) | 7.5M | 1M+ (paid) | Unknown | 2M+ |
+
+OpenCode didn't win on polish. It won on **credible exit**.
+
+## The Anomaly Rebrand: From Side Project to Infrastructure
+
+You'll notice the GitHub org changed from `sst/opencode` to `anomalyco/opencode`. That's not cosmetic.
+
+The team rebranded to **Anomaly** — a signal they're building infrastructure, not just a CLI. The v1.19.0 release (October 2026) reflects that shift:
+
+- **Background compaction** — sessions compress history without losing context, enabling genuinely long-running agents
+- **Persistent PTY on Windows x64/ARM64** — native terminal support without WSL friction
+- **Worktree tools built-in** — `opencode.worktree_create/list/remove` for parallel agent execution
+- **Google Cloud Vertex AI + Mistral** — enterprise-grade provider expansion
+- **Session archiving/restoration** — crash-resilient workflows
+- **Permission action editing** — modify approved patterns without re-prompting
+
+This isn't a hobby project anymore. It's the **Linux of coding agents** — boring, ubiquitous, and impossible to displace because everyone builds on it.
+
+## Why the Migration Is Structural, Not Emotional
+
+Three forces make this irreversible:
+
+### 1. The BYOK Economics Are Undeniable
+
+```
+Cursor Pro:        $20/mo + rate limits + model lock-in
+Claude Code Max:   $100/mo + API costs on top
+OpenCode + aiFiesta: $12/mo for GPT + Claude + Gemini + Grok + DeepSeek + 6 more
+OpenCode + local:  $0/mo marginal (hardware you already own)
+```
+
+When 80% of your daily tasks (boilerplate, tests, docs, simple refactors) run on Groq's Llama 3.1 70B at **$0.80/M tokens** instead of Anthropic's **$15/M**, the math stops being debatable.
+
+### 2. The Skill System Creates Compound Value
+
+OpenCode's `SKILL.md` files are portable. A code-review skill you write works on your laptop, your CI, your teammate's machine, your server. It's not tied to an IDE extension or a cloud subscription.
+
+```markdown
+---
+name: "security-audit"
+provider: "anthropic"
+model: "claude-3-5-sonnet"
+allowedTools: ["read", "grep", "bash"]
+---
+# Security Audit Skill
+Scan for: hardcoded secrets, SQL injection vectors, path traversal, 
+weak crypto, missing auth checks...
+```
+
+That skill becomes organizational IP — not vendor IP.
+
+### 3. The Fork Option Is Real Insurance
+
+If Anomaly pivots, raises prices, or enshittifies — the MIT license means **anyone can fork and continue**. Cursor users have no such option. Copilot users have no such option. Claude Code users have no such option.
+
+This is the same dynamic that made Linux win servers, PostgreSQL win databases, and VS Code win editors. **The ceiling rises continuously because the floor is owned by no one.**
+
+## What OpenCode Still Gets Wrong
+
+Honesty requires naming the gaps:
+
+| Gap | Reality | Workaround |
+|-----|---------|------------|
+| **Polish** | Terminal UI feels utilitarian vs. Cursor's IDE | Accept it or wrap in a TUI like `pi.dev` |
+| **Auto-routing** | Less magical than Cursor's "pick the right model" | Explicit routing configs (see below) |
+| **Plugin ecosystem** | Smaller than Claude Code's Skills marketplace | SKILL.md is the plugin; write your own |
+| **Windows PTY** | Fixed in v1.19 but still younger than Unix | Test your workflows |
+| **Vision** | No native screenshot/browser analysis | Use Oh My Pi or Mimo for vision tasks |
+
+## The Practical Migration Path (If You're Curious)
+
+Don't migrate everything. Migrate **one workflow**.
+
+```bash
+# 1. Install (no account, no login)
+curl -fsSL https://opencode.ai/install | bash
+
+# 2. Add your keys (or skip for local-only)
+export ANTHROPIC_API_KEY="sk-ant-..."
+export GROQ_API_KEY="gsk_..."
+# ollama serve  # for local
+
+# 3. Route your cheapest workload first
+opencode --provider groq --model llama-3.1-8b-instant \
+  "generate jest tests for src/auth/*.ts"
+
+# 4. Save as a skill for reuse
+cat > ~/.opencode/skill/test-gen.md << 'EOF'
+---
+name: "test-gen"
+provider: "groq"
+model: "llama-3.1-8b-instant"
+allowedTools: ["read", "write", "bash"]
+---
+Generate comprehensive unit tests for the given files.
+Focus on edge cases, error paths, and boundary conditions.
+EOF
+
+# 5. Run it anytime
+opencode --skill test-gen "src/payment/processor.ts"
+```
+
+**Cost of this experiment:** ~$0.03. **Time:** 5 minutes. **Reversibility:** Total — delete the folder.
+
+## The Bigger Picture: Vertical Integration vs. Horizontal Freedom
+
+The SpaceX-Cursor deal completed the vertical stack:
+- **xAI** owns the model (Grok)
+- **SpaceX** owns the compute (Colossus: 100K+ H100s)
+- **Cursor** owns the IDE
+- **Starlink** owns distribution
+
+No other agent company has this. Microsoft has GitHub + Azure + OpenAI *partnership* (not ownership). Anthropic has Claude + AWS/GCP *partnership*.
+
+Vertical integration **should** win on paper. But it creates a single point of strategic failure: **the owner's incentives.**
+
+OpenCode represents the horizontal alternative:
+- **Models:** Any (Claude, GPT, Gemini, Grok, local, your fine-tune)
+- **Compute:** Yours (laptop, server, cloud, hybrid)
+- **Editor:** Any (VS Code, JetBrains, Neovim, terminal, web)
+- **Orchestration:** Yours (skills, scripts, cron, CI/CD)
+
+The trade-off: you assemble the pieces. The gain: **no single entity can rug-pull your workflow.**
+
+## What Happens Next
+
+Three predictions:
+
+1. **OpenCode crosses 300K stars by Q1 2027** — the migration is accelerating, not slowing
+2. **Anomaly raises a Series A** — infrastructure companies need capital; watch whether they keep MIT or dual-license
+3. **Cursor's model diversity shrinks** — Grok becomes "preferred," others become "supported" then "deprecated"
+
+The developers who moved aren't coming back. They've tasted model freedom and local execution and portable skills. The switching cost of *returning* to lock-in just keeps rising.
+
+## The Only Question That Matters
+
+**Who owns your agent's roadmap?**
+
+If the answer is "a company that can be acquired by a rocket company," you have a dependency risk you can't patch.
+
+OpenCode's 212K stars aren't a popularity contest. They're a **hedge fund of developer trust** — diversified across models, providers, and infrastructures. The dividend is paid in optionality.
+
+---
+
+*Migrated? Staying put? Building your own fork? [Reply on X](https://x.com/terminalblog_en) — I read every response and fold the signal into future coverage.*
+
+## Related articles
+
+- [OpenCode Provider-Neutral Design: Why Model Freedom Matters](/blog/opencode-provider-neutral-biggest-advantage/)
+- [Why Open-Source Coding Agents Will Win in the Long Run](/blog/open-source-coding-agents-win/)
+- [The State of Open-Source Coding Agents in 2026](/blog/state-of-open-source-coding-agents-2026/)
+- [Cursor Just Got Acquired by SpaceX — The AI Coding Agent War Entered a New Era](/blog/cursor-spacex-acquisition-ai-coding-agent-war/)
+
+---
+
+**Disclosure:** This article contains affiliate links via aiFiesta. If you subscribe to aiFiesta through our links, we earn a commission at no extra cost to you. We only recommend services we genuinely use and trust.
