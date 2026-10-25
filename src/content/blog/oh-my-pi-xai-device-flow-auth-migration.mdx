@@ -1,14 +1,44 @@
 ---
 title: "Oh My Pi Migrated xAI Auth to Device Flow — Here's Why That's a Big Deal"
-description: "Oh My Pi switched from API key authentication to device flow for xAI. More secure, more reliable, and no more API key management."
+description: "Oh My Pi switched from API key authentication to device flow for xAI. More secure, more reliable, and no more API key management. A practical guide to the migration, troubleshooting, and what it means for multi-agent workflows."
 pubDate: "2026-07-09T10:00:00Z"
-updatedDate: "2026-09-10T04:00:00Z"
-tags: ["oh-my-pi", "xai", "auth", "device-flow", "security", "viral"]
+updatedDate: "2026-10-25T04:00:00Z"
+tags: ["oh-my-pi", "xai", "auth", "device-flow", "security", "guide"]
 tool: "oh-my-pi"
 author: "jax"
 canonical: "https://terminalblog.com/blog/oh-my-pi-xai-device-flow-auth-migration/"
-
 ---
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Does the device flow work in headless CI environments?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No — device flow requires interactive browser authentication. For CI, keep using API keys (they still work) or pre-generate a long-lived token and store it as a secret. Oh My Pi falls back to API keys automatically when device flow isn't available."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I use device flow for xAI alongside API keys for other providers?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Oh My Pi's provider registry treats each provider independently. You can have xAI on device flow, Anthropic on API key, and Google on ADC simultaneously. The agent picks the right auth per provider at runtime."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What happens if I revoke the device flow token from xAI's dashboard?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Oh My Pi will detect the revocation on the next request and prompt you to re-authenticate via device flow again. No config edits, no restarts required — just approve the new authorization in your browser."
+      }
+    }
+  ]
+})} />
 
 Oh My Pi just changed how it authenticates with xAI. Instead of requiring users to manage API keys, it now uses device flow — the same authentication method used by GitHub CLI, `gh`, and other developer tools.
 
@@ -61,6 +91,24 @@ If you're using Oh My Pi with xAI, the upgrade is seamless. Your existing API ke
 The change also signals that Oh My Pi is maturing its auth infrastructure. As more providers add device flow support — Anthropic and Google already offer it — Oh My Pi will likely adopt it across the board. That means one less config file to manage and one less secret to rotate.
 
 For operators evaluating which coding agent to trust with access to their xAI API credits, this is a point in Oh My Pi's column. Auth that just works is auth that doesn't become a security liability.
+
+## Troubleshooting Device Flow
+
+### Browser doesn't open automatically
+If Oh My Pi prints a URL and user code but doesn't launch the browser, open the URL manually and enter the code. This happens on some headless or remote setups where `open`/`xdg-open` isn't available.
+
+### Token storage location
+Device flow tokens are stored in Oh My Pi's config directory (`~/.omp/tokens/xai.json` by default). They're encrypted at rest and never written to shell history.
+
+### Multiple machines
+Each machine runs its own device flow. Tokens are not synced — you'll authorize separately on each device. This is intentional for security.
+
+## Migration Checklist for Teams
+
+- [ ] Verify all team members have browser access to console.x.ai
+- [ ] Document the device flow steps in your onboarding docs
+- [ ] Set a calendar reminder to audit authorized apps in xAI dashboard quarterly
+- [ ] For CI: keep one service-account API key as fallback (rotate quarterly)
 
 ## Related articles
 
