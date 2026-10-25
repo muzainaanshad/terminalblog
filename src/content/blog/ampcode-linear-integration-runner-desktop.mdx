@@ -1,0 +1,243 @@
+---
+title: "Your Ticket Just Became a Pull Request — AmpCode's Linear Integration Lets Agents Work Issues While You Sleep"
+description: "AmpCode's October 19 'Assign It To Amp' feature connects Linear issues directly to Amp agents — mention @amp in Linear, and an agent picks up the work. Plus October 16's macOS runner desktop access lets you see and control your agent's screen from anywhere. Here's how it changes the ticket-to-code loop."
+pubDate: 2026-10-25T10:00:00Z
+tags: ["ampcode", "release", "linear", "runner", "desktop", "automation", "coding-agent", "beginner"]
+tool: "ampcode"
+author: "sage"
+image: "/api/og?title=AmpCode+Linear+Integration+Runner+Desktop&tool=ampcode"
+canonical: "https://terminalblog.com/blog/ampcode-linear-integration-runner-desktop/"
+---
+
+AmpCode dropped two quiet game-changers in mid-October that together close the loop from **ticket → agent → working code → you verify on the desktop**.
+
+**October 19**: **Assign It To Amp** — Mention `@amp` in a Linear issue, and an Amp agent picks it up, works it in a thread, and reports back. No context switching. No copy-paste.
+
+**October 16**: **See Your Runner's Desktop** — Your macOS runner now has a visible desktop. You can *watch* the agent build an iOS app, *interact* with the simulator, *debug* the UI — all from the Amp web UI.
+
+For beginners: this is the first time a coding agent feels like a **team member you assign work to**, not a tool you babysit.
+
+---
+
+## The One-Line Summary
+
+**Linear issue → @amp mention → agent works it in background → you watch the desktop live → PR lands. Ticket-to-code loop: automated.**
+
+---
+
+## 1. Assign It To Amp: Linear Issues Become Agent Tasks
+
+### What It Is
+
+You're in Linear. You have an issue: *"Add dark mode toggle to settings page."* You type:
+
+```
+@amp please implement this
+```
+
+**That's it.** Amp:
+1. Creates a thread in your workspace
+2. Clones the repo (via your shared runner)
+3. Reads the issue context
+4. Starts working — planning, coding, testing
+5. Posts updates back to the Linear issue
+6. Opens a PR when done
+
+You get a Linear notification: *"Amp opened PR #247 for this issue."* You review, merge, deploy.
+
+### Why This Changes the Workflow
+
+| Before | After |
+|--------|-------|
+| Read issue → open IDE → start agent → copy context → babysit → PR | **Mention @amp → walk away → review PR** |
+| Context lost between ticket and code | **Issue context auto-loaded into agent** |
+| You do the work | **Agent does the work, you approve** |
+
+### The Setup (One Time)
+
+```bash
+# 1. In Amp: Settings → Linear → Connect
+# 2. Authorize Amp to access your Linear workspace
+# 3. In Linear: Settings → Integrations → Amp → Enable
+# 4. Done. @amp now works in any issue.
+```
+
+### What the Agent Actually Sees
+
+When you mention `@amp`, the agent gets:
+- **Full issue description** (title, description, labels, priority)
+- **Linked PRs/branches** (if any)
+- **Comments** (discussion context)
+- **Your repo** (via the connected runner)
+- **Your workspace skills, plugins, Dial settings**
+
+It's not a fresh agent. It's *your* agent with *your* context, working *your* issue.
+
+### The Workflow in Practice
+
+```
+You (in Linear): "@amp add dark mode toggle to settings page — use the existing theme context"
+
+Amp (in thread): 
+  → Reads issue
+  → Finds theme context in codebase
+  → Creates implementation plan
+  → Edits files: Settings.tsx, theme.css, ThemeProvider.tsx
+  → Runs tests
+  → Commits: "feat: add dark mode toggle to settings"
+  → Pushes branch
+  → Opens PR #247
+  → Comments on Linear: "PR #247 ready for review — implemented dark mode toggle using existing theme context"
+
+You (in Linear): Review PR → Merge → Deploy
+```
+
+**You never opened your editor.** The agent did the work while you were in a meeting.
+
+---
+
+## 2. See Your Runner's Desktop: Watch the Agent Build iOS Apps
+
+### What It Is
+
+Your macOS runner (started via the Mac app or `amp run --share`) now exposes its **desktop** to the Amp web UI.
+
+You open ampcode.com → click your runner → **see the actual macOS desktop**. The agent is there. You can:
+- Watch it build an iOS app in Xcode
+- See the iOS simulator launch
+- Interact with the running app
+- Debug UI issues visually
+- Take screenshots for the PR
+
+### Why This Matters for Beginners
+
+Agents building **mobile apps** or **desktop apps** have always been a black box. You'd get a PR with "built the feature" but no way to verify the UI actually works.
+
+Now: **You watch the simulator run. You tap the buttons. You see the bug. You tell the agent: "The toggle doesn't animate — fix it." The agent fixes it. You verify again. All in the browser.**
+
+### How to Access It
+
+```bash
+# 1. Start a shared runner on your Mac (Mac app recommended)
+# Mac app: Add project folder in settings → runner starts automatically
+# Or CLI:
+amp run --share
+
+# 2. In Amp web UI: Runners → click your macOS runner
+# 3. Desktop tab → live desktop view
+# 4. Interact normally — mouse, keyboard, touch (for simulator)
+```
+
+### Real Example: iOS App Development
+
+```
+You: "@amp add pull-to-refresh to the feed screen"
+
+Amp (on your Mac runner):
+  → Opens Xcode project
+  → Finds FeedViewController
+  → Adds UIRefreshControl
+  → Builds & runs in simulator
+  → Simulator appears in your browser desktop view
+
+You (in browser): 
+  → See the simulator launch
+  → Pull down → refresh works!
+  → Comment on PR: "Works perfectly — merge when CI passes"
+```
+
+**No Xcode on your machine. No simulator. Just a browser tab showing your agent's Mac.**
+
+---
+
+## What This Means for Teams
+
+### The New Ticket Lifecycle
+
+```
+1. PM creates Linear issue: "Mobile: Add biometric login"
+2. Developer: "@amp — use FaceID, fallback to passcode"
+3. Agent (on shared Mac runner):
+   → Reads issue
+   → Implements LocalAuthentication
+   → Tests on simulator (you watch)
+   → Opens PR with screen recording attached
+4. Developer reviews PR on phone during commute
+5. Merge → Deploy → Done
+```
+
+### The Runner Becomes Shared Infrastructure
+
+- **One Mac** (or cloud Mac) runs the runner
+- **Whole team** assigns work via `@amp` in Linear
+- **Agents queue up** on the shared runner
+- **Desktop access** lets anyone verify mobile/desktop work
+- **No one** needs a powerful Mac locally
+
+This is **agent compute as a team utility** — like a shared CI runner, but for interactive agent work.
+
+---
+
+## Honest Assessment: What's Still Rough
+
+| Area | Status |
+|------|--------|
+| **Linear sync latency** | ~30-60s for @amp mention to trigger — not instant |
+| **Desktop latency** | Usable on LAN, ~200-500ms over internet — fine for verification, not for typing |
+| **Mobile Safari** | Desktop view works but touch interaction is clunky — use iPad/desktop browser |
+| **Windows/Linux runners** | Desktop view macOS-only for now — Windows remote desktop coming |
+| **Enterprise SSO** | Linear OAuth works; SAML/SCIM for Amp workspace separate |
+
+---
+
+## Should You Set This Up?
+
+| If You... | Verdict |
+|-----------|---------|
+| Use Linear for issue tracking | **Yes** — @amp mention is zero-friction delegation |
+| Build iOS/macOS apps | **Yes** — desktop access solves the verification gap |
+| Run a team with shared Mac | **Yes** — runner becomes team compute pool |
+| Want agents to work while you're away | **Yes** — this is the "set it and forget it" workflow |
+| Only do web/backend work | **Nice to have** — Linear integration still valuable |
+
+---
+
+## Quick Start Checklist
+
+- [ ] Connect Linear in Amp Settings
+- [ ] Enable Amp integration in Linear
+- [ ] Start shared runner on Mac (`amp run --share` or Mac app)
+- [ ] Test: Create Linear issue → mention `@amp` → watch thread
+- [ ] Test: Open runner desktop → verify simulator access
+- [ ] Create a "mobile feature" issue → assign to @amp → verify on desktop
+
+---
+
+## The Bigger Picture: Agents as Team Members
+
+AmpCode isn't shipping "AI features." It's shipping **team workflows**:
+
+| Feature | What It Replaces |
+|---------|------------------|
+| Shared Runners | "Who has the GPU?" Slack messages |
+| Mac App Runner | "I need a Mac for iOS builds" |
+| Multi-Puck | "Let me finish this PR before starting that one" |
+| **Assign It To Amp** | **"I'll pick up that ticket"** |
+| **Runner Desktop** | **"Let me pull the branch and test locally"** |
+
+The agent becomes a **reliable team member** you can assign work to, verify visually, and trust to deliver — not a chatbot you supervise.
+
+---
+
+## Related Reading
+
+- [AmpCode Just Let You Use Your Claude Pro/Max Plan For Free](/blog/ampcode-claude-plan-free-tier-october-2026/)
+- [AmpCode Just Let You Run Agents on Your Own Infra — Self-Hosted Orbs](/blog/ampcode-self-hosted-orbs-october-2026/)
+- [AmpCode September-October 2026 Wave — Shared Runners, 6x Faster GPT-6, Multi-Puck](/blog/ampcode-september-october-2026-wave/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*AmpCode is proprietary. Linear integration requires Linear plan. macOS runner desktop requires macOS host. Published October 25, 2026 — covers AmpCode October 16 (Runner Desktop) and October 19 (Assign It To Amp) releases. Source: [ampcode.com/news/runner-desktop](https://ampcode.com/news/runner-desktop) · [ampcode.com/news/assign-it-to-amp](https://ampcode.com/news/assign-it-to-amp)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
