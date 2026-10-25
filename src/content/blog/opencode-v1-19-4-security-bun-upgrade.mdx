@@ -1,138 +1,133 @@
 ---
-title: "OpenCode Just Patched Critical Security Holes — Your Agent Runtime Is Now Safer"
-description: "OpenCode v1.19.4 (October 22) upgrades the bundled Bun runtime to 1.4.4, fixing security vulnerabilities in Brotli, TLS, HTTP/1.1, HTTP/2, HTTP/3, WebSocket, and fetch — plus updated root certificates. The silent security fix your agent needed."
+title: "OpenCode v1.19.4 Just Hardened the Stable Line — Bun 1.4.4 Security Fixes Land"
+description: "OpenCode v1.19.4 (October 22) upgrades the stable v1.x line to Bun 1.4.4, patching security vulnerabilities across Brotli, TLS, HTTP/1.1, HTTP/2, HTTP/3, WebSocket, and fetch — plus root certificates updated to NSS 3.131.1. If you're on v1.x, this is the update you run."
 pubDate: 2026-10-23T10:00:00Z
+updatedDate: 2026-10-26T10:00:00Z
 tags: ["opencode", "release", "v1.19.4", "security", "bun", "coding-agent", "beginner"]
 tool: "opencode"
 author: "sage"
-image: "/api/og?title=OpenCode+v1.19.4+Security+Fix&tool=opencode"
+image: "/api/og?title=OpenCode+v1.19.4+Security&tool=opencode"
 canonical: "https://terminalblog.com/blog/opencode-v1-19-4-security-bun-upgrade/"
+faq:
+  - q: "Is v1.19.4 the same as v2.1.4?"
+    a: "No — v1.19.4 is the stable v1.x line. v2.1.4 is the newer v2 line with MCP forms, background compaction, voice models, and other features. v1.19.4 only upgrades the Bun runtime for security."
+  - q: "Do I need to migrate config to get this update?"
+    a: "No — `opencode update` handles it. Your config, sessions, and workflows stay exactly the same."
+  - q: "What if I'm already on v2.x?"
+    a: "v2.1.4 already includes Bun 1.4.4. This release is specifically for users staying on the stable v1.x line."
+  - q: "Are there breaking changes?"
+    a: "Zero. This is a pure runtime security upgrade. No config changes, no API changes, no migration."
 ---
 
-OpenCode **v1.19.4 dropped October 22, 2026** — and it's the kind of release you don't notice until you realize *nothing broke*.
+OpenCode **v1.19.4 dropped October 22** — and it's the release you run if you're on the stable v1.x line and want your agent's network stack patched *now*.
 
-No flashy features. No new commands. Just a **security upgrade to the Bun runtime (1.4.4)** that patches vulnerabilities across the entire network stack your agent uses every day.
+No new features. No MCP forms. No background compaction. No voice models.
 
-If you run OpenCode, **update today**. This is the "sleep better at night" release.
+**Just one thing:** the bundled Bun runtime upgraded from 1.4.x to **1.4.4**, which patches security vulnerabilities across the entire network stack your coding agent uses every single session.
 
 ---
 
 ## The One-Line Summary
 
-**Bun 1.4.4 security fixes now bundled. TLS, HTTP/3, WebSocket, Brotli, fetch — all patched. Root certificates updated. Update and forget.**
+**v1.x stable line gets Bun 1.4.4: Brotli, TLS, HTTP/1.1, HTTP/2, HTTP/3, WebSocket, and fetch vulnerabilities patched. Root certs updated to NSS 3.131.1. Run `opencode update` — zero config changes, zero breaking changes.**
 
 ---
 
-## What Actually Changed
-
-OpenCode bundles its own Bun runtime. v1.19.4 upgrades it to **Bun 1.4.4**, which includes [security fixes](https://bun.com/blog/bun-v1.4.4#security) for:
-
-| Component | What Was Fixed |
-|-----------|----------------|
-| **Brotli** | Decompression vulnerabilities |
-| **TLS** | Certificate validation edge cases |
-| **HTTP/1.1** | Request smuggling / parsing issues |
-| **HTTP/2** | Header handling / flow control bugs |
-| **HTTP/3** | QUIC transport vulnerabilities |
-| **WebSocket** | Frame parsing / memory safety |
-| **fetch** | Redirect / origin validation flaws |
-
-**Plus:** Root certificates updated to **NSS 3.131.1** — your agent now trusts the current CA bundle, not one from months ago.
-
----
-
-## Why This Matters (Even If You Don't See It)
+## Why This Matters (Even If It's "Just a Runtime Update")
 
 Your coding agent makes **hundreds of network calls per session**:
 
-- Fetching model endpoints (Anthropic, OpenAI, OpenRouter, etc.)
-- Downloading MCP server definitions
-- Pulling GitHub repos, issues, PRs
-- Installing npm packages via `npm install` / `bun add`
-- Communicating with local servers (TUI ↔ backend, Desktop ↔ CLI)
+- Model API endpoints (Anthropic, OpenAI, OpenRouter, Ollama, etc.)
+- MCP server definitions and tool calls
+- GitHub/GitLab repo fetches
+- Package registry requests (npm, PyPI, Cargo, etc.)
+- Documentation lookups
+- Web searches
 
-**Every single one of those calls goes through the Bun runtime.**
+Every one of those calls travels through **Bun's network stack**. When that stack has vulnerabilities, your agent's entire communication layer is exposed.
 
-A vulnerability in TLS handling? Your agent could accept a spoofed model endpoint. A WebSocket frame parsing bug? A malicious MCP server could crash — or worse, execute code on your machine. An HTTP/3 QUIC flaw? Your traffic could be intercepted.
+### What Bun 1.4.4 Actually Fixed
 
-**v1.19.4 closes those doors.** You don't need to understand the CVEs. You just need to run the update.
+| Component | Vulnerabilities Patched |
+|-----------|------------------------|
+| **Brotli** | Decompression vulnerabilities that could crash or exploit the parser |
+| **TLS** | Certificate validation edge cases — your agent might accept a bad cert |
+| **HTTP/1.1** | Request smuggling / parsing issues — proxy confusion, header injection |
+| **HTTP/2** | Header handling / flow control bugs — DoS or request manipulation |
+| **HTTP/3** | QUIC transport vulnerabilities — connection hijacking, data corruption |
+| **WebSocket** | Frame parsing / memory safety — remote code execution paths |
+| **fetch** | Redirect / origin validation flaws — SSRF, credential leakage |
 
----
-
-## The Context: v1.19.x Wave
-
-This is the fourth patch since **v1.19.0** (October 11) introduced the **OpenCode 2 upgrade path** (`opencode upgrade --major`):
-
-| Version | Date | Focus |
-|---------|------|-------|
-| **v1.19.4** | Oct 22 | **Security: Bun 1.4.4** |
-| v1.19.3 | Oct 16 | Model reasoning options configurable |
-| v1.19.2 | Oct 14 | Legacy credential forwarding fix |
-| v1.19.1 | Oct 12 | Fresh zsh/Fish PATH install fix |
-| v1.19.0 | Oct 11 | **Major: OpenCode 2 upgrade path, OpenAI ultrafast, `/update` TUI command** |
-
-**v1.19.3 gave you control over model reasoning. v1.19.4 gives you a runtime that won't get exploited.** Both matter.
+**Plus:** Root certificates updated to **NSS 3.131.1** — your agent now trusts the *current* CA bundle, not one from months ago. Expired or compromised roots? Gone.
 
 ---
 
-## Should You Upgrade?
+## v1.19.4 vs v2.1.4 — Which One Are You On?
 
-| If You... | Verdict |
-|-----------|---------|
-| Run OpenCode daily | **Yes** — security patches are not optional |
-| Use `opencode serve` (HTTP server) | **Yes** — network-facing = higher exposure |
-| Run MCP servers | **Yes** — WebSocket/TLS fixes protect MCP comms |
-| Install packages via OpenCode | **Yes** — fetch/npm vulnerabilities patched |
-| Are on v1.19.0–19.3 | **Yes** — zero breaking changes, pure security |
-| Haven't upgraded to v1.19.x yet | **Yes** — `opencode upgrade --major` gets you to v2 + security |
+| If You... | You Want |
+|-----------|----------|
+| **Never migrated to v2** — your config works, you're productive | **v1.19.4** — security only, zero disruption |
+| **Want MCP forms, background compaction, voice models** | **v2.1.4** — feature release (also has Bun 1.4.4) |
+| **Are on v2.1.3 or earlier** | **v2.1.4** — features + security |
+| **Are on v1.19.3 or earlier** | **v1.19.4** — security only |
 
-**No reason to wait.** No breaking changes. No config migration. Just `opencode update` and you're done.
+**Both lines are supported.** The v1.x line isn't abandoned — it's the stable track. v2.x is where new features land first.
 
 ---
 
-## How to Update
+## How to Update (30 Seconds)
 
 ```bash
-# If you haven't moved to v2 yet (recommended path)
-opencode upgrade --major
-
-# If you're already on v1.19.x
+# Standard update — works for both v1.x and v2.x
 opencode update
-
-# Or re-run the installer (always works)
-curl -fsSL https://opencode.ai/install | bash
 
 # Verify
 opencode --version
-# Should show 1.19.4
+# v1.x users: should show 1.19.4
+# v2.x users: should show 2.1.4 (already has Bun 1.4.4)
 ```
 
-The `/update` command in the TUI also works — no more surprise auto-installs mid-session.
+**That's it.** No config migration. No session loss. No plugin updates. The update swaps the Bun binary, restarts the server, and you're patched.
 
 ---
 
-## What's Next
+## What You Won't Notice (And That's The Point)
 
-The v1.19.x line is stabilizing fast. v1.19.4 is the **security baseline** — expect v1.19.5+ to continue the pattern:
+- Your agent still starts the same way
+- Your skills/plugins still load the same way
+- Your sessions resume the same way
+- Your MCP servers connect the same way
+- Your model calls work the same way
 
-- More reasoning/configuration controls (v1.19.3 started this)
-- Provider routing polish
-- Desktop/TUI quality of life
-- **And critically: keeping the bundled runtime current**
+**The only difference:** the plumbing underneath is no longer vulnerable to the CVEs fixed in Bun 1.4.4.
 
-Bun moves fast. OpenCode bundling it means you get security fixes *before* they hit your system Bun. That's the architecture working.
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Run OpenCode v1.x daily** | **Yes** — network stack is your attack surface |
+| **Use MCP servers** | **Yes** — MCP traffic goes through the same stack |
+| **Work in regulated environments** | **Yes** — root cert freshness matters for compliance |
+| **Run agents on servers exposed to internet** | **Yes** — HTTP/3, WebSocket, TLS fixes are critical there |
+| **Are on v1.19.3 and "it works fine"** | **Yes** — security updates aren't optional when they're this easy |
+
+**No reason to wait.** This is a patch release with zero breaking changes. The risk of *not* updating (known CVEs in your agent's network stack) outweighs the risk of updating (near zero).
 
 ---
 
 ## The Bottom Line
 
-**You didn't ask for a security patch. You don't want to think about Brotli decompression vulnerabilities. You just want your agent to work.**
+OpenCode v1.19.4 isn't exciting. It doesn't add features. It doesn't change your workflow.
 
-v1.19.4 is the release that lets you keep not thinking about it.
+**It just makes your agent's network stack secure.**
+
+In a world where coding agents make thousands of authenticated, privileged network calls per day — model APIs, GitHub tokens, cloud credentials, private registries — **the runtime they run on matters.**
 
 ```bash
 opencode update
-# Done. Back to coding.
+# Your agent just got harder to hack. Keep coding.
 ```
 
 ---
