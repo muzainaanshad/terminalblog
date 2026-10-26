@@ -1,0 +1,155 @@
+---
+title: "Cline Desktop v0.0.48 Just Fixed GPT-6 on OpenAI — And Brought Back Sonnet 5.5 as Default"
+description: "Cline Desktop v0.0.48 (October 17) fixes GPT-6 model requests on OpenAI/Azure that were silently failing, restores Claude Sonnet 5.5 as the Cline provider default, and adds CommandCode + Reflection providers to the catalog. The desktop release that makes frontier models work."
+pubDate: 2026-10-26T08:00:00Z
+tags: ["cline", "release", "desktop", "v0.0.48", "gpt-6", "sonnet-5-5", "openai", "azure", "model-catalog", "beginner"]
+tool: "cline"
+author: "sage"
+image: "/api/og?title=Cline+Desktop+v0.0.48+GPT-6+Sonnet+5.5&tool=cline"
+canonical: "https://terminalblog.com/blog/cline-desktop-v0-0-48-gpt6-support-claude-sonnet-default/"
+---
+
+**Cline Desktop v0.0.48 dropped October 17** — and it fixes the silent failure that made GPT-6 models unusable on OpenAI and Azure since they launched.
+
+If you tried `gpt-6-sol` or `gpt-6.1-sol` and got rejected requests with no clear error — **this update fixes it**. Plus: **Claude Sonnet 5.5 is back as the Cline provider default** after a brief Gemini 4 Argon experiment, and the model catalog got two new providers (CommandCode, Reflection) plus default model shifts across 8+ services.
+
+---
+
+## The Headline Fix: GPT-6 Models Now Actually Work on OpenAI/Azure
+
+**The bug:** Since GPT-6 models launched, Cline sent `max_tokens` for every request. OpenAI and Azure **require `max_completion_tokens` for GPT-6 models** — they reject `max_tokens` with a 400 error. Every GPT-6 request silently failed.
+
+**The fix:** v0.0.48 detects GPT-6 model IDs (`gpt-6-sol`, `gpt-6.1-sol`, `gpt-6-1-sol`, and the gpt-5 through gpt-9 family) and automatically sends `max_completion_tokens`. Azure's `gpt-35-turbo` keeps `max_tokens` — the logic is model-aware.
+
+**For beginners:** You don't need to change anything. Select `gpt-6-sol` in the model picker → it works. No config, no flags, no debugging why your frontier model calls return 400.
+
+---
+
+## The Default Model Flip: Sonnet 5.5 Is Back
+
+**What happened:** v0.0.46 switched the Cline provider default to **Gemini 4 Argon** (it was top of the recommended list). v0.0.48 switches back to **Claude Sonnet 5.5** — it's #1 on the recommended list again.
+
+**Why it matters:** Sonnet 5.5 is widely considered the best all-round coding model. The default flip means new users get the strongest model out of the box, without knowing they need to pick it.
+
+**OpenRouter stays on Sonnet 5.5** — only the Cline provider default changed.
+
+---
+
+## Model Catalog Refresh: Two New Providers, Eight Default Shifts
+
+### New Providers Added
+| Provider | Notable Default |
+|----------|-----------------|
+| **CommandCode** | Reflection Beam 1.0 |
+| **Reflection** | Reflection Beam 1.0 |
+
+### Default Model Changes (v0.0.46 → v0.0.48)
+| Service | Old Default | New Default |
+|---------|-------------|-------------|
+| 302.AI | Sonnet 5.5 | Gemini 4 Argon |
+| Eden AI | Sonnet 5.5 | Muse Spark Open |
+| Prime Inference | Sonnet 5.5 | Muse Spark Open |
+| CoreWeave | Sonnet 5.5 | Reflection Beam 1.0 |
+| NanoGPT | Sonnet 5.5 | Nemotron 3.5 Super VL |
+| Pioneer | Sonnet 5.5 | Nemotron 3.5 Super VL |
+| Scaleway | Sonnet 5.5 | DeepSeek V4.1 Flash |
+| OpenCode Go | (various) | `https://opencode.ai/inference/go/v1` pinned |
+
+**The v0 provider** now offers only its default model: `v0-1.5-md` — simplified, no clutter.
+
+---
+
+## OpenCode Go Endpoint Pinned
+
+OpenCode Go's base URL is now **pinned to `https://opencode.ai/inference/go/v1`** — it won't drift if models.dev changes its provider-level URL (which it did, moving to an OpenAI-only path). Stability for OpenCode Go users.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Focus |
+|---------|------|-------|
+| **v0.0.48** | Oct 17, 2026 | **GPT-6 OpenAI/Azure fix, Sonnet 5.5 default restored, CommandCode + Reflection providers, OpenCode Go pinned** |
+| v0.0.47 | Oct 13, 2026 | GPT-6 fix for desktop/CLI, Sonnet 5.5 default, catalog refresh |
+| v0.0.46 | Oct 13, 2026 | Conversation outline, plugin error status, Cloud sign-in cancel, scheduled routines fixes, reasoning toggle fixes |
+| v0.0.45 | Oct 8, 2026 | SSH remote fix, git polling fix, Haiku 5.5 defaults, reasoning toggle fix, background service stability |
+
+**v0.0.48 is a stable desktop release.** If you're on v0.0.45–0.0.47, the GPT-6 fix alone makes it worth updating.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Want to use GPT-6 Sol / Astra on OpenAI or Azure** | **Yes** — was broken, now works |
+| **Use the Cline provider (default, no API key needed)** | **Yes** — Sonnet 5.5 is back as default |
+| **Switched to OpenRouter because Cline provider default changed** | **Yes** — default is Sonnet 5.5 again |
+| **Use OpenCode Go** | **Yes** — endpoint pinned, won't drift |
+| **Want CommandCode / Reflection models** | **Yes** — two new providers in catalog |
+| **On v0.0.47 and happy** | **Optional** — but GPT-6 fix is significant if you use frontier models |
+
+---
+
+## How to Update
+
+Cline Desktop auto-updates, but you can force it:
+
+```bash
+# Check current version in Cline Desktop → Settings → About
+# Should show 0.0.48
+
+# Or reinstall from GitHub releases
+# https://github.com/cline/cline/releases/tag/desktop-v0.0.48
+
+# CLI users
+# https://github.com/cline/cline/releases/tag/cli-v3.0.73
+
+# SDK users
+# https://github.com/cline/cline/releases/tag/sdk%2Fsdk%2Fv0.0.95
+```
+
+**First thing to try after update:**
+```bash
+# 1. Open model picker → select gpt-6-sol → send a prompt → it works
+# 2. Create new session with no model chosen → should default to Claude Sonnet 5.5
+# 3. Check model catalog → CommandCode and Reflection providers now listed
+```
+
+---
+
+## The Bottom Line
+
+**v0.0.47 fixed GPT-6 for Desktop/CLI. v0.0.48 brings the same fix to the SDK — and restores Sonnet 5.5 as the Cline provider default.**
+
+The pattern is clear: Cline Desktop moves fast, breaks things, then fixes them in the next release. The GPT-6 `max_completion_tokens` bug was a real blocker for frontier model users — it's gone. The Sonnet 5.5 default restoration means new users get the best model without thinking.
+
+Two new providers (CommandCode, Reflection) expand the catalog. OpenCode Go endpoint pinning adds stability.
+
+```bash
+# Update → pick gpt-6-sol → code with frontier models
+# That's the workflow now.
+```
+
+---
+
+## Related Articles
+
+- [Cline Desktop Just Fixed SSH Remotes — And Made Haiku 5.5 the New Default](/blog/cline-desktop-v0-0-45-ssh-remotes-haiku55-fixed/)
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Cline v4.1.23: Azure 400 Fix, .clinerules for Commits, MCP Paging](/blog/cline-v4-1-23-claude-azure-fixes-commit-rules-mcp-paging/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
+---
+
+*Cline Desktop is open source (Apache 2.0). Changelog source: [github.com/cline/cline/releases/tag/desktop-v0.0.48](https://github.com/cline/cline/releases/tag/desktop-v0.0.48). Published October 26, 2026 — covers Cline Desktop v0.0.48 released October 17, 2026. Full changelog: [github.com/cline/cline/releases](https://github.com/cline/cline/releases)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
