@@ -1,0 +1,199 @@
+---
+title: "Claude Code Just Added a Monitor Tool and Cloud Sessions — The Observability Gap Just Closed"
+description: "Claude Code 2.1.310 (Oct 23) ships the Monitor tool with plugin monitors for Bedrock, Vertex, and Foundry, fixes gateway request failures, adds Cloud Sessions with Remote Control permissions, and patches 30+ bugs across sandbox, compaction, hooks, and Windows. The terminal agent is becoming an enterprise platform."
+pubDate: 2026-10-26T10:00:00Z
+tags: ["claude-code", "release", "v2.1.310", "monitor", "cloud-sessions", "bedrock", "vertex", "foundry", "coding-agent", "beginner"]
+tool: "claude-code"
+author: "Anshad"
+image: "/api/og?title=Claude+Code+2.1.310+Monitor+Cloud+Sessions&tool=claude-code"
+canonical: "https://terminalblog.com/blog/claude-code-v2-1-310-monitor-tool-cloud-sessions/"
+---
+
+**Claude Code 2.1.310 dropped October 23** — and it's the release that finally plugs the observability hole in your agent stack.
+
+**The headline:** The **Monitor tool** is now built in, with plugin monitors for **Bedrock, Vertex, and Foundry**. You can see what your agent is doing, what it's costing, and where it's stuck — without wiring up custom telemetry.
+
+Plus: **Cloud Sessions** with Remote Control permissions, gateway request retry logic, 30+ bug fixes across sandbox, compaction, hooks, and Windows. This isn't a patch. It's a platform step.
+
+---
+
+## The One-Line Summary
+
+**Monitor tool lands with Bedrock/Vertex/Foundry plugins. Cloud Sessions get Remote Control permissions. Gateway retries fixed. 30+ sandbox/compaction/hook/Windows bugs patched. Update now.**
+
+---
+
+## 1. The Monitor Tool — Observability That Ships In-Box
+
+**What it is:** A new `Monitor` tool that streams structured events from your agent's execution. Plugins for **Bedrock, Vertex, and Foundry** ship with it — zero config to see model calls, token usage, tool invocations, and latency.
+
+**Why it matters:** Before this, you had two choices: fly blind, or build custom OpenTelemetry wiring. Now you run:
+
+```bash
+claude --monitor-plugin bedrock
+# or
+claude --monitor-plugin vertex
+# or
+claude --monitor-plugin foundry
+```
+
+And you get: model calls, tokens in/out, tool calls with args/results, errors, latency percentiles. In your terminal. In your logs. In your dashboard.
+
+**For beginners:** This is "how much did that cost?" and "why did that take 40 seconds?" answered automatically. No dashboards to build.
+
+**For operators:** The plugin architecture means your enterprise logging stack (Splunk, Datadog, CloudWatch) can ingest this natively. The events are structured JSON — pipe them wherever.
+
+---
+
+## 2. Gateway Request Failures — Fixed at the Source
+
+**The bug:** Requests failing behind certain gateways and compatible servers that reject the `effort-2025-11-24` beta value or mid-conversation system messages.
+
+**The fix:** Claude Code now **retries without them automatically**. You don't see the failure. You don't retry manually. It just works.
+
+This is the kind of fix that separates "works on my machine" from "works behind your corporate proxy." If you've ever had Claude Code stall or error on an enterprise network, **this is the release that stops it.**
+
+---
+
+## 3. Cloud Sessions + Remote Control = Enterprise Ready
+
+**What's new:**
+- **Cloud Sessions** now have **Remote Control permissions** in Enterprise custom roles — Owners control access by role
+- **Choose file button** to load cloud environment setup scripts from a file
+- **Failed saves/archives** now show errors *inside the dialog* (not just toasts)
+- **Failed routine API token actions** surface errors in the edit dialog
+- **Session start checklist** shows setup script output in a scrolling box
+- **Turning on Cloud Sessions/Remote Control** asks for confirmation and lists affected custom roles
+
+**Why it matters:** You can now run agents on GitHub repos in hosted sandboxes, with RBAC, audit trails, and setup-script versioning. This is the "run it while I sleep" workflow with enterprise guardrails.
+
+---
+
+## 4. Sandbox & Compaction Fixes That Save Your Work
+
+| Fix | Why You Care |
+|-----|--------------|
+| Background cleanup no longer deletes recent pasted images when `cleanupPeriodDays` is huge | Your screenshots/diagrams survive cleanup |
+| Compaction after "Prompt too long" no longer keeps dense text (base64, SVG) that causes repeat failures | No more compaction death spirals |
+| File read permission prompts now show where symlinks lead | You know *exactly* what you're approving |
+| Nested CLAUDE.md over size limit loads only its start | No more runaway context from massive nested instructions |
+| Linux sandbox startup names Ubuntu's AppArmor restriction and how to lift it | Bubblewrap failures become solvable in 30 seconds |
+
+---
+
+## 5. Windows: The Hook Fix You've Been Waiting For
+
+**The bug:** `PreToolUse` and `PermissionRequest` hooks **let tool calls through** when Git Bash is missing and the hook command is only quoted strings (like a quoted path).
+
+**The fix:** Fixed. Hooks now block correctly on Windows even without Git Bash.
+
+**Also fixed:**
+- PowerShell permission checks no longer auto-approve `Set-Location`/`cd` to current directory with extra args
+- Git commands run faster and show errors in English (regardless of git locale)
+- `sed -i` gets standard Bash prompt, runs as written, not restored by `/rewind`
+
+---
+
+## 6. VS Code Extension Fixes
+
+- **Enter on "Send feedback and keep planning" button** no longer approves the plan — sends comments back
+- **Panel "Something went wrong" after "Switch branch & continue"** on cloud sessions from Session History Web tab — fixed
+- **Code Review admin section** retries first load, shows "Try again" banner on failure
+
+---
+
+## 7. Quick Version Context
+
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| **2.1.310** | Oct 23, 2026 | **Stable** | **Monitor tool + Bedrock/Vertex/Foundry plugins, Cloud Sessions RBAC, gateway retries, 30+ sandbox/compaction/hook/Windows fixes** |
+| 2.1.309 | Oct 21, 2026 | Stable | Sandbox fixes, worktree isolation, session compaction, hook fixes, Windows git speed |
+| 2.1.308-309 | Oct 19, 2026 | Stable | Stability surge — 100+ fixes |
+| 2.1.306 | Oct 17, 2026 | Stable | Cloud session MCP fix |
+
+**2.1.310 is the observability release.** The Monitor tool changes what you can see. Cloud Sessions RBAC changes who can run what. Gateway retries change whether it works behind your firewall.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Run Claude Code in production** | **Yes** — Monitor tool gives you observability you'd otherwise build |
+| **Use Bedrock, Vertex, or Foundry** | **Yes** — native monitor plugins, zero config |
+| **Run behind corporate gateways/proxies** | **Yes** — automatic retry on rejected requests |
+| **Manage enterprise access to Cloud Sessions** | **Yes** — RBAC for Remote Control |
+| **Use Windows with hooks** | **Yes** — PreToolUse/PermissionRequest blocking fixed |
+| **Hit compaction death spirals with large files** | **Yes** — dense text handling fixed |
+| **Just want latest stable** | **Yes** — 30+ fixes, zero breaking changes |
+
+**No reason to wait.** This is a feature + security + reliability release with zero breaking changes.
+
+---
+
+## How to Update
+
+```bash
+# Standard update
+claude update
+
+# Verify
+claude --version
+# Should show 2.1.310
+
+# Try the Monitor tool
+claude --monitor-plugin bedrock "analyze this codebase"
+# Watch structured events stream in your terminal
+```
+
+**First things to try after update:**
+
+```bash
+# 1. Test Monitor with your cloud provider
+claude --monitor-plugin bedrock "what's in this repo?"
+# 2. Check Cloud Sessions RBAC in admin settings
+# 3. Run a task behind your corporate gateway — watch it retry automatically
+```
+
+---
+
+## The Bottom Line
+
+**2.1.309 fixed the plumbing. 2.1.310 gives you the dashboard.**
+
+- **Monitor tool** = you see what the agent does, costs, and where it stalls
+- **Cloud Sessions RBAC** = you control who runs agents on your repos
+- **Gateway retries** = it works behind your firewall
+- **30+ fixes** = the daily paper cuts are gone
+
+```bash
+claude update
+# claude --monitor-plugin bedrock "show me the money"
+# Cloud Sessions → Settings → Remote Control → assign roles
+# Your agent stack just grew up.
+```
+
+---
+
+## Related Articles
+
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release You've Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Claude Code v2.1.308-310 Stability Surge — The Release You've Been Waiting For](/blog/claude-code-v2-1-308-310-stability-surge/)
+- [Claude Code Cloud Sessions — MCP Fix in v2.1.306](/blog/claude-code-v2-1-306-cloud-session-mcp-fix/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [OpenCode Just Got the Monitor Treatment Too](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Dropped 100+ Fixes in Two Days — The Stability Wave You've Been Waiting For](/blog/claude-code-v2-1-308-309-stability-surge/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+- [Codex v0.164.0 Just Dropped Presets, Inline Model Config, and Image Preview](/blog/codex-v0-164-0-presets-config-images/)
+
+---
+
+*Claude Code 2.1.310 released October 23, 2026. Source: [github.com/anthropics/claude-code/blob/main/CHANGELOG.md](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md) · Docs: [docs.anthropic.com/claude-code](https://docs.anthropic.com/claude-code) · Published October 26, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
