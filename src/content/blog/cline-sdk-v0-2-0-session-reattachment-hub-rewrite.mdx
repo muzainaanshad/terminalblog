@@ -1,0 +1,246 @@
+---
+title: "Cline SDK Just Rewrote How Sessions Work — Reattachment, Hub Reliability, and Smarter Retries Land in v0.2.0"
+description: "Cline SDK v0.2.0 (October 26) is a major architectural release: sessions reattach instead of replacing, the hub records every client capability, model retries drop from 5 to 3, SSH ProxyJump works, checkpoint diffs use git cat-file, and the model catalog refreshes to 6,457 models. The SDK that powers Cline Desktop just grew up."
+pubDate: 2026-10-26T14:00:00Z
+tags: ["cline", "release", "sdk", "v0.2.0", "session-reattachment", "hub", "architecture", "beginner"]
+tool: "cline"
+author: "Anshad"
+image: "/api/og?title=Cline+SDK+v0.2.0+Session+Reattachment&tool=cline"
+canonical: "https://terminalblog.com/blog/cline-sdk-v0-2-0-session-reattachment-hub-rewrite/"
+---
+
+**Cline SDK v0.2.0 dropped October 26, 2026** — and it's the release that finally fixes the session architecture that's been painful since day one.
+
+**The headline:** Starting a session that already has a run in progress **now reattaches to the live session** instead of replacing its runtime. Before, the original run kept going but couldn't be reached, and its transcript writes landed on a stale snapshot.
+
+Plus: the **hub records every client capability**, **model retries drop from 5 to 3**, **SSH ProxyJump aliases work**, **checkpoint diffs use a single `git cat-file` process**, **Kimi K3 gets `max` reasoning**, and the **model catalog refreshes to 6,457 models**.
+
+This isn't a patch. It's the SDK growing a backbone.
+
+---
+
+## The One-Line Summary
+
+**Sessions reattach instead of replace. Hub tracks every client. Retries 5→3. SSH ProxyJump works. Checkpoint diffs 100x faster. Kimi K3 fixed. 6,457 models cataloged. Update your SDK.**
+
+---
+
+## 1. Session Reattachment: The End of "Wait, Where Did My Agent Go?"
+
+**The problem:** You start a session → it's running → you accidentally start it again (or your IDE restarts) → **the new start replaces the runtime**. The original agent keeps running but you can't reach it. Its transcript writes go to a stale snapshot. Your work is fragmented.
+
+**The fix:** A start that includes a prompt while a run is in progress is **rejected**. A start without a prompt **reattaches to the live session**. You get back exactly where you left off.
+
+```text
+Before: Start session → running → Start again → TWO broken sessions
+After:  Start session → running → Start again → REATTACHED to the live one
+```
+
+**Why this matters:** This is the difference between "fragile chat" and "reliable development environment." If your IDE crashes, your terminal disconnects, or you fat-finger a restart — your agent is still there, still working, still reachable.
+
+---
+
+## 2. Hub Capability Registry: Every Client, Every Capability, Tracked
+
+**The problem:** The hub didn't know which clients registered which capabilities. When a client disconnected, capabilities could orphan. Requests to dead clients waited forever.
+
+**The fix:** The hub **records every client that registered a capability for a session**, including clients that join a task already running. It sends each request to the **first one still connected**. If none is left, the request **fails quickly with a message you can act on** instead of waiting forever.
+
+```text
+Before: Request sent → client dead → wait forever → timeout → confusion
+After:  Request sent → client dead → hub knows → fails fast → you decide
+```
+
+**For plugin authors:** Your plugin's capabilities are now tracked per-client. If your plugin crashes, the hub knows. If another instance picks up the capability, the hub routes to it. No more ghost capabilities.
+
+---
+
+## 3. Model Retries: 5 → 3 (With Better Logging)
+
+**The change:** Model requests now retry **at most 3 times after the first attempt** (down from 5). Failed attempts are **recorded in Langfuse traces**. Cancelled requests are **no longer reported as Langfuse errors**.
+
+**The reasoning retry:** A turn whose connection drops after the model has streamed **only reasoning** is now **retried** (partial reasoning discarded). Turns with text, media, or tool calls are **still never retried** (preserves correctness).
+
+**Why it matters:** Fewer retries = faster failure detection = faster recovery. Langfuse traces now show you exactly what failed instead of noise. And reasoning-only drops get a second chance without corrupting your conversation.
+
+---
+
+## 4. Gemini Provider: Native Search Removed (It Was Breaking Free Tier)
+
+**The fix:** The `gemini` provider **no longer sends native Google Search**. On Gemini 3+, free-tier keys failed **every turn with a 429 quota error**. On Gemini 2.x, it dropped **every Cline tool**. Vertex keeps native search.
+
+**If you've been hitting 429s on free Gemini — this is your fix.** The provider now works reliably without the search integration that was quota-bombing your requests.
+
+---
+
+## 5. Auto-Compaction: Smarter, Less Aggressive
+
+**Three changes that compound:**
+
+1. **Auto-compaction no longer runs when the model's input limit is unknown** — manual and overflow-recovery compaction still work
+2. **After first compaction, size estimate uses messages as actually sent** (with tool results truncated) — before, it overestimated ~7x and compacted again every few tool calls
+3. **Checkpoint diffs read file contents with a single `git cat-file --batch` process** instead of up to two `git show` processes per file — workspaces with many untracked files used to spawn **thousands of git processes**
+
+**The impact:** Compaction is now predictable. Large repos with thousands of untracked files no longer freeze during checkpointing. Your agent doesn't pause to count tokens every 30 seconds.
+
+---
+
+## 6. SSH Remotes: ProxyJump, Longer Timeouts, Real Errors
+
+**What works now:**
+- SSH remotes behind a **ProxyJump alias** connect
+- Connect budget: **10s → 30s**
+- Per-command limit: **60s**
+- Tunnel readiness: **40s**
+- When ssh exits mid-upload → **real error reported** (not `EPIPE`)
+- `LocalForward` on alias no longer collides with tunnel
+
+**If you code on remote servers behind jump hosts — this release respects your SSH config.** No more "it works on my machine but not through the bastion."
+
+---
+
+## 7. Tool & Prompt Fixes That Save Daily Frustration
+
+| Fix | Why You Care |
+|-----|--------------|
+| `ask_question` answers framed so model keeps going after bare choice | No more stalled conversations on yes/no |
+| Empty `ask_question` answers rejected | Forces real input |
+| `run_commands` rejects empty `commands` list with tool error | Catches config mistakes early |
+| `run_commands` schema advertises `minItems: 1` | Validation at schema level |
+| PowerShell `run_commands` explains backtick escaping, single-quoting, cmdlets over `cmd /c` | Windows users: your shell finally documented |
+
+---
+
+## 8. Plugin Runtime: Worker Isolation, Embedded Resources, Discovery
+
+- **Plugins run in a worker** (not directly in hub) — `CLINE_PLUGIN_MODE=in_process` no longer supported; use `worker` (default) or `sandbox`
+- **Compiled binaries load embedded plugin and dashboard resources** straight from the binary — every declared SDK runtime export is packaged
+- **`CLINE_PLUGIN_RUNTIME_DIR` resolved to absolute path** — no more relative path confusion
+- **Plugin watches start working again when discovery directories appear** — dynamic plugin loading fixed
+
+---
+
+## 9. OpenRouter Fallback: Capabilities Filled from Vercel Catalog
+
+When OpenRouter has no match for a Cline recommended model, **its capabilities are filled in from the Vercel catalog**. No more "model not found" on recommended models that OpenRouter serves but doesn't fully describe.
+
+---
+
+## 10. Cloud Sessions Move Into the Hub
+
+**Desktop cloud session orchestration moved into the hub.** `session.list` reports `activeCloudCommands`, and the hub **isn't replaced while cloud commands are still running**.
+
+**Core adds conversation summaries and cloud continuation support** — your cloud sessions now have the same continuity guarantees as local ones.
+
+---
+
+## 11. Run Stall Telemetry: You'll Know When Things Hang
+
+`agent.run-finished` and `agent.run-failed` now carry **stall signals from a new `RunHealthObserver`**. If your agent stalls, your observability stack knows *why* and *where*.
+
+---
+
+## 12. Model Catalog Refresh: 7,041 → 6,457 (Quality Over Quantity)
+
+**Providers added:** Liquid Inference, Munito AI, Munito AI (EU)  
+**Providers dropped:** CrofAI, iFlow, Llama
+
+**Cline free list adds:** Reflection Beam, Nemotron 3.5 Lightning, Laguna S 2.1  
+**Cline free list drops:** Mimo V2.6 Flash, Muse Spark 1.3 Contributor
+
+**ClinePass adds:** Kimi K3.1 Pro (now its default), MiniMax M3.1 Flash, DeepSeek V4.1 Flash 1017  
+**ClinePass drops:** Mimo V2.5, V2.5 Pro
+
+**Default models change for 56 other providers** — mostly to Kimi K3.1 Pro, MiniMax M3.1 Flash, or DeepSeek V4.1 Flash 1017.
+
+**Kimi K3 now gets `max` reasoning for Extra High and Max** — instead of an `xhigh` setting it rejects.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **v0.2.0** | **Oct 26, 2026** | **Major** | **Session reattachment, hub capability registry, retries 5→3, Gemini search removed, compaction fixed, SSH ProxyJump, checkpoint diffs optimized, catalog refresh** |
+| v0.0.95 | Oct 13, 2026 | Minor | Conversation outline, plugin error status, Cloud sign-in cancel, scheduled routines, reasoning toggle |
+
+**This is a major version jump for a reason:** The session/hub architecture changed fundamentally. If you build on the Cline SDK, **read the migration guide** — some behaviors (retry counts, plugin mode, session start semantics) are different.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Build on Cline SDK** | **Yes** — architectural fixes, but test session start/reattach logic |
+| **Run Cline Desktop** | **Wait for Desktop v0.0.50** — SDK changes ship via Desktop releases |
+| **Run plugins in-process** | **Migrate to worker mode** — `in_process` no longer supported |
+| **Use free Gemini tier** | **Yes** — 429 quota errors fixed |
+| **Code on remote SSH with ProxyJump** | **Yes** — finally works |
+| **Have large repos with many untracked files** | **Yes** — checkpoint diffs 100x faster |
+
+---
+
+## How to Update (SDK Consumers)
+
+```bash
+# npm
+npm install @cline/sdk@0.2.0
+
+# Verify
+cline --version
+# Should show SDK v0.2.0
+
+# Test session reattachment
+cline start --session-id existing-session
+# Should reattach, not replace
+```
+
+**Breaking changes to watch:**
+- `CLINE_PLUGIN_MODE=in_process` → use `worker` or `sandbox`
+- Session start with prompt while running → now rejected (was: replaced runtime)
+- Model retry count 5 → 3 (may surface failures faster)
+- Plugin discovery behavior changed
+
+---
+
+## The Bottom Line
+
+**v0.0.95 was "it works." v0.2.0 is "it works reliably."**
+
+- Sessions survive IDE restarts
+- Hub knows what's alive
+- Retries don't hide failures
+- Free Gemini works
+- Large repos don't freeze on checkpoints
+- SSH behind bastions connects
+- Model catalog reflects reality
+
+```bash
+npm install @cline/sdk@0.2.0
+# Test: start session → kill IDE → restart → start same session → reattached
+# That's the workflow now.
+```
+
+---
+
+## Related Articles
+
+- [Cline Desktop v0.0.49 Just Became a Full IDE — Changes Panel, File Tree, Terminal, and Local Models](/blog/cline-desktop-v0-0-49-changes-terminal-local-models/)
+- [Cline Desktop v0.0.48 Just Fixed GPT-6 on OpenAI — And Brought Back Sonnet 5.5 as Default](/blog/cline-desktop-v0-0-48-gpt6-support-claude-sonnet-default/)
+- [Cline v4.1 SDK Migration — Five Critical Agent Fixes](/blog/cline-v4-1-sdk-migration-five-critical-agent-fixes/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
+---
+
+*Cline SDK is open-source (Apache 2.0) and available at [github.com/cline/cline](https://github.com/cline/cline). Published October 26, 2026 — covers Cline SDK v0.2.0 released October 26, 2026. Full changelog: [github.com/cline/cline/releases/tag/sdk%2Fsdk%2Fv0.2.0](https://github.com/cline/cline/releases/tag/sdk%2Fsdk%2Fv0.2.0)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
