@@ -1,0 +1,201 @@
+---
+title: "Hermes Agent Security Fixes Are Ready — But 3 Weeks Later, They're Still Not Merged"
+description: "The October 2026 security audit found 403 vulnerabilities (6 HIGH) in Hermes Agent. Local fixes exist and pass all tests. Three weeks later, zero have been merged upstream. If you run Hermes, you're still exposed."
+pubDate: 2026-10-26T10:00:00Z
+tags: ["beware", "security", "hermes-agent", "audit", "hardline", "OSC-8", "skillignore", "WSL", "XSS", "unmerged"]
+tool: "hermes"
+author: "Anshad"
+image: "/api/og?title=Hermes+Security+Fixes+Ready+Not+Merged&tool=hermes"
+---
+
+On October 2, 2026, a comprehensive security audit of **NousResearch/hermes-agent** dropped — 15,136 files, ~1.1M lines, 64 deep-read passes. The result: **403 findings**, including **6 HIGH-severity vulnerabilities** with working reproductions.
+
+The audit team didn't just find bugs. They **built fixes**. A 695-file local patch against commit `0a374d16` with a re-apply guard. Every fix has byte-level probes, negative controls, and regression tests.
+
+**Three weeks later, zero of those fixes have been merged.**
+
+---
+
+## The Six HIGH Findings — Still Unpatched
+
+| Issue | Component | Attack Vector | PR Status |
+|-------|-----------|---------------|-----------|
+| [#131563](https://github.com/NousResearch/hermes-agent/issues/131563) | `tools/approval_detection.py` | Git alias smuggling, wrapper prefixes, attached-quote flags → **zero-approval command execution** | [#131590](https://github.com/NousResearch/hermes-agent/pull/131590) — **Open** |
+| [#131565](https://github.com/NousResearch/hermes-agent/issues/131565) | TUI markdown + ink render sinks | BEL byte in markdown URLs → **terminal escape injection on render, no click required** | [#131569](https://github.com/NousResearch/hermes-agent/pull/131569) — **Open** |
+| [#131564](https://github.com/NousResearch/hermes-agent/issues/131564) | `tools/skills_guard.py` | Malicious `.skillignore` in bundle → **threat scanner disabled by the bundle it scans** | [#131582](https://github.com/NousResearch/hermes-agent/pull/131582) — **Open** |
+| [#131562](https://github.com/NousResearch/hermes-agent/issues/131562) | Desktop `avatar.tsx` | Bot name attribute breakout → **stored XSS in Electron renderer** | No PR yet |
+| [#131561](https://github.com/NousResearch/hermes-agent/issues/131561) | Desktop `external-open.ts` | WSL `cmd.exe /c start "" <url>` unquoted → **command injection via shell metacharacters** | No PR yet |
+| [#131566](https://github.com/NousResearch/hermes-agent/issues/131566) | Full codebase | 43 medium findings including TTS shell injection, path traversal, SSRF, open redirect, credential logging | Epic issue — **Open** |
+
+All six issues are tagged `type/security` and `sweeper:risk-security-boundary`. The hardline bypass (#131563) is `P2Medium — degraded but workaround exists`. The others are `P3Low — cosmetic, nice to have` — a labeling choice that feels wrong for vulnerabilities with working exploits.
+
+---
+
+## What the Fixes Actually Do
+
+The audit team shipped a **local deployment** with all fixes applied. Here's what they change:
+
+### #131563 — Hardline Blocklist Bypass (Zero-Approval Execution)
+**File**: `tools/approval_detection.py`
+
+Adds four recursive payload extractors that feed discovered payloads back through the full hardline pipeline:
+- `_git_alias_shell_payloads` — extracts `!shell` payloads from git aliases
+- `_option_command_payloads` — handles `bash -c'payload'` attached-quote form
+- `_system_call_string_payloads` — catches `awk 'BEGIN{system(...)}'`, `find -exec`, `su -c`
+- `_find_exec_command_payloads` — recursive wrapper unwrapping for `timeout`, `nice`, `sudo`, `eval`, `env`, `screen`, `tmux`, etc.
+
+**Result**: Hardline battery 6/26 → 26/26. Wrapper battery 3/15 → 15/15. End-to-end `check_all_command_guards` 7/7 BLOCKED. 35 benign commands unchanged (zero false positives).
+
+### #131565 — OSC-8 Terminal Escape Injection
+**Files**: Three render sinks in `ui-tui/`
+
+Shared `sanitizeOsc8Url()` strips C0, DEL, C1 controls (including CSI U+009B) at **every sink** before embedding. Sanitizes display text too (autolink `<url>` branch renders raw URL as text node). Byte-level probes green with negative controls.
+
+### #131564 — Skill Scanner Trusts Bundle's Own `.skillignore`
+**File**: `tools/skills_guard.py`
+
+**Never honors bundle-supplied ignore files during scanning** — every file takes both passes. Reports every ignore file found as `skill_ignore_file` finding. Bumps `SCANNER_VERSION` so cached "safe" verdicts are invalidated and re-scanned.
+
+### #131562 — Stored XSS via Bot Name
+**File**: `apps/desktop/src/plugins/hermes-bots/avatar.tsx`
+
+`escapeHtmlAttr()` (escape `& < > " '` to entities) before attribute interpolation. Regression tests with hostile names. Also fixes CSS-selector twin in `profile-ops.ts`.
+
+### #131561 — WSL `openExternal` Command Injection
+**File**: `apps/desktop/electron/external-open.ts`
+
+Two-tier `buildCmdStartArgs(url)`:
+1. Fail-closed reject for unescapable characters (`"`, `%`, `!`, whitespace/controls)
+2. Caret-escape remaining metacharacters
+3. Keep scheme allowlist
+
+20-case probe suite: 9 attack URLs fully escaped, 7 unescapable rejected, clean URLs unchanged.
+
+---
+
+## Why This Matters: The Fixes Exist. They Work. They're Not in Your Build.
+
+This isn't a "waiting for a fix" situation. The fixes are **written, tested, and proven**. They sit in open PRs (or haven't been opened yet) while every Hermes installation runs vulnerable code.
+
+**If you run Hermes Agent today, you are affected by at least some of these:**
+
+- **Hardline bypass (#131563)**: Affects **everyone**. Any prompt-injected model or malicious context can execute `timeout 1 rm -rf /` with zero approval prompts.
+- **OSC-8 injection (#131565)**: Affects **all TUI users**. Model output with a crafted markdown link injects terminal escapes on *render* — no click needed.
+- **Skill scanner bypass (#131564)**: Affects **anyone installing skills**. A single `*` in `.skillignore` masks everything except `SKILL.md`.
+- **Stored XSS (#131562)**: Affects **Desktop app users with bots**. Bot names propagate via gateway registry.
+- **WSL injection (#131561)**: Affects **Windows+WSL Desktop users**. Clicking a malicious link executes arbitrary commands.
+- **43 medium findings (#131566)**: Include TTS shell injection (`Popen(shell=True)`), path traversal in memory approve, SSRF in media relay, open redirect in dashboard auth, credential logging in BlueBubbles, plugin validation bypass, cross-user session attach, unauthenticated credential proxy, SSRF filter bypass, EPIPE killing TUI.
+
+---
+
+## What You Can Do Right Now
+
+### 1. Check Your Version
+```bash
+hermes --version
+```
+If you're on any v0.22.x or v0.21.x — you have **all six HIGH vulnerabilities**.
+
+### 2. Apply Mitigations Immediately
+```bash
+# Restrict API server to localhost only
+grep -r "0.0.0.0" ~/.config/hermes/ 2>/dev/null
+# If found, change to 127.0.0.1 in your config
+
+# Audit installed skills for .skillignore
+find ~/.config/hermes/skills -name ".skillignore" -o -name ".clawhubignore" 2>/dev/null
+# If any exist with broad patterns (*), remove or re-scan those skills
+
+# Check bot configs for suspicious names
+find ~/.config/hermes -type f \( -name "*.json" -o -name "*.yaml" \) 2>/dev/null | \
+  xargs grep -h "bot" 2>/dev/null | \
+  grep -E 'name.*["<>\\']' 2>/dev/null
+
+# Avoid clicking/rendering untrusted links in Desktop/TUI until OSC-8 fix lands
+```
+
+### 3. Watch the PRs
+The fixes will land via these PRs (bookmark them):
+- [#131590](https://github.com/NousResearch/hermes-agent/pull/131590) — Hardline bypass fix
+- [#131569](https://github.com/NousResearch/hermes-agent/pull/131569) — OSC-8 sanitization
+- [#131582](https://github.com/NousResearch/hermes-agent/pull/131582) — Skill scanner fix
+- Watch for PRs on #131561, #131562, #131566
+
+### 4. Update the Moment Fixes Land
+```bash
+# When PRs merge and a new release cuts:
+hermes update
+# or
+docker pull nousresearch/hermes-agent:stable
+```
+
+---
+
+## The Uncomfortable Question: Why Aren't They Merged?
+
+Three weeks. Six HIGH findings. Local fixes with full test coverage. Zero merges.
+
+Possible reasons:
+- **Maintainer bandwidth**: The project moves fast (6,080 PRs in the v0.22.0 window). Security PRs may not be prioritized.
+- **Review complexity**: These touch core security boundaries — `approval_detection.py`, TUI render sinks, skill installation, Electron IPC. Review takes time.
+- **Release train**: v0.22.3 (Oct 21), v0.22.4 (Oct 21), v0.22.5 (Oct 22) were patch releases focused on stability/QoL. Security fixes may wait for v0.23.0.
+- **Labeling signals**: `P3Low — cosmetic, nice to have` on 4 of 6 issues sends the wrong priority signal to reviewers.
+
+Whatever the reason, **the clock is ticking**. The audit is public. The issues are public. The reproduction scripts exist. Attackers have the same information.
+
+---
+
+## The Pattern: Hermes Shows Its Work — For Better and Worse
+
+This is the second major security audit for Hermes in 2026:
+- **August 2026**: 5 HIGH findings ([#82591](https://github.com/NousResearch/hermes-agent/issues/82591)) — fixed in subsequent releases
+- **October 2026**: 6 HIGH findings — **fixes ready, not merged**
+
+The difference: **October's audit came with a complete local patch set**. The team didn't just report problems — they solved them. The fixes are *done*.
+
+This transparency is rare and valuable. Most projects quietly patch and disclose later (or never). Hermes shows the work.
+
+But transparency cuts both ways: **attackers can read the same issues**. Every day these stay open is a day the exploit window widens.
+
+---
+
+## Bottom Line
+
+**The fixes are real. They pass tests. They're not in your Hermes.**
+
+If you run Hermes Agent:
+1. **Apply the mitigations above** (network restriction, skill audit, bot review, link caution)
+2. **Watch the PRs** — merge activity is your signal to update
+3. **Update immediately** when a release containing these fixes ships
+
+For the maintainers: **These PRs should be fast-tracked**. Security boundaries with working exploits don't belong in a patch queue behind suggestion pill removal.
+
+---
+
+## Timeline
+
+| Date | Event |
+|------|-------|
+| 2026-10-02 | Full audit published as [#131566](https://github.com/NousResearch/hermes-agent/issues/131566); six HIGH findings filed as #131561–#131565 |
+| 2026-10-02 | Local 695-file patch developed with re-apply guard against `0a374d16` |
+| 2026-10-03 | Original audit article published on terminalblog |
+| 2026-10-13 | v0.22.0 "Threshold Release" ships — **without security fixes** |
+| 2026-10-15 | v0.22.2 ships — **without security fixes** |
+| 2026-10-21 | v0.22.3 ships (620 PRs) — **without security fixes** |
+| 2026-10-21 | v0.22.4 ships — **without security fixes** |
+| 2026-10-22 | v0.22.5 ships (81 PRs) — **without security fixes** |
+| **2026-10-26** | **This article published — zero security PRs merged** |
+
+---
+
+## Related Articles
+
+- [Beware: Hermes Agent October 2026 Security Audit Finds 6 HIGH-Severity Vulnerabilities](/blog/beware-hermes-agent-oct2026-security-audit-6-high-findings/)
+- [Beware: Hermes Agent's Approval Gate Reports 'Blocked' While Commands Secretly Execute](/blog/beware-hermes-agent-approval-gate-bypass-commands-execute-while-blocked/)
+- [Beware: Hermes Agent Security Audit Uncovers 5 HIGH-Severity Findings (August 2026)](/blog/beware-hermes-agent-security-audit-5-high-severity-findings/)
+- [Coding Agent Security Checklist 2026 — The Operator's Hardening Guide](/blog/coding-agent-security-checklist-2026/)
+- [Why Hermes Agent Is the Most Underrated Open-Source AI Assistant in 2026](/blog/why-hermes-agent-is-the-most-underrated-open-source-ai-assistant-2026/)
+
+---
+
+*This article will be updated when PRs merge. Run `node scripts/content-gate.cjs --strict` before republishing.*
