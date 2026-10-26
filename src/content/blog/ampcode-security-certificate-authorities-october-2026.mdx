@@ -1,0 +1,202 @@
+---
+title: "AmpCode Just Removed Trust in Compromised Certificate Authorities — Update Your CLI Now"
+description: "AmpCode's October 22 security update removes trust in eMudhra (emSign) certificates. If your MCP servers or proxies use these CAs, you'll see 'untrusted certificate' errors. Here's what to do and why it matters for your agent's supply chain."
+pubDate: 2026-10-26T10:00:00Z
+tags: ["ampcode", "security", "certificate-authority", "emudhra", "emSign", "mcp", "supply-chain", "coding-agent", "beginner"]
+tool: "ampcode"
+author: "sage"
+image: "/api/og?title=AmpCode+Security+Certificate+Authorities&tool=ampcode"
+canonical: "https://terminalblog.com/blog/ampcode-security-certificate-authorities-october-2026/"
+faq:
+  - q: "Why am I suddenly getting 'untrusted certificate' errors in AmpCode?"
+    a: "AmpCode's October 22 update removed trust in eMudhra (emSign) certificates due to compromise. If your MCP server or proxy uses an emSign certificate, you'll see this error. Ask the server operator to switch to a different CA."
+  - q: "What version do I need to update to?"
+    a: "Update the Amp CLI to version `0.0.1792627309-g98c009` or later by running `amp update`. Check your version with `amp --version`."
+  - q: "Is this a breaking change?"
+    a: "Yes, intentionally. AmpCode removed trust in compromised CAs to protect your agent's network traffic. This is a security fix, not a bug."
+  - q: "How do I check if my MCP server uses an affected certificate?"
+    a: "Run `openssl s_client -connect your-mcp-server:port -servername your-mcp-server </dev/null | openssl x509 -noout -issuer` and look for 'eMudhra' or 'emSign' in the issuer field."
+  - q: "What other CAs might be affected?"
+    a: "This update specifically targets eMudhra/emSign. AmpCode's security page states they 'removed trust in compromised certificate authorities' (plural), suggesting other CAs may also be affected. Check ampcode.com/security for updates."
+---
+
+**AmpCode dropped a security update on October 22** that doesn't add features — it *removes* trust. Specifically, trust in **eMudhra (emSign) certificate authorities**.
+
+If your MCP servers, proxies, or any infrastructure your agent talks to uses an emSign certificate, **your Amp CLI will now reject the connection** with an "untrusted certificate" error.
+
+This isn't a bug. It's a deliberate supply-chain hardening move. Here's what happened, why it matters, and what to do.
+
+---
+
+## The One-Line Summary
+
+**AmpCode v0.0.1792627309-g98c009+ removes trust in eMudhra/emSign CAs. If your MCP server uses an emSign cert, connections fail. Ask the operator to reissue with a different CA. Run `amp update` now.**
+
+---
+
+## What Happened
+
+On **October 22, 2026**, AmpCode published a security update stating:
+
+> "This update removes trust in compromised certificate authorities, along with other security-related updates. If you see a new 'untrusted certificate' error in the Amp CLI when connecting to a server that uses an eMudhra (emSign) certificate, such as an MCP server or proxy, ask the server's operator to switch to a certificate from another certificate authority."
+
+**Translation:** eMudhra (operating as emSign) suffered a compromise. AmpCode responded by removing their root certificates from the trust store. Any server presenting an emSign-issued certificate is now rejected.
+
+---
+
+## Why This Matters for Coding Agents
+
+Your coding agent makes **hundreds of authenticated network calls per session**:
+
+- Model API endpoints (Anthropic, OpenAI, OpenRouter, etc.)
+- **MCP server connections** — tools, resources, prompts
+- GitHub/GitLab API calls
+- Package registries (npm, PyPI, Cargo, etc.)
+- Private corporate proxies
+
+**Every one of those connections relies on TLS certificate validation.** If a compromised CA is trusted, an attacker could:
+
+1. Issue a fraudulent certificate for `api.anthropic.com` or your MCP server
+2. Intercept your agent's traffic (model prompts, code, tokens, secrets)
+3. Inject malicious responses or steal credentials
+
+**AmpCode's fix closes this vector at the client level.** Your agent simply won't connect to servers using compromised CAs.
+
+---
+
+## Immediate Action Required
+
+### 1. Update Your Amp CLI
+
+```bash
+amp update
+# Verify
+amp --version
+# Should show 0.0.1792627309-g98c009 or later
+```
+
+### 2. Test Your MCP Servers
+
+Run a quick connection test for each MCP server you use:
+
+```bash
+# In Amp, try connecting to each MCP server
+# Or from command line:
+openssl s_client -connect your-mcp-server:port -servername your-mcp-server </dev/null | openssl x509 -noout -issuer
+```
+
+**Look for:** `eMudhra` or `emSign` in the issuer field.
+
+### 3. If You See "Untrusted Certificate"
+
+**The error will look like:**
+```
+Error: certificate verify failed: self signed certificate in certificate chain
+# or
+Error: unable to get local issuer certificate
+# with issuer showing eMudhra/emSign
+```
+
+**Fix:** Contact the MCP server operator and ask them to **reissue the certificate from a different CA** (Let's Encrypt, DigiCert, GlobalSign, Sectigo, etc.).
+
+**Do not** disable certificate verification. That defeats the entire security fix.
+
+---
+
+## For MCP Server Operators
+
+If you run an MCP server that agents connect to:
+
+| Current Cert CA | Action Required |
+|-----------------|-----------------|
+| **eMudhra / emSign** | **URGENT: Reissue from another CA immediately** |
+| Let's Encrypt | No action needed |
+| DigiCert / GlobalSign / Sectigo / others | No action needed |
+| Self-signed | Already untrusted — use a public CA |
+
+**Quick reissue options:**
+- **Let's Encrypt:** Free, automated, 90-day expiry (`certbot` / `acme.sh`)
+- **ZeroSSL:** Free, 90-day, ACME-compatible
+- **Your cloud provider:** AWS ACM, Google Cloud Certificate Manager, Azure Key Vault
+
+---
+
+## The Bigger Picture: Agent Supply Chain Security
+
+This update highlights a reality most developers ignore: **your coding agent is a high-value supply chain target.**
+
+| Attack Vector | What's At Risk |
+|---------------|----------------|
+| Compromised CA → MITM model API | Your prompts, code, tokens, secrets |
+| Compromised CA → MITM MCP server | Tool calls, file reads, command execution |
+| Compromised CA → MITM GitHub/GitLab | Source code, CI/CD tokens, deploy keys |
+| Compromised CA → MITM package registry | Dependency confusion, malicious packages |
+
+**AmpCode's fix is the right model:** Remove trust in compromised CAs at the client, force operators to rotate certificates. It's painful short-term, secure long-term.
+
+Other agent vendors (Claude Code, Codex, OpenCode, Zed) should watch for similar CA trust updates. The October 2026 Node.js/Bun security releases also addressed this — if your agent bundles its own runtime, **update the runtime**.
+
+---
+
+## Related: Other October 2026 Security Updates
+
+| Tool | Update | What's Fixed |
+|------|--------|--------------|
+| **AmpCode** | Oct 22 | Removed trust in eMudhra/emSign CAs |
+| **OpenCode v2.1.4 / v1.19.4** | Oct 22-23 | Bun 1.4.4: Brotli, TLS, HTTP/1.1, HTTP/2, HTTP/3, WebSocket, fetch + root certs NSS 3.131.1 |
+| **Devin Desktop v3.11.212** | Oct 23 | Electron 42.11.16 + Node.js 24.22.1 (October 2026 security fixes) |
+| **Zed v1.25.3** | Oct 23 | Dependency updates for recent software ecosystem vulnerabilities |
+
+**Pattern:** Every major agent updated their runtime/trust store in the same week. This isn't coincidence — it's coordinated response to the October 2026 CA compromises.
+
+---
+
+## Checklist: Is Your Agent Stack Secure?
+
+- [ ] **AmpCode:** `amp update` → version `0.0.1792627309-g98c009+`
+- [ ] **OpenCode:** `opencode update` → v2.1.4 or v1.19.4 (Bun 1.4.4)
+- [ ] **Claude Code:** `claude update` → v2.1.310+ (Node.js security fixes)
+- [ ] **Codex:** `npm install -g @openai/codex@latest` → v0.164.0+
+- **Zed:** Auto-update → v1.25.3+ (dependency security fixes)
+- [ ] **Devin Desktop:** Check for updates → v3.11.212+ (Electron 42 + Node 24.22.1)
+- [ ] **All MCP servers:** Verify certs not issued by eMudhra/emSign
+- [ ] **Corporate proxies:** Verify certs not issued by compromised CAs
+
+---
+
+## The Bottom Line
+
+**AmpCode didn't ship a feature. They shipped a boundary.**
+
+"Trust but verify" doesn't work when the verifier (the CA) is compromised. AmpCode chose **verify, then trust** — and that's the correct call for a tool that holds your code, tokens, and cloud credentials.
+
+```bash
+amp update
+# Test your MCP connections
+# If any fail with emSign errors → get the operator to reissue
+# Your agent's supply chain just got harder to hack.
+```
+
+---
+
+## Related Articles
+
+- [OpenCode v1.19.4 Just Hardened the Stable Line — Bun 1.4.4 Security Fixes Land](/blog/opencode-v1-19-4-security-bun-upgrade/)
+- [Devin Desktop v3.11 Just Replaced Your IDE — Agent Window, Side-by-Side Sessions](/blog/devin-desktop-v3-11-agent-window-ide/)
+- [Zed v1.25.2 Stable: 33% Smaller Binaries, Secret Leak Fix, GPT-6 Astra on Bedrock](/blog/zed-v1-25-pre-automatic-unfolding-inlay-hints-gemini-argon/)
+- [Coding Agent Security Checklist 2026 — The Operator's Hardening Guide](/blog/coding-agent-security-checklist-2026/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Dropped 100+ Fixes in Two Days — The Stability Wave You've Been Waiting For](/blog/claude-code-v2-1-308-309-stability-surge/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
+---
+
+*AmpCode security update published October 22, 2026. Source: [ampcode.com/security](https://ampcode.com/security) · AmpCode CLI is proprietary. Published October 26, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
