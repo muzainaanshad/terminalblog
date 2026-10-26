@@ -1,105 +1,155 @@
 ---
-title: "What Developers Actually Think About Coding Agents — The Four Horsemen & Code Quality Crisis"
-description: "Two major HN threads this week — 'Four Horsemen of Agentic Coding' and 'Is anybody producing good code?' — reveal the real frustrations, workarounds, and surprising truths about AI coding agents that marketing pages never mention."
-pubDate: 2026-10-04
-updatedDate: 2026-10-04
-tags: ["coding-agents", "claude-code", "ai-coding", "developer-experience", "hn-discussion"]
-draft: false
+title: "What Developers Actually Think About Vibe Coding, Trust & Token Limits — 4 Fresh HN Threads"
+description: "Real developer opinions from this week's HN: why 'vibe coding' is a slur, why adversarial AI setups still fail, how $19 plans deliver $1.37 of value, and why agents loop forever. No marketing fluff."
+publishedDate: 2026-10-26
+updatedDate: 2026-10-26
+tags: ["coding-agents", "hn-discussions", "developer-opinions", "ai-tools", "vibe-coding", "harness-engineering"]
+category: "guide"
+author: "Anshad"
 ---
 
-Two threads exploded on Hacker News this week about AI coding agents. One asked a simple question: "Is anybody producing good code with coding agents?" The other laid out "The Four Horsemen of Agentic Coding" — four fundamental problems that emerge when teams adopt these tools at scale.
+If you only read launch announcements and marketing pages, you'd think AI coding agents are magic wands that turn coffee into production-ready systems. Spend five minutes on Hacker News and you'll hear a very different story — developers who use these tools daily, hit their limits, and have strong opinions about what actually works.
 
-Together they pulled over 200 comments from senior engineers, team leads, and solo builders. The consensus isn't what the press releases say.
+I pulled four recent HN discussions with 200+ combined comments. Here's what developers are actually saying, stripped of hype.
 
-## What happened
+## What Happened: The Discussions
 
-On October 2nd, a senior engineer posted an Ask HN that cut through the hype. They described spending entire workdays reviewing AI-generated pull requests — "convoluted code riddled with footguns" — taking 5x longer to review than human-written code. The kicker: they barely understood what they were approving. Each day they drifted further from understanding their own codebase.
+Over the past week, several threads bubbled up that reveal the gap between demos and daily reality:
 
-That post hit 28 points and 40 comments.
+1. **"PSA: Do not use term 'vibe coding'"** (11 comments) — A developer argues the term is meaningless and insulting to actual engineering
+2. **"Ask HN: When can we trust AI in coding, and avoid the happy path issue?"** (7 comments) — A practitioner describes running Claude Code and Codex in adversarial setup, still getting burned
+3. **"Ask HN: Kimi Code hit its 5-hour limit after $1.37 of API usage"** (3 comments) — A paid subscriber finds their $19/month plan exhausted in minutes
+4. **"Ask HN: How do you get AI loops to converge?"** (2 comments) — A developer struggles with agents oscillating between the same bugs endlessly
 
-The same day, a Substack article titled "The Four Horsemen of Agentic Coding" hit 111 points and 89 comments. It named four specific failure modes: slop (low-quality code that technically works), alienation (engineers losing connection to their craft), deskilling (atrophy of hard-won expertise), and accountability vacuum (nobody owns the output).
-
-A third thread — Anthropic's own guide to "Getting the most out of Opus 5.5" — drew 152 comments, many from developers sharing what actually works versus what the docs claim.
-
-## Developer reactions: the good, the bad, and the "it depends"
-
-### "The code works but I have no idea how"
-
-This was the most common sentiment. Multiple commenters described the same pattern: AI produces functionally correct code that passes tests, but the implementation choices are opaque. One engineer put it bluntly: "I often discover that they didn't do what I really wanted — sometimes Claude made it faster by incurring expensive costs, or doing a migration that would be risky in prod, or making a tradeoff that's not worth it."
-
-Another described the review burden: "It takes 5x longer to review Claude merge requests and I barely understand what I approve."
-
-### The "vibe coding" trap
-
-Several developers admitted they'd fallen into what one called "vibe coding" — prompting the agent with high-level goals and letting it run. The results were predictable. As one commenter noted: "Specs that gets systematically ignored way too often." Another: "Poorly specified long running tasks is a recipe for 'rollback all those changes...'"
-
-The engineers who reported success shared a specific workflow: write detailed specs in Markdown first, iterate on the spec with the agent, *then* have it implement. One described their process: "Write good specs into files, usually Markdown. Go through the spec files with the agents, have it point out holes and problems, and then update the specs. Go through a few iterations of this and then start your agents on development. Garbage in, garbage out."
-
-### The "two modes" compromise
-
-A surprising number of senior engineers have settled on a hybrid approach. One commenter with 152 upvotes on their approach: "For AI-maintained code (like a GUI to visualize performance data), IDGAF what the code looks like. I just let claude or codex go nuts and 100% vibe code. For code I care about, I audit every single hunk as it's produced. For mission critical code, I write the code myself and have an agent review it."
-
-This "tiered trust" model appeared repeatedly: throwaway code gets full autonomy; core business logic gets human review; critical infrastructure gets human authorship with AI assistance.
-
-### The social fabric is tearing
-
-Perhaps the most striking thread wasn't about code quality at all. It was about team dynamics.
-
-"My work Slack channels are ghost-towns," wrote one engineer. "People are logged in, but they're never saying anything. PRs have their names on them, even the review comments are posted from their accounts, but it is obvious that Claude wrote everything."
-
-Another: "The team thing is killing us right now. Everyone is just kind of silo'd with their agents and they present these entire complex units of work with no input from the rest of the team, and by then it's too late to fix."
-
-A third described the "meat proxy" phenomenon — colleagues pasting raw LLM output into chat instead of answering questions themselves. "Asking a question in search of shared understanding only to be passed the modern equivalent of a LMGTFY link hurts in a very particular way."
-
-### The Opus 5.5 reality check
-
-Anthropic's own thread revealed practical truths the marketing doesn't cover. Developers reported burning $500 in token costs on single sessions. One noted: "Cache reads are priced at 5% of inputs, instead of 10% for previous models" — a meaningful cost optimization but still expensive at scale.
-
-Multiple commenters confirmed the "wall-clock time" problem: Opus 5.5 runs tasks in the background with suppressed output, sometimes waiting 30+ minutes for a timeout when something breaks silently. "It likes to run things in the background with suppressed output, waiting for it to exit before it takes action," one wrote. "Today alone I've had to break in two or three times when something obviously broke and it was sitting for over 10 min."
-
-The cybersecurity refusals were another surprise. Several developers reported sessions being poisoned by the classifier: "Eventually every single response was terminated by the classifier before it even began, with the reason being a placeholder string like 'thinking quote' or similar."
-
-## The real insight: it's a harness problem, not a model problem
-
-Reading through 200+ comments, a pattern emerges. The developers producing good code aren't using better models — they're using better *harnesses*.
-
-What separates the "it works great" crowd from the "it's slop" crowd:
-
-**1. They treat the agent like a junior engineer, not a magic box.** They write specs, do design reviews, break work into small reviewable chunks, and iterate. "I have it do small chunks I can quickly review, give it feedback, iterate, etc until I like the output, then I move on to the next step."
-
-**2. They invest in tooling around the model.** Custom harnesses with skill selectors, local model routing for cheap tasks, graph-based codebase understanding, automated PR review pipelines with multiple models arguing over changes. One team built a "Minority Report style review skill" with a separate judge model orchestrating code quality, security, and performance reviews.
-
-**3. They accept the cost structure.** The $20/month plan users hit limits fast. The $100/month users burn through $500 sessions. Teams doing this seriously budget for it like cloud compute — because that's what it is.
-
-**4. They don't pretend the code reviews itself.** The "AI reviews AI" approach failed for multiple commenters. Human review remains essential, but it shifts earlier — to the design and spec phase, not the code phase.
-
-## What it means for you
-
-If you're just starting with coding agents, the HN consensus gives you a map:
-
-**Don't start with autonomy.** Start with a spec file. Write what "done" looks like in enough detail that a human junior engineer could execute it. Then hand it to the agent.
-
-**Budget for review time, not generation time.** The 5x review multiplier is real. Plan for it. If you can't review the output, don't generate it.
-
-**Pick your battles.** Not all code deserves the same scrutiny. Internal tooling, prototypes, and one-off scripts are fine for vibe coding. Your authentication system, payment processing, and data migrations are not.
-
-**Build the harness before you scale.** The teams succeeding at scale didn't buy a tool — they built one. Custom agents, local model routing, spec-driven workflows, multi-model review pipelines. If you're rolling this out to a team, allocate engineering time for the harness, not just the subscription.
-
-**Watch the social signals.** If your team Slack goes quiet and PRs become rubber-stamp exercises, you have a process problem, not a tool problem. Schedule human design reviews. Require human-authored architecture decisions. Keep engineers talking to each other.
-
-**The "level 4 autonomy" promise is a trap.** Multiple commenters noted the seductive idea: "reach level 4 autonomy and don't read or write code anymore." The engineers who've gone furthest down this path warn it's a mirage. You either understand your codebase or you don't. When (not if) the agent produces something subtly wrong in a way tests don't catch, you need to understand it well enough to fix it.
+None of these are product launches. They're practitioners hitting walls.
 
 ---
 
-*The discussions referenced in this article:*
-- *[Ask HN: Is anybody producing good code with coding agents?](https://news.ycombinator.com/item?id=49934037)*
-- *[The Four Horsemen of Agentic Coding](https://news.ycombinator.com/item?id=49934511)*
-- *[Getting the most out of Opus 5.5 in Claude and Claude Code](https://news.ycombinator.com/item?id=49946567)*
+## Developer Reactions: The Real Sentiments
 
-*All quotes are paraphrased from public Hacker News comments. Attribution preserved where usernames were provided.*
+### On "Vibe Coding" — It's a Slur, Not a Category
 
-## Related articles
+The strongest thread wasn't about a tool — it was about language. The original poster called "vibe coding" "hopelessly vague and useless," asking what it even means to "forget the code exists and fully give in to the vibes."
 
-- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
-- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
-- [Claude Code Just Made Opus 5.5 Default and Fixed 100+ Things — Then v2.1.281/282 Added 200 More](/blog/claude-code-v2-1-280-opus-5-5-default-massive-fix-wave/)
+The responses reveal a split:
+
+**One camp sees it as derogatory.** As one commenter put it: *"It's also become insulting and a bit of a slur. We need to stop doing this. It's disrespectful."* Another: *"For every person doing careful, meticulous testing and only using AI to incrementally generate code they personally understand... there are ten thousand 'lol model go brrr' coders who don't care."*
+
+**The other camp defends it as a real workflow.** A different developer described it as: *"The best description of modern AI-driven coding is 'thinking things into existence.' All the vision, direction, yea-or-nay answers to LLM suggestions comes from the human, all the coding, testing, bug-hunting is done by the LLM."*
+
+The term originated with Andrej Karpathy, but on HN it's become a Rorschach test — either you're an undisciplined hacker, or you're a director orchestrating an AI workforce. There's no middle ground in the comments.
+
+### On Trust — The Happy Path Is a Trap
+
+The trust thread struck a nerve because it described a setup many have tried: run one AI to write code, another to review it adversarially. The poster ran Claude Code to build, Codex to test with instructions to *refute* Claude's results. Even with this strict pipeline, things broke.
+
+> *"Even with such a strict environment, I am ending up with problems... when asking Claude, the answer is 'This is on me; I did not do X and Y'; when I ask it whether Codex checked it, 'Codex checked all but not this...'"*
+
+The responses were sobering:
+
+**Judgment is the missing piece.** One commenter argued: *"Whenever we discover how the human mind does it, and then we apply it to AI systems. Currently AI just has a surface level interface that makes it seem like it can think... It's ultimately hard to articulate and hard to measure. We are only measuring very narrow tasks."*
+
+**Harness > model.** Another pointed to LangChain's benchmark: same model, different harness, 53% → 67% on Terminal-Bench. *"People are increasingly realizing they need to build their own harness instead of relying on Claude Code or Codex. Ramp scaling its operations with a custom harness is a perfect example."*
+
+**Accept imperfection.** A pragmatic take: *"Testing has always been a game of figuring out how much is enough to produce a stable product, without burning massive amounts of engineering time. LLMs have not changed that. They will never be perfect, and that is OK."*
+
+The consensus: you don't trust the model. You trust the *system* you build around it — and most people haven't built that system yet.
+
+### On Tool Economics — You Get What You Pay For (Sometimes Less)
+
+The Kimi Code thread exposed a brutal reality: a $19/month plan delivered $1.37 of API usage before hitting a 5-hour limit. The user compared it to Claude Code's $20 plan processing ~381M tokens in the same window.
+
+> *"That's easily less than 5% of what Claude Code offers at $20 subscription... Both Kimi tasks failed without delivering results."*
+
+The discussion revealed the hidden variable: **token accounting differs wildly between providers**. Cached input, fresh input, output tokens — each provider counts differently. What looks like a deal on paper becomes unusable in practice.
+
+One commenter contacted support and was told they "used it heavily" — despite providing exact token breakdowns. The quota improved slightly days later, suggesting it was a load issue, not a design choice.
+
+### On Loop Convergence — Agents Get Stuck in Local Minima
+
+The convergence thread asked a deceptively simple question: how do you stop an agent from patching the same bug forever?
+
+> *"What I am noticing is the agents/subagents oscillate between repeatedly patching the same bits of code over and over, or introducing new bugs."*
+
+The answers pointed to **stop conditions** as the missing engineering discipline:
+
+- *"For GUI work the stop condition that worked for me is interaction + visual tests. Make sure all component interactions are automatically tested. Screenshot the screens the task touches, and let your agent see what changes it made."*
+- Others linked to resources on "loop engineering" and deterministic tooling — a nascent field with few established patterns.
+
+The insight: **agents don't converge by default**. You have to engineer convergence the same way you engineer any distributed system — with explicit contracts, observability, and circuit breakers.
+
+---
+
+## The Real Insight: Harness Engineering Is the Differentiator
+
+Across all four threads, one theme dominates: **the model matters less than the harness**.
+
+The LangChain data point (53% → 67% on same model) appears in multiple discussions. Ramp's custom harness. The trust-thread poster's adversarial Claude/Codex setup. The convergence-thread's visual testing requirement. The "vibe coding" defenders describing human-as-director workflows.
+
+**Harness engineering** — the scaffolding around the model: context management, tool orchestration, evaluation loops, sandboxing, subagent delegation, checkpoint/replay — is where the leverage lives. The model is a commodity. The harness is your IP.
+
+This aligns with what Paul Iusztin (author of the free "Build Claude Code from Scratch" course) argues: the same foundations power any agent, in e-commerce, finance, or sales. He lists 8 steps: design the harness, build the bare-bones loop, sandbox it, apply context engineering, add subagents, deploy headless, build benchmarks, replay failed runs.
+
+Notice: *zero* steps are "pick the best model."
+
+---
+
+## What It Means for You
+
+If you're starting with coding agents today, here's what the practitioners would tell you:
+
+### 1. Stop Evaluating Models. Start Building Harnesses.
+The difference between "it works" and "it's reliable" isn't Opus vs. GPT-4o vs. Kimi. It's whether you have:
+- Explicit context windows with truncation strategies
+- Tool result validation before the next turn
+- Subagents for specific domains (security review, performance, docs)
+- Replay/debug infrastructure for failed runs
+- Benchmarks that reflect *your* tasks, not SWE-bench
+
+### 2. Define "Done" Before You Start
+The convergence thread is the clearest signal: agents loop forever without explicit stop conditions. For your use case, what does "done" look like?
+- All tests pass? Which tests?
+- No lint errors? Which linter?
+- Visual regression baseline matched? At what threshold?
+- Human approval on a summary diff?
+
+Code the stop condition. Don't hope the agent figures it out.
+
+### 3. Budget for Token Reality, Not Marketing Pages
+The Kimi thread isn't unique. Every provider has token accounting quirks. Before committing to a tool:
+- Run a realistic 3-hour session on your codebase
+- Measure actual tokens in/out (fresh vs. cached)
+- Calculate cost per completed task, not per million tokens
+- Build in fallback to a second provider
+
+### 4. The "Vibe Coding" Debate Is a Distraction
+Whether you call it "vibe coding," "agentic engineering," or "thinking things into existence" — the workflow that works is:
+- Human provides intent, architecture, acceptance criteria
+- Agent executes, tests, iterates within guardrails
+- Human reviews diffs, approves merges
+- System learns from the loop (replay, benchmark, refine harness)
+
+The label doesn't matter. The guardrails do.
+
+### 5. Invest in Observability Early
+Multiple threads mention logging, replay, and session inspection as afterthoughts. They shouldn't be. If you can't answer "why did the agent do X at step 47?" you can't improve the harness. Build or buy:
+- Session replay with tool inputs/outputs
+- Token usage per step
+- Decision points with alternatives considered
+- Failure categorization (model error vs. tool error vs. harness error)
+
+---
+
+## The Bottom Line
+
+Hacker News developers aren't anti-AI. They're anti-magic-thinking.
+
+The discussions reveal a community that's moved past "wow, it writes code" to "how do I make this reliable enough to ship?" The answers aren't in model benchmarks. They're in harness engineering, explicit contracts, stop conditions, observability, and accepting that the model will hallucinate — so your system must catch it.
+
+The developers winning with agents aren't the ones with the best prompts. They're the ones who built the best *systems around* the prompts.
+
+If you're treating the agent as a black box that should "just work," you're the one getting vibe-coded. The alternative is engineering. It's slower, unsexy, and it's the only thing that ships.
+
+---
+
+*Want to go deeper? The free "Build Claude Code from Scratch" course (8 articles, 6 videos, Python codebase) walks through harness engineering step by step. The Terminal-Bench and SWE-bench leaderboards show harness impact on identical models. And the next time you see a "vibe coding" tweet, check the comments — the real engineers are already there, arguing about stop conditions.*
