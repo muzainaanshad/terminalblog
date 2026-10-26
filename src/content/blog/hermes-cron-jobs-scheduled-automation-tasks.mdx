@@ -1,9 +1,9 @@
 ---
 title: "Setting Up Autonomous Cron Jobs with Hermes Agent for Recurring Tasks"
-description: "How to schedule autonomous AI agents on cron — from daily code reviews to weekly dependency audits — with Hermes Agent's built-in job system."
+description: "How to schedule autonomous AI agents on cron — from daily code reviews to weekly dependency audits — with Hermes Agent's built-in job system. Includes real YAML configs, error recovery patterns, and delivery routing to Slack/Telegram/email."
 pubDate: "2026-07-03T13:00:00Z"
-updatedDate: "2026-07-03T13:00:00Z"
-tags: ["cron-jobs", "scheduling", "automation"]
+updatedDate: "2026-10-26"
+tags: ["cron-jobs", "scheduling", "automation", "hermes-agent"]
 tool: "hermes"
 author: "Hermes Blog Team"
 keywords: "AI cron jobs, scheduled AI tasks, automated agent scheduling, Hermes Agent, autonomous life assistants, workflow orchestration, recurring automation, background tasks"
@@ -61,9 +61,56 @@ jobs:
 
 Each job gets its own isolated agent session with its own working directory, skill attachments, delivery routing, and secret scoping.
 
+### Complete cron job schema
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `schedule` | Yes | Standard cron expression (UTC) |
+| `prompt` | Yes | Goal prompt for the agent |
+| `deliver` | No | Delivery target: `slack:#channel`, `telegram:@chat`, `email:addr`, `discord:#channel`, `file:path` |
+| `workdir` | No | Working directory (defaults to project root) |
+| `skills` | No | Array of skill names to attach |
+| `secrets` | No | Secret scope: `project`, `global`, or specific names |
+| `retries` | No | Retry count (default: 3) |
+| `timeout` | No | Max execution minutes (default: 30) |
+
+### Example: Multi-delivery security audit
+
+```yaml
+jobs:
+  security-audit:
+    schedule: "0 6 * * *"
+    prompt: |
+      Audit the last 24 hours of commits for:
+      1. New dependencies with known CVEs (check npm audit / pip-audit)
+      2. Exposed secrets (.env, API keys, tokens in diffs)
+      3. Suspicious patterns (eval, exec, shell commands in new code)
+    deliver:
+      - "slack:#security"
+      - "telegram:@security-alerts"
+      - "file:reports/security-$(date +%F).md"
+    skills: ["security-audit", "git-diff-analysis"]
+    secrets: ["github-token", "npm-token"]
+    retries: 3
+    timeout: 15
+```
+
 ## Error Recovery Built In
 
 When a cron job fails — API timeout, rate limit, dependency issue — Hermes doesn't silently drop it. It logs the failure with full context, retries up to 3 times with exponential backoff, and if all retries fail, delivers an **error report** instead of a results report. The system tracks failure rates per job and alerts if a pattern emerges.
+
+### Retry behavior
+
+1. **Attempt 1** — Runs at scheduled time
+2. **Attempt 2** — 2 minutes later (if attempt 1 failed)
+3. **Attempt 3** — 8 minutes later (if attempt 2 failed)
+4. **Failure delivery** — Sends error report with full stack trace, prompt, and context to all delivery targets
+
+### Failure tracking
+
+- Each job maintains a rolling 30-day failure rate
+- If failure rate exceeds 50%, Hermes sends a **pattern alert** (separate from individual failures)
+- Successful runs reset the failure counter
 
 ## Putting It Together
 
@@ -80,3 +127,5 @@ That's the difference between an AI assistant and an autonomous life assistant.
 - [Hermes Agent v0.19.1 Quicksilver: 80% Faster Starts, Smart Approvals, and Secrets That Survive](/blog/hermes-agent-v019-quicksilver-80-percent-faster/)
 - [How I Automate My Entire Code Review Process With AI Agents](/blog/automate-code-review-ai-agents/)
 - [Hermes Agent Deep Dive: The Most Capable Open-Source Autonomous Coding Assistant](/blog/deep-dive-hermes-agent-autonomous-coding-assistant/)
+- [Hermes Cron Job Secret Scope Security Fix](/blog/hermes-cron-job-secret-scope-security-fix/)
+- [Hermes Git PR Automation Code Review Workflow](/blog/hermes-git-pr-automation-code-review-workflow/)
