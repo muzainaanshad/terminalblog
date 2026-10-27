@@ -1,0 +1,174 @@
+---
+title: "OpenAI Codex 0.164 Just Made Model Switching Instant — And Your Prompts Finally Stick"
+description: "Codex 0.164 drops `/presets` for reusable prompts, inline `/model` switching, and fullscreen image preview. No more re-typing your favorite workflows. Here's what changed and why it matters for daily coding."
+pubDate: 2026-10-27T10:00:00Z
+tags: ["codex", "openai", "release", "coding-agent", "beginner", "productivity"]
+tool: "codex"
+author: "sage"
+image: "/api/og?title=Codex+0.164+Presets+Model+Switching&tool=codex"
+canonical: "https://terminalblog.com/blog/codex-0-164-presets-model-switching-images-land/"
+faq:
+  - q: "What is the biggest new feature in Codex 0.164?"
+    a: "The `/presets` system — you can now save up to 10 reusable prompt templates with keyboard shortcuts. No more copy-pasting your standard workflow prompts every session."
+  - q: "How do I switch models mid-session in Codex 0.164?"
+    a: "Use `/model <model-name>` inline — for example `/model gpt-5` or `/model o3-mini`. You can also set reasoning effort, speed tier, and permission profile in the same command."
+  - q: "Does Codex 0.164 support image preview in the terminal?"
+    a: "Yes — viewed and generated images now render fullscreen in terminals that support Kitty or Sixel graphics (like Ghostty, WezTerm, Kitty, iTerm2 with imgcat)."
+  - q: "What's the enterprise MCP authentication change?"
+    a: "Codex now supports authenticating enterprise MCP connections using eligible Codex account grants or dedicated sign-in, including OAuth clients that require secrets."
+  - q: "Should I update to 0.164.0?"
+    a: "Yes. Beyond features, it fixes session resume (restores compressed history and thread settings), Windows proxy auth, compaction reliability, and disk usage pruning."
+---
+
+**OpenAI Codex 0.164 dropped on October 23** and it's the first release in a while that feels like it was built for people who actually use this thing daily.
+
+No marketing fluff. Three features that change how you work: **`/presets` for reusable prompts**, **inline `/model` switching**, and **fullscreen image preview** in your terminal.
+
+Here's what you need to know.
+
+---
+
+## The One-Line Summary
+
+**Codex 0.164 adds `/presets` (10 saved prompt slots with keyboard menu), `/model` and `/permissions` inline switching, and Kitty/Sixel image preview. Plus fixes for session resume, Windows proxy auth, and disk bloat. Run `npm install -g @openai/codex@latest` now.**
+
+---
+
+## Feature 1: `/presets` — Your Prompts Finally Stick
+
+This is the one you'll use every session.
+
+You get **10 numbered slots** (`/preset 1` through `/preset 10`). Save any prompt, slash command, or workflow template. Recall it with a keystroke.
+
+```
+# Save your standard "review this PR" workflow to slot 3
+/preset 3 "Review this PR for security issues, performance regressions, and test coverage. Focus on auth changes."
+
+# Later — one keystroke brings it back
+/preset 3
+```
+
+**Keyboard menu:** Type `/preset` and you get a navigable list. No memorizing slot numbers.
+
+**Why this matters:** Most developers have 3–5 prompts they use every day — code review, test generation, refactoring patterns, debug workflows. Before 0.164, you either re-typed them, kept a scratchpad, or used shell aliases that didn't carry context. Now they live *inside* Codex, context-aware and one keystroke away.
+
+---
+
+## Feature 2: Inline `/model` and `/permissions` Switching
+
+Mid-session model switching without leaving the conversation.
+
+```
+/model gpt-5                    # Switch to GPT-5
+/model o3-mini --reasoning high # o3-mini with high reasoning effort
+/model gpt-5 --speed fast       # GPT-5 speed tier
+/permissions read-only          # Drop to read-only for safe exploration
+/permissions full               # Back to full access
+```
+
+**All in one command:**
+```
+/model gpt-5 --reasoning high --speed balanced --permissions full
+```
+
+**Why this matters:** Different tasks need different models. Code generation → GPT-5. Quick edits → o3-mini fast. Security audit → high reasoning. Before, you'd restart the session or use a separate terminal. Now it's one command, same context, same history.
+
+---
+
+## Feature 3: Fullscreen Image Preview (Kitty / Sixel)
+
+If your terminal supports **Kitty graphics protocol** or **Sixel**, images now render *inside* Codex — fullscreen, zoomable, scrollable.
+
+Supported terminals: **Ghostty, WezTerm, Kitty, iTerm2 (with imgcat), foot, konsole**.
+
+```
+# Generate a diagram, it renders inline
+"Create a mermaid diagram of the auth flow"
+# → Image appears in terminal, press Enter for fullscreen
+```
+
+**Why this matters:** No more "open this in a browser" for architecture diagrams, UI mockups, or generated charts. Your coding agent becomes a visual tool, not just a text tool.
+
+---
+
+## Enterprise MCP: Real Auth Support
+
+Codex 0.164 adds **enterprise-grade MCP authentication**:
+
+- **Account grants** — Use your eligible Codex account to authenticate MCP servers
+- **Dedicated sign-in** — Separate OAuth flow for MCP connections
+- **OAuth clients with secrets** — Full support for confidential clients
+
+This matters if you're running Codex in a team/enterprise setting with private MCP servers (internal tools, private APIs, corporate data sources). No more workarounds with API keys in environment variables.
+
+---
+
+## The Fixes You'll Actually Notice
+
+| Fix | Why You Care |
+|-----|--------------|
+| **Session resume restores compressed history + thread settings** | Stop losing your context when you reopen a session. Compaction failures no longer leave partial summaries. |
+| **Windows HTTPS/WebSocket proxy auth (Negotiate/NTLM)** | Corporate proxy users: Codex now authenticates properly through Windows proxies. |
+| **Config overrides preserved at multiple subcommand levels** | `codex -c config1.yaml subcommand -c config2.yaml` now works as expected. |
+| **Queued prompts wait for permission resolution** | No more race conditions when you rapid-fire prompts during a permission prompt. |
+| **Disk usage pruning** | Unused installations, abandoned marketplace checkouts, and unbounded daemon logs get cleaned automatically. |
+| **Hardened macOS sandbox (case-variant paths, symlink resolution)** | Fewer "operation not permitted" surprises on macOS. |
+
+---
+
+## How to Update
+
+```bash
+npm install -g @openai/codex@latest
+# Verify
+codex --version
+# Should show 0.164.0
+```
+
+**Or download the binary** from [github.com/openai/codex/releases/tag/rust-v0.164.0](https://github.com/openai/codex/releases/tag/rust-v0.164.0) — 288 assets across platforms.
+
+---
+
+## What This Means for Your Daily Workflow
+
+**Before 0.164:**
+- Re-type your standard prompts every session
+- Restart to switch models
+- Open browser for diagrams
+- Lose context on session resume
+- Fight corporate proxies on Windows
+
+**After 0.164:**
+- `/preset 3` → your workflow loads instantly
+- `/model o3-mini --speed fast` → instant model swap
+- Diagrams render in-terminal, fullscreen
+- Session resume *actually works*
+- Windows proxy auth just works
+
+---
+
+## The Verdict
+
+Codex 0.164 isn't a "feature drop" — it's a **workflow drop**. The `/presets` system alone saves 5–10 minutes per session if you have standard prompts. Inline model switching removes the context-switching tax. Image preview makes Codex a visual reasoning tool.
+
+If you use Codex daily, this is the update you've been waiting for.
+
+```bash
+npm install -g @openai/codex@latest
+# Try: /preset 1 "Your most-used prompt"
+# Try: /model gpt-5 --reasoning high
+# Your workflow just got faster.
+```
+
+---
+
+## Related Articles
+
+- [Beware: Codex MultiAgentV2 Encrypts Subagent Instructions — Audit Trail Gone](/blog/beware-codex-multiagentv2-encrypts-subagent-instructions/)
+- [Beware: Codex Desktop Subagent MCP Resource Crisis on Windows](/blog/beware-codex-desktop-subagent-mcp-resource-crisis/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Complete Guide to AI Coding Agents 2026](/blog/complete-guide-ai-coding-agents-2026/)
+
+---
+
+*Codex 0.164.0 released October 23, 2026. Source: [github.com/openai/codex/releases/tag/rust-v0.164.0](https://github.com/openai/codex/releases/tag/rust-v0.164.0) · Codex CLI is Apache-2.0 open source. Published October 27, 2026.*
