@@ -1,0 +1,199 @@
+---
+title: "Cline Just Gave You a Cloud/Local Toggle, Fixed GPT-6 on Azure, and Made Cloud Sessions Actually Visible"
+description: "Cline v4.1.26 (October 26) adds a Local/Cloud model toggle in settings, progress cards for cloud sandbox startup, Claude Sonnet 5.5 back as default, GPT-6 fixes for OpenAI/Azure/SAP, and 15+ bug fixes that stop daily paper cuts. The quiet stability release that matters."
+pubDate: 2026-10-27T10:00:00Z
+tags: ["cline", "release", "v4.1.26", "cloud", "gpt-6", "azure", "gemini", "coding-agent", "beginner"]
+tool: "cline"
+author: "sage"
+image: "/api/og?title=Cline+v4.1.26+Cloud+Toggle+GPT6&tool=cline"
+canonical: "https://terminalblog.com/blog/cline-v4-1-26-cloud-toggle-gpt6-fixes/"
+---
+
+**Cline v4.1.26 dropped October 26** — and while the version number suggests a patch, this release fixes the *exact friction points* that make cloud sessions frustrating and local models unreliable.
+
+The headlines: **Local/Cloud model toggle in settings**, **progress cards so you see cloud sandboxes starting**, **Claude Sonnet 5.5 back as default**, **GPT-6 finally works on OpenAI/Azure/SAP**, **Gemini free-tier keys no longer 429 every turn**, and **15+ bug fixes that stop the daily paper cuts**.
+
+If you've been using Cline Cloud or running local models — this is the update you've been waiting for.
+
+---
+
+## The One-Line Summary
+
+**Pick cloud vs local models per session. Watch cloud sandboxes spin up in real time. GPT-6 works on Azure. Gemini free tier stops erroring. Your focus stays in chat (not terminal). Update now.**
+
+---
+
+## 1. Local/Cloud Model Toggle — Finally, Separate Settings
+
+**What it is:** Settings → API Configuration now shows a **Local | Cloud toggle** when cloud sessions are enabled. Cloud tasks get their own model setting, saved separately from your local models.
+
+**Why it matters:** You want Opus 5.5 locally for deep reasoning. You want Gemini 4 Argon in the cloud for speed and cost. Before: one model setting ruled both. Now: **cloud picks the cloud model, local picks the local model**.
+
+```bash
+# In Cline settings:
+# 1. Enable Cline Cloud
+# 2. See "Local | Cloud" toggle appear in API Configuration
+# 3. Set cloud model (e.g., Gemini 4 Argon)
+# 4. Set local model (e.g., Claude Opus 5.5)
+# 5. Click model label in cloud session composer → opens cloud model picker
+```
+
+**For beginners:** This is the "it remembers my preference" moment. No more switching models every time you flip between local and cloud.
+
+---
+
+## 2. Cloud Sandbox Progress Cards — You Can See It Starting
+
+**What it is:** Starting or resuming a cloud sandbox now shows a **progress card** with the repo, branch, and steps: *start sandbox → clone repository → start agent*. It collapses once the agent starts.
+
+**Why it matters:** Before: you clicked "run cloud task" and... waited. No feedback. Blank screen. Was it working? Frozen? Now: **you see every step**. If it stalls on "clone repository," you know exactly where.
+
+**For beginners:** This turns "did it work?" into "oh, it's cloning now." Visibility = confidence.
+
+---
+
+## 3. Claude Sonnet 5.5 Is Back as Default (Cline Provider)
+
+**What it is:** With no model chosen, the Cline provider now uses **Claude Sonnet 5.5** again — back at the top of the recommended list.
+
+**Catalog refresh details:**
+- **Added providers:** CommandCode, Reflection, Liquid Inference, Munito AI
+- **Dropped providers:** CrofAI, iFlow, Llama
+- **Free list changes:** Added Reflection Beam, Nemotron 3.5 Lightning, Laguna S 2.1. Dropped Mimo V2.6 Flash, Muse Spark 1.3 Contributor
+- **ClinePass defaults:** Kimi K3.1 Pro + MiniMax M3.1 Flash + DeepSeek V4.1 Flash 1017
+- **Most other providers:** Defaults shifted to Kimi K3.1 Pro, MiniMax M3.1 Flash, or DeepSeek V4.1 Flash 1017
+
+**What you should do:** **Pin your models** if you want stability. Provider defaults shift with every catalog refresh.
+
+---
+
+## 4. GPT-6 Finally Works on OpenAI, Azure, and SAP AI Core
+
+**The bug:** GPT-6 models (`gpt-6-sol`, `gpt-6.1-sol`) sent `max_tokens` parameter. OpenAI-compatible endpoints (including Azure and SAP AI Core) rejected with "Unsupported parameter: 'max_tokens'".
+
+**The fix:** v4.1.26 sends `max_completion_tokens` for GPT-6 models on OpenAI, Azure OpenAI-compatible, and SAP AI Core endpoints.
+
+**Why it matters:** If you've been blocked from using GPT-6 on your enterprise Azure deployment — **it works now**. No workarounds, no proxy hacks.
+
+---
+
+## 5. Gemini Free Tier: No More 429 Quota Errors Every Turn
+
+**The bug:** Gemini API keys (the `gemini` provider) were sending native Google Search with every request. Free-tier keys hit 429 quota errors on Gemini 3+ *every single turn*. On Gemini 2.x, every Cline tool was dropped.
+
+**The fix:** Gemini provider **no longer sends native Google Search**. Your free-tier key works. Tools work. No more "quota exceeded" spam.
+
+**For beginners:** If you use the free Gemini tier, **this release unbreaks your workflow entirely**.
+
+---
+
+## 6. The 15+ Bug Fixes That Stop Daily Paper Cuts
+
+| Fix | Why You'll Notice |
+|-----|-------------------|
+| **Model requests retry 3x (was 5x)** | Faster failure detection, less waiting on dead endpoints |
+| **Kimi K3 gets `max` reasoning for Extra High/Max** | No more `xhigh` setting rejection — it just works |
+| **Plan/Act toggle mid-task no longer drops first prompt** | Switch modes mid-stream without losing your question |
+| **Disabled rules stay disabled** | No more phantom rule re-enabling |
+| **Starting command doesn't steal keyboard focus** | Text you type in chat stays in chat, not the terminal |
+| **Cancelling while Cline asks question doesn't hijack next message** | Your next prompt isn't eaten as an answer to the old question |
+| **Connection drops after reasoning-only stream → retry, not end** | Transient network blips don't kill your task |
+| **Auto-compaction skips unknown context limits** | No more compaction loops on custom/unknown models |
+| **Auto-compaction doesn't re-run every few calls** | One compaction, done — not a compaction spiral |
+| **`ask_question`: model continues after you pick, empty answers rejected** | Conversation flow stays natural |
+| **`run_commands` empty list → error, not silent success** | Catches typos before they waste a turn |
+| **PowerShell: tool explains quote escaping, confirms recursive deletes** | Safer shell commands on Windows |
+| **Task header badges wrap (don't hide close button)** | UI doesn't break on long branch names |
+| **GitHub connection check no longer flashes loading indicator** | Cleaner status bar |
+| **Local/Cloud toggle padding fixed** | Settings UI looks right |
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| **v4.1.26** | Oct 26, 2026 | **Stable (Latest)** | **Local/Cloud toggle, cloud progress cards, Sonnet 5.5 default, GPT-6 Azure fix, Gemini 429 fix, 15+ bug fixes** |
+| v4.1.25 | Oct 16, 2026 | Stable | Cline Cloud sessions, Gemini 4 Argon default, local model timeout fix, base URL fix, attachment fix |
+| v4.1.24 | Oct 13, 2026 | Stable | Reasoning off fix, MCP crash fix, token estimates, catalog refresh |
+| v4.1.23 | Oct 7, 2026 | Stable | Azure 400 fix, `.clinerules` for commits, MCP paging |
+
+**v4.1.23–.26 = the stability arc.** Four releases in three weeks, each fixing the *actual* blockers: Azure 400s, reasoning crashes, MCP crashes, local timeouts, cloud visibility, GPT-6 compatibility, Gemini quotas. This isn't feature churn — it's **making the product work for the workflows you actually run**.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Use Cline Cloud** | **Yes** — progress cards + separate model toggle = cloud finally feels finished |
+| **Run GPT-6 on Azure/OpenAI/SAP** | **Yes** — the blocker is gone |
+| **Use Gemini free tier** | **Yes** — 429 errors are fixed |
+| **Switch Plan/Act mid-task** | **Yes** — no more dropped prompts |
+| **Type in chat while commands run** | **Yes** — focus stays where you put it |
+| **Just want latest stable** | **Yes** — zero breaking changes, 15+ quality-of-life fixes |
+
+---
+
+## How to Update
+
+```bash
+# VS Code / Cursor / JetBrains extension
+# Auto-updates or: Extensions → Cline → Update
+
+# CLI (if using standalone)
+# Check https://github.com/cline/cline/releases/tag/v4.1.26
+
+# Desktop app (separate release channel)
+# Desktop v0.0.49 released Oct 25
+```
+
+**Changelog:** [github.com/cline/cline/compare/v4.1.25...v4.1.26](https://github.com/cline/cline/compare/v4.1.25...v4.1.26)
+
+---
+
+## The Quiet Pattern: Fix What Hurts, Ship What Matters
+
+Cline doesn't ship "features" for demos. It ships **fixes for the workflow you actually live in**.
+
+- Azure 400 error → blocks enterprise → **fixed in .23**
+- Reasoning off → 400 error → **fixed in .24**
+- MCP crash → extension host restart → **fixed in .24**
+- Screenshot = 30k tokens → premature compaction → **fixed in .24**
+- Local model timeout → 5 min hard limit → **fixed in .25**
+- Attachments on answers → dropped silently → **fixed in .25**
+- Cloud sessions invisible → **progress cards in .26**
+- Cloud/local model conflict → **toggle in .26**
+- GPT-6 on Azure → rejected → **fixed in .26**
+- Gemini free tier → 429 every turn → **fixed in .26**
+
+**v4.1.25 gave you the platform (Cline Cloud). v4.1.26 makes it usable.**
+
+The team shipped 24 patch fixes across .23–.25. Now they ship the polish that makes cloud *feel* local. **Update. Try Cloud. Watch the progress card. Pick your cloud model. See what you build when the agent doesn't need your laptop — and you can actually see it working.**
+
+---
+
+## Related Articles
+
+- [Cline Just Launched Cloud Sessions — Run Agents on GitHub Repos While You Sleep](/blog/cline-v4-1-25-cloud-sessions-gemini-argon-model-refresh/)
+- [Cline v4.1.24 Just Fixed the Reasoning Off Bug — And MCP Servers No Longer Crash Your Editor](/blog/cline-v4-1-24-reasoning-fix-mcp-crash-model-refresh/)
+- [Cline v4.1.23 Just Fixed the Azure Claude 400 Error](/blog/cline-v4-1-23-claude-azure-fixes-commit-rules-mcp-paging/)
+- [Cline Desktop Free Coding Models — Zero API Keys](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Cline v4.1.10 — Web Search Lands](/blog/cline-v4-1-10-web-search-lands/)
+- [Beware: Cline Injection Supply Chain Attack via GitHub Actions](/blog/beware-clinejection-supply-chain-attack-github-actions/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+- [Claude Code vs Cursor 2026 Comparison](/blog/claude-code-vs-cursor-2026-comparison/)
+
+---
+
+*Cline is developed by the Cline team. Changelog source: [github.com/cline/cline/releases/tag/v4.1.26](https://github.com/cline/cline/releases/tag/v4.1.26). Published October 27, 2026 — covers Cline v4.1.26 stable released October 26, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
