@@ -1,0 +1,215 @@
+---
+title: "Cursor and OpenCode Just Turned AI Coding Agents Into Platforms — Here's What That Means for You"
+description: "Cursor launched an Agent SDK to deploy custom agents anywhere. OpenCode 2.0 rebuilt itself as a background service. Both signal the same thing: coding agents aren't tools anymore — they're infrastructure."
+slug: "cursor-agent-sdk-opencode-2-background-service-october-2026"
+publishDate: "2026-10-27"
+updatedDate: "2026-10-27"
+tags: ["cursor", "opencode", "ai-agents", "platform", "sdk", "background-service", "october-2026"]
+category: "comparison"
+heroImage: "/images/cursor-opencode-platform-shift.png"
+heroAlt: "Cursor Agent SDK and OpenCode 2.0 architecture comparison"
+author: "Anshad"
+readingTime: 12
+featured: true
+---
+
+Two major AI coding agents dropped platform-level updates in October 2026. Not feature updates — **platform shifts**.
+
+[Cursor](https://cursor.com) launched an [Agent SDK](https://cursor.com/changelog/agent-sdk) that lets you define agents as code, test them with evals, and deploy them to Cursor's infrastructure or your own. [OpenCode 2.0](https://opencode.ai/changelog) rebuilt itself from a CLI tool into a persistent background service with a server API, an embeddable SDK, and something called "Code Mode" that chains tool calls into single scripts.
+
+Different approaches. Same destination.
+
+Both are saying: **coding agents aren't tools you invoke. They're infrastructure you build on.**
+
+---
+
+## The TL;DR
+
+| Aspect | Cursor Agent SDK | OpenCode 2.0 |
+|--------|------------------|--------------|
+| **Core shift** | Agents as deployable code projects | CLI → shared background service |
+| **Deployment** | `agent-sdk deploy` to Cursor cloud or self-host | Local daemon + `@opencode/sdk` for embedding |
+| **Extensibility** | Tools, skills, MCP connections, channels as folders | Hot-reloadable plugins, server API, client SDK |
+| **Multi-client** | Channels: GitHub, Slack, webhooks, cron | Terminal, web, desktop all connect to one service |
+| **Background work** | Agents run on Cursor infra | Background subagents + shell commands |
+| **Model approach** | Bring your own (via Cursor) | Provider-agnostic, BYO model |
+| **Security surface** | Managed cloud + self-host options | Persistent local daemon with network exposure |
+
+---
+
+## Cursor Agent SDK: "Agents as Code" Is Finally Real
+
+Cursor's Agent SDK doesn't just let you *configure* an agent. It lets you *version control* one.
+
+```
+my-security-reviewer/
+├── instructions.md          # The prompt
+├── tools/
+│   ├── check-dependencies.ts
+│   └── scan-secrets.ts
+├── skills/
+│   └── owasp-top-10.md
+├── mcp-connections/
+│   └── semgrep.yaml
+└── channels/
+    └── github-pr.yaml
+```
+
+Run `npx @cursor/agent-sdk init ./my-bot`, then `agent-sdk dev` for a local playground with evals. When ready, `agent-sdk deploy` gives you a URL and starts it on Cursor's infrastructure. Secrets and integrations managed from a dashboard. Same logs, evals, playground work locally and in production.
+
+### Channels = Where Your Agent Lives
+
+This is the part that matters. Agents wake on:
+- **GitHub/GitLab/Bitbucket**: PR opened, comment, CI events (via your Cursor account — no public webhook URL needed)
+- **Slack**: Mentions and DMs
+- **Any webhook**: Generic HTTP endpoints
+- **Cron**: Scheduled runs
+
+Each conversation keeps its own session with complete message + tool call history. Follow-ups on a PR or Slack thread resume the same session.
+
+### Evals That Actually Test Behavior
+
+```bash
+agent-sdk eval                    # Run locally
+agent-sdk eval --ci               # Run in CI
+agent-sdk github replay <pr-url>  # Turn real PR into signed webhook payloads
+```
+
+An eval sends a fixed message and asserts on: which tools ran, with what input, and the shape of the reply. `--dry-run --fixtures-dir fixtures/` saves payloads as test fixtures. This is *testable* agent development — something the category has desperately needed.
+
+### Templates That Aren't Toy Examples
+
+Four production-ready templates ship with the SDK:
+- **Security Reviewer** — scans PRs for exploitable bugs
+- **Owners-Policy Approver** — enforces CODEOWNERS-style policies
+- **PR Autofixer** — attempts fixes on failing checks
+- **Linear/Jira Triager** — routes issues to the right team
+
+These aren't demos. They're the same bots Cursor runs internally.
+
+---
+
+## OpenCode 2.0: The CLI That Became a Daemon
+
+OpenCode 1.x: terminal owns the agent runtime. Close window → session dies.
+
+OpenCode 2.0: **local background service owns everything**. Terminal, web, and desktop are just clients.
+
+### What the Background Service Actually Does
+
+- Owns sessions, plugins, permissions, configuration, tool execution
+- Multiple clients connect simultaneously without losing state
+- Start a task in terminal → switch to web UI to check progress → hand to desktop app
+- Work keeps running in background while you do something else
+
+### The SDK That Changes Everything
+
+`@opencode/client` — connects apps to the OpenCode server, auto-discovers and starts the local service.
+
+`@opencode/sdk` — **embeddable OpenCode runtime**. Drop the actual agent into your own application. Build custom interfaces. Run trimmed versions on Cloudflare Durable Objects. This isn't a wrapper around a CLI — the runtime itself becomes a reusable component.
+
+### Code Mode: MCP Servers as Callable Functions
+
+Instead of round-tripping to the model for every tool call, the model writes JavaScript that chains multiple operations into a single script. MCP servers opt in by default. The goal: cut latency and context overhead when tasks need sequential tool operations.
+
+### Background Subagents + Shell Commands
+
+Long-running reviews, test suites, refactors execute while you keep working. Foreground-only model → background execution. 80+ internal features rebuilt as hot-reloadable plugins. Plugin API redesigned. OpenCode can now write and load its own plugins.
+
+**Tradeoff**: 1.x plugins and server integrations need porting.
+
+---
+
+## The Security Conversation Just Got Real
+
+Turning a CLI into a persistent daemon isn't a free architectural upgrade.
+
+### OpenCode's New Attack Surface
+
+A daemon that owns sessions, shell execution, plugin loading, and model credentials becomes a **privileged control point** for everything touching your source code.
+
+- `opencode pair` can expose/connect the service to other hosts
+- Shared session state across terminal/web/desktop = compromised client could see/influence sessions started elsewhere
+- Hot-reloadable plugins = plugin provenance and code-execution trust are live security questions
+- Background shell commands/subagents = unattended tasks need careful lifecycle/approval controls
+
+Augmented Software Engineering flagged the client-server redesign and plugin changes as the parts most likely to need careful review before production use.
+
+### Cursor's Managed Approach
+
+Cursor's Agent SDK deploys to managed infrastructure (or self-host). Secrets managed in dashboard. Channels authenticate via your Cursor account. The security model is more familiar — but you're trusting Cursor's platform.
+
+---
+
+## The Competitive Landscape Just Shifted
+
+| Tool | October 2026 Move | Signal |
+|------|-------------------|--------|
+| **Cursor** | Agent SDK + cloud deployment + channels | Agents as deployable microservices |
+| **OpenCode 2.0** | Background service + embeddable SDK + Code Mode | Agent runtime as reusable component |
+| **Claude Code 2.1.296** | Workflow-level model pinning via `CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL` | Surgical control over model distribution |
+| **GPT-6.1 Sol** | $2/M input, $10/M output (95% cached discount) | Cost war targeting coding workloads |
+| **Claude Haiku 5.5** | ~75% cheaper than 4.5, Copilot GA first | Anthropic's answer to GPT-6.1 pricing |
+
+The model pricing war accelerates. OpenCode's model-agnostic design means every price cut lowers session costs — part of why 2.0 timing aligns with the broader shakeout.
+
+---
+
+## What This Means for Your Workflow
+
+### If You're Building Internal Tooling
+
+**Cursor Agent SDK** is the faster path to production agents. Templates + evals + managed deployment = working security reviewer / PR autofixer / issue triager in hours, not weeks. The channel system handles GitHub/Slack/webhook wiring for you.
+
+### If You're Building a Product on Top of an Agent
+
+**OpenCode SDK** (`@opencode/sdk`) lets you embed the actual runtime. Custom interfaces, Cloudflare Durable Objects, your own permission model. You own the stack.
+
+### If You're a Solo Developer
+
+**Cursor's managed deployment** removes ops burden. **OpenCode's local daemon** gives you background persistence without cloud dependency. Different tradeoffs.
+
+### If Security/Compliance Owns Your Stack
+
+**Cursor self-host** or **OpenCode local-only** (disable `opencode pair`, no network exposure). Both require review — but different review scopes.
+
+---
+
+## The Pattern Nobody's Naming
+
+We've seen this before.
+
+- Docker: "container as unit of deployment" → Kubernetes: "cluster as platform"
+- Serverless functions: "code as deployment" → Platforms: "workflows as infrastructure"
+- **Coding agents: "agent as tool" → Now: "agent runtime as platform"**
+
+Cursor and OpenCode arrived at the same conclusion from opposite directions:
+
+- Cursor started cloud-first, added local development + SDK
+- OpenCode started local-first, added background service + SDK + embeddable runtime
+
+Both realized: **developers don't want another tool. They want a programmable layer that handles the agent lifecycle so they can build on top of it.**
+
+---
+
+## What to Watch Next
+
+1. **Cursor Agent SDK adoption** — Will teams actually build and deploy custom agents, or stick to Cursor's built-ins?
+2. **OpenCode 2.0 plugin ecosystem** — 1.x plugins need porting. Will the community rebuild fast enough?
+3. **Security audits** — First production incidents will define trust boundaries for background agent daemons
+4. **Model pricing** — Haiku 5.5 at $0.10/M input changes the economics of running agents at scale
+5. **Interop** — Will Cursor agents run on OpenCode runtime? Will OpenCode SDK work with Cursor channels?
+
+---
+
+## The Bottom Line
+
+October 2026 wasn't a feature month. It was the month **coding agents graduated from tools to infrastructure**.
+
+Cursor gave you a deployment pipeline for agents. OpenCode gave you an embeddable runtime. Both gave you backgrounds that don't die when you close your terminal.
+
+The question isn't "which agent should I use?" anymore. It's **"which agent platform do I build on?"**
+
+---
+
+*Found this useful? [Subscribe to the newsletter](/newsletter) for weekly AI coding agent deep dives. No spam, just the signal.*
