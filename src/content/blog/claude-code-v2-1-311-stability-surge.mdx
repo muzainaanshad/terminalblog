@@ -1,0 +1,225 @@
+---
+title: "Claude Code v2.1.311 Just Killed 80+ Daily Paper Cuts — Startup, MCP, Compaction, Subagents All Fixed"
+description: "Claude Code v2.1.311 (Oct 26) ships 80+ fixes across startup freezes, MCP hangs, compaction bugs, subagent issues, Remote Control, and VS Code extension. If you've been fighting daily paper cuts, this is the release that finally smooths them out."
+pubDate: 2026-10-27T10:00:00Z
+tags: ["claude-code", "release", "v2.1.311", "stability", "coding-agent", "beginner"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+v2.1.311+Stability&tool=claude-code"
+canonical: "https://terminalblog.com/blog/claude-code-v2-1-311-stability-surge/"
+faq:
+  - q: "Is v2.1.311 a feature release or a bug-fix release?"
+    a: "Pure bug-fix release — 80+ fixes, zero new features. Focus is entirely on stability: startup freezes, MCP hangs, compaction bugs, subagent issues, Remote Control, and VS Code extension problems."
+  - q: "Do I need to update my config or migrate anything?"
+    a: "No config changes required. Run `claude update` and you're on v2.1.311. All your settings, sessions, and MCP servers work exactly as before."
+  - q: "What's the biggest fix for daily users?"
+    a: "Fixed long freezes at startup and after reading/editing files when CLAUDE.md has very long list items. Also fixed Write/Edit stalling for 5 seconds on large file changes. These were the most visible daily paper cuts."
+  - q: "Does this fix the subagent MCP tool issues?"
+    a: "Yes — fixed subagents being unable to use MCP tools from servers that finish connecting after the subagent starts. Also fixed SubagentStop hooks running twice a minute instead of once per subagent finish."
+  - q: "What about the VS Code extension fixes?"
+    a: "Fixed custom skills/slash commands from the panel leaving out open file/selected lines, extension host freezing on macOS/Linux login shell PATH read, and voice dictation continuing after Send button."
+  - q: "Are there any breaking changes?"
+    a: "None. This is a patch release (2.1.311) — only bug fixes and improvements. Model names dropped the [1m] suffix but it's still accepted for compatibility."
+---
+
+Claude Code **v2.1.311 dropped October 26** — and if you've been living with daily paper cuts (startup freezes, MCP timeouts, compaction weirdness, subagent ghost runs), this is the release that finally sands them down.
+
+**80+ fixes. Zero new features. Pure stability.**
+
+The changelog reads like a greatest-hits album of "that annoying thing that happens every third session" — and they're all gone.
+
+---
+
+## The Headline: What You'll Actually Notice
+
+### 1. Startup Freezes — Gone
+
+**Fixed:** Long freezes at startup and after reading/editing files when a `CLAUDE.md` file holds a very long list item.
+
+**What this means:** If your project has a massive `CLAUDE.md` with sprawling lists, Claude Code no longer hangs for seconds parsing it. Startup is snappy again.
+
+---
+
+### 2. Write/Edit Stalling on Large Files — Fixed
+
+**Fixed:** Write and Edit tools stalling for up to **5 seconds** after they ran, reporting "0 lines changed" when changing thousands of lines.
+
+**What this means:** Large refactors, generated file writes, bulk edits — they complete and report correctly now. No more staring at a spinner wondering if it worked.
+
+---
+
+### 3. MCP Hangs During Interrupts — Fixed
+
+**Fixed:** Interrupting Claude not taking effect until a timeout while an MCP server hadn't answered a resource read or a skill was still downloading.
+
+**What this means:** Hit `Ctrl+C` and it *actually stops* now. No more waiting for a stalled MCP server to time out before you regain control.
+
+---
+
+### 4. Compaction "Usage Credits" False Alarm — Fixed
+
+**Fixed:** Standard-context sessions stopping with "Usage credits required for 1M context" when a request ran over 200K tokens; Claude Code now compacts the conversation and continues.
+
+**What this means:** You hit the context ceiling → it compacts → you keep working. No more false "out of credits" errors mid-session.
+
+---
+
+### 5. Subagent MCP Tools Finally Work
+
+**Fixed:** Subagents being unable to use MCP tools from servers that finish connecting *after* the subagent starts.
+
+**Fixed:** `SubagentStop` hooks running about **twice a minute** for each running subagent instead of once when it finishes.
+
+**What this means:** Delegated tasks can now use your full MCP toolkit. And your hooks fire correctly — no more phantom double-runs polluting logs or triggering side effects.
+
+---
+
+### 6. Stale CLAUDE.md/MEMORY.md After Compaction — Fixed
+
+**Fixed:** Claude seeing stale `MEMORY.md` and `CLAUDE.md` content right after automatic compaction when those files were edited earlier in the session.
+
+**What this means:** Your agent's memory stays fresh. Edits to context files are respected immediately after compaction.
+
+---
+
+### 7. Transcript Order & Message Duplication — Fixed
+
+**Fixed:** `claude -p` and SDK sessions saving transcript messages out of order or keeping messages that were taken back.
+
+**Fixed:** `↑` in an agent's chat tab recalling a message still waiting to be delivered, so resending sent a second copy.
+
+**What this means:** Your session history is clean. Up-arrow recall works. Programmatic transcripts are reliable.
+
+---
+
+### 8. Remote Control & Cloud Sessions — Major Fixes
+
+| Fixed | Impact |
+|-------|--------|
+| Remote Control sessions stuck on "Connecting" for ~2 min behind proxy | Starts fast behind corporate networks |
+| Messages sent over Remote Control appearing as *your* message in mobile apps | Attribution is correct now |
+| File attachments failing silently (disk full, >20 attachments) | You get told *why* it failed |
+| WebFetch/WebSearch hanging on stalled response in Cowork | 300s timeout, then fails cleanly |
+| Background sessions not restarting after crash while attached/pinned/scheduled | They actually recover now |
+| "Background service did not respond" suggesting disabled `claude daemon restart` | Now suggests `claude daemon stop --any` |
+
+---
+
+### 9. VS Code Extension — 4 Critical Fixes
+
+| Fixed | Impact |
+|-------|--------|
+| Custom skills/slash commands from panel missing open file/selected lines | Your context is included again |
+| Extension host freezing on macOS/Linux reading PATH from login shell | No more frozen VS Code on startup |
+| Voice dictation continuing after Send button | Send stops dictation (like Enter always did) |
+| Clicking image in tool result *also* opening text in editor | One click = one action |
+
+---
+
+### 10. MCP Command UX — Fixed
+
+- `claude mcp add/remove` and `/mcp` now name the **project entry in `~/.claude.json`** (not the current folder) when run below a repo root
+- `claude mcp list/get` no longer shows error code twice (`ENOENT: ENOENT: …`)
+- `--plugin-dir` folder no longer loads as one plugin when empty `.mcp.json` sits at its top
+
+---
+
+## Quality-of-Life Improvements (Small Things That Compound)
+
+| Improvement | Why It Matters |
+|-------------|----------------|
+| **Pro/Max startup skips 2 network calls** within an hour of last check | Faster launch — you feel it every session |
+| **Shell command timeout shows output so far** + "still running in background" | You see progress, not just a killed process |
+| **Compaction asks for summary once more** if model reply has none | Fewer empty compactions eating context |
+| **Artifacts route by `#name`** — explainers become pages, docs stay documents | Shared artifacts actually work |
+| **"Connection dropped" error points to proxy/gateway/VPN first** | Debug network issues in seconds, not minutes |
+| **Screen reader: deleting permission rule says "Deleted allow rule…" immediately** | Accessibility that works |
+| **Pasted sign-in code refusal explains: "may have expired or been used"** | No more cryptic "invalid code" |
+| **Slack connector checks channel topic for posting rules** | Stops posting to channels you shouldn't |
+| **`ultrathink` runs at xhigh effort on Opus 5.5/Sonnet 5.5/Haiku 5.5/Fable 5.1** | One keyword = max reasoning, no config |
+| **`/rewind` confirmation says "later messages removed" not "forked"** | Accurate mental model |
+| **Linux: sandboxed Bash + `--plugin-dir` + blockReadsOutsideWorkingDirectories fixed** | No more `bwrap: Can't create file` |
+| **Self-hosted runner: rate-limited repo doesn't block session start** | Starts without that repo, keeps going |
+
+---
+
+## VS Code Extension: Under the Hood
+
+- Sessions start with `DISABLE_TELEMETRY` when VS Code telemetry is off — zero usage metrics sent
+- Session list sidebar loads Web sessions *on first Web tab open*, not at startup — faster VS Code launch
+- Syntax coloring on code blocks in replies (light, dark, high-contrast dark)
+- "Running UserPromptSubmit hooks" spinner + screen reader announcement for slow hooks
+
+---
+
+## Cloud & Enterprise Fixes
+
+- **Routines** in Anthropic-hosted environments: owner can re-enable after leaving/rejoining org
+- Failed routine token delete/regenerate now shows error toast (not silent)
+- Cloud environment dialogs refuse duplicate names
+- **Claude Tag:** Skills view in analytics — see how often each skill runs in Slack, which go unused
+- **Claude Tag:** Routines with nothing to report can end without throwaway message
+- **Code Review:** Check run says "no further automatic review" when model still can't analyze on retry
+- **Code Review:** Transient server fault → auto-retry once, check run says so
+
+---
+
+## What's *Not* In This Release (And That's Fine)
+
+- No new models (Opus 5.5 / Sonnet 5.5 / Haiku 5.5 / Fable 5.1 already supported)
+- No new tools or MCP features
+- No UI redesign
+- No pricing changes
+
+**This is maintenance done right.** Every fix targets a real friction point users hit daily.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Use Claude Code daily** | **Yes** — startup, editing, interrupts, compaction all smoother |
+| **Run MCP servers** | **Yes** — subagent MCP access + hook fixes are significant |
+| **Use Remote Control / cloud sessions** | **Yes** — proxy, attachment, crash-recovery fixes |
+| **Use VS Code extension** | **Yes** — 4 fixes directly improve the editor experience |
+| **Run on Linux with sandboxing** | **Yes** — `bwrap` fix unblocks plugin dirs |
+| **Run self-hosted runners** | **Yes** — rate-limit resilience added |
+| **Are on v2.1.310 and "it works fine"** | **Yes** — zero risk, 80+ paper cuts removed |
+
+**No reason to wait.** Run:
+
+```bash
+claude update
+# Verify
+claude --version
+# Should show 2.1.311
+```
+
+---
+
+## The Pattern: Anthropic Is Listening
+
+v2.1.288 (100 fixes) → v2.1.296 (stability wave) → v2.1.311 (80+ fixes)
+
+Three major stability drops in weeks. Not feature chasing — **friction hunting**.
+
+For a beginner, this means: **the tool gets out of your way.** You ask, it answers. You interrupt, it stops. You write big files, it reports correctly. You delegate, subagents work. You remote-control, it connects.
+
+That's the product maturing.
+
+---
+
+## Related Articles
+
+- [Claude Code v2.1.310 — Cloud Session MCP Fixes](/blog/claude-code-v2-1-306-cloud-session-mcp-fix/)
+- [Claude Code v2.1.308-310 Stability Surge](/blog/claude-code-v2-1-308-310-stability-surge/)
+- [Claude Code v2.1.296 — 100 Fixes You Actually Feel](/blog/claude-code-v2-1-296-stability-guide-50-fixes/)
+- [Claude Code Just Fixed Everything You Hated](/blog/claude-code-just-fixed-everything-you-hated/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Claude Code is developed by Anthropic. Changelog source: [github.com/anthropics/claude-code/releases/tag/v2.1.311](https://github.com/anthropics/claude-code/releases/tag/v2.1.311). Published October 27, 2026 — covers Claude Code v2.1.311 stable released October 26, 2026. Full changelog: [github.com/anthropics/claude-code/blob/main/CHANGELOG.md](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
