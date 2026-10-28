@@ -1,0 +1,238 @@
+---
+title: "Cursor Just Dropped an Agent SDK — Build, Test, and Deploy AI Agents Like Real Software"
+description: "Cursor's Agent SDK (Oct 20) lets you define agents as code folders, test them with evals, and deploy to Cursor or your own infra. No more prompt engineering in a chat window — agents are now version-controlled, testable projects."
+pubDate: 2026-10-28T14:00:00Z
+tags: ["cursor", "release", "agent-sdk", "ai-agents", "coding-agent", "beginner"]
+tool: "cursor"
+author: "sage"
+image: "/api/og?title=Cursor+Agent+SDK+Build+Test+Deploy+Agents&tool=cursor"
+canonical: "https://terminalblog.com/blog/cursor-agent-sdk-just-changed-how-you-build-ai-agents/"
+faq:
+  - q: "What is the Cursor Agent SDK?"
+    a: "A framework to build AI agents as code projects — not chat prompts. You define instructions.md (the prompt), tools/ (typed actions), skills/ (procedures), mcp-connections/ (MCP tools), and channels/ (where the bot receives messages). Run `npx @cursor/agent-sdk init` to scaffold."
+  - q: "Can I deploy agents to my own infrastructure?"
+    a: "Yes. `agent-sdk deploy` builds and starts the agent on Cursor's infrastructure with a URL. You can also run agents locally with `agent-sdk dev` and manage secrets/integrations from the dashboard. The same logs, evals, and playground work locally and deployed."
+  - q: "What are evals and why do they matter?"
+    a: "Evals send a fixed message to your bot and assert on what it did — which tools ran, with what input, and the shape of the reply. Run `agent-sdk eval` locally or in CI. `agent-sdk github replay <pr-url>` turns real PRs into signed webhook payloads for testing without waiting for pushes."
+  - q: "What channels does the Agent SDK support?"
+    a: "GitHub (PR, comment, CI events), GitLab, Bitbucket, Slack (mentions/DMs), webhooks from any provider, and cron schedules. Each conversation keeps its own session with complete message and tool call history."
+  - q: "Do I need to be on a Teams/Enterprise plan?"
+    a: "The Agent SDK is generally available today. Deployment to Cursor's infrastructure and the dashboard for secrets/integrations are available. Check Cursor's pricing page for plan details on cloud deployment vs local-only usage."
+  - q: "How is this different from writing a prompt in Cursor chat?"
+    a: "Prompts are ephemeral. Agents as code are version-controlled, testable, reviewable, and deployable. You get CI/CD for your AI agents — lint, test, deploy, rollback. The agent's behavior is defined in files, not a chat window."
+---
+
+Cursor didn't just add another feature on October 20. It **changed what an AI agent is** — from a chat prompt you type repeatedly into a **version-controlled, testable, deployable software project**.
+
+The **Cursor Agent SDK** is generally available today. Here's why it matters.
+
+---
+
+## The Shift: Agents as Code, Not Prompts
+
+Before: You type a prompt in Cursor chat. It works (or doesn't). You tweak it. You lose the history. You can't test it. You can't share it with your team except by copy-pasting.
+
+After: You run:
+
+```bash
+npx @cursor/agent-sdk init ./my-security-reviewer --template security-reviewer
+cd my-security-reviewer
+agent-sdk dev
+```
+
+Now you have a **folder** that defines an agent:
+
+```
+my-security-reviewer/
+├── instructions.md      # The system prompt — what this agent does
+├── tools/
+│   ├── check-sql-injection.ts    # Typed tool: scan code for SQL injection
+│   └── find-secrets.ts           # Typed tool: detect committed secrets
+├── skills/
+│   └── trace-user-input.md       # Procedure: trace input through codebase
+├── mcp-connections/
+│   └── github.ts                 # MCP server for GitHub API access
+├── channels/
+│   └── github-pr.yml             # Wake on PR events
+└── evals/
+    └── sql-injection.test.ts     # Test: agent catches this vulnerability
+```
+
+This is **software engineering applied to AI agents**.
+
+---
+
+## What You Get That Chat Doesn't Give You
+
+### 1. Evals — Automated Testing for Agent Behavior
+
+```bash
+# Run evals locally
+agent-sdk eval
+
+# In CI — every PR must pass agent evals
+# .github/workflows/agent-evals.yml
+agent-sdk eval --ci
+```
+
+An eval sends a fixed message to your bot and asserts on **what it actually did**:
+- Which tools ran
+- With what input
+- The shape of the reply
+
+```typescript
+// evals/sql-injection.test.ts
+import { test, expect } from '@cursor/agent-sdk/eval'
+
+test('catches SQL injection in PR', async () => {
+  const result = await agent.run(`
+    PR #42: Added user search feature
+    File: src/search.ts
+    Code: "SELECT * FROM users WHERE name = '" + input + "'"
+  `)
+  
+  expect(result.toolsCalled).toContain('check-sql-injection')
+  expect(result.findings).toContainEqual(
+    expect.objectContaining({ severity: 'critical', type: 'sql-injection' })
+  )
+})
+```
+
+**`agent-sdk github replay <pr-url>`** — turns a real PR into signed webhook payloads and sends them to your bot. Test against real history without waiting for new pushes. Add `--dry-run --fixtures-dir fixtures/` to save payloads as reusable test fixtures.
+
+### 2. Channels — Agents That Wake on Events, Not Your Keystrokes
+
+Your agent doesn't sit in a chat window waiting for you. It **wakes on events**:
+
+| Channel | Triggers |
+|---------|----------|
+| GitHub | PR opened, comments, CI events, push |
+| GitLab | Merge requests, pipeline events |
+| Bitbucket | PR events |
+| Slack | Mentions, DMs, reactions |
+| Webhooks | Any HTTP POST |
+| Cron | Scheduled runs |
+
+Each conversation keeps its **own session** with a complete record of every message and tool call. Follow-ups on a PR or Slack thread **resume the same session** — context preserved.
+
+### 3. Deploy Anywhere — Cursor's Cloud or Your Infra
+
+```bash
+# Deploy to Cursor's managed infrastructure
+agent-sdk deploy
+# → gives you a URL, starts on Cursor's infra
+# → manage secrets/integrations from dashboard
+# → same logs, evals, playground work locally AND deployed
+
+# Or run locally for development
+agent-sdk dev
+# → playground UI at localhost
+# → hot reload on file changes
+```
+
+### 4. Validation Before You Deploy
+
+```bash
+agent-sdk validate
+# Checks: instructions.md exists, tools/ are valid TypeScript,
+# skills/ parse correctly, MCP connections reachable,
+# channels/ have valid config
+
+agent-sdk info
+# Prints discovered: tools, skills, MCP servers, channels
+```
+
+---
+
+## Templates: Start From Something That Works
+
+Don't start from zero. The SDK ships with templates for common agent types:
+
+```bash
+npx @cursor/agent-sdk init ./my-bot --template security-reviewer
+npx @cursor/agent-sdk init ./my-bot --template owners-policy-approver
+npx @cursor/agent-sdk init ./my-bot --template pr-autofixer
+npx @cursor/agent-sdk init ./my-bot --template linear-triager
+npx @cursor/agent-sdk init ./my-bot --template jira-triager
+```
+
+Each template is a **working agent** you can customize. The security reviewer template, for example, already has tools for SQL/command/template injection detection, auth bypass checks, secret scanning, SSRF, unsafe deserialization, and vulnerable dependency detection — tracing user input through the codebase.
+
+---
+
+## Why This Changes the Game for Teams
+
+**Before Agent SDK:**
+- Security review = manual checklist or separate SaaS tool
+- PR triage = human reads every PR
+- Incident response = human wakes up at 3 AM
+- Agent behavior = "whatever the prompt produced today"
+
+**After Agent SDK:**
+- Security review = deployed agent that runs on every PR, posts findings as review comments, enforces team rules
+- PR triage = agent reads diff, checks owners, assigns reviewers, updates labels
+- Incident response = agent wakes on PagerDuty, gathers logs, correlates with recent deploys, posts summary to Slack
+- Agent behavior = **version-controlled, tested, reviewable code**
+
+The agent's logic lives in `instructions.md` and `tools/`. Your team reviews changes to agent behavior **in pull requests**. You bisect regressions in agent behavior with `git bisect`. You roll back a bad agent change with `git revert`.
+
+---
+
+## The Origin App Marketplace Connection
+
+The October 13 Origin App Marketplace launch (20+ apps: Cloudflare, Netlify, Vercel, Linear, Sentry, Semgrep, Socket Security, CodeRabbit, Greptile, Buildkite, CircleCI, and more) wasn't a separate product — it was **the distribution layer for Agent SDK agents**.
+
+Apps in the Origin Marketplace **are** Agent SDK agents. When you install an app from the marketplace, you're installing a deployed agent that wakes on your GitHub/Slack/webhook events.
+
+**You can publish your own agents to the marketplace:**
+1. `agent-sdk deploy` your agent
+2. Create an app in your namespace at `cursor.com/codebase/settings/apps`
+3. Build against the [Origin API](https://cursor.com/docs/api/origin) — app JWT, installation tokens, webhook events, write back check runs/PR comments/reviews
+4. Submit for review with a demo video (install, uninstall, core flows)
+
+---
+
+## What This Means for You
+
+**If you're a solo dev:** Stop copy-pasting prompts. Build an agent once, test it with evals, deploy it, and it works on every PR forever. Your "security reviewer" becomes infrastructure, not a chat session.
+
+**If you're a team:** Agent behavior becomes **code reviewable**. The security rules your agent enforces? They're in `skills/trace-user-input.md` — your team reviews changes. The triage logic? In `tools/assign-reviewer.ts` — version controlled. No more "who changed the prompt?" mysteries.
+
+**If you're building developer tools:** The Agent SDK + Origin Marketplace is a **platform**. Build an agent, deploy it, publish to marketplace, teams install it. Cursor handles auth, webhooks, secrets, logging, evals. You build the logic.
+
+---
+
+## Get Started Today
+
+```bash
+# 1. Scaffold your first agent
+npx @cursor/agent-sdk init ./my-first-agent --template pr-autofixer
+
+# 2. Run it locally with the playground
+cd my-first-agent
+agent-sdk dev
+
+# 3. Write an eval for the behavior you care about
+# edit evals/pr-fix.test.ts
+
+# 4. Run evals — they must pass
+agent-sdk eval
+
+# 5. Deploy when ready
+agent-sdk deploy
+```
+
+Read the [docs](https://cursor.com/docs) for the full reference. The [publishing guide](https://cursor.com/docs/origin/apps/publish) covers marketplace submission.
+
+---
+
+## Related Reading
+
+- [Cursor October 2026 Wave: Projects, Cloud Agents, Origin Marketplace](/blog/cursor-october-2026-wave/)
+- [Cursor vs Copilot CLI: IDE vs Terminal](/blog/cursor-vs-copilot-cli-ide-vs-terminal/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [OpenCode vs Cursor: Free Terminal vs Paid IDE](/blog/opencode-vs-cursor-free-terminal-vs-paid-ide/)
+
+---
+
+*Building agents as code is the first time AI coding assistance feels like engineering. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** simplifies multi-model access while you test workflows.*
