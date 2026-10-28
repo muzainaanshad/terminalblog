@@ -1,0 +1,179 @@
+---
+title: "KiloCode Just Fixed the Chat Copy Bug That Drove Everyone Crazy"
+description: "KiloCode v7.8.18 (Oct 26) patches the VS Code 1.143 copy-paste regression where Cmd/Ctrl+C cleared your selection and jumped focus to the prompt. Plus DOMPurify 3.4.17, Vite 7.3.7 (CVE fix), and cloud sessions exposed via local API."
+pubDate: 2026-10-28T10:00:00Z
+tags: ["kilocode", "release", "v7.8.18", "vscode", "bug-fix", "security", "beginner"]
+tool: "kilocode"
+author: "Anshad"
+image: "/api/og?title=KiloCode+v7.8.18+Chat+Copy+Fix&tool=kilocode"
+canonical: "https://terminalblog.com/blog/kilocode-v7-8-18-fix-chat-copy-focus/"
+---
+
+KiloCode **v7.8.18 dropped October 26, 2026** — and if you've been fighting VS Code 1.143's copy-paste regression, this is the patch you've been waiting for.
+
+**The headline:** Copying selected chat text with Cmd/Ctrl+C or right-click Copy **no longer clears your selection and jumps focus to the prompt**. Plus DOMPurify 3.4.17, Vite 7.3.7 (CVE-2026-112944 fix), and hosted cloud sessions now exposed through the local Kilo API.
+
+---
+
+## The One-Line Summary
+
+**Chat copy bug fixed. DOMPurify and Vite security updates. Cloud sessions visible locally without handling provider credentials. Update now.**
+
+---
+
+## The Bug That Made You Swear: Chat Copy Fixed
+
+**What happened:** VS Code 1.143 introduced a regression where copying text from the chat panel (Cmd/Ctrl+C or right-click → Copy) would:
+1. Clear your selection immediately
+2. Jump focus to the prompt input
+3. Make you lose your place in the conversation
+
+**What KiloCode v7.8.18 does:** Fixed in [#15472](https://github.com/Kilo-Org/kilocode/pull/15472). The selection **stays selected**, focus **stays where it is**, and copy **just works**.
+
+```bash
+# Before v7.8.18 (VS Code 1.143):
+# Select text → Cmd+C → selection gone, focus in prompt → 😤
+
+# After v7.8.18:
+# Select text → Cmd+C → selection stays, focus stays → ✓
+```
+
+**For beginners:** This is the kind of paper cut that makes you question your tools. It's fixed. Update and copy away.
+
+---
+
+## Security Updates You Didn't Ask For But Need
+
+### DOMPurify 3.4.17 — Sanitization Fixes
+
+[#15410](https://github.com/Kilo-Org/kilocode/pull/15410) updates DOMPurify to 3.4.17, addressing sanitization issues flagged by Dependabot alerts. If you render any untrusted HTML in the chat/webview, this matters.
+
+### Vite 7.3.7 — CVE-2026-112944 Fixed
+
+[#15412](https://github.com/Kilo-Org/kilocode/pull/15412) updates Vite to 7.3.7, fixing the `launch-editor` CLI flag misinterpretation vulnerability (CVE-2026-112944 / GHSA-r825-w8mm-5pxw). This could allow path traversal in certain dev server configurations.
+
+### MCP TypeScript SDK 1.32.1 — OAuth Redirect Blocking
+
+[#15430](https://github.com/Kilo-Org/kilocode/pull/15430) updates the MCP SDK to 1.32.1, fixing security issues including **MCP HTTP and OAuth requests following cross-origin redirects**.
+
+```bash
+# What this blocks:
+# - MCP server URL redirects to another origin
+# - POST responses with 301, 302, 303 redirects
+# - Remote MCP servers that try to bounce your auth flow
+
+# What you should do:
+# Use the server's final URL directly (no redirects)
+```
+
+This is the same class of fix Claude Code, OpenCode, and Hermes Agent have shipped recently. **MCP OAuth redirects are an attack vector.** KiloCode now refuses them.
+
+---
+
+## Cloud Sessions Exposed Locally (Big for Plugin Authors)
+
+### What's New
+
+[#15358](https://github.com/Kilo-Org/kilocode/pull/15358) exposes **hosted cloud sessions through the local Kilo API**. Editors can now discover, read, and interact with a hosted session **without ever handling its provider credentials**.
+
+```bash
+# Before: You needed cloud provider credentials to manage cloud sessions
+# Now: Local API lists/reads/starts cloud sessions → credentials stay with Kilo backend
+```
+
+### Why This Matters
+
+- **Security:** Your cloud provider tokens (AWS, GCP, Azure, etc.) never touch the editor process
+- **Plugin authors:** Build cloud session UIs without credential management
+- **Teams:** Centralized cloud session control, distributed local access
+
+This is the foundation for the Kilo Cloud provider added in v7.8.17 — now actually usable from local tooling.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **v7.8.18** | **Oct 26, 2026** | **Stable** | **Chat copy fix (VS Code 1.143), DOMPurify 3.4.17, Vite 7.3.7 (CVE), MCP SDK 1.32.1 (redirect block), cloud sessions via local API** |
+| v7.8.17 | Oct 23, 2026 | Stable (Security) | eMudhra cert patch, pinned Bun runtime, HTTPS-only browser/MCP, shell injection block, PR badges, Kilo Cloud provider |
+| v7.8.16 | Oct 22, 2026 | Pre-release | Same security fixes as v7.8.17 (first release with them) |
+
+**v7.8.18 = v7.8.17 security baseline + VS Code 1.143 compatibility + local cloud session API.**
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Use VS Code 1.143+ and copy chat text** | **Yes immediately** — copy bug fixed |
+| **Run MCP servers** | **Yes** — OAuth redirect blocking |
+| **Use cloud sessions** | **Yes** — local API exposure |
+| **Care about supply chain security** | **Yes** — DOMPurify, Vite, MCP SDK updates |
+| **On v7.8.17 and happy** | **Yes** — zero breaking changes, quality-of-life + security |
+
+**No reason to wait.** Pure fixes, zero breaking changes.
+
+---
+
+## How to Update
+
+```bash
+# VS Code / Cursor / JetBrains extension
+# Auto-updates or: Extensions → Kilo Code → Update
+
+# CLI (standalone)
+# Download from: https://github.com/Kilo-Org/kilocode/releases/tag/v7.8.18
+
+# npm (if using CLI package)
+npm install -g @kilocode/cli@latest
+
+# Verify
+kilocode --version
+# Should show 7.8.18
+```
+
+**For Nix users:** Nix CLI builds stay compatible — update your flake/input.
+
+---
+
+## The Bottom Line
+
+**v7.8.17 secured the platform. v7.8.18 makes it pleasant again.**
+
+The chat copy bug was the kind of daily annoyance that erodes trust — select, copy, lose selection, lose focus, swear, repeat. Fixed.
+
+The security updates (DOMPurify, Vite CVE, MCP redirect blocking) are the quiet work that keeps you safe without you noticing.
+
+The local cloud session API is the quiet enabler — plugin authors, this is your green light to build cloud session UIs without touching credentials.
+
+```bash
+# Update command (pick your platform)
+# VS Code: Extensions → Kilo Code → Update
+# CLI: npm install -g @kilocode/cli@latest
+# Verify: kilocode --version → 7.8.18
+# Copy chat text → it just works
+```
+
+---
+
+## Related Reading
+
+- [KiloCode Just Patched the eMudhra Certificate Compromise — Browser Links and MCP OAuth Now Locked Down](/blog/kilocode-v7-8-17-security-patch-browser-mcp-fixes/)
+- [KiloCode v7.8.15: Browser Prompt Memory, Search Ignored Paths, Mobile Session Fork](/blog/kilocode-v7-8-15-agent-manager-browser-prompt-fix/)
+- [KiloCode v7.8.10: Pinned Worktrees, Integrated Browser, MCP OAuth](/blog/kilocode-v7-8-10-search-ignored-paths-grep-fix-mcp-windows/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [OpenClaw Just Patched the eMudhra Certificate Compromise](/blog/openclaw-2026-10-6-security-patch/)
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
+---
+
+*KiloCode v7.8.18 released October 26, 2026. Source: [github.com/Kilo-Org/kilocode/releases/tag/v7.8.18](https://github.com/Kilo-Org/kilocode/releases/tag/v7.8.18) · KiloCode is open-source (Apache 2.0) at [kilo.ai](https://kilo.ai) and [github.com/Kilo-Org/kilocode](https://github.com/Kilo-Org/kilocode)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
