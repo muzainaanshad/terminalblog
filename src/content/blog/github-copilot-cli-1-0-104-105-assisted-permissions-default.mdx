@@ -1,0 +1,218 @@
+---
+title: "GitHub Copilot CLI Just Killed Experimental Mode — Assisted Permissions Are Now Default"
+description: "v1.0.104 and v1.0.105 drop the experimental flag on Assisted Permissions, auto-start fusion models, fix background task waiting, and solve the long-context Fusion High/Max selection. Two releases in 48 hours that make Copilot CLI boring reliable."
+pubDate: 2026-10-28
+updatedDate: 2026-10-28
+author: "Anshad"
+category: "releases"
+tags: ["github-copilot-cli", "release", "v1.0.104", "v1.0.105", "assisted-permissions", "fusion", "coding-agents"]
+tool: "copilot-cli"
+heroAlt: "GitHub Copilot CLI v1.0.104 - Assisted Permissions default"
+---
+
+GitHub Copilot CLI v1.0.104 dropped **October 27**. v1.0.105 followed **50 minutes ago**. Two releases in 48 hours.
+
+The headline isn't a new feature — it's a **graduation**. Assisted Permissions no longer require experimental mode. They're just… on.
+
+---
+
+## The One-Line Summary
+
+**v1.0.105 (Oct 28) → v1.0.104 (Oct 27).** Assisted Permissions default-on. Fusion model auto-starts on Auto tier. Background tasks wait indefinitely in interactive/SDK Autopilot. Auto falls back gracefully. Fusion High/Max selectable from long-context sessions. Upgrade now.
+
+---
+
+## The Big One: Assisted Permissions Graduated
+
+### What Changed
+
+**v1.0.104:** `assistedApprovalInstructions` setting guides the judge. No `--experimental` flag needed. No config toggle. It works out of the box.
+
+### Why It Matters
+
+Since v1.0.101, Assisted Permissions existed but lived behind `--experimental`. You had to know the flag, enable it, tolerate rough edges. Now it's the default behavior.
+
+```bash
+# Before v1.0.104
+copilot --experimental
+# Then configure assisted permissions
+
+# After v1.0.104
+copilot
+# Assisted permissions just work
+```
+
+The judge evaluates shell commands, MCP calls, and file operations — approving safe ones automatically, prompting only when risk crosses a threshold. Your `assistedApprovalInstructions` (added in v1.0.102) teach it your project's norms.
+
+---
+
+## Fusion Model Now Starts on Auto — Automatically
+
+### What Changed
+
+**v1.0.104:** The managed `"fusion"` model starts sessions on **Auto** tier and applies your `fusionTier` settings (High/Max) without manual selection.
+
+### Why It Matters
+
+Previously: you picked a model, or Auto picked something generic. Now Auto **means Fusion** — GitHub's routed model that picks the right backend (GPT, Claude, Gemini) per task.
+
+```bash
+# Your fusionTier in settings.json controls the ceiling
+{
+  "fusionTier": "Max"  # or "High"
+}
+```
+
+Start a session. Fusion routes. You don't manage the model.
+
+---
+
+## Background Tasks Don't Time Out Anymore
+
+### What Changed
+
+**v1.0.104:** Interactive and SDK Autopilot sessions **keep waiting** for attached background tasks instead of stopping after `COPILOT_TASK_WAIT_TIMEOUT_SECONDS`.
+
+The `-p --autopilot` flag still honors the timeout — scripted runs stay predictable. But interactive work? The agent finishes what it started.
+
+### Why It Matters
+
+You kick off a long refactor. Step away. Come back. The session is still there, still working. No more "where did my agent go?"
+
+---
+
+## Auto Falls Back Instead of Failing
+
+### What Changed
+
+**v1.0.104:** When your saved Auto preference becomes unavailable (model deprecated, region blocked, plan change), Auto **falls back to its default** instead of failing every turn.
+
+### Why It Matters
+
+Enterprise policy changes. Model rolls out. Region restrictions shift. Your sessions don't brick — they adapt.
+
+---
+
+## v1.0.105: Fusion High/Max Finally Works in Long Context
+
+### What Changed
+
+**v1.0.105 (50 mins ago):** Selecting **Copilot Fusion High or Max in `/model` now works from long-context sessions**.
+
+### Why It Matters
+
+Before: long-context sessions would ignore Fusion tier selection, defaulting to base. Now your tier choice respects context size. If you pay for Max, you get Max — even at 200k tokens.
+
+---
+
+## Cumulative October Sprint (v1.0.100 → v1.0.105)
+
+| Version | Date | Key Delivery |
+|---------|------|--------------|
+| **v1.0.105** | Oct 28 | Fusion High/Max in long context |
+| **v1.0.104** | Oct 27 | Assisted Permissions default, Fusion auto-start, background task wait, Auto fallback |
+| v1.0.103 | Oct 22 | ACP sandbox persistence, cloud reconnect recovery, session titles, GPT-5 verbosity, Gemini schema fixes, worktree MCP caching |
+| v1.0.102 | Oct 21 | Native structured output, assisted approval instructions, MCP auth errors, GPT→Gemini switching |
+| v1.0.101 | Oct 20 | Session browsing, proxy sandbox, voice cleanup, Entra recovery, Windows shell |
+| v1.0.100 | Oct 19 | Dynamic workflows, structured output, sandbox auth, model switching |
+
+**Six stable releases in nine days.** The "make it boring reliable" sprint is real.
+
+---
+
+## Quick Decision Matrix
+
+| If you… | Action |
+|---------|--------|
+| Want permissions that aren't annoying | **Upgrade now** — Assisted is default |
+| Use Auto tier and want Fusion routing | **Upgrade now** — happens automatically |
+| Run long interactive sessions | **Upgrade now** — background tasks persist |
+| Hit Fusion tier selection bugs in long context | **Upgrade now** — v1.0.105 fixes it |
+| Manage enterprise Copilot policy | **Upgrade now** — Auto fallback prevents brick |
+
+---
+
+## What's NOT in These Releases
+
+- **No new models** — same roster (GPT-6 Sol/Luna, Claude Opus 5.5, Sonnet 5.5, Gemini 4 Argon, Grok 4.7)
+- **No Android** — iOS Remote Control only
+- **Rollouts/Security Review** — still Teams/Enterprise only
+- **No breaking changes** — pure polish and fixes
+
+---
+
+## How to Update
+
+```bash
+# macOS (Homebrew)
+brew upgrade github-copilot-cli
+
+# Windows (winget)
+winget upgrade GitHub.CopilotCLI
+
+# Windows (scoop)
+scoop update github-copilot-cli
+
+# Linux/macOS (npm)
+npm update -g @github/copilot-cli
+
+# Or reinstall latest
+npm install -g @github/copilot-cli@latest
+
+# Verify
+copilot --version
+# Should show 1.0.105
+```
+
+---
+
+## First Things to Try After Update
+
+```bash
+# 1. Test Assisted Permissions (no flag needed)
+copilot
+# Try a shell command — safe ones auto-approve
+
+# 2. Test Fusion auto-start on Auto
+# Start session without /model — should route via Fusion
+
+# 3. Test background task persistence
+# Kick off long task → disconnect → resume
+# Task should still be running
+
+# 4. Test Fusion High/Max in long context (v1.0.105)
+/model
+# Select Fusion High or Max in a long session
+# Should stick and route correctly
+
+# 5. Test Auto fallback
+# (Hard to simulate) but: change model policy → resume session
+# Should fall back gracefully, not fail
+```
+
+---
+
+## The Bottom Line
+
+**v1.0.100 gave you dynamic workflows. v1.0.101 made daily experience not annoying. v1.0.102 added structured workflows. v1.0.103 made the hard stuff work. v1.0.104 graduated Assisted Permissions to default, auto-started Fusion on Auto, and stopped background tasks from timing out. v1.0.105 fixed the last Fusion tier bug.**
+
+This is the release pair where Copilot CLI stops feeling like "GitHub's terminal experiment" and becomes a **daily driver you configure once and trust**.
+
+```bash
+copilot upgrade
+# Assisted permissions: on. Fusion: auto. Background tasks: persistent. Auto: resilient.
+```
+
+---
+
+## Related Articles
+
+- [GitHub Copilot CLI v1.0.103 — ACP Sandbox, Cloud Reconnect, Session Titles, Gemini Fixes](/blog/github-copilot-cli-1-0-101-session-browsing-proxy-fixes/)
+- [GitHub Copilot CLI 1.0.97 — Agent Hooks, Sandbox, Auth Overhaul](/blog/github-copilot-cli-1-0-97-agent-hooks-sandbox-auth-overhaul/)
+- [Codex vs Copilot CLI: Terminal Battle — Which Terminal Agent Actually Ships?](/blog/codex-vs-copilot-cli-terminal-battle/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+- [Opencode v2.2 Just Dropped — Desktop Plugins, Refreshed App, Breaking Changes](/blog/opencode-v2-2-desktop-plugins-breaking-changes/)
+
+---
+
+*GitHub Copilot CLI is proprietary. Requires GitHub Copilot subscription. Updated October 28, 2026 — covers v1.0.105 (Oct 28) and v1.0.104 (Oct 27). Full changelog: [github.com/github/copilot-cli/releases](https://github.com/github/copilot-cli/releases)*
