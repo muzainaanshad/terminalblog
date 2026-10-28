@@ -1,0 +1,122 @@
+---
+title: "Opencode v2.2 Just Dropped — Desktop Plugins, Refreshed App, and Breaking Changes You Can't Ignore"
+description: "The biggest Opencode release in months brings experimental desktop plugins, a completely refreshed desktop app, and breaking API changes. Here's what actually matters for your workflow."
+pubDate: 2026-10-28
+updatedDate: 2026-10-28
+author: "Anshad"
+category: "releases"
+tags: ["opencode", "release", "desktop", "plugins", "breaking-changes"]
+tool: "opencode"
+heroImage: "/blog/opencode-v2-2-hero.png"
+heroAlt: "Opencode v2.2 release - desktop plugins and breaking changes"
+---
+
+Opencode v2.2.0 landed 15 hours ago. This isn't a patch — it's a major version with breaking changes that will bite you if you update blindly.
+
+The headline features: **experimental desktop plugins**, a **completely refreshed desktop app**, and **new image/decision generation APIs** for plugins and SDK users.
+
+But the breaking changes are what you need to read first.
+
+## Breaking Changes (Read Before Updating)
+
+### 1. `@opencode/ai` Root Export Changed
+
+The package root now exports the **Promise API** instead of the Effect API. If you import from `@opencode/ai`, your code breaks.
+
+```bash
+# Old (broken)
+import { AI } from "@opencode/ai/promise"
+import { LLM } from "@opencode/ai"
+
+# New (required)
+import { AI } from "@opencode/ai"
+import { LLM } from "@opencode/ai/effect"
+```
+
+The wildcard subpath export is gone — replaced with explicit provider and protocol entry points. Update your imports or pin to v1.x.
+
+### 2. GitHub Action Removed
+
+The OpenCode GitHub Action is **no longer published**. Remove it from your workflows entirely — it won't work.
+
+### 3. TUI Plugins Require OpenTUI 0.7
+
+If you build or use TUI plugins, they need `@opentui/core` and `@opentui/solid` 0.7.0 (up from 0.6.8). The hook system changed: assign `renderBefore`, `renderAfter`, and `onLifecyclePass` in the constructor, call `refreshHooks()` after adding hooks by reflection, and replace `defineNativeIntegration()` with a `static nativeIntegration` declaration.
+
+## What's Actually New (The Good Stuff)
+
+### Desktop Plugins (Experimental)
+
+You can now **create, install, and share desktop plugins** — GUI extensions for the Opencode desktop app. This is experimental but opens the door for custom UI panels, workflow integrations, and tooling that lives inside the desktop client.
+
+Documentation: [opencode.ai/v2/docs/build/plugins/gui](https://opencode.ai/v2/docs/build/plugins/gui)
+
+### Refreshed Desktop App Experience
+
+The desktop app got a significant UX overhaul across multiple PRs (#56898, #58865, #55838, #57962). If you've avoided the desktop app, it's worth another look.
+
+### Image & Decision Generation APIs
+
+Plugins and SDK users get experimental APIs for **image generation** and **decision models** (think typesafe, clef, etc.). This enables workflows where agents can generate images or use specialized decision models mid-task.
+
+### Session Instruction Entries (Big for Plugin Authors)
+
+Plugins can now attach and update **keyed session instructions** via `ctx.session.instructions.entry.put/list/remove`. Instead of editing the system prompt (which busts the prompt cache), each change adds a small update at the next step. These survive compaction and reverts, and don't start an extra model turn.
+
+### Todo Tool Restored (Desktop, Opt-In)
+
+The Todo tool is back in the desktop app behind an opt-in flag (#59092).
+
+### Configurable Prompt Cache TTLs
+
+Per-provider/model prompt cache TTLs are now configurable (#59157) — useful for cost optimization on providers with expensive cache.
+
+## Core Improvements Worth Knowing
+
+- **Session history now starts from the latest completed compaction** — faster startup for long sessions
+- **Git project discovery is faster** while still recognizing repository changes
+- **Provider-reported session costs are now recorded** — better cost tracking
+- **GPT-6.1 Terra and GPT-6.1 Terra Fast** added to "Sign in with ChatGPT"
+- **MCP server titles exposed from `serverInfo`** — better visibility into connected servers
+- **OpenCode Console workspace config applied as a configuration layer**
+
+## Bug Fixes That Matter
+
+- **Plugins now finish reloading before each session step and tool call** — fixes race conditions
+- **Session compaction sized from provider's reported token count** — preserves usable context
+- **Legacy MCP `codemode` settings preserved during migration**
+- **Correct Vertex AI endpoints for `eu` and `us` multi-regions**
+- **Files kept intact when patch edits move a file onto itself**
+- **Literal `$0` and `$ARGUMENTS` text preserved in custom command input**
+
+## Should You Update?
+
+**If you use the SDK or `@opencode/ai`**: Plan migration time. The import changes are mechanical but widespread.
+
+**If you use the GitHub Action**: Remove it immediately — it's gone.
+
+**If you use TUI plugins**: Budget time for OpenTUI 0.7 migration.
+
+**If you just use the CLI/desktop app**: Safe to update. The desktop app improvements alone are worth it.
+
+**If you build plugins**: The new desktop plugin system and session instruction entries are the story here.
+
+## Installation
+
+```bash
+# CLI
+curl -fsSL https://opencode.ai/install | bash
+
+# Desktop (new NSIS installer for Windows)
+# Download from https://opencode.ai/download
+```
+
+## The Bottom Line
+
+Opencode v2.2 is a **major release disguised as a minor version bump**. The breaking changes are real and affect SDK users immediately. But the desktop plugin system and refreshed app signal where Opencode is heading — a more extensible, GUI-capable agent platform.
+
+If you're on v1.x, read the migration guide before updating. If you're already on v2.1.x, the breaking changes are smaller but the `@opencode/ai` import change still hits.
+
+---
+
+*Opencode v2.2.0 released October 27, 2026. Full changelog: [github.com/anomalyco/opencode/releases/tag/v2.2.0](https://github.com/anomalyco/opencode/releases/tag/v2.2.0)*
