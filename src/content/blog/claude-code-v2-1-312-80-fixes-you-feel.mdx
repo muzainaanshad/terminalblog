@@ -1,0 +1,180 @@
+---
+title: "Claude Code v2.1.312 Just Dropped 80+ Fixes — Write Stalls, MCP Hangs, Subagent Ghosts All Gone"
+description: "Claude Code v2.1.312 (Oct 27) ships 80+ fixes across Write/Edit stalling, MCP resource reads blocking interrupts, subagent MCP tools, CLAUDE.md parsing freezes, and VS Code extension issues. The daily paper cuts that made you hesitate before hitting Enter are finally fixed."
+pubDate: 2026-10-28T10:00:00Z
+tags: ["claude-code", "release", "v2.1.312", "stability", "coding-agent", "beginner"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+v2.1.312+80+Fixes&tool=claude-code"
+canonical: "https://terminalblog.com/blog/claude-code-v2-1-312-80-fixes-you-feel/"
+faq:
+  - q: "Is v2.1.312 a feature release or a bug-fix release?"
+    a: "Pure bug-fix release — 80+ fixes, zero new features. Focus is entirely on stability: Write/Edit stalling on large files, MCP hangs during interrupts, subagent MCP tool access, CLAUDE.md parsing freezes, and VS Code extension problems."
+  - q: "Do I need to update my config or migrate anything?"
+    a: "No config changes required. Run `claude update` and you're on v2.1.312. All your settings, sessions, and MCP servers work exactly as before."
+  - q: "What's the biggest fix for daily users?"
+    a: "Fixed Write and Edit tools stalling for up to 5 seconds after they ran, reporting '0 lines changed' when changing thousands of lines. Also fixed long freezes at startup when CLAUDE.md has very long list items."
+  - q: "Does this fix the subagent MCP tool issues?"
+    a: "Yes — fixed subagents being unable to use MCP tools from servers that finish connecting after the subagent starts. Also fixed the Read tool sometimes failing on PDF pages during session cleanup."
+  - q: "What about the VS Code extension fixes?"
+    a: "Fixed sessions ending on bare exit code when organization settings couldn't load, fixed mod drawings disappearing from long-open panels, and fixed Past conversations hiding sessions when claudeCode.claudeProcessWrapper is set."
+  - q: "Are there any breaking changes?"
+    a: "None. This is a patch release (2.1.312) — only bug fixes and improvements. Model names dropped the [1m] suffix but it's still accepted for compatibility."
+---
+
+Claude Code **v2.1.312 dropped October 27** — just hours after v2.1.311. If you updated to v2.1.311 yesterday, you'll want this one too. It's another **80+ fixes, zero new features** release that sands down the remaining paper cuts v2.1.311 missed.
+
+---
+
+## The Headline: What You'll Actually Notice
+
+### 1. Write/Edit Stalling on Large Files — Finally Fixed
+
+**Fixed:** Write and Edit tools stalling for up to **5 seconds** after they ran, reporting "0 lines changed" when changing thousands of lines.
+
+**What this means:** Large refactors, generated file writes, bulk edits — they complete and report correctly now. No more staring at a spinner wondering if it worked.
+
+---
+
+### 2. MCP Resource Reads Blocking Interrupts — Fixed
+
+**Fixed:** Interrupting Claude not taking effect until a timeout while an MCP server hadn't answered a resource read or a skill was still downloading.
+
+**What this means:** Hit `Ctrl+C` and it *actually stops* now. No more waiting for a stalled MCP server to time out before you regain control.
+
+---
+
+### 3. Subagent MCP Tools Finally Work
+
+**Fixed:** Subagents being unable to use MCP tools from servers that finish connecting *after* the subagent starts.
+
+**What this means:** Delegated tasks can now use your full MCP toolkit. This was a silent blocker for complex multi-agent workflows.
+
+---
+
+### 4. CLAUDE.md Parsing Freezes — Gone
+
+**Fixed:** Long freezes at startup and after reading/editing files when a `CLAUDE.md` file holds a very long list item.
+
+**What this means:** If your project has a massive `CLAUDE.md` with sprawling lists, Claude Code no longer hangs for seconds parsing it. Startup is snappy again.
+
+---
+
+### 5. Read Tool PDF Failures During Cleanup — Fixed
+
+**Fixed:** The Read tool sometimes failing on PDF pages with "pdftoppm failed: Could not write image" when the clean-up of old session files ran at the same time.
+
+**What this means:** No more random PDF read errors when session cleanup happens in the background.
+
+---
+
+### 6. Stale CLAUDE.md/MEMORY.md After Compaction — Fixed
+
+**Fixed:** Claude seeing stale `MEMORY.md` and `CLAUDE.md` content right after automatic compaction when those files were edited earlier in the session.
+
+**What this means:** Your agent's memory stays fresh. Edits to context files are respected immediately after compaction.
+
+---
+
+### 7. Effort Indicator & Cache Warning Improvements
+
+**Fixed:** The spinner, OpenTelemetry `effort` values and transcripts naming a newly picked effort level during a task before the model applied it; they now show the level in force.
+
+**Fixed:** The `/model` and `/effort` cache warning saying the re-read waits for your next message; a change made while Claude is working can trigger it sooner.
+
+**What this means:** The UI now accurately reflects what's happening. No more misleading effort levels or confusing cache warnings.
+
+---
+
+### 8. Remote Control & Cloud Sessions — Major Fixes
+
+| Fixed | Impact |
+|-------|--------|
+| Remote Control sessions stuck on "Connecting" for ~2 min behind proxy | Starts fast behind corporate networks |
+| Messages sent over Remote Control appearing as *your* message in mobile apps | Attribution is correct now |
+| Cloud environment creation errors showing only as toasts outside dialogs | Errors appear inside the dialog now |
+| Resending unchanged message after failed send running it twice | No more duplicate executions |
+
+---
+
+### 9. VS Code Extension Fixes
+
+- Fixed sessions ending on a bare exit code when your organization's settings couldn't be loaded or were refused at startup; the tab now says why and offers Retry or Sign in again
+- Fixed a mod's drawings disappearing from a long-open panel until the next turn on machines that also run an older Claude Code
+- Fixed Past conversations hiding sessions when `claudeCode.claudeProcessWrapper` is set
+- Changed background sub-agents to show correct status
+
+---
+
+### 10. Model & Provider Improvements
+
+- Changed Bedrock, Vertex, Foundry and Mantle to use the shorter system prompt for model names Claude Code doesn't recognize (custom deployment names, inference profile ARNs), even when they front Sonnet or Haiku
+- Changed automatic model switches after a flagged message to also cover model names Claude Code doesn't recognize
+- Changed usage limit messages to call the 5-hour window the "5-hour limit" instead of the "session limit"
+- Changed cloud sessions started from the CLI to get their names and branch names from the server
+
+---
+
+### 11. Hook & Prompt Improvements
+
+- Changed prompt and agent hooks to run at most 24 at a time per session (sub-agents included), plus at most 12 that have waited longer than their event's timeout
+- A `timeout` under 1 second now counts as 1 second
+- Changed a subagent's `autoCompactWindow` to lower the window set by `CLAUDE_CODE_AUTO_COMPACT_WINDOW`, where it had no effect before
+- Improved the prompt's effort indicator: a change made mid-task now says it may wait for your next message, and the note clears when it no longer applies
+
+---
+
+### 12. WebFetch & Cloud Session UX
+
+- Improved WebFetch errors in cloud sessions: a host that does not resolve is now explained as possibly outside the allowed network domains, so Claude names the host to allow
+- Added a Bash editor with colors, line numbers and a Copy button to the setup script box in cloud environment settings
+- Improved the step shown when Claude adds a repository to a cloud session: opening it now shows a short table of what happened instead of raw JSON
+
+---
+
+### 13. Small But Satisfying Fixes
+
+- Added `oidc.user_id_claim` to the Claude apps gateway, to identify people by an id_token claim other than `sub` (e.g., Microsoft Entra ID's `oid`)
+- Added click to send: in fullscreen, clicking the "to send now" hint under a queued message sends it right away, as its key does
+- Fixed managed settings and organization policy not being fetched for the rest of the session after signing in from the VS Code extension
+- Fixed per-directory and `paths:` skills not being found after a Bash `cd` deeper into a git repository
+- Fixed a rare case where the first reply after resuming a session in the terminal could be missing the next time the session was resumed
+- Fixed a command with an invalid name stopping all commands from loading, which could leave `claude -p` with no output
+- Fixed vim mode `d`, `c` and `y` with a `gj` or `gk` count larger than the lines left deleting or copying text; like Vim, they now only move the cursor
+- Fixed `/verify` showing a long description meant for Claude in `/help` and the `/` command menu instead of a short one
+
+---
+
+## Should You Update?
+
+**Yes.** Run `claude update` — this is a pure patch release with no breaking changes, no config migrations, and 80+ fixes that target the exact friction points you hit daily.
+
+If you updated to v2.1.311 yesterday, v2.1.312 is the polish coat that release needed. If you skipped v2.1.311, you get both releases' fixes in one go.
+
+---
+
+## Installation
+
+```bash
+claude update
+# or fresh install
+curl -fsSL https://claude.ai/install.sh | bash
+```
+
+---
+
+## The Bottom Line
+
+Two releases in two days (v2.1.311 Oct 26, v2.1.312 Oct 27) — 160+ fixes total. Anthropic is clearly in "stability sprint" mode. The daily paper cuts that made you hesitate before hitting Enter — Write stalls, MCP hangs, subagent ghosts, CLAUDE.md freezes — are gone.
+
+This is what a mature tool feels like. Update and keep coding.
+
+---
+
+*Claude Code v2.1.312 released October 27, 2026. Full changelog: [github.com/anthropics/claude-code/releases/tag/v2.1.312](https://github.com/anthropics/claude-code/releases/tag/v2.1.312)*
+
+## Related articles
+
+- [Claude Code v2.1.311 Just Killed 80+ Daily Paper Cuts](/blog/claude-code-v2-1-311-stability-surge/)
+- [Claude Code v2.1.296 — Stability Release You've Been Waiting For](/blog/claude-code-v2-1-295-stability-release-youve-been-waiting-for/)
+- [Claude Code v2.1.280 — Opus 5.5 Default, Massive Fix Wave](/blog/claude-code-v2-1-280-opus-5-5-default-massive-fix-wave/)
