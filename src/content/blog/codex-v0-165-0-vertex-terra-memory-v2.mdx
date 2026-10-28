@@ -1,0 +1,215 @@
+---
+title: "Codex Just Got Vertex AI, GPT-6.1 Terra, and Memory v2 by Default — v0.165.0 Is a Leap Forward"
+description: "Codex v0.165.0 stable (Oct 27) adds built-in Google Cloud Vertex AI provider, GPT-6.1 Terra model, reasoning effort changes mid-conversation, Memory v2 enabled by default for new profiles, repository filtering in session picker, and experimental thread forks."
+pubDate: 2026-10-28T14:00:00Z
+tags: ["codex", "release", "v0.165.0", "vertex-ai", "gpt-6.1-terra", "memory-v2", "reasoning", "coding-agent", "beginner", "open-source"]
+tool: "codex"
+author: "sage"
+image: "/api/og?title=Codex+v0.165.0+Vertex+AI+Terra+Memory&tool=codex"
+canonical: "https://terminalblog.com/blog/codex-v0-165-0-vertex-terra-memory-v2/"
+---
+
+**Codex v0.165.0 dropped October 27** — just four days after v0.164.0's presets and image preview. This isn't a polish release. It adds **Vertex AI as a first-class provider**, **GPT-6.1 Terra** to the model catalog, **reasoning effort you can change mid-chat**, and **Memory v2 by default for every new user**.
+
+If v0.164.0 gave you muscle memory, v0.165.0 gives you *infrastructure*.
+
+---
+
+## The Headline Features (Ranked by Long-Term Impact)
+
+### 1. Built-in Google Cloud Vertex AI Provider — `model_provider = "gcp"`
+
+**What it is:** A native Vertex AI provider configured with a single setting. No proxy, no wrapper, no custom integration.
+
+```json
+{
+  "model_provider": "gcp"
+}
+```
+
+**Why it matters:** Enterprises on GCP can now use Codex with their existing Vertex AI quotas, VPC-SC perimeters, and IAM policies. No data leaves your Google Cloud project. This is the "it just works" moment for GCP shops.
+
+**For beginners:** If your company uses Google Cloud, you no longer need to route requests through OpenAI's API. Codex talks to Vertex directly.
+
+---
+
+### 2. GPT-6.1 Terra Added to Model Catalogs
+
+**What it is:** OpenAI's newest flagship reasoning model (Terra) is now available in Codex's model picker.
+
+**Why it matters:** Terra is optimized for complex multi-step reasoning, code generation, and agentic tasks. It's the model you want when the problem is "figure out this legacy codebase and refactor it" not "write a quick function."
+
+**For beginners:** When you hit a hard problem, switch to Terra. It thinks longer but gets further.
+
+---
+
+### 3. Reasoning Effort Changes Mid-Conversation — Enabled by Default
+
+**What it is:** You can now change reasoning effort (`effort=high|medium|low`) *during* a conversation for supported models. No restart, no context loss.
+
+```bash
+# In Codex:
+/model effort=high
+# Continue your task — the model now thinks harder
+```
+
+**Why it matters:** Start fast (`effort=low`) for exploration. Dial up (`effort=high`) when you hit the hard part. The model adapts to the phase you're in.
+
+**For beginners:** This is a slider for "how hard should the model think right now." Use it liberally.
+
+---
+
+### 4. Memory v2 Enabled by Default for Fresh Profiles
+
+**What it is:** New Codex profiles get Memory v2 automatically — persistent, cross-session memory that actually works. Plus: import memories from other agents (Claude Code, Cursor, etc.).
+
+**Why it matters:** Memory v1 was "notes the model might read." Memory v2 is "context the model *uses*." It structures memories, versions them, and retrieves relevant ones automatically.
+
+**For beginners:** First run of Codex on a new machine? You get the good memory system out of the box. Switching from another agent? Bring your context with you.
+
+---
+
+### 5. Repository Filter + Directory Grouping in Session Picker
+
+**What it is:** The session picker now lets you filter by repository and groups sessions by directory. Essential when you have dozens of worktrees across multiple repos.
+
+**Why it matters:** Worktrees (added in v0.162.0) multiply your sessions. This makes them navigable.
+
+---
+
+### 6. Experimental Attached Thread Forks (App-Server API)
+
+**What it is:** Fork a running thread at any point, explore an alternative path, then merge or discard. Think `git branch` but for agent conversations.
+
+**Why it matters:** "What if I tried this approach instead?" — now you can find out without losing your main thread.
+
+---
+
+## Bug Fixes That Change Daily Life
+
+| Fix | Why You Care |
+|-----|--------------|
+| Fresh TUI sessions honor server's default approval reviewer | No more surprise permission prompts on new sessions |
+| TUI preferences stay editable when execution settings invalid | Config UI doesn't lock up on bad settings |
+| Cancelled remote MCP tool requests when local futures dropped | No more orphaned MCP calls eating quota |
+| Queued agent messages don't restart after interrupt/Plan mode | Interrupt actually means *stop* |
+| Provider "model not found" errors preserved (no retry loop) | You see the real error, not a timeout |
+| Marketplace URL validation gap closed | Supply-chain hardening for plugin installs |
+| Cache decrypted Codex auth and managed secrets | Faster startup, fewer auth prompts |
+| MCP auth status checks don't block on account refresh | Background auth stays background |
+
+---
+
+## Version Context — The October Velocity
+
+| Version | Date | Channel | Highlights |
+|---------|------|---------|------------|
+| **v0.165.0** | Oct 27, 2026 | **Stable (Latest)** | Vertex AI provider, GPT-6.1 Terra, reasoning effort mid-chat, Memory v2 default, repo filter, thread forks |
+| v0.164.0 | Oct 23, 2026 | Stable | `/presets`, inline `/model` `/permissions`, image preview, enterprise MCP auth, credential masking |
+| v0.163.0 | Oct 15, 2026 | Stable | `/config` UI, instant interrupt + steer, leader key, daemon restart, parallel read tools, Daybreak default |
+| v0.162.0 | Oct 8, 2026 | Stable | Worktrees, pinned tasks, clickable URLs, transcript copy, web access for custom providers |
+
+**Four stable releases in three weeks.** Each adds a layer: worktrees → control UI → muscle memory → infrastructure. This is compounding.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Run on GCP / use Vertex AI | **Yes** — native provider is a game-changer |
+| Need stronger reasoning for hard tasks | **Yes** — GPT-6.1 Terra + effort control |
+| Want persistent memory that works | **Yes** — Memory v2 default is the fix |
+| Juggle multiple repos/worktrees | **Yes** — session picker finally scales |
+| On v0.164.0 and happy | **Optional** — but Vertex + Terra + Memory v2 are worth it |
+
+---
+
+## How to Update
+
+```bash
+# Stable (v0.165.0) — RECOMMENDED for daily use
+npm install -g @openai/codex@0.165.0
+
+# Or just "latest" on stable channel
+npm install -g @openai/codex@latest
+
+# Via installer (auto-updates to stable)
+# macOS/Linux
+curl -fsSL https://codex.openai.com/install | bash
+
+# Windows (scoop)
+scoop update codex
+
+# Verify
+codex --version
+# Should show 0.165.0
+```
+
+**First things to try after update:**
+
+```bash
+# 1. Try Vertex AI if you're on GCP
+# /config → Model Provider → Google Cloud Vertex AI
+
+# 2. Test GPT-6.1 Terra on a hard problem
+/model gpt-6.1-terra effort=high
+# "Refactor this authentication module to use JWT with refresh tokens"
+
+# 3. Change reasoning effort mid-task
+/model effort=low   # exploration
+/model effort=high  # the hard part
+
+# 4. Check Memory v2 (new profiles get it automatically)
+/memory
+# See structured, versioned, retrievable memories
+
+# 5. Test session picker with repo filter
+# Open session picker → type repo name → sessions grouped by directory
+```
+
+---
+
+## The Bottom Line
+
+**v0.164.0 gave you speed. v0.165.0 gives you *reach*.**
+
+- **Vertex AI** = enterprise GCP adoption unblocked
+- **GPT-6.1 Terra** = the best reasoning model, one click away
+- **Reasoning effort mid-chat** = adapt compute to the problem, not the session
+- **Memory v2 default** = context that compounds across every session
+- **Thread forks** = explore alternatives without commitment
+
+Together with worktrees, presets, image preview, and config UI, Codex v0.165.0 is a **complete development environment** that happens to run in your terminal. The open-source terminal agent just grew up.
+
+```bash
+codex upgrade
+# /config → Vertex AI → your GCP project
+# /model gpt-6.1-terra effort=high → when it matters
+# /memory → see context that persists
+```
+
+---
+
+## Related Articles
+
+- [Codex v0.164.0 — Presets, Inline Config, Image Preview](/blog/codex-v0-164-0-presets-config-images/)
+- [Codex v0.163.0 — Config UI, Instant Interrupt, Parallel Tools](/blog/codex-v0-163-0-config-parallel-interrupt/)
+- [Codex v0.162.0 — Worktrees, Pinned Tasks, Clickable URLs](/blog/codex-v0-162-0-worktrees-pinned-tasks-stable/)
+- [Codex vs Copilot CLI: Terminal Battle](/blog/codex-vs-copilot-cli-terminal-battle/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+- [Codex vs Cursor 2026: Terminal Agent Showdown](/blog/cursor-vs-codex-ide-speed-cloud-parallelism/)
+
+---
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
+
+*Codex is open-source (MIT) and available at [github.com/openai/codex](https://github.com/openai/codex). Published October 28, 2026 — covers Codex v0.165.0 stable released October 27, 2026. Full changelog: [github.com/openai/codex/releases](https://github.com/openai/codex/releases)*
