@@ -1,7 +1,8 @@
 ---
 title: "Qwen Code v0.26 Just Became a Full Multi-Agent Platform — Local, Remote, and Everything In Between"
-description: "Qwen Code v0.26.0 (October 21) transforms the CLI into a multi-agent platform: managed agent sessions with durable state, desktop app v0.26, local and SSH workspace references, session-targeted skill refresh, and a read-only --check preflight. The release that makes 'agent teams' real for everyday developers."
+description: "Qwen Code v0.26.3 (October 28) adds persistent workflow mode, generated UI cards that survive navigation, 1M-token context detection for qwen4/qwen-latest-series, XML tool call recovery, and ACP identity preservation. The patch series that makes the managed-agent platform production-ready."
 pubDate: 2026-10-24T10:00:00Z
+updatedDate: 2026-10-29T10:00:00Z
 tags: ["qwen-code", "release", "v0.26", "managed-agent", "desktop", "multi-agent", "workspace-agents", "coding-agents", "beginner"]
 tool: "qwen-code"
 author: "sage"
@@ -15,10 +16,10 @@ canonical: "https://terminalblog.com/blog/qwen-code-v0-26-managed-agent-desktop-
   "mainEntity": [
     {
       "@type": "Question",
-      "name": "What's new in Qwen Code v0.26.0?",
+      "name": "What's new in Qwen Code v0.26.3?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Qwen Code v0.26.0 adds managed agent sessions with durable state and failover, Desktop app v0.26, local and SSH workspace file references, session-targeted skill/extension refresh, a read-only --check preflight for deployment validation, systemd units for single-host managed-agent deployments, 8 MiB attachment support, and a models.dev catalog for zero-config model discovery."
+        "text": "Qwen Code v0.26.3 adds persistent workflow mode (--workflow-mode on), generated UI cards that survive navigation and split views, 1M-token context detection for qwen4/qwen-latest-series aliases, valid XML tool call recovery when parameters quote other markup, and ACP/daemon rewind identity preservation across retries and checkpoints. All v0.26.0 platform features (managed agents, desktop, SSH workspaces, --check preflight, systemd units) carry forward."
       }
     },
     {
@@ -39,21 +40,21 @@ canonical: "https://terminalblog.com/blog/qwen-code-v0-26-managed-agent-desktop-
     },
     {
       "@type": "Question",
-      "name": "Is Qwen Code v0.26.0 a breaking change?",
+      "name": "Is Qwen Code v0.26.3 a breaking change?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "No known breaking changes. The release notes explicitly state 'No known breaking changes.' All v0.25.x features (workspace agents, Mem0, A2A, managed-agent stack) carry forward and v0.26.0 adds the production infrastructure on top."
+        "text": "No known breaking changes. The release notes explicitly state 'No known breaking changes.' All v0.25.x features (workspace agents, Mem0, A2A, managed-agent stack) carry forward and v0.26.0+ adds the production infrastructure on top."
       }
     }
   ]
 })} />
 ---
 
-**Qwen Code v0.26.0 dropped October 21, 2026** — and it's the release that takes the managed-agent stack from "impressive demo" to **"I can run this in production on my own server."**
+**Qwen Code v0.26.3 dropped October 28, 2026** — and the patch series (v0.26.1 through v0.26.3) takes the managed-agent platform from "operable" to **production-hardened**.
 
-If v0.25.0 gave you **workspace agents, Mem0, and A2A** (the multi-agent platform), v0.26.0 gives you **the infrastructure to actually operate it**: durable managed sessions that survive restarts, a desktop app, SSH workspace access, deployment preflight checks, and systemd units for self-hosting.
+If v0.26.0 gave you **durable managed sessions, desktop app, SSH workspaces, and --check preflight**, v0.26.1–3 give you **persistent workflow mode, generated UI cards that actually persist, 1M-token context auto-detection, XML tool call recovery, and ACP identity preservation across failures**.
 
-For a beginner: this is the first time an open-source terminal agent lets you run **persistent, multi-agent workflows on your own hardware** with the same reliability guarantees as cloud platforms.
+For a beginner: this is now an open-source terminal agent that runs **persistent, multi-agent workflows on your own hardware** with the same reliability guarantees as cloud platforms — and the patch series proves the team ships fixes fast.
 
 ---
 
@@ -176,8 +177,11 @@ qwen-code --managed --check
 
 ## Quick Version Context
 
-| Version | Date | Type | Focus |
+|| Version | Date | Type | Focus ||
 |---------|------|------|-------|
+| **v0.26.3** | **Oct 28, 2026** | **Stable Patch** | **Persistent workflow mode, generated UI card persistence, 1M context detection, XML tool call recovery, ACP identity preservation** |
+| **v0.26.2** | Oct 27, 2026 | Stable Patch | Cloud sessions Gemini/Argon model refresh, managed agent crash fixes, MCP crash recovery |
+| **v0.26.1** | Oct 24, 2026 | Stable Patch | Release publishing checkout fixes, CI retry pinning, daemon approvalMode fix |
 | **v0.26.0** | **Oct 21, 2026** | **Stable** | **Managed agent platform: durable sessions, failover, desktop, local/SSH workspaces, --check preflight, systemd units, 8 MiB attachments, models.dev catalog** |
 | v0.25.2 | Oct 12 | Preview/Stable | Managed-agent plan approval, FG8 fault gates, web-shell mobile composer |
 | v0.25.1-nightly | Oct 11 | Nightly | Managed-agent journal fixes, FG8 monitor gates |
@@ -185,7 +189,38 @@ qwen-code --managed --check
 | v0.24.7 | Sep 29 | Patch | Daemon settings isolation, Enter key fix, cross-dir permissions, broker hardening |
 | v0.24.6 | Sep 26 | Feature | Managed runtime, durable sessions, failover, advisor tool, Java SDK, 60% faster startup |
 
-**v0.24.6 built the infrastructure. v0.24.7 hardened it. v0.25.0 made it a platform. v0.26.0 makes it operable.**
+**v0.24.6 built the infrastructure. v0.24.7 hardened it. v0.25.0 made it a platform. v0.26.0 makes it operable. v0.26.1–3 harden it for production.**
+
+---
+
+## The Patch Series: v0.26.1 → v0.26.2 → v0.26.3 (Oct 24–28)
+
+Three patches in five days — the team is moving fast to harden the platform for production use.
+
+### v0.26.3 (Oct 28) — Workflow Mode, UI Persistence, 1M Context, XML Recovery
+
+| Feature | PR | What It Means |
+|---------|-----|---------------|
+| **Persistent session Workflow mode** | [#15422](https://github.com/QwenLM/qwen-code/pull/15422), [#15743](https://github.com/QwenLM/qwen-code/pull/15743) | Enable with `--workflow-mode on` or `/workflows mode on` — workflow switches now reach the CLI sandbox |
+| **Generated UI cards survive navigation/split views** | [#15611](https://github.com/QwenLM/qwen-code/pull/15611), [#15787](https://github.com/QwenLM/qwen-code/pull/15787), [#15720](https://github.com/QwenLM/qwen-code/pull/15720), [#15790](https://github.com/QwenLM/qwen-code/pull/15790) | Cards keep inputs, state, live views across history navigation, session switching, split views |
+| **Tool results shrink before auto-compaction** | [#13599](https://github.com/QwenLM/qwen-code/pull/13599), [#15758](https://github.com/QwenLM/qwen-code/pull/15758), [#15762](https://github.com/QwenLM/qwen-code/pull/15762) | Respects explicit truncation, protected content; qwen4/qwen-latest-series aliases detected as 1M context |
+| **Valid XML tool calls recovered** | [#13579](https://github.com/QwenLM/qwen-code/pull/13579) | Parameters quoting other call markup no longer break — malformed blocks isolated, quoted examples not dispatched |
+| **ACP/daemon rewind identity preserved** | [#15441](https://github.com/QwenLM/qwen-code/pull/15441), [#15657](https://github.com/QwenLM/qwen-code/pull/15657) | Subagent identity consistent across retries, cancellations, checkpoints, recordings, notifications |
+| **`/autofix-pr` stops on unpushed commits** | [#15736](https://github.com/QwenLM/qwen-code/pull/15736) | Prevents watch from overwriting unseen work |
+
+**For beginners:** Workflow mode means you can run *persistent, multi-step agent workflows* that survive restarts. The UI cards fix means your generated dashboards/charts don't disappear when you switch tabs. The 1M context detection means the new Qwen models "just work" without config.
+
+### v0.26.2 (Oct 27) — Cloud Sessions, Crash Fixes
+
+- Cloud sessions get Gemini 4 Argon model refresh
+- Managed agent crash fixes (MCP crash recovery)
+- Daemon approvalMode honored even without webhooks ([#15754](https://github.com/QwenLM/qwen-code/pull/15754))
+
+### v0.26.1 (Oct 24) — Release Infrastructure, CI Hardening
+
+- Release publishing checkout failures fixed (run-scoped GitHub token for checkout) ([#15728](https://github.com/QwenLM/qwen-code/pull/15728))
+- CI retries pinned to head SHA ([#15734](https://github.com/QwenLM/qwen-code/pull/15734))
+- Desktop release prep resets Git metadata on self-hosted runners ([#15761](https://github.com/QwenLM/qwen-code/pull/15761))
 
 ---
 
@@ -212,13 +247,13 @@ npm i -g @qwen-code/qwen-code@latest
 
 # Verify
 qwen-code --version
-# Should show 0.26.0
+# Should show 0.26.3
 
 # Desktop app (separate channel)
 # Download from https://github.com/QwenLM/qwen-code/releases/tag/desktop-v0.26.0
 
 # For self-hosted managed agents:
-# 1. Check https://github.com/QwenLM/qwen-code/releases/tag/v0.26.0 for systemd units
+# 1. Check https://github.com/QwenLM/qwen-code/releases/tag/v0.26.3 for systemd units
 # 2. Run: qwen-code --managed --check  (validates your setup)
 # 3. Follow setup guidance in release notes for single-host deployment
 ```
@@ -229,6 +264,8 @@ qwen-code --version
 3. Skills → search "Mem0" → it's bundled, just enable it
 4. Try `--check`: `qwen-code --managed --check` → see your deployment readiness
 5. Desktop: launch the app → sign in → same workspaces, same agents
+6. **New in v0.26.3:** Try `qwen-code --workflow-mode on` → run a persistent multi-step workflow
+7. **New in v0.26.3:** Generate a UI card → switch tabs → come back → card is still there with state
 
 ---
 
@@ -266,6 +303,6 @@ The question isn't "which agent should I use?" It's **"why would I pay for a clo
 
 ---
 
-*Qwen Code is open-source (Apache-2.0) and available at [github.com/QwenLM/qwen-code](https://github.com/QwenLM/qwen-code). Full changelog: [v0.26.0 release notes](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.0) and [desktop-v0.26.0](https://github.com/QwenLM/qwen-code/releases/tag/desktop-v0.26.0). Published October 24, 2026.*
+*Qwen Code is open-source (Apache-2.0) and available at [github.com/QwenLM/qwen-code](https://github.com/QwenLM/qwen-code). Full changelog: [v0.26.3 release notes](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.3), [v0.26.2](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.2), [v0.26.1](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.1), [v0.26.0](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.0) and [desktop-v0.26.0](https://github.com/QwenLM/qwen-code/releases/tag/desktop-v0.26.0). Updated October 29, 2026 — covers Qwen Code v0.26.3 released October 28, 2026.*
 
 *Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
