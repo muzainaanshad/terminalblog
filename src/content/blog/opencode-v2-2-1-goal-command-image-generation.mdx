@@ -1,0 +1,169 @@
+---
+title: "OpenCode v2.2.1 Just Added a /goal Command That Keeps Your Agent Working Until the Job Is Done"
+description: "OpenCode v2.2.1 (released 6 hours ago) introduces /goal for autonomous task completion, opt-in image generation, scheduled prompts, and a redesigned model picker. The patch release that feels like a minor version bump."
+pubDate: 2026-10-29
+updatedDate: 2026-10-29
+author: "Anshad"
+category: "releases"
+tags: ["opencode", "release", "v2.2.1", "goal", "image-generation", "desktop", "coding-agent", "beginner"]
+tool: "opencode"
+heroAlt: "OpenCode v2.2.1 release - goal command and image generation"
+---
+
+OpenCode **v2.2.1 dropped 6 hours ago** (October 28, 2026). It's technically a patch release, but the feature list reads like a minor version bump: **`/goal` command for autonomous task completion**, **opt-in image generation**, **scheduled prompts**, and a **completely redesigned model picker** in the desktop app.
+
+If you updated to v2.2.0 two days ago, you'll want this one. If you skipped v2.2.0 entirely, you get both releases' features in one go — including the breaking changes from v2.2.0 (read those first).
+
+---
+
+## The Headline: `/goal` Changes How You Delegate Work
+
+**New:** Run `/goal <objective>` in the TUI or Desktop and the session **continues until a reviewer confirms the objective is met**. Control it with `/goal pause`, `/goal resume`, or `/goal clear`.
+
+```bash
+# In OpenCode TUI or Desktop
+/goal "Add user authentication with JWT to this Express API"
+# Agent plans, implements, tests — keeps going until done
+/goal pause    # Step away, come back later
+/goal resume   # Pick up where it left off
+/goal clear    # Stop the goal, keep the work
+```
+
+**What this means:** You stop babysitting. Describe the outcome. OpenCode handles the agent choreography — planning, delegating to subagents, iterating until the reviewer (you or an automated check) says "done."
+
+For beginners: **This is multi-agent orchestration without writing YAML.** You describe the outcome; OpenCode handles the rest.
+
+---
+
+## Image Generation — Agents That Can See and Create
+
+**New:** Enable `experimental.image_generate` to let agents create or edit images with the new `image_generate` tool. Set a default model with `experimental.image_generate.model`.
+
+```json
+// ~/.config/opencode/config.json
+{
+  "experimental": {
+    "image_generate": true,
+    "image_generate": { "model": "gpt-image-2" }
+  }
+}
+```
+
+**Supported providers:** GPT Image 2 (via Codex sign-in), MiniMax, Meta Muse (via OpenRouter/Google/Vercel Grok).
+
+**What this means:** Your agent can now generate diagrams, UI mockups, charts, or edit screenshots mid-task. Ask it to "create a sequence diagram for this auth flow" and it returns an image, not ASCII art.
+
+---
+
+## Scheduled Prompts — Set It and Forget It
+
+**New:** Opt-in scheduled prompts through `/schedule`, agent tools, and `experimental.schedules`.
+
+```bash
+# Schedule a daily code review at 2 AM
+/schedule daily 02:00 "Review yesterday's commits for security issues"
+# Or via agent tools for programmatic scheduling
+```
+
+**What this means:** Background automation without cron. Your agent can run security scans, dependency updates, or refactors on a schedule — while you sleep.
+
+---
+
+## Redesigned Model Picker (Desktop Default)
+
+**New:** The model picker in Desktop is now **searchable with dedicated Favorites and Recent sections**, keyboard-accessible provider controls, and shows OpenCode free models by default.
+
+- Search across favorites, recent models, providers, and variants
+- Dedicated Favorites and Recent sections
+- Keyboard-accessible provider controls
+- OpenCode free models always included
+
+**What this means:** No more scrolling through hundreds of models. Type "opus" → see Opus variants. Type "free" → see zero-cost options. Muscle memory builds fast.
+
+---
+
+## Other Notable Improvements
+
+| Feature | Impact |
+|---------|--------|
+| **Responses API for OpenRouter, DigitalOcean, Venice** | Freeform tools support on more providers |
+| **Improved snapshot performance** | Coalesced captures, less ignore-file work |
+| **`/reload` command (Desktop)** | Reload config without restarting |
+| **Live background shell output** | Click activity pill → see live output + Stop button |
+| **Project/worktree actions in session menu** | Open in app, terminal, manage worktrees from UI |
+| **GPT-6.1 Terra & Terra Fast added** | More free model options via ChatGPT sign-in |
+
+---
+
+## Breaking Changes from v2.2.0 (If You Skipped It)
+
+If you're updating from v2.1.x or v1.x, read these **before** updating:
+
+### 1. `@opencode/ai` Root Export Changed (v2.2.0)
+```bash
+# Old (broken)
+import { AI } from "@opencode/ai/promise"
+import { LLM } from "@opencode/ai"
+
+# New (required)
+import { AI } from "@opencode/ai"
+import { LLM } from "@opencode/ai/effect"
+```
+
+### 2. GitHub Action Removed (v2.2.0)
+The OpenCode GitHub Action is **no longer published**. Remove it from workflows.
+
+### 3. TUI Plugins Require OpenTUI 0.7 (v2.2.0)
+Hook system changed: assign `renderBefore`, `renderAfter`, `onLifecyclePass` in constructor, call `refreshHooks()`, replace `defineNativeIntegration()` with `static nativeIntegration`.
+
+### 4. Provider Removals & Renames (v2.2.1)
+- **Removed:** fal, Black Forest Labs, Replicate, Stability providers
+- **Renamed:** `amazon-bedrock-mantle` → `amazon-bedrock/mantle`, `google-vertex-*` → `google-vertex/*`
+- **Config types:** Each provider's `configure()` input type is now named `Config` (e.g., `Groq.LanguageModelOptions` → `Groq.Config`)
+
+---
+
+## Should You Update?
+
+| Your Situation | Recommendation |
+|----------------|----------------|
+| **On v2.2.0** | **Yes** — `/goal`, image gen, schedules, better model picker are worth it |
+| **On v2.1.x, use SDK/`@opencode/ai`** | **Plan migration time** — import changes are mechanical but widespread |
+| **On v2.1.x, use GitHub Action** | **Remove action first**, then update |
+| **On v2.1.x, use TUI plugins** | **Budget time** for OpenTUI 0.7 migration |
+| **On v1.x** | **Read v2.2.0 migration guide first** — major breaking changes |
+| **CLI/Desktop only, no plugins** | **Safe to update** — desktop improvements alone are worth it |
+
+---
+
+## Installation
+
+```bash
+# CLI
+curl -fsSL https://opencode.ai/install | bash
+
+# Desktop (Windows NSIS installer now available)
+# Download from https://opencode.ai/download
+```
+
+---
+
+## The Bottom Line
+
+OpenCode v2.2.1 is a **patch release that ships minor-version features**. The `/goal` command alone changes the mental model from "supervise every step" to "delegate outcomes." Image generation and scheduled prompts extend that autonomy into visual work and background automation.
+
+If you're on v2.2.0: update immediately — these features compound.
+If you're on v2.1.x: read the v2.2.0 breaking changes, then update.
+If you're on v1.x: this is a major migration. Test in a side project first.
+
+The open-source coding agent just got closer to "set a goal, walk away, come back to done."
+
+---
+
+*OpenCode v2.2.1 released October 28, 2026. Full changelog: [github.com/anomalyco/opencode/releases/tag/v2.2.1](https://github.com/anomalyco/opencode/releases/tag/v2.2.1)*
+
+## Related articles
+
+- [Opencode v2.2 Just Dropped — Desktop Plugins, Refreshed App, and Breaking Changes You Can't Ignore](/blog/opencode-v2-2-desktop-plugins-breaking-changes/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
