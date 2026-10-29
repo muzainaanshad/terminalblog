@@ -1,0 +1,161 @@
+---
+title: "KiloCode v7.8.25 Quietly Preserves Your Package Manager User-Agent — The Tiny Fix That Matters"
+description: "KiloCode v7.8.25 (pre-release, Oct 28) preserves the existing package-manager user-agent when reading npm configuration. A small but critical fix for corporate environments and registry analytics."
+pubDate: 2026-10-29T14:30:00Z
+tags: ["kilocode", "release", "v7.8.25", "pre-release", "npm", "user-agent", "coding-agent", "beginner"]
+tool: "kilocode"
+author: "Anshad"
+image: "/api/og?title=KiloCode+v7.8.25+User-Agent&tool=kilocode"
+canonical: "https://terminalblog.com/blog/kilocode-v7-8-25-user-agent-preserved/"
+---
+
+**KiloCode v7.8.25 (pre-release) dropped October 28, 2026** — and it ships exactly one user-facing change: **preserving the existing package-manager user-agent when reading npm configuration** ([#15274](https://github.com/Kilo-Org/kilocode/pull/15274)).
+
+That's it. One PR. One fix. But if you work in a corporate environment with registry analytics, audit logs, or custom npm proxies — this fix matters.
+
+---
+
+## The Fix: npm User-Agent Preservation
+
+**What it was:** KiloCode's CLI was overriding the npm user-agent with its own when reading npm configuration, stripping away the original package manager's identity (npm, pnpm, yarn, bun).
+
+**What it is now:** The existing package-manager user-agent is **preserved** when KiloCode reads npm config. Your registry sees `npm/10.x.x` or `pnpm/9.x.x` or `yarn/4.x.x` — not `kilocode/7.8.25`.
+
+**Why it matters:**
+- **Corporate registries** (Artifactory, Nexus, Verdaccio) often log/route by user-agent
+- **Analytics & audit trails** expect the real package manager identity
+- **Custom proxies** may allow/deny based on user-agent patterns
+- **Rate limiting** on some registries is per-user-agent
+
+**For beginners:** You likely won't notice this change — and that's the point. It "just works" with your existing npm/pnpm/yarn/bun setup. No config, no flags, no behavior change except the right identity reaching your registry.
+
+---
+
+## Quick Version Context (v7.8.x Pre-Release Wave)
+
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| **v7.8.25** | **Oct 28, 2026** | **Pre-release** | **Preserve package-manager user-agent in npm config reads** |
+| v7.8.23 | Oct 28, 2026 | Pre-release | Exit code preservation for background jobs, large-session compaction space, multi-process scheduled task dedup |
+| v7.8.22 | Oct 28, 2026 | Pre-release | No notable changes |
+| v7.8.21 | Oct 28, 2026 | Pre-release | Hosted workspace ops, Cloud system feed, short-lived control tokens |
+| **v7.8.20** | Oct 22, 2026 | **Release** | Auto-compaction fix, Conda CLI package |
+| v7.8.18 | Oct 16, 2026 | Release | Agent Manager browser prompt fix |
+| v7.8.17 | Oct 15, 2026 | Release | Security patch: browser MCP fixes |
+
+---
+
+## The v7.8.x Pre-Release Cadence: What's Happening?
+
+KiloCode has been shipping **daily pre-releases** since late October. This isn't chaos — it's **rapid hardening** of the v7.8 line before the next stable.
+
+| Date | Pre-Release | Focus |
+|------|-------------|-------|
+| Oct 28 | v7.8.25 | npm user-agent preservation |
+| Oct 28 | v7.8.23 | Background job exit codes, compaction headroom, cron dedup |
+| Oct 28 | v7.8.22 | (No notable changes) |
+| Oct 28 | v7.8.21 | Hosted workspace ops, Cloud feed, credential rotation |
+| Oct 25 | v7.8.20 | **Stable** — auto-compaction, Conda CLI |
+| Oct 24 | v7.8.17 | **Stable** — security patch (browser MCP) |
+
+The pattern: **security/stability fixes land in pre-release first, graduate to stable within days**. If you track pre-releases, you get fixes early. If you wait for stable, you get tested fixes.
+
+---
+
+## What v7.8.20 (Last Stable) Brought — Context for v7.8.25
+
+Since v7.8.25 is a pre-release, most users are on **v7.8.20** (Oct 22 stable). Here's what you're getting if you upgrade:
+
+### 1. Auto-Compaction Fix — Large Sessions Don't Choke
+
+**Fixed:** Large-session compaction now gets **enough output space for thinking and a complete summary** ([#14976](https://github.com/Kilo-Org/kilocode/pull/14976)). Cut-off summaries are rejected without losing conversation history, with retry guidance.
+
+**Before:** Long sessions would hit compaction, produce truncated summaries, lose context.
+
+**Now:** Compaction has breathing room. If it can't fit, it tells you how to retry — no silent data loss.
+
+### 2. Multi-Process Safety — No More Ghost Replies
+
+**Fixed:** When multiple Kilo processes share a data directory, **replies being written by another process are kept** instead of deleted ([#15515](https://github.com/Kilo-Org/kilocode/pull/15515)).
+
+**Fixed:** **Scheduled wakeups and cron tasks fire once** across processes sharing a workspace ([#15516](https://github.com/Kilo-Org/kilocode/pull/15516)). Cancelled tasks stay cancelled.
+
+**Why it matters:** Team environments, CI runners, desktop + CLI simultaneously — no more duplicate executions or lost messages.
+
+### 3. Background Job Exit Codes — Real Signals
+
+**Fixed:** Background jobs now **preserve the real exit code or signal** instead of recording failed jobs as successful ([#15081](https://github.com/Kilo-Org/kilocode/pull/15081)).
+
+**For automation:** Your CI/CD can now trust Kilo's background job status. `exit 1` means failed. `exit 0` means success. No more false greens.
+
+### 4. Conda CLI Package — Python Environment Management
+
+**Added:** **Conda CLI package** for managing Python environments from within KiloCode ([#15274](https://github.com/Kilo-Org/kilocode/pull/15274) related work).
+
+**For data science / ML workflows:** Create, activate, manage conda environments without leaving the agent.
+
+---
+
+## Should You Update to v7.8.25 (Pre-Release)?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Work behind corporate npm registry/proxy** | **Yes** — user-agent preservation fixes audit/analytics/routing |
+| **Run multiple Kilo processes (desktop + CLI, team shared workspace)** | **Wait for stable** — v7.8.23 multi-process fixes are in pre-release |
+| **Use background jobs in CI/CD** | **Wait for stable** — v7.8.23 exit code fix is in pre-release |
+| **Hit auto-compaction truncation on large sessions** | **Wait for stable** — v7.8.20 compaction fix is already stable |
+| **Are on v7.8.20 stable and happy** | **No rush** — v7.8.25 is a single config-read fix |
+
+**Recommendation:** Stay on **v7.8.20 stable** unless you specifically need the user-agent fix. The pre-release wave (v7.8.21–25) is hardening multi-process safety and compaction — those will land in the next stable (likely v7.8.26 or v7.8.27).
+
+---
+
+## How to Update
+
+```bash
+# Stable (recommended for most users)
+npm i -g @kilocode/kilocode@latest
+# Verify: kilocode --version → should show 7.8.20
+
+# Pre-release (if you need the user-agent fix NOW)
+npm i -g @kilocode/kilocode@next
+# Verify: kilocode --version → should show 7.8.25
+
+# VS Code Extension: updates via marketplace (tracks stable)
+# JetBrains Plugin: updates via marketplace (tracks stable)
+```
+
+---
+
+## The Bigger Picture: KiloCode's Stability-First Cadence
+
+KiloCode's release rhythm is distinct from other agents:
+
+- **Pre-releases daily** during hardening windows — real fixes, real testing
+- **Stable every 3–7 days** — pre-release graduates after validation
+- **No "v2 coming soon" rewrites** — steady compounding on v7.x
+- **JetBrains + VS Code + CLI in sync** — same version, same features
+
+This means: **what you test in pre-release today becomes stable this week.** The v7.8.21–25 pre-releases are baking multi-process safety, compaction headroom, and hosted workspace ops into the next stable.
+
+For a beginner: **install stable, forget it.** The auto-updater handles the rest. For a team: **track pre-release notes** — the fixes you need (exit codes, compaction, multi-process) are already written, just waiting for the stable gate.
+
+---
+
+## Related Articles
+
+- [KiloCode October 2026 Wave — v7.8.15 through v7.8.20](/blog/kilocode-october-2026-wave/)
+- [KiloCode v7.8.20 Auto-Compaction Fix, Conda CLI Package](/blog/kilocode-v7-8-20-auto-compaction-fix-conda-cli/)
+- [KiloCode v7.8.17 Security Patch — Browser MCP Fixes](/blog/kilocode-v7-8-17-security-patch-browser-mcp-fixes/)
+- [KiloCode v7.8.10 Search Ignored Paths, Grep Fix, MCP Windows](/blog/kilocode-v7-8-10-search-ignored-paths-grep-fix-mcp-windows/)
+- [KiloCode v7.8.7 Agent Manager Default](/blog/kilo-code-v7-8-7-agent-manager-default/)
+- [KiloCode Desktop Launch — One App, 500+ Models](/blog/kilocode-desktop-launch-one-app-500-models/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Kilo Code vs Copilot CLI](/blog/kilo-vs-copilot-cli/)
+- [Kilo Code vs Codex](/blog/kilo-vs-codex/)
+
+---
+
+*KiloCode is open-source (MIT) and available at [github.com/Kilo-Org/kilocode](https://github.com/Kilo-Org/kilocode). Full changelog: [github.com/Kilo-Org/kilocode/releases/tag/v7.8.25](https://github.com/Kilo-Org/kilocode/releases/tag/v7.8.25). Published October 29, 2026 — covers KiloCode v7.8.25 pre-release released October 28, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*

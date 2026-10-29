@@ -1,0 +1,197 @@
+---
+title: "Goose v1.57 Just Made Thinking Automatic, Added HTTPS Allowlist Security, and Fixed Windows Build"
+description: "Goose v1.57.0 (Oct 28) adds automatic thinking level for models, HTTPS allowlist with redirect validation, caller-supplied session IDs, Linux window icons, OpenRouter variant suffix resolution, and fixes desktop fork duplication. The patch that hardens security and polishes UX."
+pubDate: 2026-10-29T14:00:00Z
+tags: ["goose", "release", "v1.57.0", "automatic-thinking", "security", "windows", "coding-agent", "beginner", "open-source"]
+tool: "goose"
+author: "Anshad"
+image: "/api/og?title=Goose+v1.57+Automatic+Thinking&tool=goose"
+canonical: "https://terminalblog.com/blog/goose-v1-57-automatic-thinking-windows-installer-security/"
+---
+
+**Goose v1.57.0 dropped October 28, 2026** — and this patch release does three things that matter: **automatic thinking level** (the model picks its own reasoning depth), **HTTPS allowlist with redirect validation** (security hardening for tool calls), and **caller-supplied session IDs** (embedding Goose gets easier).
+
+If v1.56 gave you automatic thinking, resume subagents, Windows NSIS installer, and Boa JS runtime — v1.57 hardens the security boundary and fixes the desktop UX paper cuts.
+
+---
+
+## The Headline Features (Ranked by Impact)
+
+### 1. Allowlist: Require HTTPS & Validate Redirects — Security Boundary Hardened
+
+**What it is:** New allowlist enforcement that **requires HTTPS** and **validates redirects**, blocking on policy failure ([#12619](https://github.com/aaif-goose/goose/pull/12619)).
+
+**Why it matters:** Tool calls that fetch URLs now go through a strict allowlist. HTTP is rejected. Redirects are validated against policy. If a redirect tries to bounce you to a non-allowed domain, it fails closed.
+
+**For beginners:** This is the "safe by default" moment. You don't configure it — it just protects you. Malicious redirects in tool outputs? Blocked. HTTP leaks? Blocked. The agent's network surface is now explicitly governed.
+
+---
+
+### 2. Caller-Supplied Session IDs — Embedding Goose Just Got Easier
+
+**What it is:** External callers can now **supply their own session IDs** ([#13098](https://github.com/aaif-goose/goose/pull/13098)) when starting Goose sessions via the API.
+
+**Why it matters:** If you're building an IDE plugin, CI bot, or custom frontend on Goose, you no longer need to track Goose's internal session IDs. You pass your own ID, Goose uses it. Your orchestration layer stays the source of truth.
+
+**For builders:** This unlocks clean embedding patterns. Your session management + Goose's execution = clean separation.
+
+---
+
+### 3. Automatic Thinking Level (Carried from v1.56, Now Default)
+
+**What it is:** Goose supports **automatic thinking level operation** ([#12237](https://github.com/aaif-goose/goose/pull/12237)). Instead of you setting a fixed "thinking budget," the model decides how much reasoning a task needs.
+
+**Why it matters:** Simple edits get fast responses. Complex architecture decisions get deep reasoning. Set `GOOSE_CLI_SHOW_THINKING=1` and watch it adapt per turn.
+
+**For beginners:** Stop managing sliders. The agent becomes adaptive — Claude Sonnet 5.5, Haiku 5.5, GPT-6 Sol, Opus 5.5 all pick their own depth.
+
+---
+
+## Bug Fixes That Stop Paper Cuts
+
+| Fixed | Impact |
+|-------|--------|
+| **Linux window icons restored in desktop app** | Desktop looks native on Linux again ([#13120](https://github.com/aaif-goose/goose/pull/13120)) |
+| **OpenRouter: resolve variant suffixes** | `:free`, `:nitro` suffixes resolve to base model ([#12979](https://github.com/aaif-goose/goose/pull/12979)) |
+| **Use catalog_provider_id for vision lookup** | Custom providers work with vision models ([#12993](https://github.com/aaif-goose/goose/pull/12993)) |
+| **Desktop: start agent only once after fork** | No more duplicate agent processes on fork ([#13139](https://github.com/aaif-goose/goose/pull/13139)) |
+| **Scheduler: use recipe settings in scheduled runs** | Scheduled prompts respect recipe config ([#13138](https://github.com/aaif-goose/goose/pull/13138)) |
+| **Voice: use system trust for WebSockets** | Voice works behind corporate TLS ([#13075](https://github.com/aaif-goose/goose/pull/13075)) |
+| **Prompt: surface MiniJinja render errors** | Custom system prompts show template errors ([#12794](https://github.com/aaif-goose/goose/pull/12794)) |
+| **Providers: request summarized thinking from Claude** | Token-efficient thinking summaries ([#13029](https://github.com/aaif-goose/goose/pull/13029)) |
+| **Code-mode: keep recipe final_output tool** | Final output tool preserved for model ([#13102](https://github.com/aaif-goose/goose/pull/13102)) |
+| **CLI: configure unavailable default provider** | Graceful fallback when default provider down ([#13024](https://github.com/aaif-goose/goose/pull/13024)) |
+| **Windows build error fixed** | Desktop builds on Windows again ([#13081](https://github.com/aaif-goose/goose/pull/13081)) |
+| **Developer: terminate owned shell process trees** | Clean cancellation — no orphaned shells ([#12958](https://github.com/aaif-goose/goose/pull/12958)) |
+| **ACP: fail session/prompt on turn error** | Error propagation in ACP delegation ([#13043](https://github.com/aaif-goose/goose/pull/13043)) |
+| **Databricks: send system prompt as system** | Correct message role on MLflow chat route ([#13057](https://github.com/aaif-goose/goose/pull/13057)) |
+
+---
+
+## Improvements Under the Hood
+
+- **Bump zstd to 0.14.3** for RUSTSEC advisories ([#13162](https://github.com/aaif-goose/goose/pull/13162))
+- **Remove jsonwebtoken** to avoid cargo-deny advisories ([#13141](https://github.com/aaif-goose/goose/pull/13141))
+- **Address cargo-deny failures** on main ([#13076](https://github.com/aaif-goose/goose/pull/13076))
+- **Bump @modelcontextprotocol/sdk** from 1.30.0 to 1.32.0 ([#13059](https://github.com/aaif-goose/goose/pull/13059))
+- **Remove ACP client-delegated developer tools** — simplification ([#13144](https://github.com/aaif-goose/goose/pull/13144))
+- **Build release candidate even if conflicts** — CI resilience ([#12780](https://github.com/aaif-goose/goose/pull/12780))
+
+---
+
+## Quick Version Context
+
+| Version | Date | Channel | Highlights |
+|---------|------|---------|------------|
+| **v1.57.0** | **Oct 28, 2026** | **Stable (Latest)** | **HTTPS allowlist w/ redirect validation, caller-supplied session IDs, Linux icons, OpenRouter variant fix, desktop fork fix, Windows build fix** |
+| v1.56.0 | Oct 23, 2026 | Stable | Automatic thinking, resume subagents, view-only subagent UI, concurrent limits, Windows NSIS installer, IO Intelligence, Boa JS runtime |
+| v1.55.0 | Oct 16, 2026 | Stable | AIgateway provider, W3C trace context, adaptive thinking fixes, Stop saves work, x-request-id, leaner loop |
+| v1.54.0 | Oct 8, 2026 | Stable | HTML session export, adaptive thinking (initial), hyphenated GPT-6.1-Sol aliases, system Node.js on Windows |
+| v1.53.0 | Oct 2, 2026 | Stable | Model discovery from models.dev, Meta Muse provider, lean ACP-only binary, resizable PiP, session rename CLI |
+
+---
+
+## What This Means for You
+
+**If you're new to coding agents:** Goose v1.57 doesn't change the "first run" much — but the **security hardening** compounds. HTTPS allowlist means tool calls can't leak to HTTP. Redirect validation means malicious links in tool output hit a wall. The agent feels **secure by default**, which is the feature beginners appreciate most once they realize what's at stake.
+
+**If you're embedding Goose (IDE plugin, CI bot, custom frontend):** Caller-supplied session IDs = your orchestration layer owns the session identity. No more mapping tables. ACP error propagation = your error handling gets real signals. Windows build fix = your Windows CI passes again.
+
+**If you use OpenRouter:** Variant suffixes (`:free`, `:nitro`) now resolve correctly. No more "model not found" on free tiers.
+
+**If you're on Linux:** Window icons are back. The desktop app looks native again.
+
+---
+
+## What's Still Missing (Honest Assessment)
+
+- **Desktop HTML export** — CLI only (v1.53 added it, Desktop coming)
+- **Android Remote Control** — iOS only (same as Cursor/Claude Code)
+- **Visual trace viewer** — You get W3C headers, but no built-in UI
+- **AIgateway UI** — Declarative config is code-first; no visual builder yet
+- **Auto-compaction tuning UI** — Cap is 225k tokens default (v1.55), no slider
+
+---
+
+## How to Upgrade
+
+```bash
+# CLI
+goose upgrade
+
+# Or re-run the installer
+curl -fsSL https://raw.githubusercontent.com/block/goose/main/scripts/install.sh | bash
+
+# Desktop: auto-updater handles it (enabled since v1.49)
+# Windows: download NSIS installer from releases page
+# https://github.com/aaif-goose/goose/releases/tag/v1.57.0
+
+# Docker
+docker pull ghcr.io/block/goose:latest
+```
+
+**First things to try after update:**
+
+```bash
+# 1. Watch automatic thinking in action
+export GOOSE_CLI_SHOW_THINKING=1
+goose
+# Ask something simple → fast answer
+# Ask "refactor this entire auth module" → deep reasoning appears
+
+# 2. Test caller-supplied session ID (if building on Goose)
+# Pass your own session ID via API → Goose uses it
+
+# 3. Check HTTPS allowlist behavior
+# Try a tool call to HTTP → blocked
+# Try a redirect to non-allowed domain → blocked
+
+# 4. Check Linux desktop icons
+# Launch desktop → window shows proper icon
+
+# 5. Check OpenRouter variants
+# Use model "openrouter/anthropic/claude-3.5-sonnet:free" → resolves
+```
+
+---
+
+## The Bottom Line
+
+**v1.55 hardened the runtime. v1.56 made the agent intelligent about its own intelligence. v1.57 hardens the security boundary and fixes the embedding story.**
+
+- **HTTPS allowlist + redirect validation** = tool call network surface is governed
+- **Caller-supplied session IDs** = clean embedding for IDE plugins, CI bots, custom frontends
+- **Linux icons + Windows build fix** = desktop is a first-class citizen everywhere
+- **OpenRouter variant resolution** = free/nitro tiers just work
+- **Desktop fork fix** = no more duplicate agents on fork
+
+The pattern holds: Goose isn't chasing "shiny feature of the week." It's hardening the **security layer**, the **embedding layer**, the **desktop layer**, and the **thinking layer** — the things that matter when you run agents in production, not just in a terminal.
+
+For a beginner, that means **fewer config knobs, fewer security surprises, fewer "why did it do that?" moments**. For a builder, it means **Goose is becoming a platform you can ship on top of — securely**.
+
+```bash
+goose upgrade
+# Ask a hard question → watch it think automatically
+# Embed it → pass your own session IDs → it works
+# Tool calls hit HTTP → blocked automatically
+# Linux: desktop looks native again
+```
+
+---
+
+## Related Articles
+
+- [Goose v1.56 Just Learned to Think Automatically, Resume Crashed Subagents, and Got a Real Windows Installer](/blog/goose-v1-56-automatic-thinking-resume-subagents-windows-installer/)
+- [Goose v1.55 Just Gave You AI Gateway, Smarter ACP, and a Session That Stops When You Say Stop](/blog/goose-v1-55-ai-gateway-acp-session-control/)
+- [Goose Just Made Your Sessions Portable — HTML Export, Adaptive Thinking, and the v1.54 Wave](/blog/goose-v1-53-54-html-export-adaptive-thinking-wave/)
+- [Goose Just Got GPT-6 Astra and Web Search Built In — the September Wave Is Huge](/blog/goose-v1-50-gpt6-astra-web-search-security-wave/)
+- [Beware: Goose Review Arbitrary Command Execution via fsmonitor](/blog/beware-goose-review-arbitrary-command-execution-fsmonitor/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+- [Goose vs Claude Code: Extensibility Showdown](/blog/claude-code-vs-goose-extensibility-showdown/)
+- [Codex vs Goose: Parallel vs Extensible](/blog/codex-vs-goose-parallel-vs-extensible/)
+
+---
+
+*Goose is open-source (Apache-2.0) and available at [github.com/aaif-goose/goose](https://github.com/aaif-goose/goose). Full changelog: [github.com/aaif-goose/goose/releases/tag/v1.57.0](https://github.com/aaif-goose/goose/releases/tag/v1.57.0). Published October 29, 2026 — covers Goose v1.57.0 stable released October 28, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
