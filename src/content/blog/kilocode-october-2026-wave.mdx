@@ -1,0 +1,212 @@
+---
+title: "KiloCode Just Dropped Cloud Workspaces, Fixed Compaction, and Shipped Conda — The October 2026 Wave"
+description: "KiloCode's October 2026 run (v7.8.18 stable through v7.8.25 pre-release) delivered cloud workspace management from your local CLI, auto-compaction fixes for local models, a conda-distributed CLI, and a string of stability patches. Here's what matters for your workflow."
+pubDate: 2026-10-29T15:00:00Z
+tags: ["kilocode", "release", "coding-agents", "v7.8.18", "v7.8.20", "v7.8.21", "v7.8.23", "cloud-workspaces", "auto-compaction", "conda", "beginner"]
+tool: "kilocode"
+author: "sage"
+image: "/api/og?title=KiloCode+October+2026+Wave&tool=kilocode"
+canonical: "https://terminalblog.com/blog/kilocode-october-2026-wave/"
+---
+
+KiloCode didn't ship one big October release. It shipped **eight releases in two weeks** — stable and pre-release alternating — each one removing a specific footgun or adding a platform capability you didn't know you needed.
+
+If you've been waiting for the open-source coding agent to feel like *infrastructure* instead of an experiment, this is the wave that happened.
+
+---
+
+## The Three Shifts That Change How You Use It
+
+| Before (Sept) | After (Oct 2026) |
+|---------------|------------------|
+| Local agent only | **Cloud workspaces managed from your local CLI** |
+| Compaction loops on local models | **Compaction respects threshold, no loops on unknown contexts** |
+| `npm install -g` or `curl \| bash` | **`pixi add kilo-cli` / conda-managed CLI** |
+
+---
+
+## 1. Cloud Workspaces From Your Terminal (v7.8.21 Pre-Release — Oct 28)
+
+**The feature:** The local Kilo CLI (`kilo`) now has a **session-host API** that can list, create, read, check status, and delete **hosted cloud workspaces**. You can start a cloud session, follow its preparation events through a local system feed, and run another session in the same workspace — all without leaving your terminal.
+
+```bash
+# List available workspace profiles
+kilo cloud workspace list-profiles
+
+# Create a hosted workspace
+kilo cloud workspace create --profile=standard --repo=github.com/you/project
+
+# List sessions in that workspace
+kilo cloud workspace sessions <workspace-id>
+
+# Start another session in the same workspace
+kilo cloud session start --workspace=<workspace-id>
+
+# Follow preparation/status events locally
+kilo cloud feed --workspace=<workspace-id>
+```
+
+**Why it matters:** You get the compute of cloud agents (bigger context, parallel workers, persistent environments) **controlled from your local CLI**. No dashboard clicking. No context-switching. Your terminal becomes the control plane for both local and cloud work.
+
+**PR:** [#15351](https://github.com/Kilo-Org/kilocode/pull/15351) — adds internal Session Host registry and built-in Kilo Cloud provider.
+
+---
+
+## 2. Auto-Compaction Finally Works on Local Models (v7.8.20 Pre-Release — Oct 27)
+
+**The bug:** Auto-compaction triggered **early** (before your configured threshold). Worse: on models without a known context size (Ollama, LM Studio, custom endpoints), it would **loop infinitely** — compact, hit the same wall, compact again. Stopping it manually just restarted it.
+
+**The fix (v7.8.20):**
+- Compaction now **respects your configured threshold** — no early starts
+- **No looping on unknown context sizes** — if the model doesn't report a limit, compaction backs off
+- **Stopping compaction actually stops it** — no restart spiral
+
+**Why it matters:** If you run local models — **this fixes your workflow entirely**. You can finally use Ollama/LM Studio/custom endpoints without the agent pausing every 3 minutes to summarize.
+
+**PR:** [#15479](https://github.com/Kilo-Org/kilocode/pull/15479) by @WebReflection
+
+---
+
+## 3. CLI Now on Conda — `pixi add kilo-cli` Works (v7.8.20)
+
+**What it is:** The KiloCode CLI publishes as **`kilo-cli` on Anaconda.org** (conda-forge compatible), built with rattler-build for:
+- `linux-64`, `linux-aarch64`
+- `osx-64`, `osx-arm64`
+- `win-64`
+
+```bash
+# pixi (recommended)
+pixi add kilo-cli@rc        # pre-release
+pixi add kilo-cli           # stable (when promoted)
+
+# conda
+conda install -c anaconda-cloud kilo-cli
+
+# mamba
+mamba install -c anaconda-cloud kilo-cli
+```
+
+**Why it matters:** No more `curl | bash`, no more npm global installs fighting your Node version. **Conda = reproducible, isolated, versioned CLI installs.** Works in pixi environments, Docker builds, CI pipelines.
+
+**PR:** [#14465](https://github.com/Kilo-Org/kilocode/pull/14465) by @zfralish
+
+---
+
+## 4. Stable v7.8.18 (Oct 26) — The Platform Release You're On
+
+If you're on stable, you already have these (but might not know):
+
+| Feature | What It Means |
+|---------|---------------|
+| **Chat copy fix for VS Code 1.143** | Copy-paste in chat works again |
+| **DOMPurify 3.4.17** | XSS vector in markdown rendering patched |
+| **Vite 7.3.7** | CVE in dev server patched |
+| **MCP SDK 1.32.1** | **Security: blocks cross-origin redirects in MCP HTTP/OAuth** — remote servers that redirect to another origin or answer `POST` with `301`/`302`/`303` no longer connect |
+| **Hosted cloud sessions via local API** | Foundation for v7.8.21's full workspace management |
+
+**The MCP redirect fix alone is worth the update.** Your editor validates everything the agent outputs. A redirect chain leaking credentials = supply chain compromise. **Patched.**
+
+---
+
+## 5. v7.8.23 Pre-Release (Oct 28) — The "Stop Breaking My Session" Fixes
+
+- **Background jobs preserve real exit codes** — no more "failed job recorded as successful"
+- **Large-session compaction gets enough output space** — thinking + complete summary, no cut-off summaries losing history
+- **Multi-process reply handling** — if another Kilo process is writing, it keeps the reply instead of deleting it
+- **Scheduled tasks fire once across processes** — no duplicate cron runs when multiple Kilo processes share a data directory
+
+**Why it matters:** These are the "my agent just died/lost context/did something weird" fixes. If you run long sessions or multiple Kilo instances — **this is the pre-release to test.**
+
+---
+
+## Quick Version Map
+
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| **v7.8.25** | Oct 28 | Pre-release | npm user-agent preservation |
+| **v7.8.23** | Oct 28 | Pre-release | Background job exit codes, compaction output space, multi-process fixes |
+| **v7.8.22** | Oct 28 | Pre-release | No notable changes |
+| **v7.8.21** | Oct 28 | Pre-release | **Cloud workspace ops + local system feed** |
+| **v7.8.20** | Oct 27 | Pre-release | **Auto-compaction fix, zod memory patch, conda CLI, agent-chosen base branch** |
+| **v7.8.18** | Oct 26 | **Stable (Latest)** | Chat copy, DOMPurify, Vite CVE, MCP redirect fix, cloud sessions via local API |
+| v7.8.17 | Oct 24 | Stable | Browser MCP security patch |
+| v7.8.15 | Oct 22 | Stable | Agent Manager browser prompt fix |
+
+**Current stable: v7.8.18.** Pre-releases 20–25 stack fixes on top. Next stable will include all of them.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Run local models (Ollama, LM Studio, custom endpoints)** | **Yes — grab v7.8.20+ pre-release** (compaction fix) |
+| **Want cloud workspaces controlled from terminal** | **Yes — test v7.8.21+ pre-release** |
+| **Want `pixi add kilo-cli` / conda-managed CLI** | **Yes — available now on Anaconda.org** |
+| **Hit background job / compaction / multi-process weirdness** | **Yes — v7.8.23 pre-release** |
+| **Prefer stable-only** | **Stay on v7.8.18** — solid, secure, all fixes land in next stable |
+
+---
+
+## How to Update
+
+```bash
+# VS Code / Cursor / JetBrains extension
+# Pre-release: Extensions → KiloCode → Switch to Pre-Release channel → Update
+# Stable: Auto-updates or Extensions → KiloCode → Update (stays on v7.8.18)
+
+# CLI via conda (NEW)
+pixi add kilo-cli@rc        # pre-release
+pixi add kilo-cli           # stable (when promoted)
+
+# CLI via npm (existing)
+npm update -g @kilocode/cli
+
+# Verify
+kilo --version
+# Should show 7.8.25 (pre) or 7.8.18 (stable)
+```
+
+**Changelog:** [github.com/Kilo-Org/kilocode/releases](https://github.com/Kilo-Org/kilocode/releases)
+
+---
+
+## The Pattern: Eight Releases, Zero Fluff
+
+October 2026 wasn't a feature parade. It was **footgun removal**:
+
+- **v7.8.15**: Browser prompt fix — *usability*
+- **v7.8.17**: Browser MCP security — *security*
+- **v7.8.18**: Chat copy + DOMPurify + Vite CVE + MCP redirect fix + cloud sessions foundation — *stability + security + platform*
+- **v7.8.20**: Compaction logic + zod memory + conda CLI + agent-chosen base branch — *core reliability + distribution*
+- **v7.8.21**: Cloud workspace CRUD + system feed from local CLI — *platform maturity*
+- **v7.8.23**: Background job fidelity + compaction output + multi-process safety — *session reliability*
+
+**Six releases in six days.** Each one removes a specific failure mode: compaction loops, memory DoS, redirect leaks, broken copy-paste, lost exit codes, cut-off summaries, duplicate crons. The conda package and cloud workspace API are the bonuses — **distribution and platform maturity**.
+
+**If you're on v7.8.18 stable and happy — stay. If compaction drives you crazy, or you want cloud workspaces from your terminal — grab the pre-release. The fixes are real.**
+
+---
+
+## Related Articles
+
+- [KiloCode v7.8.20 Auto-Compaction Fix, Conda CLI Package](/blog/kilocode-v7-8-20-auto-compaction-fix-conda-cli/)
+- [KiloCode v7.8.18 Fixes VS Code 1.143 Chat Copy Bug, Security Updates](/blog/kilocode-v7-8-18-fix-chat-copy-focus/)
+- [KiloCode v7.8.17 Security Patch — Browser MCP Fixes](/blog/kilocode-v7-8-17-security-patch-browser-mcp-fixes/)
+- [KiloCode v7.8.15 Agent Manager Browser Prompt Fix](/blog/kilocode-v7-8-15-agent-manager-browser-prompt-fix/)
+- [OpenCode vs Kilo Code CLI: Provider-Neutral Terminal Use or Quick AI-Assisted Tasks?](/blog/opencode-vs-kilo/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [AmpCode Just Made Agents Free, Fast, and Multi-Threaded — The September Wave You Missed](/blog/ampcode-september-october-2026-wave/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
+---
+
+*KiloCode is open-source (MIT) and available at [github.com/Kilo-Org/kilocode](https://github.com/Kilo-Org/kilocode) and [kilo.ai](https://kilo.ai). Published October 29, 2026 — covers KiloCode v7.8.18 stable (Oct 26) through v7.8.25 pre-release (Oct 28). Full changelog: [github.com/Kilo-Org/kilocode/releases](https://github.com/Kilo-Org/kilocode/releases)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
