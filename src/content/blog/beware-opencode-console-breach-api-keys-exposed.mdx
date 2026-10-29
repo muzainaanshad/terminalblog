@@ -1,0 +1,208 @@
+---
+title: "Beware: OpenCode Console Breach Exposed Your AI Provider API Keys"
+pubDate: 2026-10-29T09:00:00Z
+updatedDate: 2026-10-29T09:00:00Z
+author: "Anshad"
+tags: ["beware", "security", "opencode", "api-keys", "credential-leak"]
+description: "OpenCode Console breach on October 16-17, 2026 exposed OpenAI, Anthropic, and Google API keys for ~1.4% of Console users. Here's what happened, who's affected, and how to protect yourself."
+---
+
+## What Happened
+
+On the night of **October 16, 2026**, an intruder gained unauthorized access to a **legacy system** behind OpenCode Console — the hosted workspace service where teams store their AI provider API keys. By the morning of **October 17**, OpenCode was emailing affected users with the subject line: **"Action Required: Potential provider key breach."**
+
+The breach was **not** in the OpenCode CLI tool you run locally. It was in **OpenCode Console** — their optional cloud service where you paste your OpenAI, Anthropic, or Google API keys so your team can use models without handling credentials directly.
+
+OpenCode's public statement on X confirmed: *"We had a security breach last night related to a large scale distillation attack that impacted 1.4% of OpenCode Console users. We have notified them all this morning via email."*
+
+**What was exposed:** Third-party provider API keys saved in Console workspaces — specifically **OpenAI, Anthropic, and Google** keys (other providers like OpenRouter may also be affected).
+
+**What was NOT exposed:** Your local OpenCode CLI config, your local filesystem, your git repos, or your SSH keys — unless you also pasted those into Console (which you shouldn't).
+
+---
+
+## Who Is Affected
+
+You are **potentially affected** if **ALL** of these are true:
+
+1. You have (or had) an **OpenCode Console account**
+2. You **linked an external AI provider** (OpenAI, Anthropic, Google, or others) to a Console workspace
+3. That provider key was stored in Console **on or before October 16, 2026**
+
+**You are NOT affected if:**
+- You only use the **OpenCode CLI locally** and never signed up for Console
+- You have a Console account but **never linked an external provider key**
+- You use a different AI coding agent (Cursor, Claude Code, Codex, Cline, etc.)
+
+---
+
+## How to Check If You're Affected
+
+### 1. Check for the OpenCode Console auth file
+
+OpenCode stores linked provider credentials locally on your machine. Run these commands:
+
+**macOS / Linux:**
+```bash
+# Check if auth file exists
+cat ~/.local/share/opencode/auth.json
+
+# Or if you used the old config location
+cat ~/.config/opencode/auth.json
+```
+
+**Windows (PowerShell):**
+```powershell
+# Check if auth file exists
+type %USERPROFILE%\.local\share\opencode\auth.json
+
+# Or old location
+type %USERPROFILE%\.config\opencode\auth.json
+```
+
+**What to look for:** A JSON file listing providers like:
+```json
+{
+  "providers": [
+    { "id": "openai", "key": "sk-..." },
+    { "id": "anthropic", "key": "sk-ant-..." },
+    { "id": "google", "key": "AIza..." }
+  ]
+}
+```
+
+If this file exists **and lists any provider**, you had a linked provider. Treat those keys as **potentially compromised** — even if you didn't receive an email from OpenCode.
+
+> **Why you can't trust the email alone:** OpenCode said they notified the affected 1.4%. But the CSA research note warns: *"Other users cannot rely on the absence of an email as evidence that their keys were safe."* The 1.4% figure may be preliminary, and the investigation is ongoing.
+
+### 2. Check your provider dashboards for unauthorized usage
+
+**OpenAI:** Go to [platform.openai.com/usage](https://platform.openai.com/usage) — look for requests you didn't make, unfamiliar models, or usage from odd regions/times.
+
+**Anthropic:** Go to [console.anthropic.com/settings/usage](https://console.anthropic.com/settings/usage) — check for unexpected Claude API calls.
+
+**Google AI Studio / Vertex AI:** Check [console.cloud.google.com/apis/api/aiplatform.googleapis.com/metrics](https://console.cloud.google.com/apis/api/aiplatform.googleapis.com/metrics) for anomalous request volumes.
+
+**OpenRouter / Other providers:** Check their respective usage/billing dashboards.
+
+---
+
+## How to Protect Yourself (Immediate Actions)
+
+### 1. Rotate ALL linked API keys — **do this now**
+
+**Do not wait.** Rotate keys in the **provider's own dashboard**, not just in OpenCode Console. Deleting a key from Console only removes OpenCode's copy — it does **nothing** about a copy the attacker already has.
+
+| Provider | Where to Rotate |
+|----------|-----------------|
+| **OpenAI** | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) → "Revoke" old key → "Create new secret key" |
+| **Anthropic** | [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) → Delete old → Create new |
+| **Google (AI Studio)** | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) → Delete old → Create new |
+| **Google (Vertex AI)** | [console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials) → Rotate key |
+| **OpenRouter** | [openrouter.ai/keys](https://openrouter.ai/keys) → Revoke → Create new |
+
+**After rotating:** Update every application, script, CI/CD pipeline, and team member's config that used the old key.
+
+### 2. Reset your OpenCode Console password
+
+Even if the breach was "only" provider keys, reset your Console account password:
+- Go to [console.opencode.ai](https://console.opencode.ai) → Settings → Change password
+- Enable 2FA if available
+
+### 3. Review provider billing from **October 16 onward**
+
+Check your provider invoices/usage for charges you don't recognize. Users have reported:
+- $281 on OpenAI + $168 on Anthropic (one user)
+- $1,700 unexplained charges (another user)
+- ~$400 Anthropic, ~€200 Google (other reports)
+
+If you see unauthorized charges, **contact the provider's support immediately** — Anthropic has already revoked some keys they believed were affected, and OpenAI has issued refunds in some cases.
+
+### 4. Remove the local auth file (optional but recommended)
+
+After rotating keys, you can remove the local auth file so old (now-revoked) keys aren't sitting on disk:
+
+```bash
+# macOS / Linux
+rm ~/.local/share/opencode/auth.json
+rm ~/.config/opencode/auth.json  # if it exists
+```
+
+```powershell
+# Windows PowerShell
+Remove-Item "$env:USERPROFILE\.local\share\opencode\auth.json" -ErrorAction SilentlyContinue
+Remove-Item "$env:USERPROFILE\.config\opencode\auth.json" -ErrorAction SilentlyContinue
+```
+
+---
+
+## Is There a Fix?
+
+**For the Console service:** OpenCode says the legacy system was **in the process of being decommissioned**. They have not published a root cause, a post-mortem, or confirmed whether keys were encrypted at rest. As of October 29, the incident is still described as **"ongoing."**
+
+**For the OpenCode CLI (local tool):** This breach did **not** affect the CLI directly. However, OpenCode CLI versions **prior to 1.0.216** have a **separate critical RCE vulnerability (CVE-2026-22812)** — an unauthenticated HTTP server with permissive CORS that lets any website execute shell commands on your machine. If you use OpenCode CLI, **upgrade immediately:**
+
+```bash
+# Check your version
+opencode --version
+
+# If < 1.0.216, upgrade
+npm install -g opencode@latest
+# or
+brew upgrade opencode
+# or download from github.com/opencode-ai/opencode/releases
+```
+
+---
+
+## The Bigger Lesson: Credential Concentration Risk
+
+This incident illustrates a fundamental risk with **hosted AI agent platforms**:
+
+> **When you paste your provider keys into a hosted service, you're trusting that vendor's security posture with credentials that unlock your AI spend and data access.**
+
+OpenCode Console concentrated keys from many teams into one legacy system. One breach = keys for OpenAI, Anthropic, Google, and potentially others — all at once. The same pattern appeared with **LiteLLM** (gateway holding enterprise keys) and will appear again.
+
+**Practical takeaways for your team:**
+
+1. **Prefer local keys** — Keep API keys in your shell env, `.env` files (gitignored), or a local secret manager (1Password CLI, Bitwarden CLI, `pass`, `gopass`). The CLI tools read these directly — no hosted middleman needed.
+
+2. **If you must use a hosted workspace:** Use **project-scoped keys** with **spending limits** where providers support them (OpenAI project keys, Anthropic workspace keys). A leaked scoped key limits blast radius.
+
+3. **Rotate keys routinely** — Not just after breaches. Treat provider keys like passwords: rotate every 90 days, or after any team member leaves.
+
+4. **Audit who has what** — Use tools like [StepSecurity Dev Machine Guard](https://github.com/step-security/dev-machine-guard) (free, open source) to scan developer machines for AI coding agents and their config files:
+   ```bash
+   # Quick scan
+   ./dev-machine-guard scan
+   # Look for "OpenCode" in the AI Agents section
+   ```
+
+5. **Monitor provider usage** — Set up billing alerts on OpenAI, Anthropic, Google Cloud. Catch anomalous spend in hours, not weeks.
+
+---
+
+## Summary Checklist
+
+- [ ] **Check** `~/.local/share/opencode/auth.json` (or Windows equivalent) for linked providers
+- [ ] **Rotate** every listed provider key in the **provider's own dashboard**
+- [ ] **Review** provider usage/billing from October 16 onward for anomalies
+- [ ] **Reset** your OpenCode Console password + enable 2FA
+- [ ] **Upgrade** OpenCode CLI to ≥ 1.0.216 (separate RCE fix)
+- [ ] **Audit** your team: who has Console accounts? Who linked keys?
+- [ ] **Move** to local key management for future projects
+
+---
+
+## References & Sources
+
+- OpenCode breach confirmation on X: [x.com/opencode/status/2111519637049319818](https://x.com/opencode/status/2111519637049319818) (Oct 17, 2026)
+- The Hacker News: [OpenCode Console Breach May Have Exposed OpenAI, Anthropic, and Google API Keys](https://thehackernews.com/2026/10/opencode-console-breach-may-have.html)
+- Cloud Security Alliance: [OpenCode Console Breach: Concentrated Provider Keys at Risk](https://labs.cloudsecurityalliance.org/research/csa-research-note-opencode-console-provider-key-breach-20261/) (Oct 20, 2026)
+- StepSecurity: [OpenCode Security Breach: Distillation Attack Hit Console Users](https://www.stepsecurity.io/blog/opencode-security-breach) (Oct 18, 2026)
+- Cyera: [OpenCode Breach: What Happened and How to Rotate Exposed AI API Keys](https://www.cyera.com/research/opencode-breach-what-happened-and-how-to-rotate-exposed-ai-api-keys)
+- CVE-2026-22812 (OpenCode CLI RCE): [SentinelOne](https://www.sentinelone.com/vulnerability-database/cve-2026-22812/) | [NVD](https://nvd.nist.gov/vuln/detail/CVE-2026-22812)
+
+---
+
+*This article will be updated if OpenCode publishes a post-mortem or additional details emerge. If you have new information, please reach out.*
