@@ -1,0 +1,242 @@
+---
+title: "GitHub Copilot Just Learned to Use Your Computer — Computer Use Goes Public Preview"
+description: "GitHub Copilot CLI and Copilot app now support computer use in public preview (October 1). Your agent can click, type, take screenshots, and drive browsers — the same capability that made Anthropic's demo viral, now in your terminal. Works on macOS and Windows."
+pubDate: 2026-10-29T10:00:00Z
+tags: ["github-copilot-cli", "computer-use", "release", "public-preview", "coding-agents", "automation", "beginner"]
+tool: "copilot-cli"
+author: "Anshad"
+image: "/api/og?title=GitHub+Copilot+Computer+Use+Preview&tool=copilot-cli"
+canonical: "https://terminalblog.com/blog/github-copilot-computer-use-public-preview-october-2026/"
+faq:
+  - q: "What is GitHub Copilot Computer Use?"
+    a: "Computer Use lets Copilot control your desktop — click, type, take screenshots, navigate browsers, and interact with any GUI application. It's the same capability Anthropic demoed with Claude, now available in Copilot CLI and the Copilot app."
+  - q: "Is this available to everyone?"
+    a: "Yes — Computer Use entered public preview on October 1, 2026 for Copilot CLI and Copilot app on macOS and Windows. It's included with your Copilot subscription at no extra cost."
+  - q: "How do I enable Computer Use?"
+    a: "In Copilot CLI: run `copilot` and the agent will have computer access when you approve it. In the Copilot app: enable in Settings → Computer Use. Local sandboxing (GA since October 5) controls what the agent can access."
+  - q: "What can the agent actually do with Computer Use?"
+    a: "Click buttons, fill forms, navigate websites, take screenshots, read screen content, interact with desktop apps, run GUI workflows. Think: automate a manual QA flow, fill a legacy admin panel, scrape a site that blocks bots, test a web app end-to-end."
+  - q: "Is my computer safe? Can the agent access everything?"
+    a: "Local sandboxing (GA October 5) limits what agents can access — files, networks, and credentials. You approve each computer-use action. The agent runs in a sandboxed environment with explicit permissions."
+  - q: "Does this work with GitHub Copilot in VS Code?"
+    a: "Computer Use is in Copilot CLI and the Copilot app. VS Code sessions using Agent Host also get local sandboxing. Full computer-use control (click/type/screenshot) is CLI/app-focused for now."
+---
+
+**GitHub Copilot entered public preview for Computer Use on October 1, 2026** — and it changes what "terminal agent" means.
+
+Your agent can now **click, type, take screenshots, and drive browsers**. Not "generate code that clicks." Actually click. Actually type. Actually navigate a website and scrape what it sees.
+
+This is the same capability that made Anthropic's Computer Use demo go viral — now in your terminal, included with your Copilot subscription.
+
+---
+
+## The One-Line Summary
+
+**Copilot CLI + Copilot App (macOS/Windows) now control your desktop. Click. Type. Screenshot. Browse. Automate the GUI work you've been doing manually. Public preview since Oct 1. Included with Copilot.**
+
+---
+
+## What Computer Use Actually Means
+
+### Before: Agents Generate Code
+You ask Copilot to "fill out this form" → it writes a Playwright script → you run it → maybe it works.
+
+### After: Agents Use the Computer
+You ask Copilot to "fill out this form" → it **opens the browser, finds the fields, types the values, clicks submit**. You watch it happen.
+
+| Old Workflow | Computer Use Workflow |
+|--------------|----------------------|
+| Write automation script | **Agent does the task directly** |
+| Debug selectors, waits, flakes | **Agent sees what you see** |
+| Maintain test suite | **No maintenance — it's just using the UI** |
+| Limited to APIs | **Works on ANY GUI — legacy apps, no-API sites, desktop tools** |
+
+---
+
+## What You Can Automate Now
+
+### 1. Legacy Admin Panels With No API
+That internal tool your team built in 2019? No API. No webhooks. Just a grid of buttons.
+```
+You: "Go to admin.acme.corp → filter 'pending' → approve all → screenshot results"
+Copilot: *opens browser → clicks → types → clicks → saves PNG → done*
+```
+
+### 2. End-to-End Web App Testing
+```
+You: "Sign up as a new user on staging → complete onboarding → verify welcome email shows in UI"
+Copilot: *drives the full flow, screenshots each step, reports back*
+```
+
+### 3. Scraping Sites That Block Bots
+```
+You: "Go to competitor.com/pricing → scroll to enterprise tier → copy the feature matrix → save as CSV"
+Copilot: *navigates, scrolls, reads rendered text, structures data*
+```
+
+### 4. Desktop App Workflows
+```
+You: "Open Postman collection → run 'prod smoke tests' → export results → attach to Linear ticket"
+Copilot: *controls Postman GUI directly*
+```
+
+### 5. One-Off Manual Tasks You Hate
+```
+You: "Renew SSL cert in AWS console → download → upload to Cloudflare → verify DNS"
+Copilot: *clicks through both consoles, handles the file transfer*
+```
+
+---
+
+## How to Get Started (5 Minutes)
+
+### Option A: Copilot CLI (Terminal)
+```bash
+# 1. Update to latest
+npm install -g @github/copilot-cli@latest
+# Verify: copilot --version (should be 1.0.105+)
+
+# 2. Start a session
+copilot
+
+# 3. Try a computer-use task
+# "Open github.com in browser and take a screenshot of the homepage"
+# "Go to my Linear board and move ticket ABC-123 to Done"
+# "Fill out the contact form at example.com/contact with test data"
+```
+
+### Option B: Copilot App (Desktop GUI)
+1. Download from [github.com/features/ai/github-app](https://github.com/features/ai/github-app)
+2. Sign in with your Copilot account
+3. Settings → **Computer Use** → Enable
+4. Start a chat → ask it to do something on your desktop
+
+---
+
+## The Safety Model: Local Sandboxing (GA Since Oct 5)
+
+Computer Use sounds scary — "the agent controls my mouse?" GitHub solved this with **local sandboxing**, now generally available:
+
+| Protection | What It Does |
+|------------|--------------|
+| **File access limits** | Agent only reads/writes folders you approve |
+| **Network controls** | Agent only reaches domains you allow |
+| **Credential isolation** | Agent never sees your tokens, SSH keys, AWS creds |
+| **Per-action approval** | You approve each click/type/screenshot before it happens |
+| **Session scoping** | Sandbox resets between tasks — no persistent agent state |
+
+```bash
+# Configure sandbox in ~/.copilot/settings.json
+{
+  "sandbox": {
+    "files": { "allow": ["~/projects/**"], "deny": ["~/.ssh/**", "~/.aws/**"] },
+    "network": { "allow": ["github.com", "linear.app"], "deny": ["*"] },
+    "developerTools": true  # allows npm, git, docker inside sandbox
+  }
+}
+```
+
+**You stay in control. The agent just has hands now.**
+
+---
+
+## Real Example: Automating a Linear Ticket Close
+
+```bash
+You: "Close Linear ticket ENG-847 and add comment 'Deployed to prod, verified healthy'"
+
+Copilot (Computer Use):
+1. Opens browser → linear.app/ENG-847
+2. Clicks "Change status" → selects "Done"
+3. Finds comment box → types "Deployed to prod, verified healthy"
+4. Clicks "Save"
+5. Takes screenshot → shows you the confirmation
+6. Returns: "Ticket ENG-847 closed. Screenshot saved."
+
+Time: ~15 seconds. You never left the terminal.
+```
+
+---
+
+## What's Different From Anthropic's Computer Use?
+
+| Aspect | Anthropic Claude Computer Use | GitHub Copilot Computer Use |
+|--------|------------------------------|----------------------------|
+| **Access** | API only (limited beta) | **Public preview — CLI + App today** |
+| **Integration** | Standalone | **Built into your existing Copilot workflow** |
+| **Sandboxing** | Basic | **Local sandboxing GA (files, network, creds)** |
+| **Cost** | Token-heavy | **Included with Copilot subscription** |
+| **Models** | Claude 3.5 Sonnet only | **Routes via Fusion (GPT, Claude, Gemini)** |
+
+---
+
+## The Catch (Honest Assessment)
+
+- **macOS and Windows only** — no Linux support yet (WSL2 works)
+- **Public preview** — expect rough edges, API changes
+- **Not fully autonomous** — you approve each action (by design)
+- **Screen resolution matters** — very high DPI can cause coordinate issues
+- **No Android/iOS** — desktop only for now
+- **Enterprise policies** — org admins can disable Computer Use entirely
+
+---
+
+## Quick Test to Verify It Works
+
+```bash
+# 1. Update CLI
+npm install -g @github/copilot-cli@latest
+
+# 2. Start session
+copilot
+
+# 3. Try this prompt:
+"Open https://github.com in a browser, take a screenshot, and tell me what the hero headline says"
+
+# 4. Watch: browser opens → page loads → screenshot captured → text read → answer returned
+```
+
+If that works, you have Computer Use. Start automating the manual GUI work you've been putting off.
+
+---
+
+## The Bigger Picture: Agents With Hands
+
+For two years, coding agents have been **brains without hands** — they generate code, you execute it.
+
+**Computer Use gives them hands.**
+
+| Era | Agent Capability |
+|-----|------------------|
+| 2023 | Code completion |
+| 2024 | Multi-file edits, terminal commands |
+| 2025 | MCP tools, GitHub actions, PR automation |
+| **Oct 2026** | **Computer Use — click, type, browse, screenshot** |
+
+This doesn't replace API automation. It **reaches where APIs don't exist** — legacy systems, no-API SaaS, desktop apps, one-off manual workflows.
+
+Your terminal agent just became a **desktop agent**.
+
+---
+
+## Related Reading
+
+- [GitHub Copilot CLI Just Killed Experimental Mode — Assisted Permissions Are Now Default](/blog/github-copilot-cli-1-0-104-105-assisted-permissions-default/)
+- [GitHub Copilot CLI v1.0.103 — ACP Sandbox, Cloud Reconnect, Session Titles, Gemini Fixes](/blog/github-copilot-cli-1-0-101-session-browsing-proxy-fixes/)
+- [Cursor Just Shipped Projects, Cloud Agents, and an App Marketplace](/blog/cursor-october-2026-wave/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+- [Coding Agent Security Checklist 2026 — The Operator's Hardening Guide](/blog/coding-agent-security-checklist-2026/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+
+---
+
+*GitHub Copilot Computer Use entered public preview October 1, 2026. Requires Copilot subscription. Local sandboxing GA October 5, 2026. Source: [GitHub Changelog Oct 9](https://github.blog/changelog/2026-10-09-github-copilot-weekly-releases-october-5/) · [Copilot CLI releases](https://github.com/github/copilot-cli/releases)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
