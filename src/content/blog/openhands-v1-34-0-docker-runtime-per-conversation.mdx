@@ -1,0 +1,217 @@
+---
+title: "OpenHands Just Let You Pick a Docker Runtime Per Conversation — v1.34.0 Changes Everything"
+description: "OpenHands v1.34.0 (October 27) adds per-conversation Docker runtime settings, a new Runtime settings page, filterable automation tags, and the ability to start new conversations in existing sandboxes. The release that makes Agent Canvas feel like a real platform."
+pubDate: 2026-10-28T10:00:00Z
+tags: ["openhands", "release", "v1.34.0", "docker", "agent-canvas", "automations", "coding-agent", "beginner"]
+tool: "openhands"
+author: "sage"
+image: "/api/og?title=OpenHands+v1.34.0+Docker+Runtime&tool=openhands"
+canonical: "https://terminalblog.com/blog/openhands-v1-34-0-docker-runtime-per-conversation/"
+---
+
+**OpenHands v1.34.0 dropped October 27, 2026** — and it's the release that finally makes Agent Canvas feel like a platform you can build on, not just a chat interface.
+
+The headlines: **Docker runtime settings per conversation**, **a dedicated Runtime settings page**, **filter and edit automation tags**, **start new conversations inside existing sandboxes**, plus **15+ bug fixes** and **security hardening** (untrusted markdown can no longer hijack link targets).
+
+If you run OpenHands Agent Canvas — this is the update that lets you isolate workloads properly.
+
+---
+
+## The One-Line Summary
+
+**Pick a Docker runtime per conversation. See it in Settings. Filter automation tags. Spin up new chats in the same sandbox. Security: markdown can't inject `rel=opener`. Update now.**
+
+---
+
+## 1. Per-Conversation Docker Runtime — Isolation That Matters
+
+**What it is:** Settings → Runtime now lets you configure a **Docker runtime per conversation**. Each chat gets its own isolated container with its own tools, secrets, and environment.
+
+**Why it matters:** Before: all conversations shared the host environment. One rogue `npm install` polluted everything. Secrets leaked across tasks. Now: **every conversation is a clean room**. You pick the image, the resources, the mounted volumes — per task.
+
+```bash
+# In OpenHands Agent Canvas:
+# 1. Open a conversation → Settings (gear icon) → Runtime
+# 2. Choose Docker runtime
+# 3. Pick image (e.g., node:22, python:3.12, your custom Dockerfile)
+# 4. Set CPU/memory limits
+# 5. Mount secrets via env vars (not argv — fixed in this release!)
+# 6. Start coding — the agent runs inside that container
+```
+
+**For beginners:** This is the "my agent broke my other project" problem, solved. Each conversation = fresh container. Your main machine stays clean.
+
+---
+
+## 2. Runtime Settings Page — Finally Visible
+
+**What it is:** A **new Settings → Runtime page** (OHE-3765) that surfaces Docker configuration, launcher labels, and runtime health checks in one place.
+
+**Why it matters:** Runtime config was buried. Now it's a first-class settings section. You see:
+- Default runtime for new conversations
+- Per-conversation overrides
+- Health status of running sandboxes
+- Resource usage per container
+
+**PR:** [#18436](https://github.com/OpenHands/OpenHands/pull/18436) by @VascoSch92
+
+---
+
+## 3. Filter & Edit Automation Tags — Organize at Scale
+
+**What it is:** Automations now support **filterable, editable tags**. You can tag automations by team, project, environment — and filter the list instantly.
+
+**Why it matters:** When you have 50+ automations (scheduled code reviews, dependency updates, incident response), tags are the only way to find what you need. **Edit tags inline. Filter by tag. Stop scrolling.**
+
+**PR:** [#18767](https://github.com/OpenHands/OpenHands/pull/18767) by @VascoSch92
+
+---
+
+## 4. Start New Conversation in Existing Sandbox — Reuse the Work
+
+**What it is:** In the sidebar, each conversation row now has a **"Start new conversation in this sandbox"** action (OHE-3689).
+
+**Why it matters:** You spun up a sandbox, installed deps, configured the environment. Now you want a fresh chat *in that same sandbox* — without re-cloning, re-installing, re-configuring. **One click. Same sandbox. New conversation.**
+
+**PR:** [#18912](https://github.com/OpenHands/OpenHands/pull/18912) by @hieptl
+
+---
+
+## 5. Share Toggle Labels Fixed — "Share with Org Users"
+
+**What it is:** In team organizations, the share toggle now reads **"Share with Org users"** (OHE-3765) instead of the ambiguous "Share."
+
+**Why it matters:** Clarity. You know exactly who gets access. No accidental public shares.
+
+**PR:** [#18986](https://github.com/OpenHands/OpenHands/pull/18986) by @hieptl
+
+---
+
+## 6. Security: Untrusted Markdown Can't Hijack Links
+
+**What it is:** **Fixed** — untrusted markdown (agent outputs, web content) can no longer set `rel="opener"` or arbitrary `target` attributes on links.
+
+**Why it matters:** This was a **tab-nabbing / phishing vector**. An agent could output a link that, when clicked, gave the target page control over your opener tab. **Now blocked at the renderer.**
+
+**PR:** [#17156](https://github.com/OpenHands/OpenHands/pull/17156) by @LeizhenZhang
+
+---
+
+## 7. Secrets Passed via Env (Not argv) — Fixed
+
+**What it is:** Session API keys now passed to static-server via **environment variables** instead of command-line arguments.
+
+**Why it matters:** `ps aux` on the host no longer leaks your session keys. **Process list security = fixed.**
+
+**PR:** [#16420](https://github.com/OpenHands/OpenHands/pull/16420) by @putramkti (first contribution!)
+
+---
+
+## 8. The Bug Fixes That Stop Daily Paper Cuts (Selected)
+
+| Fix | Why You'll Notice |
+|-----|-------------------|
+| **Drag-selection stays inside message feed** | No more accidentally selecting the whole sidebar while copying agent output |
+| **Invalid OAuth relay attempts isolated** | Malformed auth doesn't crash the auth flow |
+| **Escape closes automation setup menus** | Muscle memory works — Esc closes popovers |
+| **Automation KV secret pinned** | Session-key rotation no longer corrupts KV data |
+| **Repository labels decoded correctly** | Git links with special chars work |
+| **Profile list refreshes even on title cleanup failure** | UI stays consistent |
+| **Custom-script automations pick their own LLM** | Not forced to use the default model |
+| **Tags don't hide automation names or overflow** | List view stays readable |
+| **ACP tool calls without titles don't leak i18n templates** | Clean transcript output |
+| **Cloud files opened in new window shown correctly** | Multi-window workflows work |
+| **Socket close race condition guarded** | Fewer "connection reset" errors under load |
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| **v1.34.0** | **Oct 27, 2026** | **Stable (Latest)** | **Per-conversation Docker runtime, Runtime settings page, filterable automation tags, new-conversation-in-sandbox, security fixes** |
+| v1.33.0 | Oct 23, 2026 | Stable | Verification improvements, automations fixes |
+| v1.32.0 | Oct 23, 2026 | Stable | Conversation improvements |
+| v1.31.0 | Oct 22, 2026 | Stable | Agent Canvas features |
+| v1.30.1 | Oct 22, 2026 | Patch | Bug fixes |
+| v1.30.0 | Oct 22, 2026 | Stable | Major Agent Canvas features |
+| v1.29.0 | Oct 20, 2026 | Stable | Scoped agents, isolated runtimes |
+
+**v1.30–.34 = the platform arc.** Six releases in one week. Each adds the infrastructure pieces: scoped agents, Docker runtimes, automation tags, verification, conversation management. **This isn't feature churn — it's building the platform layer.**
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Run multiple conversations in parallel** | **Yes** — per-conversation Docker = true isolation |
+| **Have 10+ automations** | **Yes** — tags + filtering = manageable |
+| **Use team orgs** | **Yes** — share toggle clarity + org-scoped sharing |
+| **Run untrusted agent output** | **Yes** — markdown link hijacking fixed |
+| **Pass secrets to agents** | **Yes** — keys no longer in `argv` |
+| **Just want latest stable** | **Yes** — 15+ fixes, zero breaking changes |
+
+---
+
+## How to Update
+
+```bash
+# Docker (recommended)
+docker pull ghcr.io/openhands/openhands:1.34.0
+# Or latest
+docker pull ghcr.io/openhands/openhands:latest
+
+# Verify
+docker run --rm ghcr.io/openhands/openhands:1.34.0 --version
+# Should show 1.34.0
+
+# If running from source
+git pull origin main
+git checkout v1.34.0
+npm ci && npm run build
+```
+
+**Changelog:** [github.com/OpenHands/OpenHands/compare/v1.33.0...v1.34.0](https://github.com/OpenHands/OpenHands/compare/v1.33.0...v1.34.0)
+
+---
+
+## The Pattern: Platform First, Features Second
+
+OpenHands doesn't ship "AI features" for demos. It ships **infrastructure that makes AI agents reliable at scale**.
+
+- v1.29: Scoped agents + isolated Docker runtimes → **foundation**
+- v1.30: Conversation management → **usability**
+- v1.31: Agent Canvas features → **platform**
+- v1.32: More conversation tools → **polish**
+- v1.33: Verification + automations → **enterprise readiness**
+- **v1.34: Per-conversation runtime + tags + security → production grade**
+
+**Six releases in seven days.** Each one removes a blocker for running agents in production: isolation, organization, security, observability.
+
+**Update. Configure a per-conversation Docker image. Tag your automations. Watch the Runtime page. Build something that doesn't break when the agent goes wild — because now it can't.**
+
+---
+
+## Related Articles
+
+- [OpenHands Agent Canvas 1.10.0 — Persistent Memory & Automations](/blog/openhands-agent-canvas-1-10-0-persistent-memory-automations/)
+- [OpenHands Agent Canvas Desktop App Changes Everything](/blog/openhands-agent-canvas-desktop-app-changes-everything/)
+- [OpenHands v1.24 — Automation, Agent Canvas, MCP Fixes](/blog/openhands-v1-24-automation-agent-canvas-mcp-fixes/)
+- [OpenHands v1.25 — Agent Canvas, Automation, Voice](/blog/openhands-v1-25-agent-canvas-automation-voice/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Coding Agent Security Checklist 2026 — The Operator's Hardening Guide](/blog/coding-agent-security-checklist-2026/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
+---
+
+*OpenHands is open-source (MIT) and available at [github.com/OpenHands/OpenHands](https://github.com/OpenHands/OpenHands) and [openhands.dev](https://openhands.dev). Published October 28, 2026 — covers OpenHands v1.34.0 released October 27, 2026. Full changelog: [github.com/OpenHands/OpenHands/releases/tag/v1.34.0](https://github.com/OpenHands/OpenHands/releases/tag/v1.34.0)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
