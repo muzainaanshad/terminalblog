@@ -1,0 +1,195 @@
+---
+title: "KiloCode Just Fixed Auto-Compaction Loops and Shipped a Conda Package — v7.8.20 Pre-Release"
+description: "KiloCode v7.8.20 (October 27, pre-release) fixes auto-compaction starting too early and looping on unknown context sizes, upgrades zod to patch a memory-exhaustion vulnerability, and publishes the CLI as a conda package on Anaconda.org. The stability pre-release that matters."
+pubDate: 2026-10-28T14:00:00Z
+tags: ["kilocode", "release", "v7.8.20", "auto-compaction", "conda", "security", "zod", "cli", "coding-agent", "beginner"]
+tool: "kilocode"
+author: "sage"
+image: "/api/og?title=KiloCode+v7.8.20+Auto-Compaction+Fix&tool=kilocode"
+canonical: "https://terminalblog.com/blog/kilocode-v7-8-20-auto-compaction-fix-conda-cli/"
+---
+
+**KiloCode v7.8.20 pre-release dropped October 27, 2026** — and while it's labeled "pre-release," the fixes inside are the kind you want *before* they hit stable.
+
+The headlines: **auto-compaction no longer starts early or loops on unknown context sizes**, **zod upgraded to patch a memory-exhaustion vulnerability**, **CLI now available as a conda package on Anaconda.org**, plus **agents can choose their base branch for worktree sessions**.
+
+If you've been bitten by runaway compaction or want `pixi add kilo-cli` — this is the update.
+
+---
+
+## The One-Line Summary
+
+**Compaction respects your threshold now. No more loops on unknown models. Zod memory bug patched. `pixi add kilo-cli` works. Agents pick base branch for worktrees. Update if you run into any of these.**
+
+---
+
+## 1. Auto-Compaction Fixed — No More Early Starts or Infinite Loops
+
+**The bug:** Auto-compaction was triggering **well before your configured context threshold**. Worse: on models without a known context size (custom endpoints, local models), it would **loop indefinitely** — compact, hit the same wall, compact again. And if you manually stopped a compaction, it would just restart.
+
+**The fix (v7.8.20):**
+- Compaction now **respects your configured threshold** — no more early starts
+- **No looping on unknown context sizes** — if the model doesn't report a limit, compaction backs off
+- **Stopping compaction actually stops it** — no more restart spiral
+
+**PR:** [#15479](https://github.com/Kilo-Org/kilocode/pull/15479) by @WebReflection
+
+**Why it matters:** This was the "my agent keeps pausing to summarize and I can't get work done" bug. If you run local models (Ollama, LM Studio) or custom endpoints — **this fixes your workflow entirely**.
+
+---
+
+## 2. Zod Upgraded — Memory-Exhaustion Vulnerability Patched
+
+**The issue:** The VS Code extension used a zod version with a **memory-exhaustion advisory** when validating oversized constrained collections. A malicious or accidental massive payload could OOM the extension host.
+
+**The fix:** **zod upgraded to a patched release** in the VS Code extension.
+
+**PR:** [#15483](https://github.com/Kilo-Org/kilocode/pull/15483)
+
+**Why it matters:** Supply-chain security. Your editor validates *everything* the agent outputs. A DoS vector in the validator = a DoS vector in your IDE. **Patch applied.**
+
+---
+
+## 3. CLI Now on Conda — `pixi add kilo-cli` Works
+
+**What it is:** The KiloCode CLI is now published as **`kilo-cli` on Anaconda.org** (conda-forge compatible), built with rattler-build for:
+- `linux-64`, `linux-aarch64`
+- `osx-64`, `osx-arm64`
+- `win-64`
+
+**Install:**
+```bash
+# pixi (recommended)
+pixi add kilo-cli
+
+# conda
+conda install -c anaconda-cloud kilo-cli
+
+# mamba
+mamba install -c anaconda-cloud kilo-cli
+```
+
+**Pre-releases** publish to the `rc` label — `pixi add kilo-cli@rc` for bleeding edge.
+
+**PR:** [#14465](https://github.com/Kilo-Org/kilocode/pull/14465) by @zfralish
+
+**Why it matters:** No more `curl | bash`, no more npm global installs fighting with your Node version. **Conda = reproducible, isolated, versioned CLI installs.** Works in pixi environments, Docker builds, CI pipelines.
+
+---
+
+## 4. Agents Choose Base Branch for Worktree Sessions
+
+**What it is:** When Agent Manager starts a worktree session, the agent can now **choose the base branch** instead of defaulting to the repo's default branch.
+
+**Why it matters:** You're on `feature/xyz` branched from `main`. Agent starts a worktree — before it used `main` as base. Now it can use `feature/xyz` (or any branch you tell it). **Worktrees start from where you actually are.**
+
+**PR:** [#15482](https://github.com/Kilo-Org/kilocode/pull/15482)
+
+---
+
+## 5. Dependency Updates (Gateway, Indexing, MCP, OpenCode Core)
+
+| Package | Version | Notes |
+|---------|---------|-------|
+| `@kilocode/kilo-gateway` | 7.9.0 | Gateway updates |
+| `@kilocode/kilo-indexing` | 7.8.19 | Indexing fixes |
+| `@kilocode/kilo-ui` | 7.8.19 | UI sync |
+| `@opencode-ai/core` | 7.8.19 | OpenCode core sync |
+| `@opencode-ai/ui` | 7.8.19 | OpenCode UI sync |
+| `@opencode-ai/server` | 7.8.19 | Server sync (CLI) |
+| `@opencode-ai/tui` | 7.8.19 | TUI sync (CLI) |
+| `@kilocode/kilo-telemetry` | 7.8.19 | Telemetry sync |
+| **MCP TypeScript SDK** | **1.32.1** | **Security: blocks cross-origin redirects in MCP HTTP/OAuth** |
+
+**The MCP fix** (from v7.8.18, carried forward): Remote MCP servers that redirect to another origin, or answer `POST` with `301`/`302`/`303`, **no longer connect** — use the server's final URL instead. Prevents credential leakage via redirect chains.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| **v7.8.20** | **Oct 27, 2026** | **Pre-release** | **Auto-compaction fix, zod memory patch, conda CLI package, agent-chosen base branch** |
+| v7.8.18 | Oct 26, 2026 | **Stable (Latest)** | Chat copy fix (VS Code 1.143), DOMPurify 3.4.17, Vite 7.3.7 (CVE), hosted cloud sessions via local API, MCP SDK 1.32.1 security |
+| v7.8.17 | Oct 24, 2026 | Stable | Security patch: browser MCP fixes |
+| v7.8.16 | Oct 23, 2026 | Pre-release | Pre-release fixes |
+| v7.8.15 | Oct 22, 2026 | Stable | Agent Manager browser prompt fix |
+
+**v7.8.18 = current stable. v7.8.20 = pre-release with compaction + zod fixes.** If you hit the compaction loop or want conda CLI — test v7.8.20. Otherwise wait for stable.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Hit auto-compaction loops on local/custom models** | **Yes** — pre-release fixes your exact pain |
+| **Run large agent outputs that could trigger zod validation** | **Yes** — memory-exhaustion vector patched |
+| **Want `pixi add kilo-cli` / conda-managed CLI** | **Yes** — available now on Anaconda.org |
+| **Use Agent Manager worktrees from feature branches** | **Yes** — agent picks correct base branch |
+| **Prefer stable-only** | **Wait** — v7.8.18 stable is solid; v7.8.20 fixes land in next stable |
+
+---
+
+## How to Update
+
+```bash
+# VS Code / Cursor / JetBrains extension
+# Pre-release: Extensions → KiloCode → Switch to Pre-Release channel → Update
+# Stable: Auto-updates or Extensions → KiloCode → Update (stays on v7.8.18)
+
+# CLI via conda (NEW)
+pixi add kilo-cli@rc        # pre-release
+pixi add kilo-cli           # stable (when promoted)
+
+# CLI via npm (existing)
+npm update -g @kilocode/cli
+
+# Verify
+kilo --version
+# Should show 7.8.20 (pre) or 7.8.18 (stable)
+```
+
+**Changelog:** [github.com/Kilo-Org/kilocode/releases/tag/v7.8.20](https://github.com/Kilo-Org/kilocode/releases/tag/v7.8.20)
+
+---
+
+## The Pattern: Stability Over Speed
+
+KiloCode's October arc tells a story:
+
+- **v7.8.15**: Browser prompt fix — *usability*
+- **v7.8.17**: Browser MCP security — *security*
+- **v7.8.18**: Chat copy + DOMPurify + Vite CVE + MCP redirect fix + cloud sessions — *stability + security + platform*
+- **v7.8.20**: Compaction logic + zod memory + conda CLI — *core reliability + distribution*
+
+**Four releases in six days.** Each one removes a footgun: compaction loops, memory DoS, redirect leaks, broken copy-paste. The conda package is the bonus — **distribution maturity**.
+
+**If you're on v7.8.18 stable and happy — stay. If compaction drives you crazy — grab v7.8.20 pre-release. The fixes are real.**
+
+---
+
+## Related Articles
+
+- [KiloCode v7.8.18 Fixes VS Code 1.143 Chat Copy Bug, Security Updates](/blog/kilocode-v7-8-18-fix-chat-copy-focus/)
+- [KiloCode v7.8.17 Security Patch — Browser MCP Fixes](/blog/kilocode-v7-8-17-security-patch-browser-mcp-fixes/)
+- [KiloCode v7.8.15 Agent Manager Browser Prompt Fix](/blog/kilocode-v7-8-15-agent-manager-browser-prompt-fix/)
+- [KiloCode v7.8.10 Search Ignored Paths, Grep Fix, MCP Windows](/blog/kilocode-v7-8-10-search-ignored-paths-grep-fix-mcp-windows/)
+- [KiloCode v7.8.9 Drag-Drop Projects, Agent Manager](/blog/kilocode-v7-8-9-drag-drop-projects-agent-manager/)
+- [KiloCode v7.8.8 Pinned Worktrees, Integrated Browser, MCP OAuth](/blog/kilocode-v7-8-8-pinned-worktrees-integrated-browser-mcp-oauth/)
+- [Kilo Code vs Opencode: The Lightweight Agent Showdown](/blog/kilo-vs-opencode/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
+---
+
+*KiloCode is open-source (MIT) and available at [github.com/Kilo-Org/kilocode](https://github.com/Kilo-Org/kilocode) and [kilo.ai](https://kilo.ai). Published October 28, 2026 — covers KiloCode v7.8.20 pre-released October 27, 2026. Full changelog: [github.com/Kilo-Org/kilocode/releases/tag/v7.8.20](https://github.com/Kilo-Org/kilocode/releases/tag/v7.8.20)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
