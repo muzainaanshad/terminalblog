@@ -1,0 +1,277 @@
+---
+title: "Claude Code v2.1.314 Just Added the Security Feature Everyone Was Begging For — And Idle Compaction Finally Works"
+description: "Claude Code v2.1.314 (Oct 30) drops the long-requested `permissions.blockWritesOutsideWorkingDirectories` setting — write/edit/notebookedit tools now refuse paths outside your working directories in every permission mode. Plus: idle compaction in VS Code/Claude Desktop, effort cap fixes, and 40+ other fixes. The security boundary you've been waiting for is finally here."
+pubDate: 2026-10-30T10:00:00Z
+tags: ["claude-code", "release", "v2.1.314", "security", "stability", "coding-agent", "beginner"]
+tool: "claude-code"
+author: "sage"
+image: "/api/og?title=Claude+Code+v2.1.314+Security+Feature&tool=claude-code"
+canonical: "https://terminalblog.com/blog/claude-code-v2.1.314-permissions-block-writes-idle-compaction/"
+faq:
+  - q: "What is the new permissions.blockWritesOutsideWorkingDirectories setting?"
+    a: "A new security boundary that makes Write, Edit, and NotebookEdit tools refuse any path outside your configured working directories — regardless of permission mode (even in auto/allow mode). This prevents accidental or malicious writes to system directories, home folder, or other projects."
+  - q: "Does idle compaction work automatically now?"
+    a: "Yes — VS Code and Claude Desktop's Code tab now automatically summarize conversations over 200K tokens that sit idle. The summary is used on your next message if the prompt cache expired. No manual /compact needed."
+  - q: "What's the effort cap fix about?"
+    a: "When an org admin caps a model's effort level, Claude Code now automatically lowers the effort, retries, and tells you which level it's using — instead of failing turn after turn with 'Invalid effort level'."
+  - q: "Are there breaking changes in v2.1.314?"
+    a: "No breaking changes. This is a patch release (2.1.314) — only bug fixes, security improvements, and quality-of-life updates. Run `claude update` safely."
+  - q: "What about the MCP authentication fixes?"
+    a: "Fixed MCP servers showing 'needs authentication' after stored sign-in stopped working — they now work signed out. Fixed `claude mcp logout` falsely reporting success when macOS keychain is locked over SSH."
+
+---
+
+Claude Code **v2.1.314 dropped October 30** — just 3 days after v2.1.312's 80-fix wave. But this one's different. It ships the **single most-requested security feature** since auto-mode launched: a hard boundary that stops writes outside your working directories, period.
+
+Plus idle compaction that actually works in VS Code, effort cap handling that doesn't brick your session, and 40+ other fixes.
+
+---
+
+## The Headline: `permissions.blockWritesOutsideWorkingDirectories` — The Boundary You've Been Waiting For
+
+### What It Does
+
+Add this to your settings:
+
+```json
+{
+  "permissions": {
+    "blockWritesOutsideWorkingDirectories": true
+  }
+}
+```
+
+**Result:** Write, Edit, and NotebookEdit tools **refuse any path outside your working directories** — in *every* permission mode. Even `auto` mode. Even if you explicitly allow it.
+
+### Why This Matters
+
+Before v2.1.314, the permission system had a gap:
+
+| Scenario | Old Behavior | New Behavior |
+|----------|--------------|--------------|
+| `auto` mode + `Write(/etc/passwd)` | ❌ Allowed (you said auto) | ✅ **Blocked** |
+| Malicious prompt injection writes to `~/.ssh/id_rsa` | ❌ Possible | ✅ **Blocked** |
+| Accidental `Edit(../../../package.json)` | ❌ Allowed | ✅ **Blocked** |
+| Subagent tries to escape project root | ❌ Possible | ✅ **Blocked** |
+
+This is a **hard security boundary**, not a permission prompt. The tool call fails before it reaches the filesystem.
+
+### Who Should Enable This
+
+- **Everyone running in `auto` mode** — this is the missing safety net
+- **Teams with shared Claude Code configs** — prevents one project's agent from touching another
+- **CI/CD pipelines** — hard guarantee the agent can't escape the workspace
+- **Anyone using MCP servers** — supply chain attacks often try filesystem escape
+
+### The Catch
+
+Legitimate cross-project workflows (monorepos, shared configs) need explicit working directory setup:
+
+```bash
+# Add multiple working directories
+claude config add workingDirectories '["/home/user/project-a", "/home/user/project-b"]'
+
+# Or per-session
+claude -p --working-directory /home/user/project-a --working-directory /home/user/shared-config
+```
+
+---
+
+## Idle Compaction Finally Works in VS Code & Claude Desktop
+
+### The Problem Before
+
+Conversations over 200K tokens would:
+- Slow down responses
+- Burn through context windows
+- Require manual `/compact` (which you'd forget)
+
+### What v2.1.314 Ships
+
+**Automatic idle compaction** in VS Code extension and Claude Desktop's Code tab:
+
+1. Conversation hits **200K+ tokens**
+2. You leave it **idle** (no messages for a while)
+3. Claude Code **summarizes it in the background**
+4. Next message uses the **summary** — if prompt cache expired
+
+No manual trigger. No UI interruption. It just works.
+
+### The Fine Print
+
+- Only in VS Code extension + Claude Desktop Code tab (not terminal CLI yet)
+- Requires prompt cache expiry to kick in (otherwise cached context is used)
+- Summary preserves: key decisions, file changes, task context
+- Subagents get their own compaction windows (configurable via `autoCompactWindow`)
+
+---
+
+## Effort Cap Handling — No More "Invalid Effort Level" Loops
+
+### The Bug
+
+Organizations using admin policies to cap model effort (e.g., "max Haiku effort") would hit:
+
+```
+Invalid effort level
+```
+
+...turn after turn. The agent couldn't proceed, couldn't explain, just failed.
+
+### The Fix
+
+Claude Code now:
+1. **Detects** the org's effort cap
+2. **Lowers** effort automatically (Opus → Sonnet → Haiku)
+3. **Retries** the request
+4. **Tells you** which level it's using
+
+Transparent fallback. Zero session breaks.
+
+---
+
+## MCP Authentication Fixes — The Silent Session Killers
+
+### Fixed: "Needs Authentication" Ghost State
+
+MCP servers that **work without sign-in** (public servers, local tools) would show "needs authentication" after their stored sign-in expired or broke.
+
+**Now:** They work signed out. No phantom auth prompts.
+
+### Fixed: `claude mcp logout` Lying to You
+
+Over SSH with locked macOS keychain, `claude mcp logout` reported success but **didn't actually remove the sign-in**.
+
+**Now:** It reports the real status. If keychain is locked, it says so.
+
+### Fixed: Extra Sign-in Renewals
+
+Multiple sessions sharing an Anthropic profile login would hammer the credentials lock with redundant renewals.
+
+**Now:** Coordinated renewal — one session refreshes, others wait.
+
+---
+
+## The Rest: 40+ Fixes You'll Actually Feel
+
+### Remote Control & Cloud Sessions
+
+| Fix | Why You Care |
+|-----|--------------|
+| Remote Control stuck "Connecting" ~2 min behind proxy | Starts fast on corporate networks |
+| Messages sent over Remote Control showing as *your* message in mobile apps | Correct attribution |
+| Cloud environment errors only as toasts outside dialogs | Errors appear *inside* the dialog |
+| Resending failed message running it twice | No duplicate executions |
+| Resumed claude.ai cloud session making phantom model calls | Stops ghost API usage |
+
+### Bedrock / Vertex / Foundry / Gateway
+
+- **Model ID dots fixed:** `claude-opus-4.8` behind gateway no longer treated as older model (wrong context window, effort, cost)
+- **Gateway beta headers:** Request retried without beta header if gateway refuses by name
+- **Vertex upstream hangs:** Fixed Google token endpoint accepting connection then never answering
+- **Foundry fallback:** No deployment for default model → falls back to older model of same family
+
+### TLS & Certificate Handling
+
+- **Cross-signed root certs:** Fixed `UNABLE_TO_GET_ISSUER_CERT` when system store has renewed cross-signed root
+- **Managed settings TLS trust:** Admin TLS settings now apply in Claude Desktop sessions
+
+### VS Code Extension
+
+- Sessions failing to start with "Subprocess initialization did not complete within 60000ms" — SessionStart command hook time no longer counts toward limit (up to 10 min total)
+- Session closed during startup no longer leaves Claude Code process orphaned
+- Mod drawings disappearing from long-open panels on machines with older Claude Code — fixed
+- Past conversations hiding sessions when `claudeCode.claudeProcessWrapper` is set — fixed
+- Background sub-agents now show correct status
+
+### Hooks & Prompts
+
+- Prompt/agent hooks: max 24 concurrent per session (sub-agents included), plus 12 that waited past timeout
+- Timeout under 1 second → counts as 1 second
+- Subagent `autoCompactWindow` now lowers `CLAUDE_CODE_AUTO_COMPACT_WINDOW` (was no-op before)
+- Effort indicator: mid-task change now says "may wait for your next message," clears when irrelevant
+
+### WebFetch & Cloud UX
+
+- Cloud session WebFetch: unresolvable host explained as "possibly outside allowed network domains" — Claude names the host to allow
+- Bash editor in cloud environment settings: colors, line numbers, Copy button
+- Repository add step: short table instead of raw JSON
+
+### Small But Satisfying
+
+- `oidc.user_id_claim` in Claude apps gateway — identify by id_token claim other than `sub` (e.g., Entra ID's `oid`)
+- Click-to-send in fullscreen: click "to send now" hint under queued message → sends immediately
+- Managed settings/org policy now fetched after VS Code extension sign-in
+- Per-directory and `paths:` skills found after `cd` deeper into git repo
+- Rare case: first reply after terminal resume missing on second resume — fixed
+- Invalid command name no longer stops all commands from loading (could leave `claude -p` silent)
+- Vim mode `d`/`c`/`y` with `gj`/`gk` count > lines left: only moves cursor (like Vim)
+- `/verify` shows short description in `/help` and `/` menu (was long Claude-facing description)
+- `/artifacts` delete confirmation: numbered choices (1/Enter keep, 2 delete, y/n/Esc still work)
+- Mods question: plain text, no link/session ID, stays up on new turn, tells you what loaded
+- Tool search on by default behind custom `ANTHROPIC_BASE_URL`; 400/422 retries without it
+- Compaction sends skill list again; `/reload-skills` sends only new/changed skills
+- Skill hooks: max 1,024 hooks and 16,384 matcher chars per session per source
+- Policy allowing hooks from plugins only: skill whose hooks blocked no longer gets `allowed-tools`
+- `/claude-api` skill uses `ant` CLI on Claude Platform on AWS (not SDK/curl fallback)
+- Removed `claude plugin validate` notes predicting where mod hooks would run
+- Removed "(research preview)" label from `/fast` dialog title on Opus 5.5
+
+---
+
+## Should You Update?
+
+**Yes. Immediately.**
+
+```bash
+claude update
+# or fresh install
+curl -fsSL https://claude.ai/install.sh | bash
+```
+
+### Why This One Matters More Than v2.1.312
+
+| v2.1.312 | v2.1.314 |
+|----------|----------|
+| 80 bug fixes (paper cuts) | **1 security boundary + idle compaction + effort caps + 40 fixes** |
+| "Nice to have" | **"Enable this before you run auto mode again"** |
+| Stability polish | **Security architecture + UX foundation** |
+
+If you run `auto` mode without `blockWritesOutsideWorkingDirectories: true`, you're one prompt injection away from a filesystem escape. This release closes that door.
+
+---
+
+## Installation
+
+```bash
+claude update
+# or fresh install
+curl -fsSL https://claude.ai/install.sh | bash
+```
+
+Verify:
+
+```bash
+claude --version
+# Should show: claude-code/2.1.314
+```
+
+---
+
+## The Bottom Line
+
+Three releases in 6 days (v2.1.311 Oct 26, v2.1.312 Oct 27, v2.1.314 Oct 30) — **200+ fixes total**. Anthropic is in full stability sprint mode.
+
+But v2.1.314 isn't just fixes. It's the **security boundary** auto-mode needed from day one, **idle compaction** that makes long sessions viable in VS Code, and **effort cap handling** that keeps org-managed sessions alive.
+
+Update. Enable `blockWritesOutsideWorkingDirectories`. Keep coding.
+
+---
+
+*Claude Code v2.1.314 released October 30, 2026. Full changelog: [github.com/anthropics/claude-code/releases/tag/v2.1.314](https://github.com/anthropics/claude-code/releases/tag/v2.1.314)*
+
+## Related articles
+
+- [Claude Code v2.1.312 Just Dropped 80+ Fixes — Write Stalls, MCP Hangs, Subagent Ghosts All Gone](/blog/claude-code-v2-1-312-80-fixes-you-feel/)
+- [Claude Code v2.1.296 — Stability Release You've Been Waiting For](/blog/claude-code-v2-1-295-stability-release-youve-been-waiting-for/)
+- [Claude Code v2.1.280 — Opus 5.5 Default, Massive Fix Wave](/blog/claude-code-v2-1-280-opus-5-5-default-massive-fix-wave/)
