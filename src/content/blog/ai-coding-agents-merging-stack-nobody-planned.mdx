@@ -1,0 +1,278 @@
+---
+title: "Cursor, Claude Code, and Codex Are Quietly Merging Into One AI Coding Stack — Nobody Planned This"
+description: "OpenAI shipped a Codex plugin for Claude Code. Cursor runs agents that use any model. The three biggest tools are layering into each other — and it changes everything about how you work."
+pubDate: 2026-10-30T15:00:00Z
+tags: ["claude-code", "cursor", "codex", "ecosystem", "interoperability", "ai-coding-agents", "featured", "deep-dive"]
+tool: "industry"
+author: "Anshad"
+image: "/api/og?title=AI+Coding+Agents+Merging+Stack+Nobody+Planned&tool=industry"
+canonical: "https://terminalblog.com/blog/ai-coding-agents-merging-stack-nobody-planned/"
+---
+
+This wasn't supposed to happen.
+
+The AI coding agent war was supposed to produce **one winner**. One tool. One subscription. One workflow. You pick your horse — Cursor, Claude Code, or Codex — and ride it.
+
+Instead, something weirder is happening. The three biggest tools are **absorbing each other**.
+
+OpenAI shipped an official plugin that runs Codex *inside* Claude Code. Cursor's agents can call any model — including Claude and GPT. Codex runs as a subagent inside Cursor. They're not competing anymore. They're **layering**.
+
+And nobody planned this stack. It emerged from developers solving their own problems.
+
+---
+
+## The Three Layers Forming Right Now
+
+### Layer 1: The Editor Shell (Cursor)
+
+Cursor started as "VS Code with AI." Now it's an **agent orchestration platform**.
+
+- **Projects**: Coordinator agents that plan, delegate to subagents, maintain context across months
+- **Cloud agents**: Run overnight, produce interactive canvases (dashboards, diagrams, test reports)
+- **Origin + Marketplace**: 20+ integrations (Vercel, Semgrep, Linear, Datadog) — deploy, CI, security, monitoring inside the editor
+- **Remote Control**: iOS app controls your local agents from anywhere
+
+Cursor doesn't care which model you use. Composer 2, GPT-6, Opus 5.5, Grok 4.7 — they're all plug-and-play.
+
+### Layer 2: The Terminal Agent (Claude Code)
+
+Claude Code started as Anthropic's terminal CLI. Now it's an **extensible agent OS**.
+
+- **Mods**: Plugin architecture that rewrites *deeper behavior* — not just tool calls. Hook `agent.spawn`, cache prompt blocks, raise native notifications
+- **Remote MCP**: Servers survive container restarts with exponential backoff
+- **Security hardening**: UNC path blocking, worktree isolation for git 2.56+
+- **OpenAI's own plugin**: `/codex:review`, `/codex:rescue`, `/codex:transfer` — Codex runs *inside* Claude Code
+
+Claude Code doesn't care which editor you use. Terminal, VS Code, JetBrains, desktop app, web, mobile — same agent.
+
+### Layer 3: The Portable Runtime (Codex)
+
+Codex started as OpenAI's terminal agent. Now it's a **composable execution layer**.
+
+- **Mid-response steering**: Correct the agent *while it's generating* — no restart needed
+- **Parallel read-only tools**: Skill lookups, memory searches, history retrieval all at once
+- **Config UI**: `/config` — searchable preferences, no flag memorization
+- **Runs inside both Cursor and Claude Code** as a subagent
+
+Codex doesn't care where it runs. Terminal, browser, embedded in another agent's workflow — same runtime.
+
+---
+
+## The Plugin That Broke the Mental Model
+
+**OpenAI built a first-party plugin for a rival's product.**
+
+That sentence should not exist in a competitive market. But here it is: `codex-plugin-cc` — Apache 2.0, maintained by OpenAI, installs in Claude Code with `/plugin marketplace add openai/codex-plugin-cc`.
+
+```bash
+# Inside Claude Code:
+/plugin marketplace add openai/codex-plugin-cc
+/plugin install codex@openai-codex
+/reload-plugins
+/codex:setup
+```
+
+What you get:
+
+| Command | What It Does |
+|---------|-------------|
+| `/codex:review` | Read-only Codex review of current/branch changes |
+| `/codex:adversarial-review` | Steerable review that challenges design decisions |
+| `/codex:rescue` | Hands task to Codex via subagent to investigate/fix |
+| `/codex:transfer` | Exports session to persistent Codex thread |
+| `/codex:status` / `/result` / `/cancel` | Manage background Codex jobs |
+
+The plugin **wraps your existing Codex CLI**. No separate runtime. No new login. Same repo, same auth, same config.
+
+OpenAI's docs even warn about the optional "review gate" — a Stop hook that runs Codex review on Claude's response before accepting, blocking if issues found. "Can create long-running Claude/Codex loop and drain usage limits quickly."
+
+This isn't competition. This is **composition**.
+
+---
+
+## The Cursor → Codex → Claude Code Triangle
+
+### Cursor Calls Codex
+
+Cursor's Agent SDK lets you define agents as code, deploy to Cursor's cloud or self-host. The templates include a **Security Reviewer** that scans PRs for exploitable bugs — and it can invoke Codex for the actual review.
+
+### Cursor Calls Claude Code
+
+Cursor's built-in models include Opus 5.5 and Sonnet 5.5. You can also bring your own Anthropic key. The agent *is* the orchestration layer; the model is a commodity.
+
+### Claude Code Calls Codex
+
+Via the official plugin. `/codex:rescue` spins up a Codex subagent to "take a second pass at a problem." `/codex:transfer` exports your entire session to Codex with `codex resume` command.
+
+### Codex Runs Inside Both
+
+Codex's `/daemon` manages background state. Multiple clients connect. Start in terminal → switch to web UI → hand to desktop app. The runtime persists.
+
+---
+
+## What This Means for Your Daily Workflow
+
+### You Don't Pick One Anymore
+
+The question "Cursor or Claude Code or Codex?" is becoming obsolete. The real question: **which layer do you want to own?**
+
+| If You Want... | Own This Layer | Use the Others As... |
+|----------------|----------------|----------------------|
+| Full IDE with orchestration, deploy monitoring, security review | **Cursor** | Model backends + subagents |
+| Terminal-first, extensible, portable skills, any model | **Claude Code** | Editor shell + specialized reviewers |
+| Open-source, embeddable runtime, background persistence | **Codex** | Orchestration layer + model provider |
+
+### The Skill Format Is Converging
+
+All three now read `SKILL.md` / `AGENTS.md` / `CLAUDE.md` — portable prompt files that define agent behavior.
+
+```markdown
+---
+name: "security-audit"
+provider: "anthropic"
+model: "claude-3-5-sonnet"
+allowedTools: ["read", "grep", "bash"]
+---
+# Security Audit Skill
+Scan for: hardcoded secrets, SQL injection vectors, path traversal,
+weak crypto, missing auth checks...
+```
+
+Write it once. Runs in Cursor, Claude Code, Codex, OpenCode, Cline. **Your workflow becomes portable IP — not vendor IP.**
+
+---
+
+## The Economics Just Flipped
+
+### Old Model: Vertical Integration
+
+| Tool | Model Lock-in | Monthly Cost |
+|------|--------------|--------------|
+| Cursor Pro | Composer 2 / selected | $20 + rate limits |
+| Claude Code Max | Anthropic only | $100 + API costs |
+| Codex | OpenAI only | ChatGPT sub or API |
+
+### New Model: Horizontal Freedom
+
+```
+OpenCode + aiFiesta: $12/mo → GPT + Claude + Gemini + Grok + DeepSeek + 6 more
+OpenCode + local:     $0/mo marginal (hardware you own)
+Cursor (BYOK):        Your keys, any model
+Claude Code (BYOK):   Your keys, any OpenAI-compatible endpoint
+```
+
+When 80% of daily tasks (boilerplate, tests, docs, simple refactors) run on Groq's Llama 3.1 70B at **$0.80/M tokens** instead of Anthropic's **$15/M**, the math stops being debatable.
+
+GPT-6.1 Sol at **$2/M input, $10/M output** (95% cached discount). Haiku 5.5 at **~75% cheaper than 4.5**. The model pricing war means every price cut lowers session costs — and the horizontal tools (OpenCode, Cursor BYOK, Claude Code BYOK) capture the savings automatically.
+
+---
+
+## The Security Conversation Just Got Real
+
+### OpenCode's Daemon = New Attack Surface
+
+OpenCode 2.0 runs a **persistent background service** that owns sessions, shell execution, plugin loading, and model credentials.
+
+- `opencode pair` can expose/connect the service to other hosts
+- Shared session state across terminal/web/desktop = compromised client could see/influence sessions started elsewhere
+- Hot-reloadable plugins = plugin provenance and code-execution trust are live security questions
+- Background shell commands/subagents = unattended tasks need careful lifecycle/approval controls
+
+Augmented Software Engineering flagged the client-server redesign and plugin changes as the parts most likely to need careful review before production use.
+
+### Cursor's Managed Approach
+
+Cursor's Agent SDK deploys to managed infrastructure (or self-host). Secrets in dashboard. Channels authenticate via your Cursor account. More familiar security model — but you trust Cursor's platform.
+
+### Claude Code's Mod System
+
+Mods run with deep hooks into agent behavior. Community Mods will handle custom permission gates, compliance checks, specialized review loops. The API is new — expect rapid ecosystem growth *and* supply-chain risk.
+
+---
+
+## What to Watch Next
+
+1. **Cursor Agent SDK adoption** — Will teams build and deploy custom agents, or stick to built-ins?
+2. **OpenCode 2.0 plugin ecosystem** — 1.x plugins need porting. Will community rebuild fast enough?
+3. **Security audits** — First production incidents will define trust boundaries for background agent daemons
+4. **Model pricing** — Haiku 5.5 at $0.10/M input changes economics of running agents at scale
+5. **Interop** — Will Cursor agents run on OpenCode runtime? Will OpenCode SDK work with Cursor channels?
+6. **The fourth layer** — Zed (speed + model breadth), Aider (git truth), OpenCode (provider-neutral), Hermes (scheduling + cron) — which becomes the *substrate*?
+
+---
+
+## The Pattern Nobody's Naming
+
+We've seen this before.
+
+- Docker: "container as unit of deployment" → Kubernetes: "cluster as platform"
+- Serverless functions: "code as deployment" → Platforms: "workflows as infrastructure"
+- **Coding agents: "agent as tool" → Now: "agent runtime as platform"**
+
+Cursor and OpenCode arrived at the same conclusion from opposite directions:
+
+- Cursor started cloud-first, added local development + SDK
+- OpenCode started local-first, added background service + SDK + embeddable runtime
+- Claude Code started terminal-first, added Mods platform + rival plugins
+
+All three realized: **developers don't want another tool. They want a programmable layer that handles the agent lifecycle so they can build on top of it.**
+
+---
+
+## The Bottom Line
+
+October 2026 wasn't a feature month. It was the month **coding agents graduated from tools to infrastructure**.
+
+- Cursor gave you a deployment pipeline for agents
+- OpenCode gave you an embeddable runtime
+- Claude Code gave you an extensible OS with rival plugins
+- All three gave you backgrounds that don't die when you close your terminal
+
+The question isn't "which agent should I use?" anymore.
+
+It's **"which agent platform do I build on?"**
+
+And the answer might be: **all of them, layered.**
+
+---
+
+## FAQ
+
+### Which AI coding agent had the biggest October 2026 update?
+
+Claude Code's Mods platform is the most architecturally significant — it turns the agent into an extensible OS. Cursor's Remote Control + Rollouts + Security Review + Projects is the broadest product shift. Codex's mid-response steering + config UI + parallel tools is the best daily UX upgrade. OpenCode 2.0's background service + SDK is the deepest architectural shift.
+
+### Should I switch agents based on October 2026 releases?
+
+Only if your workflow maps to a new capability: need iOS remote control → Cursor; need programmable permission model → Claude Code Mods; need embeddable runtime → OpenCode SDK; need git-native day-zero model support → Aider. Don't switch for "features" — switch for **architecture alignment**.
+
+### Is Cursor's Security Review a replacement for SAST tools?
+
+No. It finds *exploitable bugs in PR context* (injection, auth bypass, SSRF, secrets, unsafe deserialization, vulnerable dependencies). It complements SAST — it doesn't replace whole-repo static analysis. Think of it as "security review per change" vs "security audit per codebase."
+
+### What are Claude Code Mods practically useful for today?
+
+The built-in "You Should Know" mod runs a side agent that flags missed edge cases, security issues, and pattern violations. Community Mods will likely handle: custom permission gates, compliance checks, specialized review loops, automated documentation, and workflow enforcement. The API is new — expect rapid ecosystem growth.
+
+### Does Codex's steering feature actually work in practice?
+
+Yes. You type a correction mid-stream, Codex interrupts, re-plans, continues with your direction. It's like grabbing the wheel when your GPS tries to drive you into a lake — except the car actually listens. This alone changes how you trust the agent on long tasks.
+
+### Can I really run Codex inside Claude Code inside Cursor?
+
+Yes. Cursor agent → calls Codex subagent → which could theoretically invoke a Claude Code Mod. The layers are composable. Whether it's *wise* depends on your latency and cost tolerance — but the architecture permits it.
+
+---
+
+## Related Articles
+
+- [Cursor Just Shipped Projects, Cloud Agents, and an App Marketplace — The October Wave That Changes Everything](/blog/cursor-october-2026-wave/)
+- [Claude Code v2.1.302 Quietly Fixed 50+ Bugs — Including the Worktree Corruption That Ate Repos](/blog/claude-code-v2-1-302-bug-fixes/)
+- [Codex v0.163.0 Just Gave You a Config UI, Instant Interrupt, and Parallel Tools](/blog/codex-v0-163-0-config-parallel-interrupt/)
+- [OpenAI Just Shipped an Official Codex Plugin for Claude Code — Here's What It Does](/blog/openai-codex-plugin-for-claude-code/)
+- [Cursor and OpenCode Just Turned AI Coding Agents Into Platforms](/blog/cursor-agent-sdk-opencode-2-background-service-october-2026/)
+- [Best Coding Agents 2026 — Decision Guide (Not Another Hype List)](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
