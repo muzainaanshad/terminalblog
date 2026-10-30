@@ -1,0 +1,250 @@
+---
+title: "Codex v0.166.0 Just Shipped Keyboard Transcript Selection, GPT-6.1 Terra Everywhere, and a Network Doctor — The Terminal Agent Keeps Leveling Up"
+description: "Codex v0.166.0 stable (Oct 29) adds keyboard-driven transcript selection with word/line/page motions, consistent Markdown rendering, GPT-6.1 Terra in bundled/Vertex/Bedrock catalogs, codex queue --resume, clearer safety explanations, and codex doctor --network-only for connectivity diagnostics."
+pubDate: 2026-10-30T10:00:00Z
+tags: ["codex", "release", "v0.166.0", "transcript", "vertex-ai", "gpt-6.1-terra", "doctor", "coding-agent", "beginner", "open-source"]
+tool: "codex"
+author: "sage"
+image: "/api/og?title=Codex+v0.166.0+Transcript+Selection+Terra&tool=codex"
+canonical: "https://terminalblog.com/blog/codex-v0-166-0-transcript-selection-vertex-terra-doctor/"
+faq:
+  - q: "What is keyboard-driven transcript selection?"
+    a: "Navigate your conversation history with Vim-style motions — word, line, page jumps, integrated search, and configurable shortcuts. No mouse needed to copy, reference, or search past messages."
+  - q: "Is GPT-6.1 Terra available on Vertex AI and Bedrock now?"
+    a: "Yes — v0.166.0 adds Terra to the bundled, Vertex AI, and Amazon Bedrock model catalogs. If you use GCP or AWS, Terra is one click away in the model picker."
+  - q: "What does codex queue --resume do?"
+    a: "Resumes unloaded threads after queueing a message. Your background work picks up where it left off without manual intervention."
+  - q: "What are the safety-block explanation improvements?"
+    a: "When the Guardian safety system blocks a tool call, you now get clearer explanations and selectable safer follow-up prompts in the TUI — so you can adjust and keep going instead of hitting a wall."
+  - q: "What is codex doctor --network-only?"
+    a: "A focused diagnostic command that checks configuration, connectivity, and WebSocket health without running the full doctor suite. Great for troubleshooting corporate proxy or firewall issues."
+  - q: "Are there breaking changes in v0.166.0?"
+    a: "No breaking changes. This is a patch release (0.166.0) with new features, bug fixes, and chores. Safe to upgrade from v0.165.0."
+---
+
+**Codex v0.166.0 dropped October 29** — just two days after v0.165.0's Vertex AI and Memory v2 release. The October velocity is relentless: four stable releases in three weeks, each adding a layer that compounds.
+
+This one isn't just fixes. It gives you **keyboard-native transcript navigation**, **consistent Markdown everywhere**, **Terra on every major cloud**, **queue resume for background work**, and a **network doctor** for when corporate proxies eat your connection.
+
+---
+
+## The Headline Features (Ranked by Daily Impact)
+
+### 1. Keyboard-Driven Transcript Selection — Vim Motions for Your Chat History
+
+**What it is:** Navigate, select, search, and copy from your transcript using keyboard motions — word (`w`/`b`), line (`j`/`k`), page (`Ctrl+f`/`Ctrl+b`), integrated search (`/`), and configurable shortcuts.
+
+**Why it matters:** You're in a deep debugging session. The agent printed a 200-line stack trace 40 messages ago. Before: scroll, hunt, mouse-select, copy. Now: `/error` → `n` → `v` → `y` → done. Your hands never leave the keyboard.
+
+```bash
+# In Codex TUI:
+/search-term    # Jump to matches
+v               # Visual selection mode
+w / b           # Word forward/backward
+j / k           # Line down/up
+Ctrl+f / Ctrl+b # Page down/up
+y               # Yank (copy) selection
+```
+
+**For beginners:** This is Vim keybindings applied to your conversation history. If you know Vim, you already know this. If you don't, the basics (`/`, `n`, `v`, `y`) get you 90% of the value in 5 minutes.
+
+---
+
+### 2. Consistent Markdown Rendering Everywhere
+
+**What it is:** Async questions, choices, answers, and transcript replies now all render Markdown the same way. No more "why does this look different in the prompt vs the reply?"
+
+**Why it matters:** Tables, code blocks, lists, links — they render identically whether the agent is asking you a question, showing a choice, or streaming a response. Mental model stays consistent.
+
+---
+
+### 3. GPT-6.1 Terra Now in Bundled, Vertex AI, and Bedrock Catalogs
+
+**What it is:** OpenAI's flagship reasoning model (Terra) is now available not just via OpenAI's API, but natively through **Google Cloud Vertex AI** and **Amazon Bedrock**.
+
+**Why it matters:** Enterprises on GCP or AWS can use Terra with their existing cloud quotas, VPC perimeters, and IAM policies. No data leaves your cloud project. One model, three cloud paths.
+
+```json
+// Works on all three now:
+{
+  "model": "gpt-6.1-terra",
+  "model_provider": "openai"  // or "gcp" or "bedrock"
+}
+```
+
+**For beginners:** Terra is the model you reach for when the problem is "understand this legacy system and refactor it" not "write a quick function." Now it's available wherever your cloud lives.
+
+---
+
+### 4. `codex queue --resume` — Background Work That Survives
+
+**What it is:** Queue a message for an unloaded thread, and Codex resumes the thread automatically. The agent picks up where it left off.
+
+**Why it matters:** You started a long refactor, closed the terminal, came back tomorrow. Before: find the session, resume manually, re-send the prompt. Now: `codex queue --resume "continue the auth refactor"` and it just works.
+
+```bash
+# Queue a follow-up for a background thread
+codex queue --resume "add refresh token rotation to the JWT implementation"
+# Thread loads, context restores, agent continues
+```
+
+---
+
+### 5. Clearer Safety-Block Explanations + Selectable Safer Follow-Ups
+
+**What it is:** When Guardian (Codex's safety system) blocks a tool call, you now get:
+- **Clearer explanation** of what triggered the block
+- **Selectable safer follow-up prompts** in the TUI — click to retry with a safer approach
+
+**Why it matters:** Safety blocks used to be dead ends. Now they're decision points. "This command was blocked because it writes outside the workspace. Try: 'write to ./output instead' → click → agent retries safely."
+
+---
+
+### 6. `codex doctor --network-only` — Connectivity Diagnostics That Don't Waste Time
+
+**What it is:** A focused diagnostic that checks only configuration, connectivity, and WebSocket health. Skips the full doctor suite (model checks, auth, disk, etc.).
+
+**Why it matters:** You're behind a corporate proxy. `codex doctor` takes 2 minutes and tells you 50 things you don't care about. `codex doctor --network-only` takes 10 seconds and tells you: "WebSocket upgrade failed at proxy hop 2 — check `HTTPS_PROXY` config."
+
+```bash
+codex doctor --network-only
+# Output focuses on:
+# - Config resolution
+# - DNS resolution
+# - TLS handshake
+# - WebSocket upgrade
+# - Proxy detection
+```
+
+---
+
+## Bug Fixes That Change Daily Life
+
+| Fix | Why You Care |
+|-----|--------------|
+| Preserved acknowledged approval/permission settings on resume/fork | No more surprise permission prompts after restart |
+| Preserved local image attachments when composer text killed | Your screenshots/diagrams survive accidental closes |
+| Fixed macOS standalone cleanup with non-ASCII paths | No more failed uninstalls on international paths |
+| Restored spawned descendant threads when unarchiving parent | Thread trees stay intact |
+| Fixed app-server thread startup/shutdown races | No more phantom "session not found" errors |
+| Improved TUI reconnection recovery (offline `/quit` `/exit`) | Works on flaky connections |
+| Preserved reasoning-token accounting across resume/fork | No premature compaction eating your context |
+
+---
+
+## Version Context — The October Compound Effect
+
+| Version | Date | Channel | Highlights |
+|---------|------|---------|------------|
+| **v0.166.0** | Oct 29, 2026 | **Stable (Latest)** | Keyboard transcript selection, consistent Markdown, Terra on Vertex/Bedrock, queue --resume, safety explanations, doctor --network-only |
+| v0.165.0 | Oct 27, 2026 | Stable | Vertex AI provider, GPT-6.1 Terra, reasoning effort mid-chat, Memory v2 default, repo filter, thread forks |
+| v0.164.0 | Oct 23, 2026 | Stable | `/presets`, inline `/model` `/permissions`, image preview, enterprise MCP auth, credential masking |
+| v0.163.0 | Oct 15, 2026 | Stable | `/config` UI, instant interrupt + steer, leader key, daemon restart, parallel read tools |
+| v0.162.0 | Oct 8, 2026 | Stable | Worktrees, pinned tasks, clickable URLs, transcript copy, web access |
+
+**Four stable releases in three weeks.** Each adds a layer: worktrees → control UI → muscle memory → infrastructure → **polish that feels like features**. This is compounding velocity.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Live in the transcript (copy/paste/ref reference past output) | **Yes** — keyboard selection alone saves hours/week |
+| Use GCP Vertex AI or AWS Bedrock | **Yes** — Terra now native on your cloud |
+| Run background/queued work | **Yes** — `queue --resume` is the missing piece |
+| Hit safety blocks and waste time figuring out why | **Yes** — clearer explanations + safer retries |
+| Debug behind corporate proxies/firewalls | **Yes** -- `doctor --network-only` is built for this |
+| On v0.165.0 and happy | **Optional** — but transcript navigation is addictive |
+
+---
+
+## How to Update
+
+```bash
+# Stable (v0.166.0) — RECOMMENDED for daily use
+npm install -g @openai/codex@0.166.0
+
+# Or just "latest" on stable channel
+npm install -g @openai/codex@latest
+
+# Via installer (auto-updates to stable)
+# macOS/Linux
+curl -fsSL https://codex.openai.com/install | bash
+
+# Windows (scoop)
+scoop update codex
+
+# Verify
+codex --version
+# Should show 0.166.0
+```
+
+**First things to try after update:**
+
+```bash
+# 1. Test keyboard transcript selection
+# Open a long session → /search-term → v → w/b/j/k → y
+
+# 2. Try Terra on Vertex/Bedrock if applicable
+/codex config model_provider gcp
+/model gpt-6.1-terra effort=high
+
+# 3. Test queue resume
+codex queue --resume "continue where we left off"
+
+# 4. Run network doctor if you're behind a proxy
+codex doctor --network-only
+
+# 5. Trigger a safety block intentionally to see new UX
+# Try a command that writes outside workspace
+```
+
+---
+
+## The Bottom Line
+
+**v0.165.0 gave you reach (Vertex, Terra, Memory v2). v0.166.0 gives you *flow*.**
+
+- **Keyboard transcript selection** = your chat history is now a navigable buffer, not a scroll trap
+- **Consistent Markdown** = mental model stays intact across every interaction mode
+- **Terra everywhere** = best reasoning model, zero cloud lock-in
+- **Queue resume** = background work that actually survives
+- **Safety UX** = blocks become decision points, not dead ends
+- **Network doctor** = proxy debugging in 10 seconds, not 2 minutes
+
+Together with worktrees, presets, image preview, config UI, Vertex, Memory v2, and thread forks, Codex v0.166.0 is a **complete development environment that happens to live in your terminal**. The open-source terminal agent isn't catching up — it's setting the pace.
+
+```bash
+codex upgrade
+# /search → navigate history like a buffer
+# /model gpt-6.1-terra effort=high → when it matters
+# codex queue --resume → background work that survives
+# codex doctor --network-only → when the proxy fights back
+```
+
+---
+
+## Related Articles
+
+- [Codex v0.165.0 — Vertex AI, GPT-6.1 Terra, Memory v2 Default](/blog/codex-v0-165-0-vertex-terra-memory-v2/)
+- [Codex v0.164.0 — Presets, Inline Config, Image Preview](/blog/codex-v0-164-0-presets-config-images/)
+- [Codex v0.163.0 — Config UI, Instant Interrupt, Parallel Tools](/blog/codex-v0-163-0-config-parallel-interrupt/)
+- [Codex v0.162.0 — Worktrees, Pinned Tasks, Clickable URLs](/blog/codex-v0-162-0-worktrees-pinned-tasks-stable/)
+- [Codex vs Copilot CLI: Terminal Battle](/blog/codex-vs-copilot-cli-terminal-battle/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+- [Codex vs Cursor 2026: Terminal Agent Showdown](/blog/cursor-vs-codex-ide-speed-cloud-parallelism/)
+
+---
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
+
+*Codex is open-source (MIT) and available at [github.com/openai/codex](https://github.com/openai/codex). Published October 30, 2026 — covers Codex v0.166.0 stable released October 29, 2026. Full changelog: [github.com/openai/codex/releases/tag/rust-v0.166.0](https://github.com/openai/codex/releases/tag/rust-v0.166.0)*
