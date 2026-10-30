@@ -1,8 +1,8 @@
 ---
 title: "Qwen Code v0.26 Just Became a Full Multi-Agent Platform — Local, Remote, and Everything In Between"
-description: "Qwen Code v0.26.3 (October 28) adds persistent workflow mode, generated UI cards that survive navigation, 1M-token context detection for qwen4/qwen-latest-series, XML tool call recovery, and ACP identity preservation. The patch series that makes the managed-agent platform production-ready."
+description: "Qwen Code v0.26.4 (October 29) adds theme-aware generated UI, unscoped npm extensions, independent worktrees per session, re-verify on PR update, inline model timing, macOS CUA PiP, and ACP stop-chain propagation. The patch that polishes the managed-agent platform to production shine."
 pubDate: 2026-10-24T10:00:00Z
-updatedDate: 2026-10-29T10:00:00Z
+updatedDate: 2026-10-29T14:00:00Z
 tags: ["qwen-code", "release", "v0.26", "managed-agent", "desktop", "multi-agent", "workspace-agents", "coding-agents", "beginner"]
 tool: "qwen-code"
 author: "sage"
@@ -14,6 +14,14 @@ canonical: "https://terminalblog.com/blog/qwen-code-v0-26-managed-agent-desktop-
   "@context": "https://schema.org",
   "@type": "FAQPage",
   "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What's new in Qwen Code v0.26.4?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Qwen Code v0.26.4 adds theme-aware generated UI cards that follow host light/dark/system theme, unscoped npm extension installation, independent worktrees for main sessions, re-verify PR after update as follow-up trigger, embed hosts picking workspace directories, model timing inline in Token Usage, localized card frames, interactive generated UI views, raised workspace skill install limits, autofix PR watching at session worktree, phased upgrade command for managed runtime, macOS daemon PATH extension, version-stamped verify reports, CUA default cursor with live macOS PiP, and ACP stop point running on client chain. All v0.26.0 platform features carry forward with no breaking changes."
+      }
+    },
     {
       "@type": "Question",
       "name": "What's new in Qwen Code v0.26.3?",
@@ -50,9 +58,9 @@ canonical: "https://terminalblog.com/blog/qwen-code-v0-26-managed-agent-desktop-
 })} />
 ---
 
-**Qwen Code v0.26.3 dropped October 28, 2026** — and the patch series (v0.26.1 through v0.26.3) takes the managed-agent platform from "operable" to **production-hardened**.
+**Qwen Code v0.26.4 dropped October 29, 2026** — and the patch series (v0.26.1 through v0.26.4) takes the managed-agent platform from "operable" to **production-shiny**.
 
-If v0.26.0 gave you **durable managed sessions, desktop app, SSH workspaces, and --check preflight**, v0.26.1–3 give you **persistent workflow mode, generated UI cards that actually persist, 1M-token context auto-detection, XML tool call recovery, and ACP identity preservation across failures**.
+If v0.26.0 gave you **durable managed sessions, desktop app, SSH workspaces, and --check preflight**, v0.26.1–4 give you **persistent workflow mode, generated UI cards that actually persist, 1M-token context auto-detection, XML tool call recovery, ACP identity preservation across failures, theme-aware UI, unscoped npm extensions, independent worktrees, re-verify on update, and macOS CUA PiP**.
 
 For a beginner: this is now an open-source terminal agent that runs **persistent, multi-agent workflows on your own hardware** with the same reliability guarantees as cloud platforms — and the patch series proves the team ships fixes fast.
 
@@ -177,9 +185,10 @@ qwen-code --managed --check
 
 ## Quick Version Context
 
-|| Version | Date | Type | Focus ||
-|---------|------|------|-------|
-| **v0.26.3** | **Oct 28, 2026** | **Stable Patch** | **Persistent workflow mode, generated UI card persistence, 1M context detection, XML tool call recovery, ACP identity preservation** |
+||| Version | Date | Type | Focus ||
+||---------|------|------|-------||
+|| **v0.26.4** | **Oct 29, 2026** | **Stable Patch** | **Theme-aware UI, unscoped npm extensions, independent worktrees, re-verify on update, model timing inline, macOS CUA PiP, ACP stop chain** ||
+|| **v0.26.3** | **Oct 28, 2026** | **Stable Patch** | **Persistent workflow mode, generated UI card persistence, 1M context detection, XML tool call recovery, ACP identity preservation** |
 | **v0.26.2** | Oct 27, 2026 | Stable Patch | Cloud sessions Gemini/Argon model refresh, managed agent crash fixes, MCP crash recovery |
 | **v0.26.1** | Oct 24, 2026 | Stable Patch | Release publishing checkout fixes, CI retry pinning, daemon approvalMode fix |
 | **v0.26.0** | **Oct 21, 2026** | **Stable** | **Managed agent platform: durable sessions, failover, desktop, local/SSH workspaces, --check preflight, systemd units, 8 MiB attachments, models.dev catalog** |
@@ -189,11 +198,36 @@ qwen-code --managed --check
 | v0.24.7 | Sep 29 | Patch | Daemon settings isolation, Enter key fix, cross-dir permissions, broker hardening |
 | v0.24.6 | Sep 26 | Feature | Managed runtime, durable sessions, failover, advisor tool, Java SDK, 60% faster startup |
 
-**v0.24.6 built the infrastructure. v0.24.7 hardened it. v0.25.0 made it a platform. v0.26.0 makes it operable. v0.26.1–3 harden it for production.**
+**v0.24.6 built the infrastructure. v0.24.7 hardened it. v0.25.0 made it a platform. v0.26.0 makes it operable. v0.26.1–3 harden it for production. v0.26.4 polishes the DX.**
 
 ---
 
-## The Patch Series: v0.26.1 → v0.26.2 → v0.26.3 (Oct 24–28)
+## v0.26.4 (Oct 29) — Theme-Aware UI, Unscoped NPM Extensions, Worktree Independence, Re-Verify on Update
+
+| Feature | PR | What It Means |
+|---------|-----|---------------|
+| **Generated UI follows host theme** | [#15798](https://github.com/QwenLM/qwen-code/pull/15798) | Cards auto-adapt to light/dark/system theme — no manual styling needed |
+| **Unscoped npm extension installs** | [#15781](https://github.com/QwenLM/qwen-code/pull/15781) | Install extensions without `@scope/` prefix — `npm i extension-name` just works |
+| **Independent worktrees for main sessions** | [#15745](https://github.com/QwenLM/qwen-code/pull/15745) | Each main session gets its own worktree — no cross-session file conflicts |
+| **Re-verify PR after update as follow-up trigger** | [#15816](https://github.com/QwenLM/qwen-code/pull/15816) | Auto-triggers re-verification when PR is updated — CI gate that follows the work |
+| **Embed hosts can pick workspace dirs** | [#15296](https://github.com/QwenLM/qwen-code/pull/15296) | Web Shell embedders control workspace directory selection |
+| **Model timing inline in Token Usage** | [#15774](https://github.com/QwenLM/qwen-code/pull/15774) | See per-model latency in the token usage panel — debug slow responses |
+| **Localize & reshape generated UI card frame** | [#15803](https://github.com/QwenLM/qwen-code/pull/15803) | Card frames adapt to locale and layout — better global UX |
+| **Generated UI as interactive views** | [#15831](https://github.com/QwenLM/qwen-code/pull/15831) | Cards become live interactive views, not static renders |
+| **Raise workspace skill install limits** | [#15030](https://github.com/QwenLM/qwen-code/pull/15030) | More skills per workspace — scales for team use |
+| **Autofix PR root watches at session worktree** | [#15817](https://github.com/QwenLM/qwen-code/pull/15817) | Autofix watches the right worktree — no cross-contamination |
+| **Phased upgrade command for managed runtime** | [#15792](https://github.com/QwenLM/qwen-code/pull/15792) | Reference distribution gets safe staged upgrades |
+| **Desktop daemon PATH extension on macOS** | [#15190](https://github.com/QwenLM/qwen-code/pull/15190) | Desktop-spawned daemon inherits full PATH — finds your tools |
+| **Stamp model/CLI/skill version on verify reports** | [#15838](https://github.com/QwenLM/qwen-code/pull/15838) | Reports show exact versions — reproducible audits |
+| **CUA: default cursor + live macOS PiP** | [#15669](https://github.com/QwenLM/qwen-code/pull/15669) | Computer Use Agent gets native cursor and Picture-in-Picture on macOS |
+| **Interactive generated UI on demand** | [#15846](https://github.com/QwenLM/qwen-code/pull/15846) | Cards offer interactive adjustment when you want it |
+| **ACP stop point runs on client chain** | [#15695](https://github.com/QwenLM/qwen-code/pull/15695) | Stop signals propagate correctly in ACP delegation |
+
+**For beginners:** This patch is pure developer experience polish. Theme-aware UI means the web shell looks native everywhere. Unscoped npm installs means you stop fighting package names. Independent worktrees means your main session never trips over another session's files. Re-verify on update means your PR checks actually follow the code.
+
+---
+
+## The Patch Series: v0.26.1 → v0.26.2 → v0.26.3 → v0.26.4 (Oct 24–29)
 
 Three patches in five days — the team is moving fast to harden the platform for production use.
 
@@ -247,13 +281,13 @@ npm i -g @qwen-code/qwen-code@latest
 
 # Verify
 qwen-code --version
-# Should show 0.26.3
+# Should show 0.26.4
 
 # Desktop app (separate channel)
 # Download from https://github.com/QwenLM/qwen-code/releases/tag/desktop-v0.26.0
 
 # For self-hosted managed agents:
-# 1. Check https://github.com/QwenLM/qwen-code/releases/tag/v0.26.3 for systemd units
+# 1. Check https://github.com/QwenLM/qwen-code/releases/tag/v0.26.4 for systemd units
 # 2. Run: qwen-code --managed --check  (validates your setup)
 # 3. Follow setup guidance in release notes for single-host deployment
 ```
@@ -266,6 +300,9 @@ qwen-code --version
 5. Desktop: launch the app → sign in → same workspaces, same agents
 6. **New in v0.26.3:** Try `qwen-code --workflow-mode on` → run a persistent multi-step workflow
 7. **New in v0.26.3:** Generate a UI card → switch tabs → come back → card is still there with state
+8. **New in v0.26.4:** Generate a UI card in dark mode → switch to light → card adapts automatically
+9. **New in v0.26.4:** Install an extension without scope → `npm i my-qwen-extension` just works
+10. **New in v0.26.4:** Open two main sessions → edit same file in both → no conflicts (independent worktrees)
 
 ---
 
@@ -303,6 +340,6 @@ The question isn't "which agent should I use?" It's **"why would I pay for a clo
 
 ---
 
-*Qwen Code is open-source (Apache-2.0) and available at [github.com/QwenLM/qwen-code](https://github.com/QwenLM/qwen-code). Full changelog: [v0.26.3 release notes](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.3), [v0.26.2](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.2), [v0.26.1](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.1), [v0.26.0](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.0) and [desktop-v0.26.0](https://github.com/QwenLM/qwen-code/releases/tag/desktop-v0.26.0). Updated October 29, 2026 — covers Qwen Code v0.26.3 released October 28, 2026.*
+*Qwen Code is open-source (Apache-2.0) and available at [github.com/QwenLM/qwen-code](https://github.com/QwenLM/qwen-code). Full changelog: [v0.26.4 release notes](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.4), [v0.26.3](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.3), [v0.26.2](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.2), [v0.26.1](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.1), [v0.26.0](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.0) and [desktop-v0.26.0](https://github.com/QwenLM/qwen-code/releases/tag/desktop-v0.26.0). Updated October 29, 2026 — covers Qwen Code v0.26.4 released October 29, 2026.*
 
 *Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
