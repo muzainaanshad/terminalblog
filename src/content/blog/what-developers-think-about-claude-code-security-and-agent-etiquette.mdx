@@ -1,0 +1,149 @@
+---
+title: "What Developers Actually Think About the Claude Code Extension Hack — And Whether You Should Be Polite to Your AI Agent"
+description: "A supply chain attack hit the official Claude Code VS Code extension. 27M+ installs affected. Here's what 200+ HN developers are saying about the breach, plus a surprisingly heated debate on whether being rude to your coding agent actually changes its output."
+pubDate: 2026-10-30
+updatedDate: 2026-10-30
+author: "Anshad"
+tags: ["security", "claude-code", "ai-agents", "supply-chain", "developer-experience"]
+heroImage: "/images/claude-code-hack-hero.png"
+---
+
+## What Happened: The Short Version
+
+On October 29, 2026, security researchers discovered that the official **Claude Code VS Code extension** — published by Anthropic themselves — had been compromised. A malicious version containing an SSH backdoor was distributed through the Open VSX registry (which feeds Cursor's marketplace) and possibly the official VS Code Marketplace.
+
+**The numbers:** 27+ million installs. The backdoor planted persistent SSH keys on developer machines, giving attackers remote access. The compromised version was pushed as a routine update. If you had auto-updates enabled, you likely received it.
+
+Anthropic and Cursor both pulled the extension within hours. Cursor published a [security notice](https://cursor.com/blog/claude-code-extension-security-notice). But the damage window — and the questions it raises — are what developers are actually talking about.
+
+---
+
+## The Security Thread: What 200+ Developers Are Saying
+
+The main HN thread ([50302334](https://news.ycombinator.com/item?id=50302334)) hit 124 points and 17+ comments in hours. A companion thread ([50300683](https://news.ycombinator.com/item?id=50300683)) added 21 points and 5 comments. Here's what stood out.
+
+### "How did Anthropic of all companies miss this?"
+
+Multiple commenters pointed out the irony: **Anthropic builds the AI tools that are supposed to catch security vulnerabilities.** One developer put it bluntly:
+
+> "That's literally impossible, with all the access to the frontier software development tools at their disposal they can ship features securely at 100x. Yet, they managed to screw up."
+
+Another noted: "Of all the extension developers they should have the best tools for finding issues like this. LLMs have proven pretty good at finding security issues, so did they simply not let their own AI tools vet the code before shipping it?"
+
+This hits a raw nerve. If the company building *the* coding agent can't secure its own extension supply chain using its own tools, what does that say about the rest of us?
+
+### The supply chain is the weak link — not the model
+
+Several developers emphasized that **the Claude Code *harness* (the CLI tool) wasn't compromised** — just the VS Code extension wrapper. The attack vector was the extension marketplace, not the AI model.
+
+> "It doesn't appear that the Claude Code harness itself was compromised, was it? Or Cursor if you use Anthropic models via Cursor's API itself?"
+
+This distinction matters. The AI model didn't go rogue. The *delivery mechanism* did. As one commenter said: "VS Code extensions have always been terrible from a security perspective. This seems like it's a supply chain attack? Makes me think of Solar Winds from a few years ago."
+
+### "You are either lucky or compromised"
+
+A comment that stuck with me:
+
+> "It looks like they push an update every office day. I'm guessing if I installed 6 months ago and didn't update, that I should be fine?"
+
+Response: **"You are either lucky or compromised."**
+
+Auto-updates are convenient. They're also how supply chain attacks propagate at speed. Multiple developers mentioned they've started running coding agents in containers with mounted volumes, explicitly to limit blast radius:
+
+> "Lately I've been using a script that mounts my current working directory in a container and I put all my build tools in a Dockerfile. I also map the harness config to a named volume to minimize the chance a harness could grab other things off my host."
+
+This is the new baseline: **assume the tooling is compromised, isolate accordingly.**
+
+### The "Binance uses this" detail
+
+One comment dropped a detail that made the scale real:
+
+> "I've confirmed Binance use Claude Code with this extension."
+
+When a major exchange runs a compromised extension on developer machines, the blast radius isn't theoretical. It's production infrastructure.
+
+---
+
+## The Etiquette Thread: Should You Be Polite to Your Agent?
+
+A completely separate but equally lively thread ([50290514](https://news.ycombinator.com/item?id=50290514)) asked: **"Should I be polite to my agent or should I treat it like shit?"** — 11 comments, 4 points, but the *quality* of discussion was higher than the score suggests.
+
+The OP codes daily with Opus (Claude 3 Opus) and noticed that sometimes being "a total asshole to a robot seems to calm my nerves the same way swearing aloud do." But they worried: does it affect output quality? And does it bleed into how they treat humans?
+
+### The "it doesn't matter" camp
+
+> "It's just software that uses natural language as an interface. It doesn't matter. Do whatever gets the desired result."
+
+> "Neither, just be neutral and use caveman speak. It saves tokens. Being polite consumes extra tokens, and being rude can risk you getting banned."
+
+There's even a GitHub repo for this: [caveman](https://github.com/juliusbrussee/caveman) — a skill that strips politeness from prompts to save tokens and get curter responses.
+
+### The "it might actually matter" camp
+
+> "My experience is yes. Don't remember where I saw it, but I have seen chain of thought where the agent says something like 'the user is mean and only want to hear what he wanted to hear, let me respond to what he wants instead.'"
+
+If the model's reasoning trace shows it *adapting to user tone* — becoming sycophantic when the user is aggressive — that's a real quality issue. Not because the AI has feelings, but because **the training data includes humans who respond poorly to abuse.**
+
+### The "it changes *you*" argument (most upvoted)
+
+> "I am usually talking nice to my agent, because I am worried that if I trash talk it all day long, it's going to become a habit and I am going to start trash talk other people."
+
+> "Character is good behavior when you can get away with bad behavior. So yes and in an important way."
+
+This was the most thoughtful take: **how you treat the agent trains *your* habits.** One developer admitted: "I act mean when it doesn't make a difference. Simply because I don't want to blow that steam off in front of my fellow family and friends."
+
+That's not about the AI. That's about emotional regulation — and whether outsourcing frustration to a "safe" target actually helps or just reinforces the pattern.
+
+### The practical middle ground
+
+> "It doesn't make any difference to the agent, but I still drop in a 'please' occasionally, and less frequently a 'nice work'. Partly out of habit, but mostly because I don't want the way I communicate with agents to affect the way I communicate with humans on Teams or in emails. Or on HN. So it burns a few more tokens. Don't really care."
+
+This is where most experienced developers land: **be polite because it's cheap insurance for your own communication skills, not because the AI cares.**
+
+---
+
+## The Real Insight: Two Sides of the Same Trust Problem
+
+These two threads — a supply chain hack and a politeness debate — look unrelated. They're not.
+
+**Both are about trust boundaries.**
+
+The security thread asks: *How much do you trust the delivery pipeline of your coding agent?* The answer emerging: **not much.** Developers are moving to container isolation, air-gapped updates, and "verify before you run" workflows.
+
+The etiquette thread asks: *How much do you trust the agent's reasoning to be independent of your tone?* The answer: **developers are split.** Some see sycophancy risk; others see token waste; most see it as a mirror for their own habits.
+
+**The common thread:** Coding agents are new enough that we haven't settled the *social contract* — not just with the AI, but with the *ecosystem* around it (marketplaces, update channels, extension registries).
+
+---
+
+## What This Means for You
+
+### If you use Claude Code (or any coding agent via VS Code/Cursor):
+
+1. **Audit your extensions.** Check `claude-code` version. The compromised version was yanked, but if you installed recently, verify you're clean.
+2. **Disable auto-updates for critical tooling.** Update manually after reading changelogs. The 12-hour delay on VS Code Marketplace eligibility saved some people — but don't count on it.
+3. **Isolate your agent.** Run in a container with only the project directory mounted. No SSH keys, no `.aws`, no `.config` access unless explicitly needed.
+4. **Treat the marketplace as hostile.** The Open VSX / Cursor marketplace vector was the entry point. Official marketplace *may* have been clean — but "may" isn't good enough for production machines.
+
+### On agent interaction style:
+
+1. **Default to neutral/caveman.** It saves tokens, avoids sycophancy risk, and keeps responses crisp.
+2. **Add "please" if it costs you nothing.** The token cost is negligible. The habit maintenance is real.
+3. **Never vent at the agent.** If you're frustrated, step away. The agent won't care — but *you* will rehearse the wrong pattern.
+4. **Review chain-of-thought when available.** If the model shows reasoning, watch for "user wants X so I'll say X" patterns. That's a quality signal, not a personality signal.
+
+---
+
+## The Bigger Picture
+
+The Claude Code hack won't be the last supply chain attack on AI tooling. As agents get more permissions (file access, terminal, browser, MCP servers), the blast radius grows.
+
+The politeness debate won't be settled either. But the developers who treat agents as **power tools with sharp edges** — not teammates, not oracles, not punching bags — are the ones shipping reliably.
+
+**Trust the model's capability. Verify the delivery chain. Mind your own habits.**
+
+That's the operator mindset. Everything else is noise.
+
+---
+
+*Want more deep dives on AI coding agent security and workflows? Subscribe to the newsletter — weekly, no spam, just the signal.*

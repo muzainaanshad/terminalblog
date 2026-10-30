@@ -97,9 +97,13 @@ function extractFaq(body) {
   // Normalize line endings to \n for consistent regex matching
   const normalizedBody = body.replace(/\r\n/g, '\n');
 
-  // Find FAQ section - look for ## FAQ and capture until next ## heading, 
+  // Find FAQ section - look for ## FAQ (H2) or ### FAQ (H3) and capture until next heading, 
   // or \n---, or end of string
-  const faqMatch = normalizedBody.match(/(?:^|\n)## FAQ\s*\n([\s\S]*?)(?:\n## |\n---|$)/);
+  let faqMatch = normalizedBody.match(/(?:^|\n)## FAQ\s*\n([\s\S]*?)(?:\n## |\n---|$)/);
+  if (!faqMatch) {
+    // Try H3 FAQ format (### FAQ)
+    faqMatch = normalizedBody.match(/(?:^|\n)### FAQ\s*\n([\s\S]*?)(?:\n### |\n## |\n---|$)/);
+  }
   if (!faqMatch) return [];
 
   const faqContent = faqMatch[1];
@@ -142,6 +146,16 @@ function extractFaq(body) {
       const q = match[1].trim().replace(/^["']|["']$/g, '');
       const a = match[2].trim().replace(/^["']|["']$/g, '');
       if (q && a) faqs.push({ q, a });
+    }
+  }
+
+  // Pattern 5: H3 question format (### Question?) followed by answer
+  if (faqs.length === 0) {
+    const pattern5 = /^###\s+([^\n?]+?\?)\s*\n([\s\S]*?)(?=\n###\s+[^\n?]+?\?|\n## |\n---|$)/gmi;
+    while ((match = pattern5.exec(faqContent)) !== null) {
+      const q = match[1].trim().replace(/^["']|["']$/g, '');
+      const a = match[2].trim().replace(/^["']|["']$/g, '');
+      if (q && a && q.length > 3) faqs.push({ q, a });
     }
   }
 
