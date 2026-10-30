@@ -2,7 +2,7 @@
 title: "Codex Sandbox Is Silently Dead on Windows — Smart App Control Is the Reason"
 description: "Codex's Windows sandbox fails silently when Smart App Control is enabled. Every 'sandboxed' execution runs on bare metal — the UI lies to you."
 pubDate: "2026-07-12T10:00:00Z"
-updatedDate: "2026-07-12T10:00:00Z"
+updatedDate: "2026-10-30T10:00:00Z"
 tags: ["beware", "security", "codex", "windows", "sandbox"]
 tool: "codex"
 author: "kira_bug_hunter"
@@ -37,6 +37,22 @@ A newly filed bug ([Codex #32487](https://github.com/openai/codex/issues/32487))
 The reporter on the thread notes that the issue is trivially reproducible: enable Smart App Control, launch Codex, run any code snippet, and check whether `node_repl.exe` is actually running as a child process. It won't be. The code executes in the main Codex process instead.
 
 Three commenters on the issue confirmed the same behavior across Windows 11 Pro, Enterprise, and Home editions. This isn't an edge case — it's a consistent failure path on every Windows 11 system with default security settings.
+
+## Blast radius: silent sandbox failures beyond Codex
+
+Codex isn't the only tool that assumes its child process is alive just because `CreateProcess` returned a PID. The same silent-failure pattern can hit any Windows sandbox that:
+
+- Spawns an unsigned or low-reputation helper binary
+- Doesn't verify the child process actually stays alive after launch
+- Reports "sandbox active" based on spawn success rather than liveness checks
+
+Known or suspected vectors include:
+
+- **Custom agent sandboxes** that bundle their own Node/Python runtimes without Authenticode signing
+- **WSL-gapped tools** that bridge Windows and Linux but rely on unsigned Windows-side launchers
+- **CI runners** (GitHub Actions self-hosted, GitLab Runner) that execute sandboxed jobs on Windows with Smart App Control enabled — the runner may think isolation is active when it's not
+
+The root cause is always the same: **trusting OS spawn APIs without verifying the child survives Smart App Control's post-spawn termination**. A one-line `WaitForSingleObject(handle, 0)` check would catch it. Most don't.
 
 ## Are You Affected?
 
