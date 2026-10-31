@@ -1,0 +1,188 @@
+---
+title: "AmpCode Just Let You Run Orbs on Your Own Machine — No Admin Required"
+description: "AmpCode's October 27 'Your Own Self-Hosted Orbs' release lets individuals and teams run agent compute on their own Docker/Kubernetes/Modal/Vercel infra — free forever, no workspace admin needed. Your code, your network, your hardware, Amp orchestrates."
+pubDate: 2026-10-28T10:00:00Z
+tags: ["ampcode", "release", "self-hosted", "orbs", "infrastructure", "beginner"]
+tool: "ampcode"
+author: "Anshad"
+image: "/api/og?title=AmpCode+Personal+Self-Hosted+Orbs&tool=ampcode"
+canonical: "https://terminalblog.com/blog/ampcode-personal-self-hosted-orbs-october-2026/"
+---
+
+AmpCode **October 27** shipped the sibling to last week's enterprise Self-Hosted Orbs: **Your Own Self-Hosted Orbs** — the same "you host compute, Amp orchestrates" model, but for individuals and teams. **No workspace admin required. Free forever.**
+
+---
+
+## The One-Line Summary
+
+**Run Amp orbs on your laptop, server, or cloud account. One command connects your infra. Amp sends spawn/pause/delete events; your script handles the rest. Free for individuals and teams. No admin approval needed.**
+
+---
+
+## Wait — Wasn't Self-Hosted Orbs Already Released?
+
+**October 22**: "Self-Hosted Orbs" — enterprise-focused, requires workspace admin, Helm charts for GKE/EKS/AKS, standard orb pricing starts Oct 29 for Enterprise.
+
+**October 27**: "Your Own Self-Hosted Orbs" — **personal/team version**. Create a custom orb provider in *your personal settings* (not workspace admin), run `amp orb provider ./dispatch.sh` on any machine, and your orbs run there. **Free forever for individuals and teams.**
+
+Two releases, same protocol, different audiences.
+
+---
+
+## What This Actually Means
+
+| Before (Amp-hosted) | After (Your Self-Hosted) |
+|---------------------|--------------------------|
+| Amp runs the orb | **You run the orb** |
+| Pay per orb-hour | **Your infra, your bill** |
+| Data leaves your network | **Data stays on your machine/VPC** |
+| Limited regions | **Any region, any cloud, your laptop** |
+| Shared tenancy | **Dedicated, isolated, yours** |
+
+---
+
+## The 5-Minute Setup (Docker on Your Machine)
+
+```bash
+# 1. Create a workspace at ampcode.com (free)
+# 2. Settings → Custom Orb Provider → Create → Copy token
+#    (This is in YOUR personal settings, not workspace admin)
+
+# 3. Save this as dispatch.sh
+cat > dispatch.sh << 'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case "$ORB_OPERATION" in
+    spawn)
+        docker start "$ORB_ID" 2>/dev/null || \
+            docker run --platform linux/amd64 -d --name "$ORB_ID" \
+                "$ORB_IMAGE" sleep infinity
+        docker exec -d --env ORB_TOKEN "$ORB_ID" amp orb bootstrap
+        ;;
+    pause)
+        docker stop "$ORB_ID"
+        ;;
+    delete)
+        docker rm -f "$ORB_ID"
+        ;;
+esac
+EOF
+chmod +x dispatch.sh
+
+# 4. Run the provider (keeps running in terminal)
+export AMP_ORB_PROVIDER_TOKEN="<your-token>"
+amp orb provider ./dispatch.sh
+
+# 5. New thread → Orb → Self-Hosted → your provider → prompt
+```
+
+That's it. Your laptop is now an Amp compute node.
+
+---
+
+## What Your `dispatch.sh` Receives
+
+Amp passes four environment variables:
+
+| Variable | Description |
+|----------|-------------|
+| `ORB_OPERATION` | `spawn` / `pause` / `delete` |
+| `ORB_ID` | Unique orb identifier |
+| `ORB_TOKEN` | Auth token for the orb to call back to Amp |
+| `ORB_IMAGE` | Amp's pre-built orb image (or your custom one) |
+
+Your script decides **HOW** to spawn/pause/delete. Docker? Kubernetes? Modal? Vercel? Daytona? E2B? Apple Containers? exe.dev? Amp ships example scripts for all of them.
+
+---
+
+## Supported Infrastructure (Copy-Paste Ready)
+
+Amp provides ready-to-copy `dispatch.sh` examples for:
+
+| Platform | Best For |
+|----------|----------|
+| **Docker** | Laptop, single server, simple start |
+| **Kubernetes (GKE/EKS/AKS)** | Team clusters, auto-scaling, Helm chart included |
+| **Modal** | Serverless GPUs, native snapshots for pause/resume |
+| **Vercel Sandboxes** | Web-native, persistent snapshots |
+| **Daytona** | Dev environment platform |
+| **E2B** | Code interpreter sandboxes |
+| **Apple Containers** | macOS-native Linux VMs |
+| **exe.dev** | Lightweight VMs over SSH |
+
+**Bring your own image** if you need custom dependencies — just ensure `amp orb bootstrap` runs in it.
+
+---
+
+## Why This Matters for Beginners
+
+### You Don't Need to Understand Kubernetes
+
+The Docker example above runs on **any machine with Docker**. Your laptop. A $5 DigitalOcean droplet. A Raspberry Pi (ARM64 image available). No cluster required.
+
+### Your Code Never Leaves Your Machine
+
+When the orb spawns, it clones your repo *on your machine*. The agent runs *on your machine*. Amp's orchestrator only sends control events (`spawn`, `pause`, `delete`) over an outbound WebSocket. No inbound ports. No data egress.
+
+### Free Forever for Individuals & Teams
+
+> "We built self-hosted orbs for enterprises that *can't* use the orbs we host — regulations, internal networks, custom hardware. If you're on Enterprise, let us know and we'll help you set it up." — Amp team
+
+**Translation:** If you're not Enterprise, this is free infrastructure orchestration. Forever.
+
+---
+
+## The Catch (Honest)
+
+- **You need Docker (or K8s/Modal/etc.)** — not for total beginners
+- **No managed SLAs** — Amp supports *their* end; your dispatch script is yours
+- **Pause/resume needs snapshot-capable infra** — Docker stop/start works; K8s needs PVC; Modal/Vercel/Daytona/E2B have native snapshots
+- **Enterprise support only for Enterprise plans** — community on Discord
+
+---
+
+## Should You Self-Host?
+
+| You Are... | Verdict |
+|------------|---------|
+| Solo dev, happy with Amp-hosted | **Stay hosted** — zero ops, reasonable pricing |
+| Team with cloud credits / existing K8s | **Yes** — use credits, keep data close |
+| Regulated industry (finance/health/gov) | **Yes** — compliance requires it |
+| GPU-rich org (own H100s, Mac fleet) | **Yes** — why pay Amp for your own hardware? |
+| Want fully air-gapped | **Not yet** — auth still needs internet |
+
+---
+
+## What's Next
+
+Amp's roadmap hints at:
+- More provider templates (AWS Batch, GCP Cloud Run, Azure Container Apps)
+- Built-in cost tracking per provider
+- Orb image customization UI
+- Team-level provider sharing
+
+But the core is done: **`amp orb provider ./your-script` works today.**
+
+---
+
+## Related Reading
+
+- [AmpCode Just Let You Run Agents on Your Own Infra — Self-Hosted Orbs (Enterprise)](/blog/ampcode-self-hosted-orbs-october-2026/)
+- [AmpCode September-October 2026 Wave — Free Tier, Shared Runners, Multi-Puck](/blog/ampcode-september-october-2026-wave/)
+- [AmpCode vs GitHub Copilot CLI: Pricing Battle](/blog/ampcode-vs-copilot-cli-pricing-battle/)
+- [Best Free AI Coding Agents 2026 — No Credit Card Required](/blog/best-free-ai-coding-agents-2026-no-credit-card/)
+- [Coding Agent Pricing Guide 2026](/blog/coding-agent-pricing-guide-2026/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
+---
+
+*Your Own Self-Hosted Orbs announced October 27, 2026. Source: [ampcode.com/news/personal-self-hosted-orbs](https://ampcode.com/news/personal-self-hosted-orbs) · Docs: [ampcode.com/docs/orbs/self-hosted](https://ampcode.com/docs/orbs/self-hosted)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
