@@ -1,0 +1,160 @@
+---
+title: "Opencode v2.2.5 Just Made Worktrees One Keystroke Away — And Compaction Finally Gets Percentages"
+description: "Opencode v2.2.5 (Oct 30) adds Cmd+Opt+O to pick worktrees instantly, Cmd+Shift+X to toggle shell mode, quote-send from comment popups, and percentage-based compaction buffers. The quality-of-life patch that makes daily work feel smoother."
+pubDate: 2026-10-31T05:00:00Z
+tags: ["opencode", "release", "v2.2.5", "worktrees", "compaction", "desktop", "beginner"]
+tool: "opencode"
+author: "Anshad"
+image: "/api/og?title=Opencode+v2.2.5+Worktree+Shortcuts&tool=opencode"
+---
+
+Opencode **v2.2.5 dropped October 30** — just 3 days after v2.2.0's breaking changes. This patch doesn't change APIs. It changes **how fast you move**.
+
+Three things you'll use every session: **worktree shortcuts**, **quote-send from popups**, and **percentage compaction buffers**. Plus fixes that stop MCP disconnections and idle restarts.
+
+---
+
+## The Headline: Worktree Switching Is Now One Keystroke
+
+### Before: Context Switching Tax
+
+You're in a worktree. You need to check the main branch. You:
+
+1. `Ctrl+C` out of current task
+2. Type `opencode worktree list`
+3. Find the name
+4. Type `opencode worktree switch <name>`
+5. Wait for context reload
+
+### After: `Cmd+Opt+O` (Mac) / `Ctrl+Alt+O` (Win/Linux)
+
+A dropdown opens. You pick. Done.
+
+```
+┌─ Worktrees ────────────────────────┐
+│ ▸ feature/auth-refactor   (HEAD)   │
+│   main                        3h   │
+│   bugfix/login-race         2d     │
+│   experiment/new-ui         1w     │
+└────────────────────────────────────┘
+```
+
+**Base branch shortcut too:** `Cmd+Opt+B` / `Ctrl+Alt+B` picks the base branch for the current worktree.
+
+**Shell mode toggle:** `Cmd+Shift+X` / `Ctrl+Shift+X` flips the composer between chat and shell. No menu diving.
+
+*Desktop only for now — TUI shortcuts coming.*
+
+---
+
+## Quote-Send From Comment Popups — The "Just Send This One" Feature
+
+You're reviewing a diff. You highlight a line. A comment popup appears. You type a reply.
+
+**Old way:** Close popup → find the comment in composer → send → go back to diff.
+
+**New way:** Hold `Cmd` (Mac) / `Ctrl` (Win/Linux) in the popup. The checkmark turns into a **send button**. Press `Cmd+Enter` / `Ctrl+Enter` — just that quote and comment send. The rest of your composer stays untouched.
+
+```bash
+# What this enables:
+# 1. Review diff
+# 2. Highlight line → type "this logic is inverted"
+# 3. Hold Cmd → press Enter
+# 4. Comment posted, diff still open, composer unchanged
+# 5. Move to next line
+```
+
+Tiny UX change. Massive workflow speedup for code review.
+
+---
+
+## Percentage Compaction Buffers — One Setting Fits All Models
+
+### The Problem
+
+You set `compaction.buffer: 50000` tokens. Works great for 200K context models. But you switch to a 32K model — compaction never triggers. Switch to 1M — compaction fires too early.
+
+### The Fix
+
+```json
+{
+  "compaction": {
+    "buffer": "20%"
+  }
+}
+```
+
+**20% of whatever model's context window.** Switch models, buffer scales automatically. Token counts still work if you prefer absolute numbers.
+
+---
+
+## Fixes That Stop Daily Annoyances
+
+| Fix | Why You'll Notice |
+|-----|-------------------|
+| **MCP servers no longer disconnect on >10MB stdio messages** | Large tool outputs (logs, dumps) used to kill the connection. Now they stream fast and stay connected. |
+| **Idle locations don't restart MCP servers immediately after shutdown** | No more "wait, it just started" flicker when you return to a session. |
+| **Compaction caps prompt at model's context window** | Input limit larger than context? Compaction respects the real ceiling. |
+| **LiteLLM context errors trigger compaction instead of stopping** | Session keeps going instead of hard-failing on provider quirks. |
+| **Reasoning preserved when switching models mid-response** | No more request errors from reasoning text leaking into new model calls. |
+| **Connect menu no longer lists MCP servers** | MCP management has its own place. Connect menu stays clean. |
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Use worktrees daily** | **Yes** — `Cmd+Opt+O` alone saves minutes per session |
+| **Do code review in Opencode** | **Yes** — quote-send from popups changes the review loop |
+| **Switch between models with different context windows** | **Yes** — percentage buffer = one config forever |
+| **Hit MCP disconnections on large outputs** | **Yes** — 10MB limit gone |
+| **Just want latest stable** | **Yes** — zero breaking changes, pure quality-of-life |
+
+**No rush if:** You're on v2.2.4 and everything works. But the worktree shortcuts are the kind of thing you don't realize you needed until you have them — then you can't go back.
+
+---
+
+## How to Update
+
+```bash
+# CLI
+curl -fsSL https://opencode.ai/install | bash
+# or: npm i -g @opencode/cli@latest
+
+# Desktop (new NSIS installer for Windows)
+# Download from https://opencode.ai/download
+
+# Verify
+opencode --version
+# Should show: v2.2.5
+```
+
+---
+
+## The Bigger Picture: v2.2.x Is Polish, Not Churn
+
+```
+v2.2.0 (Oct 27)  →  Breaking changes, desktop plugins, new SDK exports
+v2.2.1 (Oct 28)  →  Goal command, image generation
+v2.2.5 (Oct 30)  →  Worktree shortcuts, quote-send, % compaction, MCP fixes
+```
+
+Three releases in four days. **No new breaking changes since v2.2.0.** The team shipped the major migration, then immediately followed with the fixes that make it pleasant to use.
+
+This is the release cadence you want: **break once, polish fast.**
+
+---
+
+## Related Articles
+
+- [Opencode v2.2 Just Dropped — Desktop Plugins, Refreshed App, and Breaking Changes You Can't Ignore](/blog/opencode-v2-2-desktop-plugins-breaking-changes/)
+- [Opencode v2.2.1 — Goal Command, Image Generation, and the Features You'll Actually Use](/blog/opencode-v2-2-1-goal-command-image-generation/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Opencode v2.2.5 released October 30, 2026. Full changelog: [github.com/anomalyco/opencode/releases/tag/v2.2.5](https://github.com/anomalyco/opencode/releases/tag/v2.2.5)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
