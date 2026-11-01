@@ -1,38 +1,41 @@
 ---
-title: "OpenClaw 2026.10.10-beta.1 Just Dropped Cloud Sessions, Local Gateway, and Gemini 4 Argon — Here's What Actually Matters"
-description: "OpenClaw 2026.10.10-beta.1 (Oct 15) brings cloud sessions you can move between local and cloud, local Gateway in Windows/macOS desktop apps, Gemini 4 Argon as default, Nemotron 3.5 Super VL, xAI Imagine 2.0, Muse Code integration, Bun runtime, and a faster Gateway that stays responsive under load."
+title: "OpenClaw 2026.10.10-beta.5 Just Fixed Node 24/26, Gateway Streaming, and Update Rollback — The Beta That Finally Works"
+description: "OpenClaw 2026.10.10-beta.5 (Oct 30) fixes Node 24/26 compatibility, Gateway streaming stalls on tool-call XML, update rollback stranding packages, and cron missed slots. Plus security hardening: HTTPS allowlist enforcement, browser proxy blocking, credential redaction. The beta that makes cloud sessions, local Gateway, and auto-model-discovery actually reliable."
 pubDate: "2026-10-18T15:00:00Z"
-tags: ["openclaw", "release", "v2026.10.10-beta.1", "beta", "cloud-sessions", "local-gateway", "gemini-4-argon", "nemotron", "xai-imagine", "muse-code", "bun-runtime", "beginner"]
+updatedDate: "2026-11-01T06:00:00Z"
+tags: ["openclaw", "release", "v2026.10.10-beta.5", "beta", "cloud-sessions", "local-gateway", "gemini-4-argon", "nemotron", "xai-imagine", "muse-code", "bun-runtime", "node-compatibility", "security", "beginner"]
 tool: "openclaw"
 author: "rho"
-image: "/api/og?title=OpenClaw+2026.10.10-beta.1+Cloud+Sessions&tool=openclaw"
+image: "/api/og?title=OpenClaw+2026.10.10-beta.5+Node+Gateway+Fixes&tool=openclaw"
 canonical: "https://terminalblog.com/blog/openclaw-v2026-10-10-beta1-cloud-sessions-local-gateway-new-models/"
 faq:
   - q: "What are OpenClaw cloud sessions and how do they work?"
     a: "Cloud sessions let you move your work between local and cloud from the session menu. Environments are organized by repository with environment recipes and verified Node toolchains. Your session state, deps, and secrets travel with it."
   - q: "Does OpenClaw desktop app now include a local Gateway?"
     a: "Yes — the Windows desktop app and fresh Tauri/macOS installs run a local Gateway out of the box. No separate `openclaw gateway` process needed. First-run setup chooses inference automatically."
-  - q: "What new models are available in OpenClaw 2026.10.10-beta.1?"
+  - q: "What new models are available in OpenClaw 2026.10.10-beta.5?"
     a: "Gemini 4 Argon (new default), Nemotron 3.5 Super VL (NVIDIA vision-language), xAI Imagine Image 2.0, Fish Audio Drama 3 preview, and Muse Code (Meta's agent runtime). New models appear automatically without waiting for an OpenClaw release."
   - q: "What is Muse Code integration in OpenClaw?"
     a: "Meta's models (Llama, etc.) now run through the Muse Code CLI agent runtime inside OpenClaw. Sign in from Model Setup and Provider Access. Consented turns run under a conversation tool policy — Llama can now use tools, run code, and access your repo."
   - q: "Does this beta require macOS 26.2?"
     a: "Yes — native apps and Control UI now require macOS 26.2, iOS 26.2, Safari 26.2 or newer. Windows and Linux are unaffected."
   - q: "Are updates more reliable in this beta?"
-    a: "Yes — upgrades from 2026.10.1+ complete reliably. Busy Gateways and slow Doctor steps no longer roll back good updates. Failed updates don't leave half-installed versions. Interrupted replies resume after Gateway restart."
+    a: "Yes — upgrades from 2026.10.1+ complete reliably. Busy Gateways and slow Doctor steps no longer roll back good updates. Failed updates don't leave half-installed versions. Interrupted replies resume after Gateway restart. Beta.5 adds: failed rollback no longer strands packages, immediate Git rollback keeps operator edits."
+  - q: "Does OpenClaw 2026.10.10-beta.5 work on Node 24 and Node 26?"
+    a: "Yes — beta.5 fixes Node compatibility for `>=24.16.0 <25 || >=26.1.0`. Node 24.22.1 or 26.12.1 is a security recommendation, not a hard requirement. Node 26 workers no longer abort when stdin is a file."
+  - q: "Did beta.5 fix the Gateway streaming stalls on tool-call XML?"
+    a: "Yes — replies with tool-call-like XML, tool calls, or partial HTML tags no longer stall the Gateway. Missing-answer notices no longer follow streamed delivery. Side-question replies no longer disappear or repeat."
 ---
 
-OpenClaw **2026.10.10-beta.1** dropped **October 15** — and it's the beta that finally makes cloud feel native. You can now move sessions between your laptop and the cloud with one click, run a local Gateway inside the desktop apps (Windows *and* macOS), and get the newest models (Gemini 4 Argon, Nemotron 3.5 Super VL, xAI Imagine 2.0) without waiting for an OpenClaw release.
+OpenClaw **2026.10.10-beta.5** dropped **October 30** — and it's the patch that finally makes the beta.1 features reliable. **Node 24/26 compatibility fixed** (installs and updates work again), **Gateway streaming stalls on tool-call XML resolved**, **failed npm rollback no longer strands packages**, **cron missed slots no longer dropped**. Plus security hardening: HTTPS allowlist enforcement, browser proxy blocking, credential redaction from logs and errors.
 
-Plus: **Bun runtime** for faster standalone builds, **Muse Code** (Meta's agent) running inside OpenClaw, a **Gateway that stays fast** even with massive agent fleets, and macOS 26.2/iOS 26.2 as the new minimum.
-
-If you've been waiting for OpenClaw to feel like "production infrastructure" — this beta is the closest it's ever been.
+Plus all the beta.1 goodness: **Cloud sessions that move**, **Local Gateway in desktop apps**, **Models that appear instantly**, **Bun runtime**, **Muse Code inside**, **Gateway that scales**, **Requires macOS 26.2**. Test this beta.
 
 ---
 
 ## The One-Line Summary
 
-**Cloud sessions that move. Local Gateway in the desktop app. Models that appear instantly. Bun runtime. Muse Code inside. Gateway that scales. Requires macOS 26.2. Test this beta.**
+**Cloud sessions that move. Local Gateway in the desktop app. Models that appear instantly. Bun runtime. Muse Code inside. Gateway that scales. Node 24/26 fixed. Gateway streaming fixed. Update rollback fixed. Cron fixed. Security hardened. Requires macOS 26.2. Test this beta.**
 
 ---
 
@@ -49,6 +52,11 @@ If you've been waiting for OpenClaw to feel like "production infrastructure" —
 | **Updates that finish** | Upgrades from 2026.10.1+ complete, busy Gateways/slow Doctor no longer roll back good updates |
 | **Restart-safe replies** | Interrupted/unfinished replies resume after Gateway restart; child results, queued turns survive |
 | **macOS 26.2 required** | Native apps and Control UI now require macOS 26.2, iOS 26.2, Safari 26.2 or newer |
+| **Node 24/26 compatibility** | Installs and updates work again on Node `>=24.16.0 <25 \|\| >=26.1.0`; Node 26 workers no longer abort on file stdin |
+| **Gateway streaming fixed** | Replies with tool-call-like XML, tool calls, or partial HTML tags no longer stall the Gateway |
+| **Update rollback fixed** | Failed npm rollback no longer strands the installed package; immediate Git rollback keeps operator edits |
+| **Cron missed slots fixed** | Missed slots with stale stored next run time are no longer dropped; startup catch-up runs admitted |
+| **Security hardening** | HTTPS allowlist enforcement, browser proxy blocking, credential redaction from logs/errors |
 
 ---
 
@@ -131,16 +139,76 @@ If you've been waiting for OpenClaw to feel like "production infrastructure" —
 
 ---
 
+## 8. Node 24/26 Compatibility: Installs and Updates Work Again
+
+**What it does:** Node compatibility fixed for `>=24.16.0 <25 || >=26.1.0`. Node 24.22.1 or 26.12.1 is now a **security recommendation** instead of a hard requirement. Node 26 workers **no longer abort when stdin is a file**.
+
+**Before:** Node 24/26 users hit install failures, update failures, or worker aborts on file stdin.
+
+**Now:** Just works. The version check is advisory, not blocking.
+
+**Why beginners care:** You don't need to pin Node versions or downgrade. OpenClaw works on current LTS and current releases.
+
+---
+
+## 9. Gateway Streaming: Tool-Call XML and Partial HTML No Longer Stall
+
+**What it does:** Replies that **contain tool-call-like XML, look like tool calls, or end long HTML at a partial tag** no longer stall the Gateway.
+
+**Before:** Streaming a reply with `<tool>` tags, tool-call patterns, or truncated HTML would freeze the Gateway — turns would queue, UI would hang.
+
+**Now:** Gateway parses through these patterns without stalling. Missing-answer notices no longer follow streamed delivery. Side-question replies no longer disappear or repeat after tool sends. Multiline `/btw`, `/loop`, and `/acp` steer input is preserved. Compaction failures show instead of stale overflow advice.
+
+**Why it matters:** If you run agents that emit structured output or work with HTML-heavy tasks, the Gateway stays responsive. This was a daily paper cut for heavy users.
+
+---
+
+## 10. Update Rollback: Failed Rollback No Longer Strands Packages
+
+**What it does:** A **failed npm rollback no longer strands the installed package**. An **immediate Git rollback keeps operator edits**. An **update whose executor dies recovers its offline state**.
+
+**Before:** Failed update → rollback attempt → rollback fails → package in limbo, operator edits lost, executor dead = session broken.
+
+**Now:** Each failure mode has a recovery path. The package isn't stranded. Your edits survive. The executor recovers.
+
+**Why it matters:** This completes the "updates don't strand you" story from beta.1 — now covering the rollback path itself.
+
+---
+
+## 11. Cron: Missed Slots No Longer Dropped
+
+**What it does:** Missed cron slots with a **stale stored next run time are no longer dropped**. **Startup catch-up runs are admitted after a restart**.
+
+**Before:** If the Gateway was down when a cron should have fired, the slot was silently dropped. Restart didn't catch up.
+
+**Now:** Stored next-run-time is validated. If it's stale, the missed slot fires on startup. Your scheduled agents run when they should.
+
+---
+
+## 12. Security Hardening: HTTPS Allowlist, Browser Proxy Blocking, Credential Redaction
+
+**What it does:** Multiple security boundaries hardened in beta.5:
+
+- **HTTPS allowlist enforcement** — require approval for `test`/`[ -v` operands in exec allowlist mode, refuse browser proxy commands sent through generic node invoke, fail closed when sandboxed spawned children resolve CLI-backed models
+- **Browser proxy blocking** — stop crafted Teams HTML from stalling the Gateway before sender checks, refuse embedded Control UI auth on pinned Android Gateway connections
+- **Credential redaction** — keep browser pairing credentials out of opener process arguments, mask Google OAuth client secrets in logs, redact credentials from MCP CLI inspection, omit credentials from rejected search endpoint errors, keep malformed piped input from corrupting model credentials
+- **Dependency security** — update fast-uri, bound vendored Zod traversal for A2UI and Discord input, scope the patched MSAL for Microsoft Teams, pick up nodemailer sender-parsing fixes for IMAP
+
+**Why it matters:** This is defense-in-depth. Each layer catches what the previous missed. If you run OpenClaw in production or shared environments, these boundaries matter.
+
+---
+
 ## Quick Version Context
 
 | Version | Date | Focus |
 |---------|------|-------|
-| **2026.10.10-beta.1** | Oct 15, 2026 | **Cloud sessions, local Gateway in desktop, Gemini 4 Argon, Nemotron 3.5 Super VL, xAI Imagine 2.0, Muse Code, Bun runtime, faster Gateway, restart-safe replies, macOS 26.2 req** |
+| **2026.10.10-beta.5** | **Oct 30, 2026** | **Node 24/26 compatibility, Gateway streaming fixes, update rollback recovery, cron catch-up, security hardening (HTTPS allowlist, proxy blocking, credential redaction) — makes beta.1 reliable** |
+| **2026.10.10-beta.1** | Oct 15, 2026 | Cloud sessions, local Gateway in desktop, Gemini 4 Argon, Nemotron 3.5 Super VL, xAI Imagine 2.0, Muse Code, Bun runtime, faster Gateway, restart-safe replies, macOS 26.2 req |
 | **2026.10.5-beta.1** | Oct 11, 2026 | Safer updates, restart-safe conversations, faster Gateway, reliable subagents, X channel, voice upgrades, smarter pickers, ClawHub |
 | **2026.10.1** | Oct 10, 2026 | Memory survival, Haiku 5.5, Workboard, MCP Apps alive, sealed installs, Windows fixes |
 | **2026.9.9** | Oct 8, 2026 | GPT-6.1 Sol native, Windows junction stores fixed, safer live updates |
 
-**2026.10.5-beta.1** made the platform reliable. **2026.10.10-beta.1** makes it *cloud-native, model-current, and desktop-ready*.
+**2026.10.5-beta.1** made the platform reliable. **2026.10.10-beta.1** makes it *cloud-native, model-current, and desktop-ready*. **2026.10.10-beta.5** makes it *actually work on Node 24/26, stream reliably, rollback safely, and run cron correctly*.
 
 ---
 
@@ -148,13 +216,14 @@ If you've been waiting for OpenClaw to feel like "production infrastructure" —
 
 | If You... | Verdict |
 |-----------|---------|
-| Run OpenClaw in production | **Yes (staging first)** — cloud sessions + local Gateway + update fixes = operational maturity |
+| Run OpenClaw in production | **Yes (staging first)** — cloud sessions + local Gateway + update fixes + Node 24/26 fix + streaming fix = operational maturity |
 | Want cloud without vendor lock-in | **Yes** — move sessions local↔cloud freely, BYO cloud infra |
 | Use the Windows/macOS desktop app | **Yes** — local Gateway built in, guided first-run |
 | Want latest models instantly | **Yes** — picker auto-discovers, recommended first |
 | Run many agents / high-traffic Gateway | **Yes** — worker-thread reads = stays responsive |
 | Need absolute stability | **Wait for stable** — this is beta, test in staging first |
 | On macOS < 26.2 | **Can't** — native apps require macOS 26.2+ now |
+| On Node 24 or 26 | **Yes** — beta.5 fixes installs/updates/workers |
 
 ---
 
@@ -162,17 +231,17 @@ If you've been waiting for OpenClaw to feel like "production infrastructure" —
 
 ```bash
 # npm (Global CLI)
-npm install -g openclaw&#64;2026.10.10-beta.1
+npm install -g openclaw@2026.10.10-beta.5
 
 # Docker
-docker pull openclaw/openclaw:2026.10.10-beta.1
+docker pull openclaw/openclaw:2026.10.10-beta.5
 
 # Verify
 openclaw --version
-# Should show 2026.10.10-beta.1
+# Should show 2026.10.10-beta.5
 ```
 
-**Desktop apps:** Download from the [GitHub Release assets](https://github.com/openclaw/openclaw/releases/tag/v2026.10.10-beta.1) — Windows `.msi`, macOS `.dmg`, Linux `.AppImage`.
+**Desktop apps:** Download from the [GitHub Release assets](https://github.com/openclaw/openclaw/releases/tag/v2026.10.10-beta.5) — Windows `.msi`, macOS `.dmg`, Linux `.AppImage`.
 
 **Report issues:** [github.com/openclaw/openclaw/issues](https://github.com/openclaw/openclaw/issues) — beta feedback shapes the stable release.
 
@@ -180,26 +249,26 @@ openclaw --version
 
 ## What's Next
 
-The 2026.10.10-beta.1 release notes show **hundreds of contributors** and fixes across every subsystem. The velocity is real.
+The 2026.10.10-beta.5 release notes show **hundreds of contributors** and fixes across every subsystem. The velocity is real.
 
 Next stable (2026.10.x) will likely bring:
-- Beta fixes promoted to stable
+- Beta.1 through beta.5 fixes promoted to stable
 - More model integrations (GPT-6.2, Opus 6, etc.)
 - Desktop app improvements (Windows/macOS parity)
 - ACP protocol enhancements
 - Plugin marketplace features
 - Cloud session UX polish
 
-For now: **test the beta in staging, move a session to cloud and back, try the desktop app's local Gateway, and enjoy models that just appear.**
+For now: **test the beta in staging, move a session to cloud and back, try the desktop app's local Gateway, enjoy models that just appear, and verify Node 24/26 works, streaming doesn't stall, and your cron jobs actually run.**
 
 ---
 
 ## Release Artifacts
 
-- **npm:** [openclaw@2026.10.10-beta.1](https://www.npmjs.com/package/openclaw/v/2026.10.10-beta.1)
-- **Docker:** `docker pull openclaw/openclaw:2026.10.10-beta.1`
-- **GitHub Release:** [v2026.10.10-beta.1](https://github.com/openclaw/openclaw/releases/tag/v2026.10.10-beta.1)
-- **Changelog:** [CHANGELOG/2026.10.10-beta.1.md](https://raw.githubusercontent.com/openclaw/openclaw/main/CHANGELOG/2026.10.10-beta.1.md)
+- **npm:** [openclaw@2026.10.10-beta.5](https://www.npmjs.com/package/openclaw/v/2026.10.10-beta.5)
+- **Docker:** `docker pull openclaw/openclaw:2026.10.10-beta.5`
+- **GitHub Release:** [v2026.10.10-beta.5](https://github.com/openclaw/openclaw/releases/tag/v2026.10.10-beta.5)
+- **Changelog:** [CHANGELOG/2026.10.10-beta.5.md](https://raw.githubusercontent.com/openclaw/openclaw/main/CHANGELOG/2026.10.10-beta.5.md)
 
 ---
 
@@ -220,6 +289,6 @@ For now: **test the beta in staging, move a session to cloud and back, try the d
 
 ---
 
-*OpenClaw is open-source (MIT) and available at [github.com/openclaw/openclaw](https://github.com/openclaw/openclaw). Updated October 18, 2026 — covers OpenClaw 2026.10.10-beta.1 released October 15, 2026. Full changelog: [github.com/openclaw/openclaw/releases/tag/v2026.10.10-beta.1](https://github.com/openclaw/openclaw/releases/tag/v2026.10.10-beta.1)*
+*OpenClaw is open-source (MIT) and available at [github.com/openclaw/openclaw](https://github.com/openclaw/openclaw). Updated November 1, 2026 — covers OpenClaw 2026.10.10-beta.5 released October 30, 2026. Full changelog: [github.com/openclaw/openclaw/releases/tag/v2026.10.10-beta.5](https://github.com/openclaw/openclaw/releases/tag/v2026.10.10-beta.5)*
 
 *Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
