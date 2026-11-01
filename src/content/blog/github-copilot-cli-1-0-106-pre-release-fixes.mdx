@@ -1,0 +1,241 @@
+---
+title: "GitHub Copilot CLI v1.0.106 Just Fixed the Multi-Line Paste Bug You've Been Living With — Plus 19 Other Fixes in Two Pre-Releases"
+description: "Two pre-releases in 24 hours (v1.0.106-1 and v1.0.106-2) fix multi-line paste after slash commands, web_fetch encoding, WSL clipboard, session resume stalls, MCP symlink handling, and more. The quiet quality sprint continues."
+pubDate: 2026-11-01T14:00:00Z
+tags: ["github-copilot-cli", "release", "v1.0.106", "pre-release", "fixes", "coding-agents", "beginner"]
+tool: "copilot-cli"
+author: "Anshad"
+image: "/api/og?title=GitHub+Copilot+CLI+v1.0.106+PreRelease+Fixes&tool=copilot-cli"
+---
+
+GitHub Copilot CLI dropped **two pre-releases in 24 hours** — v1.0.106-1 (Oct 31) and v1.0.106-2 (Nov 1). Combined: **20+ fixes** with zero new features. Just the paper cuts you feel every day.
+
+---
+
+## The One Fix You'll Notice Immediately: Multi-Line Paste Finally Works
+
+**The bug:** You copy a block of code, type `/ask` or `/clear` or `/delegate`, paste — and it all arrives as **one long line**. Indentation gone. Readability gone. You retype it manually.
+
+**v1.0.106-1 fixes this.** Text pasted over several lines after `/clear`, `/new`, `/ask`, `/delegate`, or `/diagnose` now **keeps its line breaks and indentation**.
+
+```bash
+# Before v1.0.106-1
+/ask
+# Paste a 20-line function → arrives as one line
+
+# After v1.0.106-1
+/ask
+# Paste → arrives exactly as copied, indentation intact
+```
+
+This also fixes `/new` (new conversation), `/clear` (clear context), `/delegate` (handoff to subagent), and `/diagnose` (debugging command). If you use slash commands daily, this alone is worth the update.
+
+---
+
+## The Fix That Stops Your Agent From Ghosting: Session Resume Stalls
+
+**The bug:** You close a session, come back later, run `copilot --resume` — and it **stalls for 30 seconds** before showing the conversation.
+
+**v1.0.106-1:** Reopening a recently closed local session no longer stalls. It's instant.
+
+---
+
+## The Fix That Saves Your Work on Ctrl+C
+
+**The bug:** You hit `Ctrl+C` to stop a long-running `copilot -p` task. The process dies **before writing the session shutdown record** — usage totals, code-change counts, all lost.
+
+**v1.0.106-1:** The shutdown record now writes **before exit**. Your usage dashboard stays accurate.
+
+---
+
+## web_fetch Finally Reads Non-UTF-8 Pages
+
+**The bug:** `web_fetch` on ISO-8859-1, windows-1252, or other legacy encodings would reach the model with **mojibake** — accented characters replaced by garbage.
+
+**v1.0.106-1:** `web_fetch` now decodes pages in their declared encoding (Content-Type charset or meta tag). Non-UTF-8 pages **just work**.
+
+---
+
+## WSL Clipboard Copy Fixed
+
+**The bug:** Copy in WSL was broken — `clip.exe` arguments didn't match what cmd.exe expects.
+
+**v1.0.106-1:** Fixed by running `clip.exe` with compatible cmd.exe arguments. Copy/paste in WSL **works now**.
+
+---
+
+## MCP Config Symlinks Preserved
+
+**The bug:** Saving MCP server changes would **break symlinks** — your `mcp-config.json` symlink got replaced with a regular file.
+
+**v1.0.106-2:** Symlinked `mcp-config.json` files are preserved and the symlink target updated. Your dotfile management stays intact.
+
+---
+
+## Screen Reader Users: Errors Now Announce Themselves
+
+**v1.0.106-2:** With `--screen-reader`, failed/rejected tool calls, unknown commands, and warnings now begin with **"Error:"** or **"Warning:"** instead of reading like any other message. Accessibility win.
+
+---
+
+## /resume Stops Duplicating Background Sessions
+
+**v1.0.106-2:** Running `/resume` on an already-running background session now **foregrounds it** instead of showing it twice on exit. Cleaner session management.
+
+---
+
+## HTTP MCP Servers That Hang — Timeout Once, Not Three Times
+
+**v1.0.106-2:** An HTTP MCP server that accepts connections but never answers now holds startup for **its connection timeout once**, instead of retrying three times. Faster failure detection.
+
+---
+
+## Skills Stay In Sync With Session
+
+**v1.0.106-2:** `/skills add`, `/skills remove`, and `/skills reload` now **stay in sync with session skills** and report refresh failures immediately. No more phantom skills.
+
+---
+
+## All Fixes at a Glance
+
+| Area | v1.0.106-1 (Oct 31) | v1.0.106-2 (Nov 1) |
+|------|---------------------|-------------------|
+| **Paste/Input** | Multi-line paste after slash commands keeps formatting | — |
+| **Session/Resume** | No 30s stall reopening closed sessions | `/resume` foregrounds running background session |
+| **Shutdown** | `Ctrl+C` writes shutdown record before exit | — |
+| **web_fetch** | Decodes declared charset (ISO-8859-1, windows-1252, etc.) | — |
+| **WSL** | Clipboard copy via clip.exe fixed | — |
+| **MCP** | GHES host format fix; generated images on no-hardlink fs | Symlink preservation; single timeout for hung servers |
+| **Errors/Refusals** | Original refusal returned when org disables Claude fallback | Screen reader: "Error:"/"Warning:" prefixes |
+| **Session Data** | Citation sources kept with tool results on resume | Skills sync with session; immediate refresh failure reporting |
+| **Rewind** | Keeps turns where agents edit files above capture limit | — |
+| **Session Picker** | — | Closes immediately after `/resume` switch commits |
+| **Server Stability** | `session.resume` non-JSON params fail cleanly (no crash) | — |
+
+---
+
+## Should You Update? (Pre-Release Caveat)
+
+**These are pre-releases** — not on the stable channel yet. But they're built from the same commit (`e192829`) that passed GitHub's verified signature.
+
+| If You... | Verdict |
+|-----------|---------|
+| Hit the multi-line paste bug daily | **Yes** — quality of life alone |
+| Use WSL and clipboard is broken | **Yes** — finally fixed |
+| Fetch non-UTF-8 pages via web_fetch | **Yes** — encoding handled |
+| Run long `copilot -p` tasks and Ctrl+C them | **Yes** — shutdown record preserved |
+| Manage MCP via symlinked config | **Yes** — symlinks preserved |
+| Need absolute stability | **Wait** for stable v1.0.106 (days away) |
+
+Pre-releases install side-by-side with stable. You can test without committing.
+
+---
+
+## How to Install the Pre-Release
+
+```bash
+# macOS (Homebrew) - pre-release tap
+brew install github/copilot-cli/copilot-cli@pre
+# or
+brew upgrade github/copilot-cli/copilot-cli@pre
+
+# Windows (winget) - pre-release not in winget yet
+# Download from: https://github.com/github/copilot-cli/releases/tag/v1.0.106-2
+
+# Linux/macOS (npm) - pre-release tag
+npm install -g @github/copilot-cli@pre
+# or specific version
+npm install -g @github/copilot-cli@1.0.106-2
+
+# Verify
+copilot --version
+# Should show: 1.0.106-2 (or 1.0.106-1)
+```
+
+---
+
+## First Things to Try After Update
+
+```bash
+# 1. Test multi-line paste (the big one)
+/ask
+# Paste a multi-line function with indentation
+# Should arrive perfectly formatted
+
+# 2. Test web_fetch on a legacy-encoding page
+# Find an ISO-8859-1 page → web_fetch → accented chars render correctly
+
+# 3. Test WSL clipboard (if on WSL)
+# Copy in WSL → paste in Windows → works
+
+# 4. Test session resume speed
+copilot --resume
+# Should be instant, no 30s stall
+
+# 5. Test Ctrl+C shutdown record
+copilot -p "long task"
+# Ctrl+C → check usage dashboard → totals preserved
+
+# 6. Test MCP symlink (if you use one)
+# Edit MCP config via CLI → symlink target updated, symlink preserved
+```
+
+---
+
+## The Bigger Picture: The "Make It Boring Reliable" Sprint Is Real
+
+```
+v1.0.100 (Oct 19) → Dynamic workflows, structured output, sandbox auth
+v1.0.101 (Oct 20) → Session browsing, proxy sandbox, voice cleanup, Windows shell
+v1.0.102 (Oct 21) → Native structured output, assisted approval instructions
+v1.0.103 (Oct 22) → ACP sandbox, cloud reconnect, session titles, Gemini fixes
+v1.0.104 (Oct 27) → Assisted Permissions DEFAULT, Fusion auto-start, background tasks persist
+v1.0.105 (Oct 28) → Fusion High/Max in long context
+v1.0.106-1 (Oct 31) → 13 fixes: paste, resume, shutdown, encoding, WSL, MCP, rewind
+v1.0.106-2 (Nov 1)  → 8 fixes: screen reader, resume dup, MCP timeout, skills sync
+```
+
+**Eight stable/pre releases in 13 days.** The team isn't shipping features — they're **eliminating every reason you'd hesitate to use this daily**.
+
+v1.0.104 graduated Assisted Permissions to default. v1.0.105 fixed the last Fusion tier bug. v1.0.106 pre-releases are now cleaning up the **daily paper cuts** — paste, resume, encoding, clipboard, symlinks, shutdown records.
+
+This is the release cadence you want: **features land, then the rough edges get sanded until they disappear.**
+
+---
+
+## Bottom Line
+
+**v1.0.106 pre-releases don't add features. They remove friction.**
+
+- Multi-line paste after `/ask` `/clear` `/delegate` → **fixed**
+- 30-second session resume stall → **fixed**
+- `Ctrl+C` losing usage data → **fixed**
+- `web_fetch` mojibake on legacy encodings → **fixed**
+- WSL clipboard → **fixed**
+- MCP symlink breakage → **fixed**
+- Screen reader error announcements → **fixed**
+- Background session duplication on `/resume` → **fixed**
+- Hung MCP server triple timeout → **fixed**
+- Skills drift from session → **fixed**
+
+If you've been living with any of these, the pre-release is stable enough to use. If you prefer stable, v1.0.106 proper lands in days.
+
+```bash
+npm install -g @github/copilot-cli@pre
+# Paste works. Resume is instant. Shutdown records save. Encoding handles. Symlinks hold.
+```
+
+---
+
+## Related Articles
+
+- [GitHub Copilot CLI Just Killed Experimental Mode — Assisted Permissions Are Now Default](/blog/github-copilot-cli-1-0-104-105-assisted-permissions-default/)
+- [GitHub Copilot CLI v1.0.103 — ACP Sandbox, Cloud Reconnect, Session Titles, Gemini Fixes](/blog/github-copilot-cli-1-0-101-session-browsing-proxy-fixes/)
+- [Codex vs Copilot CLI: Terminal Battle — Which Terminal Agent Actually Ships?](/blog/codex-vs-copilot-cli-terminal-battle/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*GitHub Copilot CLI v1.0.106-2 pre-release published November 1, 2026. v1.0.106-1 published October 31, 2026. Stable v1.0.106 expected within days. Full changelog: [github.com/github/copilot-cli/releases](https://github.com/github/copilot-cli/releases)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
