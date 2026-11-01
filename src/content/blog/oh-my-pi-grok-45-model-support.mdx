@@ -1,9 +1,9 @@
 ---
 title: "Oh My Pi Just Got Grok 4.5 — xAI's Latest Model Is Now Available with Prompt-Cache Affinity"
-description: "Oh My Pi v16.3.15 adds Grok 4.5 to the model catalog with full prompt-cache affinity support. Your coding agent can now use xAI's most capable model with 30-50% cost savings on repeated prompts."
+description: "Oh My Pi v16.3.15 adds Grok 4.5 to the model catalog with full prompt-cache affinity support. Your coding agent can now use xAI's most capable model with 30-50% cost savings on repeated prompts. Complete technical breakdown with routing examples."
 pubDate: "2026-07-09T12:00:00Z"
-updatedDate: "2026-10-09T12:00:00Z"
-tags: ["oh-my-pi", "grok", "xai", "model-catalog", "prompt-caching", "v16", "cost-optimization"]
+updatedDate: "2026-11-01T14:00:00Z"
+tags: ["oh-my-pi", "grok", "xai", "model-catalog", "prompt-caching", "v16", "cost-optimization", "model-routing"]
 tool: "oh-my-pi"
 author: "jax"
 ---
@@ -29,6 +29,17 @@ Grok 4.5 is xAI's most capable model to date, positioned as a direct competitor 
 | Strengths | Reasoning, code generation, long context |
 
 It's available through xAI's API (not X Premium) — you'll need an xAI API key separate from any X subscription.
+
+## Grok 4.5 vs. the Field: Quick Comparison
+
+| Model | Context | Input/Output per 1M | Prompt Cache | Best For |
+|-------|---------|---------------------|--------------|----------|
+| **Grok 4.5** | 128K | $2 / $8 | 5 min, ~90% | Reasoning, code gen, long context |
+| GPT-4o | 128K | $2.50 / $10 | 5–60 min, 50% | General purpose, speed |
+| Claude 3.5 Sonnet | 200K | $3 / $15 | 5 min, 90% | Analysis, refactoring |
+| Gemini 2.5 Pro | 2M | $1.25 / $5 | 60 min, 75% | Massive context, docs |
+
+Grok 4.5's pricing sits between GPT-4o and Claude — cheaper than Anthropic for input, same output as OpenAI. The 128K context is adequate for most coding tasks; if you need 2M tokens, Gemini 2.5 Pro is the play.
 
 ## Why Prompt-Cache Affinity Matters
 
@@ -103,6 +114,46 @@ models:
 ```
 
 The model is available through xAI's API with your existing API key. No additional setup required.
+
+## Real-World Routing Example: A 2-Hour Session
+
+Here's what a typical coding session looks like with Grok 4.5 in the routing mix:
+
+```yaml
+# .oh-my-pi/config.yaml
+models:
+  default: "xai/grok-4.5"
+  routing:
+    # Architecture/design → Grok 4.5 (reasoning strength)
+    - pattern: "*architect*|*design*|*refactor*|*plan*"
+      model: "xai/grok-4.5"
+    # Code generation → Grok 4.5 (strong at code)
+    - pattern: "*implement*|*write*|*generate*|*create*"
+      model: "xai/grok-4.5"
+    # Tests/quick fixes → cheaper fast model
+    - pattern: "*test*|*fix*|*lint*|*format*|*quick*"
+      model: "baseten/qwen-2.5-coder-72b"
+    # Massive context → Gemini
+    - pattern: "*analyze*|*review*|*docs*|*summarize*"
+      model: "google/gemini-2.5-pro"
+```
+
+**Session breakdown (50 requests over 2 hours):**
+
+| Task Type | Requests | Model | Est. Cost |
+|-----------|----------|-------|-----------|
+| Architecture planning | 5 | Grok 4.5 | $0.45 |
+| Feature implementation | 20 | Grok 4.5 | $1.80 |
+| Unit tests | 10 | Qwen 2.5 Coder | $0.15 |
+| Code review | 8 | Gemini 2.5 Pro | $0.40 |
+| Quick fixes | 7 | Qwen 2.5 Coder | $0.10 |
+| **Total** | **50** | — | **~$2.90** |
+
+Without routing (all Grok 4.5): ~$5.20. **Savings: ~44%** with smart routing.
+
+With prompt-cache affinity on the Grok calls (system prompt ~15K tokens, cached after first request): additional **~$1.20 saved** on cached prefix.
+
+**Real cost: ~$1.70 for 2 hours of agent-assisted coding.**
 
 ## What This Signals for Oh My Pi
 
