@@ -1,0 +1,348 @@
+---
+title: "Hermes Agent v0.22.6 Just Landed 776 PRs — The Biggest Patch Drop Since Threshold"
+description: "Hermes Agent v0.22.6 (Nov 2) rolls up 776 merged PRs, 3,448 commits, and 385 closed issues since v0.22.5. Webapp on gateway listener, per-skill locks, prepared compaction, cron cancel with missed-run policy, OS-keychain vault storage, Telegram video notes, and resumable downloads. Full curated notes ship with v0.23.0."
+pubDate: 2026-11-03T10:00:00Z
+tags: ["hermes-agent", "release", "v0.22.6", "threshold", "patch", "coding-agent", "beginner", "open-source"]
+tool: "hermes"
+author: "Anshad"
+image: "/api/og?title=Hermes+Agent+v0.22.6+776+PRs&tool=hermes-agent"
+canonical: "https://terminalblog.com/blog/hermes-agent-v0-22-6-patch-776-prs-stable-release/"
+faq:
+  - q: "What's the biggest change in v0.22.6?"
+    a: "The Webapp now runs on the gateway's own listener (`hermes webapp`), giving you a Desktop Web Access pane to open it on your network or your own URL behind Nous sign-in. Desktop plugins also load in a browser tab now."
+  - q: "Are there breaking changes?"
+    a: "No. This is a pure patch release rolling up 776 PRs since v0.22.5. Safe to upgrade."
+  - q: "What about the catalog's `requires_hermes` enforcement?"
+    a: "Plugin installs and updates now enforce `requires_hermes` at install time — plugins that need a newer Hermes version won't install on older versions."
+  - q: "When do full curated release notes arrive?"
+    a: "Full curated notes for the entire v0.22.0 window ship with v0.23.0 — highlights, feature areas, and complete contributor credits. Nothing in this window is skipped."
+  - q: "How do I update?"
+    a: "CLI: `hermes update` or re-run the installer. Docker: `nousresearch/hermes-agent:stable`. Microsoft Store app updates through the Store. Desktop installer (.exe/.dmg) updates with next bundled release."
+---
+
+**Hermes Agent v0.22.6 dropped November 2, 2026** — and it's the biggest patch drop since the Threshold release. **776 merged PRs. 3,448 non-merge commits. 385 closed issues.** All rolled into one stable tag for the GitHub release, Microsoft Store, Docker, and Hermes Cloud.
+
+If you've been on v0.22.5, you're 776 PRs behind. Here's what that actually means for your daily workflow.
+
+---
+
+## The One-Line Summary
+
+**v0.22.6 (Nov 2) → 776 PRs, 3,448 commits, 385 issues closed. Webapp on gateway listener, per-skill locks, prepared compaction, cron cancel/stop, OS-keychain vault, Telegram video notes, resumable downloads. Full curated notes ship with v0.23.0.**
+
+---
+
+## The Headline Features (Ranked by Daily Impact)
+
+### 1. Webapp on Gateway Listener — `hermes webapp`
+
+**What it is:** The Webapp now runs on the gateway's own listener. Run `hermes webapp` and you get a **Desktop Web Access pane** — open it on your network, or behind your own URL with Nous sign-in.
+
+**Why it matters:** No more separate web server. The gateway *is* the web server. Desktop plugins also load in a browser tab now — your plugin UI works in the browser, not just the native app.
+
+```bash
+# Start the webapp
+hermes webapp
+# Opens Desktop Web Access pane → pick network URL or custom domain with Nous sign-in
+```
+
+**For beginners:** This is the moment Hermes becomes a **web-first agent**. Your skills, plugins, cron jobs, memory — all accessible from a browser tab on any device on your network.
+
+---
+
+### 2. Per-Skill Locks Against Autonomous Writes
+
+**What it is:** Skills can now be **locked** from the Desktop Capabilities pane. A locked skill refuses autonomous writes — the agent can read it, but won't modify it without explicit permission.
+
+**Why it matters:** You have a skill that manages production infra. You want the agent to *read* it for context, but *never* auto-edit it. Lock it. Done.
+
+```bash
+# In Desktop → Capabilities → find skill → toggle "Lock"
+# Or via CLI (coming in v0.23.0 tooling)
+```
+
+**For teams:** This is the "trust but verify" control. Junior devs can use powerful skills. Senior devs lock the dangerous ones.
+
+---
+
+### 3. Prepared Compaction (`compression.prepare_ahead`)
+
+**What it is:** Opt-in **prepared compaction**. When enabled, Hermes compresses conversation history *ahead* of the context window limit — not reactively when you hit it.
+
+**Why it matters:** No more "context window full" mid-task pauses. Compaction happens in the background. Your session stays fluid.
+
+```json
+// In hermes.json or profile config
+{
+  "compression": {
+    "prepare_ahead": true
+  }
+}
+```
+
+---
+
+### 4. Cron Cancel + Missed-Run Policy + Stop Button
+
+**What it is:** Three cron upgrades that actually matter:
+- `hermes cron cancel` — cancel a running cron job
+- Per-job **missed-run policy** — what happens if the machine was asleep/offline when a cron was scheduled
+- **Stop button in Desktop cron editor** — click to kill a running job
+
+**Why it matters:** Cron jobs are no longer "fire and forget." You control them mid-flight.
+
+```bash
+# Cancel a running cron
+hermes cron cancel <job-id>
+
+# Missed-run policies (per job):
+# - "run_immediately" — run as soon as machine wakes
+# - "skip" — skip this occurrence
+# - "run_next_schedule" — wait for next scheduled time
+```
+
+---
+
+### 5. OS-Keychain Vault Storage (Opt-In)
+
+**What it is:** The vault encryption key can now be stored in your **OS keychain** (Windows Credential Manager, macOS Keychain, Linux Secret Service) instead of a file.
+
+**Why it matters:** No more `vault.key` file sitting on disk. The OS protects it with your login credentials. Opt-in — you choose.
+
+```bash
+# Enable (one-time setup)
+hermes vault migrate --keychain
+# Vault key moves to OS keychain. File deleted.
+```
+
+---
+
+### 6. Delegation Choices Saved Per Session
+
+**What it is:** `/delegation` choices (which agent handles which task) are now **persisted for the next session**.
+
+**Why it matters:** You set up your agent team once. Next session, they remember their roles. No re-configuration.
+
+---
+
+### 7. Telegram Video Notes + Slack Emoji Reactions
+
+**What it is:** Telegram integration now supports **video notes** (the round video messages). Slack gets **emoji reactions in thread context** — reactions show which thread they belong to.
+
+**Why it matters:** Richer notifications. Video notes for quick demos. Thread-aware reactions for team coordination.
+
+---
+
+### 8. Resumable Downloads in Package Manager
+
+**What it is:** Plugin/skill downloads **resume on interruption**. Network blip? Docker layer fails? It picks up where it left off.
+
+**Why it matters:** Large plugins (looking at you, browser automation) don't fail on flaky WiFi. Just works.
+
+---
+
+### 9. `/model reset` — Clear Model Pin Without Losing History
+
+**What it is:** New slash command: `/model reset` clears the session's **pinned model** but **keeps all history**.
+
+**Why it matters:** You pinned Opus 5.5 for a deep task. Task done. `/model reset` → back to default routing. History intact.
+
+---
+
+### 10. Agent-Picked ElevenLabs Voices in `text_to_speech`
+
+**What it is:** The `text_to_speech` skill now lets the **agent pick the ElevenLabs voice** per utterance — not a static config.
+
+**Why it matters:** Agent says "this is urgent" → picks a serious voice. "Here's a fun fact" → picks a playful voice. Dynamic TTS personality.
+
+---
+
+### 11. `pre_llm_call` Hook — Block a Turn Before Inference
+
+**What it is:** New hook: `pre_llm_call` fires **before the LLM request**. Can **block the turn entirely**.
+
+**Why it matters:** Hard guardrails. Budget enforcement. Content filtering. Custom routing logic. The agent *asks permission* before every inference call.
+
+---
+
+### 12. Desktop Group Chat: Rename, Disband, Mentions, Attachment Paste
+
+**What it is:** Group chats in Desktop get:
+- **Rename** — give your agent team a real name
+- **Disband** — clean shutdown
+- **Mentions** — `@agent-name` to direct a message
+- **Attachment paste** — drag/drop images, files into group chat
+
+**Why it matters:** Group chat becomes a **collaboration workspace**, not just a demo feature.
+
+---
+
+### 13. Every Profile as a Desktop Sidebar Section
+
+**What it is:** Each Hermes profile now appears as its **own sidebar section** in Desktop. Switch profiles → switch sidebar context instantly.
+
+**Why it matters:** Work profile, personal profile, experiment profile — each has its own skills, plugins, cron, memory. Visual separation.
+
+---
+
+### 14. Migrate Grok Bot / OpenBot Users
+
+**What it is:** `hermes migrate` now moves **Grok Bot and OpenBot users** into Hermes profiles.
+
+**Why it matters:** If you were on Grok Bot or OpenBot, one command brings your config, history, and habits over.
+
+---
+
+### 15. Catalog `requires_hermes` Enforced at Install
+
+**What it is:** Plugins declare `requires_hermes: ">=0.22.0"` in their manifest. Hermes **enforces it at install/update time**.
+
+**Why it matters:** No more "plugin installed but crashes because it needs newer Hermes." Version mismatch caught *before* you waste time debugging.
+
+---
+
+## The Small Wins That Add Up
+
+| Fix | Why You'll Notice |
+|-----|-------------------|
+| Grok Bot / OpenBot migration | One command switches you over |
+| Every profile = sidebar section | Visual profile switching in Desktop |
+| Group chat mentions | `@reviewer` actually routes to that agent |
+| Attachment paste in group chat | Drag screenshot → all agents see it |
+| Video notes in Telegram | 30-sec demo > 10 paragraphs of text |
+| Slack thread emoji reactions | Know which thread a 👍 belongs to |
+| Resumable plugin downloads | Large plugins survive flaky networks |
+| `pre_llm_call` hook | Hard budget/content guards before inference |
+| Agent-picked ElevenLabs voices | TTS adapts to message tone |
+| `/model reset` keeps history | Switch models mid-conversation, no context loss |
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **v0.22.6** | **Nov 2, 2026** | **Patch (Latest)** | **776 PRs: webapp on gateway, per-skill locks, prepared compaction, cron control, OS-keychain, delegation persistence, group chat upgrades, migration, catalog enforcement** |
+| v0.22.5 | Oct 27, 2026 | Patch | 81 PRs stable release |
+| v0.22.4 | Oct 24, 2026 | Patch | Kills suggestion pills |
+| v0.22.3 | Oct 22, 2026 | Patch | 620 fixes |
+| v0.22.2 | Oct 19, 2026 | Patch | Gateway reboot, local models |
+| v0.22.1 | Oct 15, 2026 | Patch | Chaos fixed |
+| **v0.22.0** | **Oct 5, 2026** | **Minor** | **Threshold Release — changes everything** |
+
+**v0.22.0 → v0.22.6 = 6 patches in 4 weeks.** The Threshold release broke ground. These patches are paving the road.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Use Hermes daily** | **Yes** — 776 PRs of polish compound |
+| **Run cron jobs** | **Yes** — cancel, stop, missed-run policy |
+| **Share agents with team** | **Yes** — per-skill locks, group chat mentions, profiles as sections |
+| **Use Telegram/Slack for ops** | **Yes** — video notes, thread reactions |
+| **Build plugins/skills** | **Yes** — `requires_hermes` enforcement, `pre_llm_call` hook |
+| **Run on flaky networks** | **Yes** — resumable downloads |
+| **Want web access to your agent** | **Yes** — `hermes webapp` is the gateway |
+| **On v0.22.5 and stable** | **Yes** — zero breaking changes, pure accumulation |
+
+**No reason to wait.** This is the "Threshold release, polished" you've been living with for a month — now with 776 more fixes.
+
+---
+
+## How to Update
+
+```bash
+# CLI
+hermes update
+
+# Or re-run installer
+curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
+
+# Docker / Hermes Cloud
+docker pull nousresearch/hermes-agent:stable
+# or :latest
+
+# Microsoft Store
+# Updates automatically
+
+# Desktop installer (.exe / .dmg)
+# Updates with next bundled release (not this patch)
+```
+
+**First things to try after update:**
+
+```bash
+# 1. Launch the webapp
+hermes webapp
+# Opens Desktop Web Access pane → try your network URL
+
+# 2. Lock a dangerous skill
+# Desktop → Capabilities → find skill → toggle Lock
+
+# 3. Test prepared compaction
+# Add to hermes.json: "compression": { "prepare_ahead": true }
+# Run a long session → watch compaction happen in background
+
+# 4. Try cron cancel
+hermes cron list
+hermes cron cancel <job-id>
+
+# 5. Test /model reset
+# Pin a model → /model reset → history stays, pin cleared
+
+# 6. Check profile sidebar
+# Desktop → each profile = own sidebar section
+
+# 7. Try group chat mentions
+# Create group chat → @agent-name → message routes to that agent
+```
+
+---
+
+## The Bottom Line
+
+**v0.22.0 Threshold changed everything. v0.22.1–v0.22.5 fixed the chaos. v0.22.6 is the accumulation — 776 PRs of "it just works better now."**
+
+- **Webapp on gateway** → your agent is a web service
+- **Per-skill locks** → trust but verify, enforced
+- **Prepared compaction** → no more context pauses
+- **Cron with teeth** → cancel, stop, missed-run policy
+- **OS-keychain vault** → no key file on disk
+- **Group chat grows up** → mentions, attachments, rename, disband
+- **Migration path** → Grok Bot / OpenBot users welcome
+- **Catalog enforcement** → version mismatches caught at install
+
+The pattern holds: **Hermes doesn't chase shiny. It hardens the layers that matter when you run agents in production — security, reliability, embeddability, team workflow.**
+
+For a beginner, that means **fewer config surprises, fewer "why did it break?" moments, more "it just works."** For a team, it means **Hermes is becoming the platform you standardize on — securely.**
+
+```bash
+hermes update
+# Webapp on gateway
+# Skills locked down
+# Compaction prepared
+# Cron under control
+# Vault in keychain
+# Group chat with mentions
+# Plugins resume downloads
+# Model reset keeps history
+```
+
+---
+
+## Related Articles
+
+- [Hermes Agent v0.22.5 — 81 PRs Stable Release](/blog/hermes-agent-v0-22-5-patch-81-prs-stable-release/)
+- [Hermes Agent v0.22.3 — 620 Fixes, What Actually Changed](/blog/hermes-agent-v0-22-3-patch-620-fixes-what-changed/)
+- [Hermes Agent v0.22.0 — The Threshold Release That Changes Everything](/blog/hermes-agent-v0-22-threshold-release-changes-everything/)
+- [Deep Dive: Hermes Agent — The Autonomous Coding Assistant That Grows With You](/blog/deep-dive-hermes-agent-autonomous-coding-assistant/)
+- [Hermes Agent Security Fixes Ready — Not Merged](/blog/hermes-agent-security-fixes-ready-not-merged/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Hermes Agent is open-source (Apache-2.0) and available at [github.com/NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent). Full changelog: [github.com/NousResearch/hermes-agent/releases/tag/v0.22.6](https://github.com/NousResearch/hermes-agent/releases/tag/v0.22.6). Published November 3, 2026 — covers Hermes Agent v0.22.6 stable released November 2, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*

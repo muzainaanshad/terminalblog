@@ -1,0 +1,271 @@
+---
+title: "OpenClaw 2026.10.9 Just Patched the Supply Chain — Fast-URI, Zod, IMAP, MSAL All Hardened"
+description: "OpenClaw 2026.10.9 (Oct 29) patches vulnerable runtime dependencies: fast-URI 4.2.3 rejects malformed schemes in MCP validation, oversized Zod collections rejected early, IMAP sender parsing uses nodemailer 10.1.4 to block spoofed senders, Microsoft Teams uses patched MSAL Node 7.1.1. Plus safe update rollbacks, SQLite tokenizer recovery, full-disk recovery, and large transcript migration."
+pubDate: 2026-11-03T12:00:00Z
+tags: ["openclaw", "release", "2026.10.9", "security", "supply-chain", "recovery", "coding-agent", "beginner", "open-source"]
+tool: "openclaw"
+author: "Anshad"
+image: "/api/og?title=OpenClaw+2026.10.9+Supply+Chain+Patches&tool=openclaw"
+canonical: "https://terminalblog.com/blog/openclaw-2026-10-9-supply-chain-security-patches/"
+faq:
+  - q: "What's the biggest security fix in 2026.10.9?"
+    a: "fast-URI 4.2.3 now rejects malformed URI schemes and hosts in MCP schema validation — this closes a vector where malformed URIs could bypass validation in MCP tool calls."
+  - q: "Are there breaking changes?"
+    a: "No. This is a maintenance release focused on security dependency patches, recovery, data preservation, and reliability fixes. Zero breaking changes."
+  - q: "What about the failed update rollback fixes?"
+    a: "Git-source rollbacks now preserve operator edits instead of resetting the checkout. npm rollbacks retry transient Windows denials and report the exact move that restores a bootable install — no more stranded package roots."
+  - q: "Does this fix the SQLite tokenizer issue?"
+    a: "Yes — agent databases and stale full-text indexes recover after SQLite tokenizer changes, including update snapshots. Your data survives the upgrade."
+  - q: "How do I update?"
+    a: "OpenClaw auto-updates. Or download from github.com/openclaw/openclaw/releases/tag/v2026.10.9. The npm package publishes automatically via GitHub Actions."
+---
+
+**OpenClaw 2026.10.9 dropped October 29, 2026** — and it's the kind of release that doesn't make headlines but **saves your ass when things go wrong**. 48 PRs. Security dependency patches across the supply chain. Failed update rollbacks that actually work. SQLite tokenizer recovery. Full-disk survival. Large transcript migration without Node.js string limits.
+
+This is the "boring" release that makes the exciting ones possible.
+
+---
+
+## The One-Line Summary
+
+**2026.10.9 (Oct 29) → 48 PRs: fast-URI 4.2.3, Zod oversized collection rejection, nodemailer 10.1.4 (IMAP spoofing), MSAL Node 7.1.1 (Teams), safe Git/npm rollbacks, SQLite tokenizer recovery, full-disk survival, transcript migration. Zero breaking changes. Pure hardening.**
+
+---
+
+## The Supply Chain Security Patches (The Headline)
+
+### 1. fast-URI 4.2.3 — Malformed URI Rejection in MCP Validation
+
+**What it is:** `fast-uri` upgraded to **4.2.3**. It now **rejects malformed URI schemes and hosts** during MCP schema validation.
+
+**Why it matters:** MCP tool calls pass URIs for resources, tools, prompts. A malformed URI (crafted scheme, weird host) could previously slip through validation. Now it's rejected at the schema layer.
+
+```bash
+# Before: malformed URI in MCP tool call → might pass validation
+# After: fast-uri 4.2.3 → "Invalid URI scheme" / "Invalid host" → rejected
+```
+
+**For beginners:** This is supply chain hardening. You didn't write the URI parser. `fast-uri` did. Now it's stricter. Your MCP surface just got smaller.
+
+---
+
+### 2. Zod Oversized Collection Rejection — Early Bailout
+
+**What it is:** **Oversized Zod collections are rejected early** in A2UI and the Discord embedded app SDK.
+
+**Why it matters:** Zod schemas define your data shapes. An attacker sends a 10MB array where you expect 10 items. Old behavior: parse it all, then validate. New behavior: **reject at collection size check, before parsing.**
+
+```typescript
+// Your schema
+const items = z.array(itemSchema).max(100);
+
+// Attack: 10,000 items
+// Before: Zod parses all 10k → then checks .max(100) → OOM risk
+// After: Collection size checked FIRST → rejected immediately
+```
+
+---
+
+### 3. nodemailer 10.1.4 — IMAP Sender Spoofing Blocked
+
+**What it is:** IMAP sender parsing now uses **nodemailer 10.1.4**. **Spoofed senders cannot pass the sender token gate.**
+
+**Why it matters:** Email-based agents (receiving tasks via IMAP) now validate the *actual* sender cryptographically. `From:` header spoofing? Blocked. The token gate requires valid DKIM/SPF alignment.
+
+---
+
+### 4. MSAL Node 7.1.1 — Microsoft Teams Authentication Hardened
+
+**What it is:** Microsoft Teams integration uses **patched MSAL Node 7.1.1**.
+
+**Why it matters:** Token acquisition flows for Teams are now on a version with known auth bypass fixes. If your agent talks to Teams, this matters.
+
+---
+
+## The Recovery & Reliability Fixes (The "Save Your Ass" Features)
+
+### 5. Safe Failed Update Rollbacks — Git + npm
+
+**What it is:** Two rollback fixes that actually work:
+
+**Git-source rollbacks:** Preserve **operator edits** instead of resetting the checkout. You edited a config during an update? It survives the rollback.
+
+**npm rollbacks:** Retry **transient Windows denials** (file locks, AV interference) and **report the exact move** that restores a bootable install — no more "stranded package root" where you don't know what broke.
+
+```bash
+# Before: update fails → rollback → your edits gone / package root stranded
+# After: update fails → rollback → your edits preserved / exact restore move logged
+```
+
+---
+
+### 6. SQLite Tokenizer Change Recovery — Databases + Indexes Survive
+
+**What it is:** Agent databases and **stale full-text indexes recover after SQLite tokenizer changes**, including **update snapshots**.
+
+**Why it matters:** SQLite tokenizer changes (e.g., upgrading FTS5) used to corrupt full-text search indexes. Now: **auto-recovery on startup**. Your conversation history, memory, skills — all searchable after upgrade.
+
+---
+
+### 7. Full-Disk Survival — Agent Recovers When Space Returns
+
+**What it is:** Agents **recover after a full disk once space becomes available**, **without requiring a restart**.
+
+**Why it matters:** Disk fills up (logs, cache, downloads). Agent pauses. You clear space. **Agent resumes automatically.** No restart. No manual intervention.
+
+---
+
+### 8. Large Transcript Migration — No More Node.js String Limits
+
+**What it is:** **Migrate large transcript archives without exceeding Node.js string limits.**
+
+**Why it matters:** Your 50MB conversation history? The migration script used to hit `RangeError: Invalid string length`. Now: **streaming migration**. No memory spike. No crash.
+
+---
+
+## The Daily Quality-of-Life Fixes
+
+| Fix | Why You'll Notice |
+|-----|-------------------|
+| **Gateway-built tools respect `tools.fs.workspaceOnly`** | Delegate changes still require approval. Media tools stay inside workspace. No sandbox escapes via delegation. |
+| **Live credentials out of MCP CLI inspection** | `openclaw mcp inspect` no longer prints live creds. Google OAuth client secrets masked in logs. |
+| **Publication-complete updates survive remount** | Remount mid-update? Original launcher and sealed recovery helper retained. |
+| **Local media in Codex steering resolves from session workspace** | Not the agent's default workspace. Correct context for multi-workspace setups. |
+| **Buffered command cleanup reported honestly** | Local CLI speech providers etc. — uncertain cleanup reported as uncertainty, not ordinary failure. |
+| **Reapproved node connections stay alive** | Approval published with committed pairing facts before request resumes. No re-auth loops. |
+| **Stopped Gateways recover** | Service activation verification failure → auto-recovery. Windows triage retains untouched-recovery behavior. |
+| **macOS passive stop doesn't uninstall Gateway service** | No service installed? Passive stop doesn't try to uninstall. Clean. |
+| **CLI Node runtimes recover from filesystem root** | Including launchd jobs. Edge case: you ran `openclaw` from `/`. Now works. |
+| **New ACP sessions start in requested working directory** | Not default workspace. Your `cd /project && openclaw` actually starts there. |
+| **Model refreshes don't overlap** | Prevent overlapping refreshes from failing requests. Concurrent refresh = queued, not crashed. |
+| **Explicit SSH port 22 honored in gateway probe** | `--ssh` flag respects explicit port 22 instead of alias's configured port. |
+| **Skill metadata preserved with trailing YAML comments** | Icons, homepages kept when inline YAML has trailing comment. Parser fix. |
+| **Provider-ignored options shown in video generate output** | `openclaw infer video generate` shows what provider ignored. Debugging visibility. |
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **2026.10.9** | **Oct 29, 2026** | **Stable (Latest)** | **48 PRs: supply chain patches (fast-uri, Zod, nodemailer, MSAL), safe rollbacks, SQLite recovery, full-disk survival, transcript migration** |
+| 2026.10.8 | Oct 28, 2026 | Stable | 3 PRs baseline |
+| 2026.10.7 | Oct 23, 2026 | Stable | Replay safe recovery |
+| 2026.10.6 | Oct 22, 2026 | Stable | Security patch |
+| 2026.10.5 | Oct 21, 2026 | Stable | |
+| 2026.10.4 | Oct 20, 2026 | Stable | |
+| 2026.10.3 | Oct 19, 2026 | Stable | Update blockers fixed, saved sign-ins, doctor |
+
+**2026.10.3 → 2026.10.9 = 7 releases in 10 days.** The October security wave. Each one patches a layer.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Run OpenClaw in production** | **Yes** — supply chain patches are non-negotiable |
+| **Use MCP tools** | **Yes** — fast-URI validation, workspaceOnly enforcement |
+| **Receive tasks via IMAP/email** | **Yes** — nodemailer 10.1.4 blocks sender spoofing |
+| **Integrate with Microsoft Teams** | **Yes** — MSAL Node 7.1.1 auth hardening |
+| **Have large conversation histories** | **Yes** — transcript migration no longer OOMs |
+| **Run on Windows with AV** | **Yes** — npm rollback retries file locks |
+| **Ever had disk fill up** | **Yes** — auto-recovery when space returns |
+| **Upgrade SQLite/FTS versions** | **Yes** — tokenizer change auto-recovery |
+| **On 2026.10.8 and stable** | **Yes** — zero breaking changes, pure hardening |
+
+**No reason to wait.** This is the "sleep better at night" release.
+
+---
+
+## How to Update
+
+```bash
+# Auto-update (enabled by default)
+# OpenClaw checks and updates on startup
+
+# Manual: download from releases
+# https://github.com/openclaw/openclaw/releases/tag/v2026.10.9
+
+# npm (if using as library)
+npm update @openclaw/core
+
+# Docker
+docker pull ghcr.io/openclaw/openclaw:latest
+
+# Verify
+openclaw --version
+# Should show 2026.10.9
+```
+
+**First things to verify after update:**
+
+```bash
+# 1. Check version
+openclaw --version
+# 2026.10.9
+
+# 2. Test MCP inspection (no creds leaked)
+openclaw mcp inspect <server>
+# Verify: no live tokens in output, Google OAuth secrets masked
+
+# 3. Test IMAP sender validation (if using email agent)
+# Send spoofed email → should be rejected at token gate
+
+# 4. Test full-disk recovery (simulate)
+# Fill disk → agent pauses → clear space → agent resumes (no restart)
+
+# 5. Test large transcript migration (if upgrading from old version)
+# Migration runs automatically on first start → no RangeError
+
+# 6. Test Gateway tool workspaceOnly
+# Delegate a change → should still require approval
+# Media tool → should stay in workspace
+```
+
+---
+
+## The Bottom Line
+
+**2026.10.3 fixed update blockers. 2026.10.6 patched eMudhra certs. 2026.10.7 fixed replay recovery. 2026.10.9 patches the supply chain and makes recovery bulletproof.**
+
+- **fast-URI 4.2.3** → MCP schema validation rejects malformed URIs
+- **Zod early rejection** → oversized collections die before parsing
+- **nodemailer 10.1.4** → IMAP sender spoofing blocked at token gate
+- **MSAL Node 7.1.1** → Teams auth on patched foundation
+- **Git rollback preserves edits** → your config survives failed updates
+- **npm rollback reports exact restore move** → no stranded package roots
+- **SQLite tokenizer auto-recovery** → databases + indexes survive upgrades
+- **Full-disk auto-recovery** → agent resumes when space returns
+- **Streaming transcript migration** → 50MB history migrates without OOM
+
+The pattern holds: **OpenClaw doesn't chase features. It hardens the runtime, the supply chain, the recovery paths, the data integrity — the things that matter when you run agents on real infrastructure with real data.**
+
+For a beginner, that means **fewer "my agent ate my data" moments, fewer "update broke my config" disasters, fewer "disk full = manual recovery" weekends.** For an operator, it means **OpenClaw is becoming the agent runtime you trust with production workloads.**
+
+```bash
+# Update command
+openclaw --version
+# 2026.10.9
+# Supply chain patched
+# Rollbacks safe
+# Recovery automatic
+# Data survives
+```
+
+---
+
+## Related Articles
+
+- [OpenClaw 2026.10.7 — Replay Safe Recovery](/blog/openclaw-2026-10-7-replay-safe-recovery/)
+- [OpenClaw 2026.10.6 — Security Patch](/blog/openclaw-2026-10-6-security-patch/)
+- [OpenClaw 2026.10.3 — Update Blockers Fixed, Saved Sign-ins, Doctor](/blog/openclaw-2026-10-3-update-blockers-fixed-saved-signins-doctor/)
+- [OpenClaw Just Patched the eMudhra Certificate Compromise](/blog/openclaw-2026-10-6-security-patch/)
+- [Beware: OpenClaw Git Backup RCE — Path Traversal + SQL Injection](/blog/beware-openclaw-git-backup-rce-path-traversal-sql-injection/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*OpenClaw is open-source and available at [github.com/openclaw/openclaw](https://github.com/openclaw/openclaw). Full changelog: [github.com/openclaw/openclaw/releases/tag/v2026.10.9](https://github.com/openclaw/openclaw/releases/tag/v2026.10.9). Published November 3, 2026 — covers OpenClaw 2026.10.9 stable released October 29, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
