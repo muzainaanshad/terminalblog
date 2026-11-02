@@ -1,0 +1,287 @@
+---
+title: "Claude Code v2.1.316 Just Fixed 60+ Bugs — The Stability Release You've Been Waiting For"
+description: "Claude Code v2.1.316 (Oct 31) rolls up 60+ fixes: shell commands no longer leak on exit, bash aliases with line breaks work, PowerShell hooks block correctly, network requests don't hang on compressed responses, Vertex/Bedrock model switching is fixed, and Windows Git Bash keeps your aliases. The quiet patch that makes daily friction disappear."
+pubDate: 2026-11-02T10:00:00Z
+tags: ["claude-code", "release", "v2.1.316", "stability", "bug-fixes", "coding-agent", "beginner"]
+tool: "claude-code"
+author: "Anshad"
+image: "/api/og?title=Claude+Code+v2.1.316+Stability+Release&tool=claude-code"
+canonical: "https://terminalblog.com/blog/claude-code-v2-1-316-stability-release-youve-been-waiting-for/"
+faq:
+  - q: "What's the biggest fix in v2.1.316?"
+    a: "Shell commands no longer stay running when Claude Code exits (e.g., when credentials are refused or a cloud session is archived). This was a major resource leak on macOS and Linux."
+  - q: "Does v2.1.316 fix the Windows Git Bash alias issue?"
+    a: "Yes — bash aliases with line breaks and functions starting with a dash now work correctly in Git Bash. Your .bashrc loads properly again."
+  - q: "Are there any breaking changes?"
+    a: "No breaking changes. This is a pure patch release (v2.1.316) with only bug fixes and small improvements. Safe to upgrade from v2.1.314 or v2.1.315."
+  - q: "What about the Opus 4.8 fast mode deprecation?"
+    a: "Fast mode for Opus 4.8 is deprecated as of Oct 30, 2026 and will be removed Nov 30, 2026. After removal, fast mode requests on Opus 4.8 return an error — migrate to Opus 5.5 to keep the speedup."
+  - q: "Does this fix the auto-mode server setting for host applications?"
+    a: "Yes — CLAUDE_CODE_AUTO_MODE_SERVER=1 is now respected in sessions started by host applications (like Claude Desktop) behind a proxy or LLM gateway with experimental betas turned off."
+---
+
+**Claude Code v2.1.316 dropped October 31** — and it's the stability release you've been waiting for. No flashy features. Just **60+ fixes** that eliminate the daily paper cuts: shell commands leaking on exit, bash aliases breaking in Git Bash, PowerShell hooks ignoring exit codes, network requests hanging on corrupted responses, and Vertex/Bedrock model switching failing silently.
+
+If you've been on v2.1.314 or v2.1.315 and thought "it mostly works but..." — this is the patch that makes "mostly" disappear.
+
+---
+
+## The One-Line Summary
+
+**v2.1.316 (Oct 31) → 60+ fixes: shell commands no longer orphan on exit, bash aliases with line breaks work in Git Bash, PowerShell hooks respect exit code 2, network requests don't hang on truncated compressed responses, Vertex/Bedrock models auto-fallback, auto-mode server setting works behind proxies, cloud sessions mark failed correctly, Windows Git Bash keeps aliases/functions. The quiet patch that makes daily friction disappear.**
+
+---
+
+## The Fixes You'll Actually Notice
+
+### 1. Shell Commands No Longer Leak When Claude Exits
+
+**Before:** You're in a cloud session. Credentials get refused, or the session archives. Claude exits — but the shell commands it started **keep running in the background**. Orphaned processes. Wasted CPU. Confusion when you come back.
+
+**After (v2.1.316):** Fixed on macOS and Linux. When Claude Code exits (credentials refused, cloud session archived, any self-exit), **it cleans up its child processes**. No more orphaned shells.
+
+```bash
+# Test it:
+# 1. Start a long-running command via Claude
+# 2. Revoke credentials / archive cloud session
+# 3. Claude exits → command stops. No zombies.
+```
+
+### 2. Bash Aliases with Line Breaks Finally Work (Git Bash)
+
+**Before:** Your `.bashrc` has aliases spanning multiple lines, or functions named like `my-func`. In Git Bash on Windows, they'd **garble or disappear** when Claude's Bash tool loaded them.
+
+**After:** Fixed. Line-break aliases load correctly. Functions starting with a dash load correctly. Your shell config **just works** in Git Bash.
+
+```bash
+# These now work in Claude Code on Windows Git Bash:
+alias my-long-alias='echo "line 1" &&
+                     echo "line 2"'
+
+my-func() { echo "dash function works"; }
+```
+
+### 3. PowerShell Hooks Now Block on Exit Code 2
+
+**Before:** You set up a PreToolUse hook in PowerShell. It returns exit code 2 (block). Claude **ignores it** if the command starts with a type cast (`[int]`), `param`, `using`, or an attribute (`[CmdletBinding()]`). The hook fires but the tool runs anyway.
+
+**After:** Fixed. Exit code 2 **always blocks**, regardless of command prefix. Your security hooks are reliable again.
+
+### 4. Network Requests Don't Hang on Corrupted Compressed Responses
+
+**Before:** A compressed response gets cut off or corrupted mid-stream. The request **hangs indefinitely** — no timeout, no error, just frozen.
+
+**After:** Fixed. Truncated/corrupted compressed responses **fail fast with a clear error**. No more silent hangs.
+
+### 5. Vertex AI & Bedrock Model Switching Works
+
+**Before:** You're on Sonnet 5.5 via Vertex AI. It's not available in your region. Claude shows an error **mid-session** instead of gracefully falling back to an older available model.
+
+**After:** Fixed. When the newest model isn't available to your account/region, Claude **switches to an older model** instead of erroring. Session continues.
+
+### 6. Auto-Mode Server Setting Works Behind Proxies
+
+**Before:** You run `CLAUDE_CODE_AUTO_MODE_SERVER=1` in a session started by a host app (Claude Desktop) behind a proxy/LLM gateway with experimental betas off. The setting is **ignored**. Auto mode doesn't engage.
+
+**After:** Fixed. The setting is **respected** regardless of proxy/gateway configuration.
+
+### 7. Cloud Sessions Mark Failed When Auto Mode Stops
+
+**Before:** Auto mode stops a turn because the server returns no safety verdict. The cloud session / scheduled task **stays marked "running"** instead of "failed." You think it's still working. It's not.
+
+**After:** Fixed. Sessions **correctly mark failed** when auto mode stops for safety verdict absence.
+
+### 8. `claude -p` Text Output Explains Why Auto Mode Stopped
+
+**Before:** You run `claude -p` (print mode). A background agent is still running. Auto mode stops the turn. The output **doesn't say why** — just cuts off.
+
+**After:** Fixed. Print mode output **includes the stop reason** even with background agents running.
+
+### 9. Plugin MCP `headersHelper` Gets Correct Environment
+
+**Before:** Your plugin's `headersHelper` script receives a **corrupted `CLAUDE_PLUGIN_ROOT`** and server URL when a credential-named env var is set to a switch value like `1`. Your auth headers break.
+
+**After:** Fixed. Environment variables passed to `headersHelper` are **clean and correct**.
+
+### 10. SDK `register_repo_root` Loads External CLAUDE.md
+
+**Before:** You use the SDK's `register_repo_root` to load a CLAUDE.md from outside the working directory (with `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`). It **doesn't load**.
+
+**After:** Fixed. External CLAUDE.md files **load correctly** via the SDK control request.
+
+---
+
+## The Small Fixes That Add Up
+
+| Fix | Why You Care |
+|-----|--------------|
+| Bash scripts with `SHELLOPTS` exported stop after first command | Your complex bash scripts run fully |
+| `sonnet`/`opus`/`haiku` on Vertex/Bedrock error mid-session instead of fallback | Fixed — they fallback now |
+| Gateway not checking every model against `availableModels`/`deniedModels` | Blocked models now return 400 naming the field |
+| `claude auth login` refuses to run where managed settings require gateway | Now shows gateway sign-in in terminal |
+| `--restricted` sessions upload files outside working dirs when Read allow rule covers them | Fixed — restricted means restricted |
+| Invisible characters in prompts need second Enter to send | Plain prompts send clean on first Enter |
+| Sub-agents inheriting parent sub-agent's model move to main model on wake | Fixed — they keep their model |
+| Auto-mode allow list without `"$defaults"` gets built-in exceptions back | Fixed — scheduled-task prompts work |
+| `/model <id>` doesn't warn when model unrecognized (assumes 200K context) | Now warns — auto-compact uses right window |
+| "Hold space to speak" hint uses 3 showings in one session, shows empty key when unbound | Fixed — hint tracking works |
+| Grep/Glob never return when search killed at timeout but doesn't exit (Windows) | Fixed — they return on timeout |
+| Resuming conversation doesn't restore plan after `/clear`/`/resume` during save | Fixed — plan restores correctly |
+| First-run setup drops words in narrow terminals | Fixed — full text shows |
+| Enterprise survey card takes typed 1/0 without Enter | Now requires Enter |
+| Self-hosted runner: message sent while working answered after Stop | Fixed — message handled correctly |
+| Self-hosted runner: MCP server on/off switch lost when session moves machines | Fixed — switch persists |
+| VSCode: missing Effort slider, Ultracode switch, model name with `[1m]` tag | Fixed — UI complete |
+| VSCode: saved `/btw` side-question history deleted too early | Fixed — history persists |
+
+---
+
+## VSCode & Cloud Session Improvements
+
+### VSCode Integration
+- **Sign-in to Claude apps gateway from chat panel** — no terminal needed
+- **`ultrathink` runs at `xhigh` effort with rainbow highlight** — matches terminal UX
+- **Conversation doesn't return in Auto mode after reload** when plan approved with "Yes, and manually approve edits"
+- **`/code-review` shows findings card** (not plain text) in cloud/remote-control sessions
+
+### Cloud Sessions
+- **Form card for MCP server requests** — fill in or decline instead of silent cancel
+- **"Catching up…" line** when switching back to a syncing cloud/Remote Control session
+- **Enterprise members add/delete network secrets** on their own cloud environments
+- **Changes pane improved** — "what list leaves out" is a badge beside branch name
+- **File search shows paths from project root** (not `../..` after `cd`)
+
+---
+
+## New Environment Variables (For Power Users)
+
+```bash
+# Turn off the `ultrathink` keyword entirely
+export CLAUDE_CODE_DISABLE_ULTRATHINK=1
+
+# Keep system cross-certificates that certify each other in a loop
+# (for servers whose private CA needs one)
+export CLAUDE_CODE_DISABLE_LOOPED_CROSS_CERT_DROP=1
+
+# Set default effort level for subagents (instead of inheriting session's)
+export CLAUDE_CODE_SUBAGENT_EFFORT=xhigh  # or high, medium, low
+```
+
+---
+
+## Deprecation Notice: Opus 4.8 Fast Mode
+
+**Fast mode for Opus 4.8 is deprecated as of October 30, 2026.** It will be **removed on November 30, 2026**.
+
+After removal:
+- Fast mode requests on Opus 4.8 return an error
+- They do **not** fall back to standard Opus 4.8
+- **Migrate to Opus 5.5** to keep the speedup
+
+---
+
+## Version Context — The October Stability Arc
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **v2.1.316** | Oct 31, 2026 | **Patch (Latest)** | **60+ fixes: shell leaks, bash/PowerShell, network, Vertex/Bedrock, auto-mode, cloud sessions** |
+| v2.1.315 | Oct 29, 2026 | Patch | Safety event telemetry |
+| v2.1.314 | Oct 28, 2026 | Patch | Permissions block writes, idle compaction |
+| v2.1.312 | Oct 25, 2026 | Patch | 80 fixes you actually feel |
+| v2.1.311 | Oct 24, 2026 | Patch | Stability surge |
+| v2.1.310 | Oct 23, 2026 | Patch | Monitor tool for cloud sessions |
+
+**Six patch releases in eight days.** Each one sanding down friction. v2.1.316 is the culmination — the release where "it mostly works" becomes "it works."
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| Run cloud sessions / scheduled tasks | **Yes** — failed sessions now mark correctly |
+| Use Git Bash on Windows | **Yes** — aliases/functions finally work |
+| Use PowerShell hooks for security | **Yes** — exit code 2 now blocks reliably |
+| Hit Vertex AI / Bedrock region limits | **Yes** — graceful fallback works |
+| Run behind proxy / LLM gateway | **Yes** — auto-mode server setting respected |
+| Use `--restricted` mode | **Yes** — file access properly constrained |
+| Use SDK with external CLAUDE.md | **Yes** — `register_repo_root` works |
+| On v2.1.314/315 and happy | **Optional** — but these fixes compound daily |
+
+---
+
+## How to Update
+
+```bash
+# Auto-update (usually handles it)
+claude update
+
+# Or check manually
+# Help → Check for Updates (in desktop app)
+
+# Verify
+claude --version
+# Should show 2.1.316
+```
+
+**First things to verify after update:**
+
+```bash
+# 1. Test shell cleanup
+# Start a cloud session → archive it → check no orphan processes (ps aux | grep <cmd>)
+
+# 2. Test Git Bash aliases (Windows)
+# Add multi-line alias to .bashrc → restart Claude Code → alias works
+
+# 3. Test PowerShell hook blocking
+# PreToolUse hook returning exit 2 with [int] prefix → tool blocked
+
+# 4. Test Vertex/Bedrock fallback
+# Use model not in your region → should fallback instead of error
+
+# 5. Test auto-mode behind proxy
+# CLAUDE_CODE_AUTO_MODE_SERVER=1 in host app → auto mode engages
+```
+
+---
+
+## The Bottom Line
+
+**v2.1.314 gave you permissions hardening. v2.1.315 gave you safety telemetry. v2.1.316 fixes the plumbing.**
+
+- **Shell commands clean up on exit** → no more zombies
+- **Git Bash aliases work** → your shell config respected
+- **PowerShell hooks block** → security hooks reliable
+- **Network requests fail fast** → no silent hangs
+- **Vertex/Bedrock fallback** → sessions survive region limits
+- **Auto-mode works behind proxies** → enterprise deployments unblocked
+- **Cloud sessions mark failed** → you know when things break
+
+This isn't a feature release. It's the **reliability layer** that makes every feature release before it actually usable in production.
+
+```bash
+claude update
+# Shell leaks gone
+# Git Bash aliases work
+# PowerShell hooks block
+# Network hangs fixed
+# Vertex fallback works
+# Auto-mode unblocked
+# Cloud sessions honest
+```
+
+---
+
+## Related Articles
+
+- [Claude Code v2.1.312 — 80 Fixes You Actually Feel](/blog/claude-code-v2-1-312-80-fixes-you-feel/)
+- [Claude Code v2.1.314 — Permissions Block Writes, Idle Compaction](/blog/claude-code-v2-1-314-permissions-block-writes-idle-compaction/)
+- [Claude Code Just Fixed the Streaming Crash That Stole Your Work](/blog/claude-code-just-fixed-the-streaming-crash-that-stole-your-work/)
+- [Claude Code Just Made Subagents Free and They Remember Everything](/blog/claude-code-just-made-subagents-free-and-they-remember-everything/)
+- [Beware: Claude Code's Approoval Preview Unicode Spoof](/blog/beware-claude-code-approval-preview-unicode-spoof/)
+
+---
+
+*Claude Code is available at [claude.ai/code](https://claude.ai/code) and [github.com/anthropics/claude-code](https://github.com/anthropics/claude-code). Published November 2, 2026 — covers Claude Code v2.1.316 stable released October 31, 2026. Full changelog: [github.com/anthropics/claude-code/releases/tag/v2.1.316](https://github.com/anthropics/claude-code/releases/tag/v2.1.316)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
