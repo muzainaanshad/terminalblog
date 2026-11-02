@@ -1,0 +1,238 @@
+---
+title: "Codex 0.166 Just Made Transcript Navigation Keyboard-First, Added GPT-6.1 Terra Everywhere, and Shipped a Network Doctor"
+description: "Codex 0.166 (Oct 29) adds keyboard-driven transcript selection with word/line/page motions, consistent Markdown rendering in async UI, GPT-6.1 Terra to Vertex/Bedrock catalogs, queue resume for unloaded threads, clearer safety blocks, and a network-only doctor. The power-user UX release."
+pubDate: 2026-11-02T11:00:00Z
+tags: ["codex", "openai", "release", "0.166.0", "transcript", "navigation", "gpt-6-1-terra", "vertex-ai", "bedrock", "doctor", "coding-agent", "beginner"]
+tool: "codex"
+author: "Anshad"
+image: "/api/og?title=Codex+0.166+Transcript+Navigation&tool=codex"
+canonical: "https://terminalblog.com/blog/codex-0-166-transcript-navigation-gpt6-terra-doctor/"
+faq:
+  - q: "What is the biggest new feature in Codex 0.166?"
+    a: "Keyboard-driven transcript navigation — word, line, and page motions with integrated search and configurable shortcuts. Finally, you can navigate long conversations like a text editor."
+  - q: "What's new with GPT-6.1 Terra?"
+    a: "GPT-6.1 Terra is now in the bundled catalog, Vertex AI, AND Amazon Bedrock. Three enterprise paths to the same coding-optimized model."
+  - q: "What does `codex queue --resume` do?"
+    a: "Resumes unloaded threads after queueing a message. Useful for background processing — queue work, unload thread, resume later with results."
+  - q: "What's `codex doctor --network-only`?"
+    a: "A focused diagnostic that checks configuration, connectivity, and WebSocket health without running the full doctor suite. Faster triage for network issues."
+  - q: "Should I update to 0.166.0?"
+    a: "Yes if you live in long sessions (transcript nav), use Vertex/Bedrock (Terra), run background queues, or need faster network diagnostics. Also fixes: approval/permission preservation on resume/fork, local image attachment restore, macOS standalone cleanup, thread restoration on unarchive, app-server race conditions, TUI reconnection, and reasoning-token accounting across resume/fork."
+
+---
+
+**OpenAI Codex 0.166 dropped October 29** — and this release is pure UX craftsmanship. No splashy new capabilities. Just the things that make daily use **feel** better: **keyboard-first transcript navigation**, **consistent Markdown everywhere**, **GPT-6.1 Terra on every enterprise platform**, **queue resume for background work**, **clearer safety explanations**, and a **network-focused doctor**.
+
+If you spend hours in Codex, this is the update you'll feel every session.
+
+---
+
+## The One-Line Summary
+
+**Codex 0.166 adds keyboard-driven transcript selection (word/line/page motions + search), consistent Markdown in async UI, GPT-6.1 Terra to Vertex AI & Bedrock, `codex queue --resume`, clearer safety blocks, and `codex doctor --network-only`. Plus fixes for approval preservation, image attachments, macOS cleanup, thread restoration, app-server races, TUI reconnection, and reasoning-token accounting. Run `npm install -g @openai/codex@latest` now.**
+
+---
+
+## Feature 1: Keyboard-Driven Transcript Navigation — Finally, Edit-Mode for Conversations
+
+**What it is:** Full keyboard navigation of your transcript with:
+- **Word motions** — `Ctrl+Left/Right` (or `Option+Left/Right` on Mac)
+- **Line motions** — `Up/Down` with context awareness
+- **Page motions** — `Page Up/Down` for fast scanning
+- **Integrated search** — `/` to search transcript, `n`/`N` for next/prev
+- **Configurable shortcuts** — remap to your muscle memory
+
+```bash
+# In Codex TUI:
+/search-term        # Search transcript
+n / N               # Next / previous match
+Ctrl+Left/Right     # Word-by-word
+Page Up/Down        # Page-by-page
+```
+
+**Why it matters:** Before 0.166, long transcripts meant mouse scrolling or `j`/`k` line-by-line. Now: **navigate like Vim, search like less, jump like a pro**.
+
+**For beginners:** This turns "where was that error message from 3 hours ago?" into `/error` → `n` → found. Muscle memory builds in one session.
+
+---
+
+## Feature 2: Consistent Markdown Rendering in Async UI
+
+**What it is:** Async questions, choices, answers, and transcript replies now **all render Markdown consistently**. No more "why does this look different in the approval dialog vs the main chat?"
+
+```markdown
+# This heading
+**This bold**
+`This code`
+- This list
+> This quote
+```
+
+Renders identically whether it's a permission prompt, a choice dialog, an async answer, or the main transcript.
+
+**Why it matters:** Visual consistency = cognitive load reduction. Your brain stops parsing formatting differences and starts reading content.
+
+---
+
+## Feature 3: GPT-6.1 Terra — Now on Vertex AI AND Amazon Bedrock
+
+**What it is:** GPT-6.1 Terra (added in 0.165 to bundled catalog) is now also in:
+- **Vertex AI catalog** — for GCP teams
+- **Amazon Bedrock catalog** — for AWS teams
+
+```yaml
+# Vertex AI
+model_provider: "gcp"
+model: "gpt-6.1-terra"
+
+# Bedrock
+model_provider: "bedrock"
+model: "gpt-6.1-terra"
+```
+
+**Why it matters:** Terra is the coding-optimized GPT-6.1 variant. Now you get it **wherever your infra lives** — no cloud lock-in for the best model.
+
+---
+
+## Feature 4: `codex queue --resume` — Background Work That Survives Restarts
+
+**What it is:** Queue a message, unload the thread, resume later with results intact.
+
+```bash
+# Queue a long-running task
+codex queue "Refactor the entire auth module to use JWT"
+
+# Thread unloads (saves resources)
+# ... later ...
+codex queue --resume  # Picks up where it left off
+```
+
+**Why it matters:** Long tasks (big refactors, test generation, doc writing) no longer block your session. Queue → walk away → resume with results.
+
+**For teams:** This is the primitive for "agent as background worker" patterns. CI can queue, agent processes, results appear on resume.
+
+---
+
+## Feature 5: Clearer Safety Blocks + Selectable Safer Follow-Ups
+
+**What it is:** When Guardian (Codex's safety system) blocks something, you now get:
+- **Clear explanations** — why it was blocked, not just "blocked"
+- **Selectable safer follow-ups** — one-click alternatives that avoid the issue
+
+```bash
+# Before: "Request blocked by safety system"
+# After:
+# "This request was blocked because it may generate credentials.
+#  [Try: 'Show me how to rotate API keys securely']
+#  [Try: 'Explain OAuth 2.0 flow for this API']
+#  [Try: 'Generate a .env.example template']"
+```
+
+**Why it matters:** Safety blocks used to be dead ends. Now they're **teaching moments with escape hatches**.
+
+---
+
+## Feature 6: `codex doctor --network-only` — Focused Network Triage
+
+**What it is:** A targeted diagnostic that checks only:
+- Configuration validity
+- Connectivity (DNS, TLS, proxy)
+- WebSocket health
+
+```bash
+codex doctor --network-only
+# Skips: disk, memory, plugin, marketplace checks
+# Returns: network health in seconds, not minutes
+```
+
+**Why it matters:** Full `codex doctor` is comprehensive but slow. When you're debugging "why can't I connect?", you want **network answers now**.
+
+---
+
+## The Fixes You'll Actually Notice
+
+| Fix | Why You Care |
+|-----|--------------|
+| **Approval/permission settings preserved on resume/fork** | Your "always allow read" choices survive session restore |
+| **Local image attachments restored on composer kill** | Paste a screenshot, accidentally close composer → image comes back |
+| **macOS standalone cleanup fixed for in-use paths/non-ASCII** | No more "installation in use" errors on Mac updates |
+| **Descendant threads restored on parent unarchive** | Fork a thread, archive parent, unarchive → children come back |
+| **App-server thread startup/shutdown races fixed** | Background threads don't leak runtimes or stall on restart |
+| **TUI reconnection recovery improved (offline `/quit`/`/exit`)** | Kill network, type `/quit` → exits cleanly instead of hanging |
+| **Reasoning-token accounting preserved across resume/fork** | No premature compaction from lost reasoning token counts |
+
+---
+
+## How to Update
+
+```bash
+npm install -g @openai/codex@latest
+# Verify
+codex --version
+# Should show 0.166.0
+```
+
+**Or download the binary** from [github.com/openai/codex/releases/tag/rust-v0.166.0](https://github.com/openai/codex/releases/tag/rust-v0.166.0) — 356 assets across platforms.
+
+---
+
+## What This Means for Your Daily Workflow
+
+**Before 0.166:**
+- Transcript nav = mouse scroll or `j`/`k` line-by-line
+- Markdown = inconsistent across async UI elements
+- GPT-6.1 Terra = bundled catalog only
+- Background queue = fire and forget, no resume
+- Safety blocks = opaque dead ends
+- Doctor = full suite or nothing
+- Resume/fork = lose approvals, images, reasoning tokens
+
+**After 0.166:**
+- Transcript nav = Vim-style motions + search
+- Markdown = consistent everywhere
+- GPT-6.1 Terra = bundled + Vertex + Bedrock
+- Background queue = `queue --resume` with results
+- Safety blocks = explanations + safer alternatives
+- Doctor = `--network-only` for 5-second triage
+- Resume/fork = approvals, images, reasoning tokens preserved
+
+---
+
+## The Verdict
+
+Codex 0.166 is the **"thousand paper cuts" release**. No single feature makes the keynote. But combined? **Every session feels smoother.**
+
+- Transcript nav alone saves 2-3 minutes per long session
+- Consistent Markdown removes micro-friction dozens of times per day
+- GPT-6.1 Terra on Vertex/Bedrock removes cloud-lock for the best model
+- Queue resume enables "agent as background worker" patterns
+- Clearer safety blocks turn frustration into learning
+- Network doctor cuts triage time from minutes to seconds
+- Preserved state on resume/fork = trust the session restore
+
+If you use Codex daily, **this is the update that makes it feel like a pro tool, not a prototype.**
+
+```bash
+npm install -g @openai/codex@latest
+# Try: /search in a long transcript
+# Try: codex doctor --network-only
+# Try: codex queue "big task" && codex queue --resume
+# Your daily friction just dropped.
+```
+
+---
+
+## Related Articles
+
+- [OpenAI Codex 0.164 Just Made Model Switching Instant — And Your Prompts Finally Stick](/blog/codex-0-164-presets-model-switching-images-land/)
+- [Codex 0.165 Just Got Built-In Vertex AI, Memory V2 Default, and Reasoning Effort That Works Mid-Conversation](/blog/codex-0-165-vertex-ai-memory-v2-reasoning/)
+- [Beware: Codex MultiAgentV2 Encrypts Subagent Instructions — Audit Trail Gone](/blog/beware-codex-multiagentv2-encrypts-subagent-instructions/)
+- [Beware: Codex Desktop Subagent MCP Resource Crisis on Windows](/blog/beware-codex-desktop-subagent-mcp-resource-crisis/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Complete Guide to AI Coding Agents 2026](/blog/complete-guide-ai-coding-agents-2026/)
+
+---
+
+*Codex 0.166.0 released October 29, 2026. Source: [github.com/openai/codex/releases/tag/rust-v0.166.0](https://github.com/openai/codex/releases/tag/rust-v0.166.0) · Codex CLI is Apache-2.0 open source. Published November 2, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*

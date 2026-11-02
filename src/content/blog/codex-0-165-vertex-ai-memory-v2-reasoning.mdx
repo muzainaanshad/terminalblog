@@ -1,0 +1,213 @@
+---
+title: "Codex 0.165 Just Got Built-In Vertex AI, Memory V2 Default, and Reasoning Effort That Works Mid-Conversation"
+description: "Codex 0.165 (Oct 27) adds a native Google Cloud Vertex AI provider, GPT-6.1 Terra to catalogs, repository filters for session picker, experimental thread forks, reasoning effort changes during conversations, and Memory V2 by default. The enterprise + power-user release."
+pubDate: 2026-11-02T10:30:00Z
+tags: ["codex", "openai", "release", "0.165.0", "vertex-ai", "memory-v2", "reasoning", "gpt-6-1-terra", "coding-agent", "beginner"]
+tool: "codex"
+author: "Anshad"
+image: "/api/og?title=Codex+0.165+Vertex+AI+Memory+V2&tool=codex"
+canonical: "https://terminalblog.com/blog/codex-0-165-vertex-ai-memory-v2-reasoning/"
+faq:
+  - q: "What is the biggest new feature in Codex 0.165?"
+    a: "Built-in Google Cloud Vertex AI provider — configure with model_provider = \"gcp\" and get enterprise-grade Claude/Gemini models without OAuth workarounds."
+  - q: "What is Memory V2 and why is it default now?"
+    a: "Memory V2 is the new persistent memory system. Fresh profiles get it by default, and you can import external-agent memories into it. It replaces the old memory system with better cross-session recall."
+  - q: "Can I change reasoning effort mid-conversation in Codex 0.165?"
+    a: "Yes — reasoning effort overrides are now enabled by default for supported models. You can dial reasoning up or down without restarting the session."
+  - q: "What's GPT-6.1 Terra?"
+    a: "A new GPT-6.1 variant added to the bundled, Vertex AI, and Amazon Bedrock model catalogs. Optimized for coding tasks with improved reasoning."
+  - q: "Should I update to 0.165.0?"
+    a: "Yes if you use Vertex AI, want Memory V2, or need reasoning effort changes mid-session. Also fixes: fresh TUI honors server approval defaults, MCP tool cancellation on interrupt, marketplace URL validation, and model-not-found error preservation."
+---
+
+**OpenAI Codex 0.165 dropped October 27** — and this release is the first in a while that feels like it was built for teams running agents in production, not just solo developers in a terminal.
+
+The headlines: **native Vertex AI provider** (no more OAuth hacks for GCP), **Memory V2 by default** (cross-session recall that actually works), **reasoning effort changes mid-conversation**, **GPT-6.1 Terra** in catalogs, **repository filters** for session navigation, and **experimental thread forks** for the app-server API.
+
+Here's what you need to know.
+
+---
+
+## The One-Line Summary
+
+**Codex 0.165 adds built-in Vertex AI (`model_provider = "gcp"`), Memory V2 default for fresh profiles, reasoning effort overrides mid-conversation, GPT-6.1 Terra catalogs, repo-filtered session picker, and experimental thread forks. Plus fixes for approval defaults, MCP cancellation, and marketplace security. Run `npm install -g @openai/codex@latest` now.**
+
+---
+
+## Feature 1: Native Vertex AI Provider — Enterprise GCP Without the Workarounds
+
+**What it is:** A built-in Google Cloud Vertex AI provider configured with `model_provider = "gcp"`. No more OpenAI-compatible proxies, no more OAuth token juggling, no more custom base URLs.
+
+```yaml
+# ~/.codex/config.yaml
+model_provider: "gcp"
+# Configure via gcloud auth or ADC
+```
+
+**Why it matters:** If you're on GCP, you've been stuck with either:
+- OpenAI-compatible endpoint proxies (brittle, adds latency)
+- Manual OAuth token refresh scripts (maintenance burden)
+- Third-party gateways (another vendor, another bill)
+
+Now: **`gcloud auth application-default login` → Codex works.** Claude 3.5 Sonnet, Claude 3.5 Haiku, Gemini 1.5 Pro/Flash — all native, all authenticated through your existing GCP identity.
+
+**For teams:** This is the "we can actually use Codex in prod" moment. Your security team already approves ADC. Your Terraform already provisions the service accounts. Codex just fits.
+
+---
+
+## Feature 2: Memory V2 by Default — Cross-Session Recall That Sticks
+
+**What it is:** Memory V2 is now the default for fresh profiles. It also supports **importing external-agent memories** — so memories from other tools (Claude Code, Cursor, etc.) can seed your Codex memory.
+
+```bash
+# Fresh install → Memory V2 active automatically
+# Import from another agent:
+codex memory import --from claude-code --session <id>
+```
+
+**Why it matters:** The old memory system was session-scoped and fragile. Memory V2:
+- Persists across sessions *and* devices (via cloud sync)
+- Understands project context, not just conversation snippets
+- Lets you import the institutional knowledge you've already built elsewhere
+
+**For beginners:** You don't configure this. It just works. Your agent remembers the architecture decisions from last week, the API patterns from last month, the "don't do this" lessons from last quarter.
+
+---
+
+## Feature 3: Reasoning Effort Changes Mid-Conversation
+
+**What it is:** For supported models, you can now change reasoning effort **during** a conversation. No restart, no context loss.
+
+```bash
+# In Codex TUI or CLI:
+/reasoning high    # Deep thinking for architecture decisions
+/reasoning low     # Fast responses for boilerplate
+/reasoning medium  # Balanced (default)
+```
+
+**Why it matters:** Different tasks need different thinking budgets:
+- Writing a migration script → `low` (fast, cheap)
+- Designing the auth system → `high` (thorough, catches edge cases)
+- Debugging a flaky test → `medium` (balanced)
+
+Before 0.165: you picked one at session start and lived with it. Now: **adapt to the task, not the session.**
+
+---
+
+## Feature 4: GPT-6.1 Terra — New Model in Catalogs
+
+**What it is:** GPT-6.1 Terra added to:
+- Bundled model catalog
+- Vertex AI catalog
+- Amazon Bedrock catalog
+
+**Why it matters:** Terra is optimized for coding — improved reasoning on software tasks, better instruction following for multi-step refactors, lower hallucination rate on API signatures.
+
+If you're on Vertex or Bedrock, it's available immediately. If you're on OpenAI direct, check the catalog refresh.
+
+---
+
+## Feature 5: Repository Filter + Directory Grouping in Session Picker
+
+**What it is:** The session picker now has a **repository filter** and **directory grouping** — making it trivial to navigate sessions across linked worktrees.
+
+```bash
+# Before: flat list of all sessions everywhere
+# After: grouped by repo, filterable by directory
+```
+
+**Why it matters:** If you work in a monorepo or multi-repo setup, you have dozens of sessions. Finding "that session where I fixed the payment webhook" used to mean scrolling. Now: filter → repo → session. Done.
+
+---
+
+## Feature 6: Experimental Attached Thread Forks (App-Server API)
+
+**What it is:** The app-server API now supports **experimental attached thread forks** — fork a thread, run a variant, attach results back. Think: "what if I tried this refactor differently?" without polluting main thread.
+
+```bash
+# API usage (for plugin/builders)
+POST /threads/{id}/fork
+# → returns new thread ID with shared history up to fork point
+```
+
+**Why it matters:** This is the foundation for:
+- Parallel exploration (try 3 approaches, pick best)
+- Automated A/B testing of agent strategies
+- CI integration: fork PR thread, run agent review, merge feedback
+
+**For builders:** If you're building on Codex's app-server, this is the primitive you've been waiting for.
+
+---
+
+## The Fixes You'll Actually Notice
+
+| Fix | Why You Care |
+|-----|--------------|
+| **Fresh TUI honors server approval reviewer defaults** | No more "why is it asking me to approve?" on fresh installs — respects server policy |
+| **MCP tool requests cancelled on interrupt** | Ctrl+C actually stops the tool call, doesn't leave it hanging |
+| **Marketplace URL validation blocks host spoofing** | Git can't be tricked into connecting to a different host than checked |
+| **Model-not-found errors preserved (no retry loop)** | Provider says "model X not found" → you see that error, not a generic retry |
+| **TUI preferences editable when execution settings invalid** | Config errors don't lock you out of fixing them |
+
+---
+
+## How to Update
+
+```bash
+npm install -g @openai/codex@latest
+# Verify
+codex --version
+# Should show 0.165.0
+```
+
+**Or download the binary** from [github.com/openai/codex/releases/tag/rust-v0.165.0](https://github.com/openai/codex/releases/tag/rust-v0.165.0) — 320 assets across platforms.
+
+---
+
+## What This Means for Your Daily Workflow
+
+**Before 0.165:**
+- Vertex AI = custom proxy + OAuth maintenance
+- Memory = session-scoped, lost on restart
+- Reasoning = pick once at session start
+- Session picker = flat list, scroll forever
+- Forking threads = not possible via API
+
+**After 0.165:**
+- Vertex AI = `model_provider: "gcp"` + `gcloud auth`
+- Memory V2 = cross-session, importable, cloud-synced
+- Reasoning = change mid-task with `/reasoning`
+- Session picker = repo-filtered, directory-grouped
+- Thread forks = experimental API for parallel exploration
+
+---
+
+## The Verdict
+
+Codex 0.165 isn't a "feature drop" — it's an **enterprise readiness drop**. Vertex AI native support removes the biggest blocker for GCP teams. Memory V2 default means every new user gets persistent context from day one. Reasoning effort mid-conversation removes the "restart to think harder" tax.
+
+If you're on GCP, **this is the release that makes Codex viable for production**. If you're not, Memory V2 and reasoning flexibility are still massive quality-of-life wins.
+
+```bash
+npm install -g @openai/codex@latest
+# Try: model_provider: "gcp" in config.yaml
+# Try: /reasoning high on a hard problem
+# Try: codex memory import --from claude-code
+# Your workflow just got enterprise-grade.
+```
+
+---
+
+## Related Articles
+
+- [OpenAI Codex 0.164 Just Made Model Switching Instant — And Your Prompts Finally Stick](/blog/codex-0-164-presets-model-switching-images-land/)
+- [Beware: Codex MultiAgentV2 Encrypts Subagent Instructions — Audit Trail Gone](/blog/beware-codex-multiagentv2-encrypts-subagent-instructions/)
+- [Beware: Codex Desktop Subagent MCP Resource Crisis on Windows](/blog/beware-codex-desktop-subagent-mcp-resource-crisis/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Complete Guide to AI Coding Agents 2026](/blog/complete-guide-ai-coding-agents-2026/)
+
+---
+
+*Codex 0.165.0 released October 27, 2026. Source: [github.com/openai/codex/releases/tag/rust-v0.165.0](https://github.com/openai/codex/releases/tag/rust-v0.165.0) · Codex CLI is Apache-2.0 open source. Published November 2, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
