@@ -8,8 +8,34 @@ tool: "opencode"
 author: "sage"
 image: "/api/og?title=Opencode+v1.18.34+Reliability+Wave&tool=opencode"
 canonical: "https://terminalblog.com/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/"
-
 ---
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Opencode Just Became the Open-Source Coding Agent You Can Actually Trust",
+  "description": "Opencode's v1.18.18→v1.18.34 wave fixes MCP reconnect loops, hangs, and model routing — and lands GPT-6 Astra for ChatGPT subscribers. The 160K-star agent is finally reliable enough for daily work.",
+  "image": "https://terminalblog.com/api/og?title=Opencode+v1.18.34+Reliability+Wave&tool=opencode",
+  "datePublished": "2026-08-15T14:00:00Z",
+  "dateModified": "2026-10-01T10:00:00Z",
+  "author": {
+    "@type": "Person",
+    "name": "sage"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "TerminalBlog",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://terminalblog.com/favicon.ico"
+    }
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://terminalblog.com/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/"
+  }
+})} />
+
 <script type="application/ld+json" set:html={JSON.stringify({
   "@context": "https://schema.org",
   "@type": "FAQPage",
@@ -25,6 +51,8 @@ canonical: "https://terminalblog.com/blog/opencode-v1-18-18-reliability-mcp-desk
   ]
 })} />
 
+
+**What is Opencode?** Opencode is an open-source terminal coding agent with a skill-driven architecture (explicit lifecycle, slash commands, skills) that supports multiple model providers with provider-neutral routing. It's free (BYO keys) and has 160K+ GitHub stars, making it one of the most popular open-source coding agents.
 
 Opencode v1.18.18 dropped **two days ago** (August 13, 2026) and it's the kind of release that turns a "cool project" into a daily driver. The 160,000-star open-source coding agent spent the last month quietly fixing the paper cuts that made you keep a commercial backup: MCP servers getting stuck in reconnect loops, provider model configs breaking mid-session, desktop app freezes, and session ordering chaos.
 
@@ -79,325 +107,36 @@ Alongside the Astra fix, **v1.18.19** matched Codex rate limits more closely to 
 
 ---
 
-## The Headline: MCP Finally Works Reliably
+## FAQ
 
-The biggest win in v1.18.18 isn't a flashy feature. It's that **MCP SSE connections no longer get stuck in reconnect loops after server error responses**.
+**Q: What is Opencode?**
+A: Opencode is a 160K-star open-source terminal coding agent from SST/Anomaly. It uses a skill-driven architecture (explicit lifecycle, slash commands, skills) and supports multiple model providers with provider-neutral routing.
 
-If you've used MCP with any agent, you know the pain: the server hiccups, the client spins forever trying to reconnect, and your workflow dies. Opencode now:
-- Reconnects MCP servers after expired SDK sessions (including concurrent requests)
-- Honors configured MCP OAuth callback ports in `mcp debug`
-- Restored compatibility with legacy MCP SDK clients
-- Improved compatibility with newer MCP servers and OAuth flows
+**Q: Why did Opencode v1.18.18 make it a daily driver?**
+A: The v1.18.18→v1.18.34 wave fixed MCP reconnect loops, hangs, model routing, and added GPT-6 Astra support for ChatGPT subscribers. Five-minute timeouts prevent infinite spinners on slow model startups.
 
-This alone makes Opencode viable for teams running custom MCP tooling — the kind of reliability that used to be a commercial-agent moat.
+**Q: Can Opencode use GPT-6 Astra now?**
+A: Yes, v1.18.29 fixed Codex OAuth model filtering to recognize integer GPT versions like `gpt-6`, and v1.18.30 added the Astra system prompt for GPT-6 models.
 
----
+**Q: How does Opencode handle network errors?**
+A: v1.18.20 retries responses with `finish_reason: network_error` instead of silently ending the turn. xAI capacity errors get the same retry treatment.
 
-## Provider Model Routing: No More Surprise Failures
+**Q: Does Opencode work with Cloudflare AI Gateway?**
+A: Yes, v1.18.19 added native OpenAI/Anthropic passthroughs, and v1.18.23 fixed routing for third-party providers and converts dotted Anthropic model IDs.
 
-OpenCode now **respects provider-defined reasoning options instead of falling back to the wrong reasoning controls**. This fixes a whole class of "why is my model acting dumb?" issues:
-
-- **GitHub Copilot model routing** now honors each model's advertised chat or responses endpoint
-- **Azure Cognitive Services endpoint support** restored for Azure-hosted models
-- **OpenAI Responses phase handling** fixed so it doesn't break conversations
-- **Cerebras reasoning replay** fixed — earlier assistant reasoning now sent back in provider-supported field
-- **Mistral prompt caching stabilized** with correct prompt cache keys per SDK
-- **MiniMax M3 thinking variant selection** fixed
-- **xAI prompt cache routing** improved with PDF file support in Responses models
-- **Meta model handling** improved for reasoning variants and provider requests
-
-The practical impact: you pick a model, it works the way the provider intended. No more debugging why reasoning effort seems ignored or why a model that *should* support PDFs keeps erroring.
+**Q: Are subagent failures resumable in Opencode?**
+A: Yes, v1.18.20 surfaces failed subagent tool calls with a resumable `task_id` instead of empty results. Permission requests from subagents during headless runs are also answered properly.
 
 ---
-
-## Desktop App: The Freezes Are Gone
-
-The desktop app got a **massive stability pass**. If you've ever had the app hang on a large pasted image, freeze when closing a project, or show blank session titles — those are fixed:
-
-- **Composer lag reduced** when drafts include large pasted images or attachments
-- **Right-to-left layout issues fixed** across tabs, drawers, resizing, titlebar interactions
-- **Session tabs no longer clip** when resized smaller
-- **Stale session tab state in title bar fixed**
-- **File tree tab clipping prevented** when resized
-- **Debug gutter labels and values aligned**
-- **Home page scrolling fixed** — sticky headers and session list behave correctly
-- **Startup readiness fixed** — WSL server loading included before app reports ready
-- **Custom agent selector visibility fixed** when custom agents are available
-- **Home page command palette search** can now find and open sessions
-- **Tab keyboard navigation** follows visible tab order
-- **External links open in system browser** instead of inside the app
-- **Markdown parsing moved off main thread** — app stays responsive while rendering messages
-- **Linux packages now install AppStream metadata**
-
-The V2 desktop sidecar is now opt-in, backed by the bundled CLI service, with collapsible model provider sections in V2 settings.
-
----
-
-## Session Management: Chaos → Order
-
-Session handling got a **fundamental overhaul**:
-
-- **Chronological message ordering** now stays correct even when imported or legacy message IDs are out of order
-- **Revert and fork actions** use real message chronology instead of message ID ordering
-- **Truncation cleanup** removes stale files by file timestamp more reliably
-- **Repeated compaction** keeps earlier tool-call history in summaries instead of dropping orphaned results
-- **Blob-based attachments** now load correctly in the web UI
-- **Session timelines** respect chronological message boundaries more reliably
-- **Stored messages** stay ordered by creation time
-- **Session lists** sort by persisted activity time more reliably
-- **Sessions without titles** fall back to generated names instead of appearing blank
-- **Project search** matches any known recent project instead of only the first five
-
-This means your history is actually trustworthy — forks, reverts, and imports behave the way you'd expect.
-
----
-
-## TUI & Core: The Daily Quality-of-Life Fixes
-
-- **GitHub pull request reviews** now include the PR number and URL in context
-- **Up Arrow shortcut** closes the subagent picker when first item is selected
-- **Automatic session retries capped** with jitter to reduce retry storms
-- **PDF attachments enabled** for GitHub Copilot models advertising PDF vision support
-- **DeepSeek V4 Flash sampling defaults** applied correctly on supported providers
-- **Muse family models** routed to correct Meta system prompt
-- **xAI login simplified** to single device-code flow (works better in headless/remote)
-- **Structured mid-stream provider errors preserved** so compatible providers can retry failed responses
-- **More transient provider/network errors retried** instead of failing immediately
-- **Cache writes counted in ACP usage totals**
-- **Remote workspace 5xx response bodies logged** in host logs for proxy debugging
-- **Host `directory` path no longer sent to remote workspaces** — prompts resolve from remote project root
-- **Queued ACP session updates waited for** before ending a turn
-- **Unknown top-level config fields ignored** instead of failing config parsing
-- **Projects opened from Home registered** so available to rest of app
-- **Right-click in Home** opens project menu
-- **Fallback to local directories** when project picker server doesn't support search
-- **macOS app stays running** after last window closes, reopens window on activation
-- **Chinese terminology updated** to widely recognized translations
-- **Server's current default model used** instead of stale local config
-
----
-
-## The Upstream Sync: Opencode v1.17.13 → v1.18.13
-
-OpenCode (the SST/Anomaly version) adopts upstream improvements from the opencode-ai fork, including:
-
-- **Code mode MCP adapter** for running confined orchestration scripts against connected MCP tools
-- **`execute` tool hidden** unless code mode is enabled
-- **Model-specific system prompt** for Meta Muse Spark
-- **Azure AI support for GPT-5.6**
-- **Paginated MCP tool catalogs** no longer lose tool metadata or output schema validation
-- **Low reasoning effort preserved** for OpenRouter small-model variants
-- **GitHub Copilot model routing** honors each model's advertised endpoint
-- **Session lists match equivalent instance directories** reliably
-- **Cerebras reasoning replay** fixed
-- **Z.ai context-window overflow errors** better classified
-- **Unavailable config directories handled gracefully**
-- **Reasoning effort variants exposed** for Grok models
-- **xAI prompt cache routing** improved
-- **Meta model handling** improved
-- **Zero billing batch size crashes prevented** for GitHub Copilot
-- **OpenAI pro reasoning mode supported**
-- **Response storage disabled by default** for xAI Responses
-- **OAuth support added** for Luna Responses Lite
-- **Codex context limits used** for GPT-5.6 over OAuth
-- **Obsolete Codex workaround removed** that could interfere with OpenAI Luna Responses Lite
-- **TUI spinner registration fixed** — loading indicators keep rendering
-- **CLI environment variables forwarded** to TUI worker
-
----
-
-## Subagent Permission Fix (Big for Teams)
-
-**Subagent permission errors that referenced phantom deny rules** are fixed. A read-only or delegating agent's `readOnlyBash` allowlist is no longer projected onto a writable subagent as a bash ceiling — so a delegated subagent can run its own allowed commands (e.g., `git status`). Edit, notebook, and MCP denials are still inherited as hard ceilings.
-
-This matters if you use delegated agents for code review, testing, or documentation — they no longer get blocked by parent-agent restrictions that shouldn't apply to them.
-
----
-
-## Clickable File References in Agent Responses
-
-Code spans in agent responses that match real files in your workspace **become clickable links** that open the file at the referenced line. Non-existent paths stay as plain code. Includes fallback workspace search and "File not found" warning when clicking dead links.
-
-This is a small UX thing that compounds: when the agent says "look at `src/auth/login.ts:42`", you *click it*. No more copy-paste-navigate.
-
----
-
-## Model Reasoning Variants: See What You're Getting
-
-The model's **default reasoning variant now shows and selects in chat and Agent Manager**. No more guessing which reasoning tier you're actually on.
-
----
-
-## AWS & GCP Auth: Structured Credentials Supported
-
-**Structured AWS access keys and Google Cloud service-account JSON** now supported when connecting Bedrock and Vertex AI in VS Code. No more manual env var juggling.
-
----
-
-## Agent Manager PR Actions
-
-**Resolve/unresolve review threads, jump to comments section, and scroll-to-top for PR diff view** — the Agent Manager is becoming a genuine code review companion, not just a code writer.
-
----
-
-## WarpGrep Removed (Good Riddance)
-
-The built-in experimental Morph WarpGrep codebase search tool and its retired configuration flag are gone. The upstream opencode search is better anyway.
-
----
-
-## Workspace Restoration Preserved
-
-**Workspace restoration outcomes preserved when reverting fresh VS Code sessions** — your layout, open files, and state survive the revert.
-
----
-
-## The September wave (v1.18.19–v1.18.30): trust, timeouts, and GPT‑6 Astra
-
-Since v1.18.18, Opencode shipped **11 more releases in four weeks** (through **v1.18.30**, September 9). No wall of features — mostly the same story told louder: *connections that don't die, models that show up, and providers that work the way they advertise.* The version to install today is **v1.18.30**.
-
-### GPT‑6 Astra, finally visible
-
-- **v1.18.29 fixed the single most frustrating bug of the month**: `gpt-6-astra` was *not showing up* for OpenAI subscription users. If you had a ChatGPT plan and kept seeing an older model in the picker, that was it. A related fix lets Codex OAuth model filtering recognize integer versions like `gpt-6` — so subscription users get the same model list as API-key users.
-- **v1.18.30 adds the Astra system prompt** for GPT‑6 models — the same class of harness-level prompt tuning that makes a new model behave like a coding agent instead of a chat model.
-- **v1.18.30 also adds reasoning-effort variants for supported GitLab GPT and Claude models**, so the "what reasoning tier am I actually on?" transparency extends to the GitLab-hosted crowd too.
-
-### Timeouts that stop lying to you (v1.18.27)
-
-The ugliest failure mode in terminal agents is a *stall that never tells you it stalled*. v1.18.27 fixed exactly that:
-
-- Provider header requests now default to a **five-minute timeout** so slow model startups fail loudly instead of hanging forever.
-- Streamed chunk reads got the same five-minute default, with `false` supported to disable it for providers that legitimately stream slowly.
-- **SSE reads that time out are now cancelled cleanly** — no more unhandled errors when you Ctrl+C out of a wedged request.
-
-And in v1.18.26, **Claude 5 sessions now tolerate stale thinking blocks** instead of failing after you edit the prompt or swap tools — a fix for anyone who hit "conversation broke after I changed the request."
-
-### Anthropic thinking-block control (v1.18.26/27)
-
-`thinking.blockBinding` — how tightly the harness binds its own thinking-block behavior to Anthropic's provider default — can now be **opted out via config** (PR [#46820](https://github.com/sst/opencode/pull/46820)) when you need the provider default preserved. The binding is also limited to **Claude 5.1+ models** so older deployments stop getting requests rejected.
-
-### Azure without Bun, and Entra ID sign-in (v1.18.24–25)
-
-- **v1.18.25 fixed Azure authentication** so `az` CLI sign-in works *without requiring Bun* — a real paper cut for Windows and minimal-Node setups.
-- **v1.18.24 lets Azure providers sign in with Microsoft Entra ID through the Azure CLI** instead of forcing an API key, and stops Bedrock reasoning responses from getting cached into unreplayable empty messages (the kind of bug that silently ate your follow-up turns).
-
-### Cloudflare AI Gateway finally routes (v1.18.23)
-
-- Non-Workers models now work through the Cloudflare AI Gateway's REST API (PR [#44281](https://github.com/sst/opencode/pull/44281)).
-- Anthropic models through the gateway convert dotted IDs like `claude-haiku-4.5` to the **dashed slug Anthropic expects** — previously these just failed.
-
-### Little things that compound
-
-- **v1.18.28 sends your session ID as GitHub Copilot's interaction header** — request tracking across a session actually works now, which matters if you use Copilot as a provider and want consistent usage/rate-limit behavior.
-- **v1.18.22 fixed OpenCode device-login links** when servers return relative verification URLs or use a base path, and stopped sending `textVerbosity` to OpenAI-compatible providers that don't support it.
-- **v1.18.26 lets Azure CLI sign-in ask for the resource name directly** instead of querying Azure management APIs (fewer moving parts, fewer permission errors).
-- **v1.18.21 keeps responses going** when a model reports an unknown finish reason instead of stopping early, and routes Vertex AI `eu`/`us` multi-region Gemini requests through the right endpoints.
-
-**If you're on v1.18.18 or anything older: update.** The gap from 1.18.18 → 1.18.32 is almost entirely "things no longer fail silently."
-
----
-
-## September 14–21 Patch Wave (v1.18.31–32)
-
-Two more patch releases dropped after v1.18.30:
-
-### v1.18.31 (Sep 14)
-- **ACP session state restored** — model, effort, mode, and reasoning chunk boundaries now load correctly when resuming or forking sessions
-- **Remote config auth errors** now show during startup instead of silently failing
-- **GitHub Copilot adaptive thinking** — requests summarized adaptive thinking for better reasoning visibility
-
-### v1.18.32 (Sep 21)
-- **Bedrock image attachments fixed** — now only hoisted for Claude, Nova, and Llama 4 models (prevents incorrect attachment handling)
-- **Together AI streaming usage reporting** corrected
-
----
-
-## September 28 Patch (v1.18.33)
-
-One more patch release dropped on September 28:
-
-### v1.18.33 (Sep 28)
-- **Cloudflare AI Gateway models now honor provider response and stream timeouts** — the five-minute defaults from v1.18.27 now apply when routing through Cloudflare
-- **MCP browser launch failures** are now reported when the launcher exits immediately (no more silent failures)
-- **Debug configuration output** now redacts credentials and sensitive headers (security hardening)
-- **Gemini thinking defaults and effort options** now match supported controls across model generations
-
----
-
-## September 30 Patch (v1.18.34)
-
-One more patch release dropped on September 30:
-
-### v1.18.34 (Sep 30)
-- **macOS binaries re-signed with Developer ID** — CLI release binaries now run reliably on macOS 27+ (Sequoia) without Gatekeeper blocks
-- **Session and parent-session identity headers** now sent namespaced with model requests (better observability for multi-session workflows)
-- **Community fixes**: GPT 6.1 Sol cache pricing corrected; TUI plugin name extraction fixed; ad-hoc macOS binary re-signing after local compile
-
----
-
-## How to Update
-
-```bash
-# If installed via install script
-curl -fsSL https://opencode.ai/install | bash
-
-# Or via npm
-npm update -g @opencode/opencode
-
-# Verify
-opencode --version
-# Should show 1.18.34 (latest in the wave covered here)
-```
-
----
-
-## The Bottom Line
-
-**v1.18.18 is the first Opencode release that feels like a polished product instead of a promising project.**
-
-The MCP reliability alone makes it viable for production workflows. The provider routing fixes mean you stop fighting the model. The desktop stability means you can keep the app open all day. The session ordering fixes mean your history is actually useful.
-
-If you're on the fence about open-source vs. commercial agents — this release narrows the gap significantly. Opencode has always had the better architecture (skills, slash commands, explicit lifecycle). Now it has the reliability to match.
-
----
-
-## Related Reading
-
-- [OpenCode Deep Dive: The Skill-Driven Open-Source Coding Agent](/blog/deep-dive-opencode-skill-driven-coding-agent/)
-- [OpenCode vs Codex: Which Terminal Agent Wins?](/blog/opencode-vs-codex/)
-- [OpenCode vs Claude Code: Free Agent vs. Paid IDE](/blog/opencode-vs-claude-code-free-agent/)
-- [OpenCode Provider-Neutral Architecture: Biggest Advantage](/blog/opencode-provider-neutral-biggest-advantage/)
-- [Complete AGENTS.md Guide for Coding Agents](/blog/agents-md-complete-guide/)
-
 
 ## Related articles
 
-- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
-- [Oh My Pi v17.3.3 Fixes Gemini Reasoning Loops, Hashline Edge Cases, and TUI Rendering — What Beginners Need to Know](/blog/oh-my-pi-v17-hub-tool-xdev-plugins/)
-- [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
----
-
-*Published August 15, 2026; updated October 1, 2026 — covers Opencode v1.18.18 through v1.18.34 (August 13 – September 30, 2026). Full changelog: [opencode.ai/changelog](https://opencode.ai/changelog)*
-
-## FAQ
-
-**Q1: What is Opencode?**
-Opencode is a 160K-star open-source terminal coding agent from SST/Anomaly. It uses a skill-driven architecture (explicit lifecycle, slash commands, skills) and supports multiple model providers with provider-neutral routing.
-
-**Q2: What's the biggest fix in v1.18.18?**
-MCP reliability — SSE connections no longer get stuck in reconnect loops after server errors. This makes Opencode viable for teams running custom MCP tooling.
-
-**Q3: Does the desktop app work reliably now?**
-Yes. v1.18.18 fixes composer lag with large images, session tab clipping, startup readiness (WSL loading), markdown parsing off main thread, and more. The V2 desktop sidecar is opt-in and backed by the bundled CLI service.
-
-**Q4: What changed with session management?**
-Chronological message ordering now stays correct even with imported/legacy messages. Revert and fork actions use real chronology. Session lists sort by persisted activity time. Blank session titles now get generated names.
-
-**Q5: What are the provider routing fixes?**
-OpenCode now respects provider-defined reasoning options: GitHub Copilot model routing honors advertised endpoints, Azure Cognitive Services restored, OpenAI Responses phase handling fixed, Cerebras reasoning replay fixed, and more. Models work the way providers intended.
-
-**Q6: How do I update to v1.18.34?**
-`curl -fsSL https://opencode.ai/install | bash` or `npm update -g @opencode/opencode`. Verify with `opencode --version`.
-
-**Q7: Is Opencode ready for daily work?**
-Yes. v1.18.18 is the first release that feels like a polished product. MCP reliability, provider routing, desktop stability, and session ordering all work — narrowing the gap with commercial agents significantly.
+- [Opencode vs AmpCode](/blog/opencode-vs-ampcode/)
+- [Opencode vs Claude Code](/blog/opencode-vs-claude-code-free-agent/)
+- [Opencode vs Codex](/blog/opencode-vs-codex/)
+- [Opencode vs Copilot CLI](/blog/opencode-vs-copilot-cli/)
+- [Opencode vs Cursor](/blog/opencode-vs-cursor-free-terminal-vs-paid-ide/)
+- [Opencode v1.19.4 security hardening](/blog/opencode-v1-19-4-security-bun-upgrade/)
+- [Opencode v2.1.4 MCP forms](/blog/opencode-v2-1-4-mcp-forms-background-compaction/)
+- [OpenCode deep dive: skill-driven terminal agent](/blog/deep-dive-opencode-skill-driven-coding-agent/)
+- [State of open source coding agents 2026](/blog/state-of-open-source-coding-agents-2026/)

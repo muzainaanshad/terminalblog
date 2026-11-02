@@ -53,9 +53,10 @@ function parse(file) {
   // Check for FAQPage JSON-LD
   const hasFaqSchema = /FAQPage|application\/ld\+json/i.test(body) || /buildFaqSchema/i.test(body);
   
-  // Check for clear definition at start (first 500 chars)
-  const firstSection = body.slice(0, 500);
-  const hasDefinition = /^(What is|What are|A (coding agent|agent) is|An (agent|agent) is|is a|refers to|means)/im.test(firstSection);
+  // Check for clear definition at start (first 2000 chars of body after any script tags)
+    const bodyAfterScripts = body.replace(/<script[^>]*>[\s\S]*?<\/script>\s*/g, '').replace(/<script[^>]*set:html=\{JSON\.stringify\([\s\S]*?\)\}\s*\/\>\s*/g, '');
+    const firstSection = bodyAfterScripts.slice(0, 2000);
+    const hasDefinition = /^(\*{0,2})(What is|What are|A (coding agent|agent) is|An (agent|agent) is|is a|refers to|means)/im.test(firstSection.trim());
   
   // Check for canonical URL in frontmatter
   const hasCanonical = !!fm.canonical;
@@ -184,6 +185,51 @@ function injectFaqSchema(raw, faqSchema) {
   const scriptTag = `\n<script type="application/ld+json" set:html={JSON.stringify(${JSON.stringify(faqSchema, null, 2)})} />\n`;
   
   // Insert after frontmatter
+  return raw.slice(0, fmEnd + 4) + scriptTag + raw.slice(fmEnd + 4);
+}
+
+function buildArticleSchema(post) {
+  const articleSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: post.title,
+    description: post.fm.description || '',
+    image: post.fm.image && !post.fm.image.includes('api/og?title=Article') ? `https://terminalblog.com${post.fm.image}` : undefined,
+    datePublished: post.fm.pubDate,
+    dateModified: post.fm.updatedDate || post.fm.pubDate,
+    author: {
+      '@type': 'Person',
+      name: post.fm.author || 'TerminalBlog'
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'TerminalBlog',
+      logo: {
+        '@type': 'ImageObject',
+        url: 'https://terminalblog.com/favicon.ico'
+      }
+    },
+    mainEntityOfPage: {
+      '@type': 'WebPage',
+      '@id': `https://terminalblog.com/blog/${post.slug}/`
+    }
+  };
+  
+  // Remove undefined values
+  Object.keys(articleSchema).forEach(key => articleSchema[key] === undefined && delete articleSchema[key]);
+  if (articleSchema.image === undefined) delete articleSchema.image;
+  
+  return articleSchema;
+}
+
+function injectArticleSchema(raw, articleSchema) {
+  // Find the frontmatter end and inject script tag after it
+  const fmEnd = raw.indexOf('\n---', 4);
+  if (fmEnd === -1) return raw;
+  
+  const scriptTag = `\n<script type="application/ld+json" set:html={JSON.stringify(${JSON.stringify(articleSchema, null, 2)})} />\n`;
+  
+  // Insert after frontmatter (after any existing FAQ schema)
   return raw.slice(0, fmEnd + 4) + scriptTag + raw.slice(fmEnd + 4);
 }
 
@@ -336,6 +382,14 @@ function applyFixes(posts) {
         fileChanged = true;
         console.log(`  ✓ Added canonical URL to ${p.slug}`);
       }
+    }
+    
+    // Add Article/BlogPosting schema if missing
+    if (!p.hasArticleSchema) {
+      const articleSchema = buildArticleSchema(p);
+      newRaw = injectArticleSchema(newRaw, articleSchema);
+      fileChanged = true;
+      console.log(`  ✓ Added BlogPosting schema to ${p.slug}`);
     }
     
     if (fileChanged) {
