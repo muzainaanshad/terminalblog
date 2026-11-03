@@ -1,0 +1,267 @@
+---
+title: "Open Interpreter 0.0.58 Just Became the Best Local-First Codex Alternative — Kimi K3, GLM 5.3, ACP Native"
+description: "Open Interpreter 0.0.58 (Nov 1) validates Codex 0.159.0 compatibility, preserves legacy feedback with signed attachments, and ships 166 platform-specific binaries. The open-source coding agent for local models (Kimi K3, GLM 5.3) just got production-ready."
+pubDate: 2026-11-03T15:00:00Z
+tags: ["openinterpreter", "release", "v0.0.58", "codex", "kimi", "glm", "local-models", "acp", "beginner", "open-source"]
+tool: "industry"
+author: "Anshad"
+image: "/api/og?title=Open+Interpreter+0.0.58+Codex+Compat&tool=openinterpreter"
+canonical: "https://terminalblog.com/blog/openinterpreter-v0-0-58-codex-compat-kimi-glm/"
+faq:
+  - q: "What is Open Interpreter and how is it different from Codex?"
+    a: "Open Interpreter is a coding agent optimized for LOCAL models (Kimi K3, GLM 5.3, Qwen, Llama) while maintaining Codex SDK compatibility. You get a Codex-like interface but run entirely on your hardware — no API keys, no cloud costs, full privacy."
+  - q: "Does this mean I can use my existing Codex plugins/skills?"
+    a: "Yes — Open Interpreter 0.0.58 validates the maintained Codex 0.159.0 compatibility profile. Model discovery and request admission work with the Codex SDK. It's ACP compatible too."
+  - q: "What models work best with Open Interpreter?"
+    a: "Kimi K3 and GLM 5.3 are the flagship local models. It also supports Qwen, Llama, DeepSeek, and any Ollama/OpenAI-compatible local model. The `/harness` command lets you switch between native, claude-code, kimi-code, qwen-code, and other emulation modes."
+  - q: "Is it ready for daily use?"
+    a: "0.0.58 ships 166 platform-specific binaries (Linux musl, macOS, Windows) with sigstore signatures. The Rust rewrite is production-grade. Legacy feedback delivery is preserved alongside optional signed attachment uploads."
+  - q: "How do I install it?"
+    a: "Download the binary for your platform from GitHub releases, or use the installer. No npm, no Python dependency hell — single binary. Run `interpreter` and pick your local model."
+
+---
+
+**Open Interpreter 0.0.58 dropped November 1, 2026** — and it's the release that finally makes "Codex locally" real. **Codex 0.159.0 compatibility validated. 166 signed binaries across every platform. Legacy feedback preserved. ACP native.** The open-source coding agent for Kimi K3 and GLM 5.3 just graduated from experiment to daily driver.
+
+---
+
+## The One-Line Summary
+
+**v0.0.58 (Nov 1) → Codex 0.159.0 compat validated, 166 signed binaries (Linux/macOS/Windows), legacy feedback + signed attachments, ACP/Codex SDK compatible. Kimi K3 + GLM 5.3 first-class. Single binary, no cloud required.**
+
+---
+
+## Why This Release Matters: The "Local Codex" Promise Delivered
+
+### What Open Interpreter Actually Is
+
+Open Interpreter is a **coding agent optimized for low-cost local models**. You run it on your machine. It uses your GPU/CPU. It speaks the Codex SDK protocol. It's ACP compatible. You get:
+
+- **No API keys** — ever
+- **No cloud costs** — ever  
+- **Full privacy** — your code never leaves your machine
+- **Codex-like interface** — same commands, same workflow
+- **Local model freedom** — Kimi K3, GLM 5.3, Qwen, Llama, whatever Ollama serves
+
+```bash
+# Install (single binary, no runtime deps)
+curl -fsSL https://openinterpreter.com/install | bash
+
+# Or download from GitHub releases — 166 platform-specific artifacts
+# Linux: bwrap-x86_64-unknown-linux-musl.tar.gz
+# macOS: codex-aarch64-apple-darwin.dmg
+# Windows: codex-aarch64-pc-windows-msvc.exe
+
+# Run
+interpreter
+# Pick model → code
+```
+
+---
+
+## The Headline Features
+
+### 1. Codex 0.159.0 Compatibility Profile — Validated
+
+**What it is:** Open Interpreter maintains a **compatibility profile** that mirrors Codex's model discovery and request admission. v0.0.58 **validates the maintained Codex 0.159.0 profile**.
+
+**Why it matters:** If you build on Codex SDK, your tools *work* with Open Interpreter. Model catalog, tool schemas, request/response shapes — aligned. This isn't "compatible-ish." It's **validated against a specific Codex version**.
+
+```json
+// Your Codex SDK code
+import { query } from "@anthropic-ai/claude-agent-sdk";
+// Works with Open Interpreter's local models
+```
+
+**For beginners:** You don't need to learn a new SDK. Your existing Codex scripts, plugins, and workflows port over. Just point at the local endpoint.
+
+---
+
+### 2. 166 Platform-Specific Binaries — Sigstore Signed
+
+**What it is:** Every release now publishes **166 artifacts** covering:
+- **Linux musl** (x86_64, aarch64) — `bwrap-*.tar.gz` + `.sigstore`
+- **macOS** (Apple Silicon) — `codex-*.dmg` / `.tar.gz` / `.zst`
+- **Windows** (ARM64) — `codex-*.exe`
+- **Source** — `.zip` / `.tar.gz`
+
+**Every binary has a `.sigstore` signature** — cryptographic proof of provenance. Verify with `cosign` or `sigstore-python`.
+
+```bash
+# Verify a binary
+cosign verify-blob --signature bwrap-x86_64-unknown-linux-musl.sigstore \
+  --certificate bwrap-x86_64-unknown-linux-musl.crt \
+  bwrap-x86_64-unknown-linux-musl.tar.gz
+```
+
+**Why it matters:** Supply chain security for local-first tools. You *know* what you're running. No `npm install` supply chain. No `pip` dependency confusion. **Single binary, verified, done.**
+
+---
+
+### 3. Legacy Feedback Preserved + Optional Signed Attachments
+
+**What it is:** Feedback delivery (telemetry, crash reports, usage stats) now:
+- **Preserves legacy delivery** — existing integrations don't break
+- **Adds optional signed attachment uploads** — protocol + streaming-guide coverage
+
+**Why it matters:** You want local-first *and* you want the project to improve. This lets you opt into signed, verifiable feedback without breaking existing setups. Protocol documented. Streaming guide included.
+
+---
+
+### 4. Harness Emulation — Switch Personalities
+
+**What it is:** The `/harness` command lets you emulate other agents:
+
+```bash
+> /harness
+
+native          # Open Interpreter native
+claude-code     # Claude Code emulation
+claude-code-bare
+zcode
+kimi-code       # Kimi CLI style
+kimi-cli
+qwen-code       # Qwen Code style
+deepseek-tui
+swe-agent
+minimal
+```
+
+**Why it matters:** You like Kimi's keybindings but want GLM 5.3? `kimi-code` harness + GLM model. You want Codex shortcuts on local models? `native` harness. **One binary, every workflow.**
+
+---
+
+### 5. ACP + Codex SDK Dual Compatibility
+
+**What it is:** Open Interpreter speaks **both**:
+- **ACP (Agent Communication Protocol)** — the emerging standard for agent interop
+- **Codex SDK** — OpenAI's agent SDK protocol
+
+```bash
+# ACP client connects directly
+# Codex SDK client connects directly
+# Same binary, both protocols
+```
+
+**Why it matters:** You're not locked into one ecosystem. Use Open Interpreter as an ACP server for your custom orchestration. Use Codex SDK tools for your existing workflows. **It's a protocol bridge.**
+
+---
+
+## The Models That Shine Here
+
+### Kimi K3 (Moonshot) — The Local Reasoning King
+
+- **1M token context** (k3-256k = 256K)
+- **Native tool use** — no wrapper needed
+- **Reasoning tokens** — controllable via `/think-tokens`
+- **Open weights** — runs on your hardware
+
+### GLM 5.3 (Z.ai) — The Chinese Model That Codes
+
+- **Bilingual excellence** — Chinese + English coding
+- **Tool use trained** — not bolted on
+- **Competitive benchmarks** — beats GPT-4 on coding tasks
+- **Open weights** — local inference ready
+
+### Qwen 2.5 / 3.x — The Reliable Workhorse
+
+- **Multiple sizes** — 0.5B to 72B
+- **Ollama native** — `ollama pull qwen2.5-coder`
+- **Proven in production** — millions of downloads
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **v0.0.58** | **Nov 1, 2026** | **Stable (Latest)** | **Codex 0.159.0 compat, 166 sigstore binaries, legacy feedback + signed attachments** |
+| v0.0.57 | Oct 31, 2026 | Stable | Codex 0.159.0 compat |
+| v0.0.56 | Oct 7, 2026 | Stable | GPT-6.1 Sol metadata, Claude Sonnet 5.5, shell env rebind on resume |
+| v0.0.55 | Sep 30, 2026 | Stable | Branding unification, local model diagnostics, Ollama Qwen smoke test |
+| v0.0.45 | Sep 2026 | Stable | Early Rust rewrite milestone |
+
+**The Rust rewrite is done.** v0.0.55+ are production binaries. The velocity is **weekly stable releases** with real compatibility validation.
+
+---
+
+## Should You Switch?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Pay for Codex/Claude/ChatGPT monthly** | **Yes** — $0/mo for equivalent local capability |
+| **Need privacy / air-gapped / compliance** | **Yes** — code never leaves your machine |
+| **Run local models (Ollama, LM Studio, llama.cpp)** | **Yes** — first-class support, not an afterthought |
+| **Build on Codex SDK / ACP** | **Yes** — validated compatibility |
+| **Want single-binary simplicity** | **Yes** — no runtime, no deps, verified |
+| **Need cloud-scale parallel agents** | **No** — this is local-first, single-machine |
+| **Rely on 1M+ token cloud context** | **Maybe** — local 1M context needs VRAM/RAM |
+
+---
+
+## How to Start (5 Minutes)
+
+```bash
+# 1. Install
+curl -fsSL https://openinterpreter.com/install | bash
+# OR download from https://github.com/openinterpreter/openinterpreter/releases/tag/rust-v0.0.58
+
+# 2. Run
+interpreter
+
+# 3. Pick model (arrow keys)
+# > Kimi K3 (local, 1M context)
+# > GLM 5.3 (local, bilingual)
+# > Qwen 2.5 Coder (local, fast)
+# > Ollama model...
+# > OpenAI-compatible endpoint...
+
+# 4. Code
+# "Refactor this auth module to use JWT with refresh tokens"
+# "Write tests for the payment service"
+# "Explain this legacy regex"
+
+# 5. Try harness switching
+/harness kimi-code
+# Now you're in Kimi keybindings with your chosen model
+```
+
+---
+
+## The Bottom Line
+
+**Open Interpreter 0.0.58 is the first release where "local Codex" isn't a metaphor — it's a verified binary.**
+
+- **Codex 0.159.0 compat** = your SDK tools work
+- **166 signed binaries** = supply chain secure, every platform
+- **Legacy feedback + signed attachments** = opt-in improvement, no breakage
+- **Harness emulation** = your keybindings, your model
+- **ACP + Codex SDK** = protocol freedom
+- **Kimi K3 + GLM 5.3** = reasoning models that run on your GPU
+
+The open-source coding agent category just got a **daily-driver grade** entry. No API keys. No monthly bills. No cloud. Just code.
+
+```bash
+interpreter
+# Kimi K3 loads
+# You code
+# $0.00
+# Private
+# Fast
+```
+
+---
+
+## Related Articles
+
+- [Best Free AI Coding Agents 2026 — No Credit Card Required](/blog/best-free-ai-coding-agents-2026-no-credit-card/)
+- [Run Coding Agents on Ollama — Local Models Guide](/blog/run-coding-agents-ollama-local-models-guide/)
+- [Kimi K2 vs Copilot — Open Weight Price Rebellion](/blog/kimi-k2-7-copilot-open-weight-price-rebellion/)
+- [Qwen Code — Managed Runtime, Lightweight Pairing](/blog/qwen-code-managed-runtime-lightweight-pairing/)
+- [State of Open Source Coding Agents 2026](/blog/state-of-open-source-coding-agents-2026/)
+
+---
+
+*Open Interpreter is open-source (MIT) and available at [github.com/openinterpreter/openinterpreter](https://github.com/openinterpreter/openinterpreter). Full changelog: [github.com/openinterpreter/openinterpreter/releases/tag/rust-v0.0.58](https://github.com/openinterpreter/openinterpreter/releases/tag/rust-v0.0.58). Published November 3, 2026 — covers Open Interpreter 0.0.58 stable released November 1, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
