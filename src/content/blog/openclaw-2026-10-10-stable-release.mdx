@@ -1,0 +1,299 @@
+---
+title: "OpenClaw 2026.10.10 Just Went Stable — Cloud Sessions, Local Gateway, Backup Safety, and Codex 0.164"
+description: "OpenClaw 2026.10.10 (Nov 2) graduates the beta wave to stable: cloud sessions that move local↔cloud, local Gateway built into desktop apps, secret-redacted PostgreSQL Git backups, Codex 0.164 runtime, Node 24/26 fixed, Gateway streaming unstalled, cron catch-up. The beta that finally works is now stable."
+pubDate: 2026-11-03T12:00:00Z
+tags: ["openclaw", "release", "2026.10.10", "stable", "cloud-sessions", "local-gateway", "backup", "codex", "coding-agent", "beginner", "open-source"]
+tool: "openclaw"
+author: "Anshad"
+image: "/api/og?title=OpenClaw+2026.10.10+Stable&tool=openclaw"
+canonical: "https://terminalblog.com/blog/openclaw-2026-10-10-stable-release/"
+faq:
+  - q: "What's the biggest feature in 2026.10.10 stable?"
+    a: "Cloud sessions are now first-class — move your work between local and cloud from the session menu, organized by repository with environment recipes and verified Node toolchains. Your session state, deps, and secrets travel with it."
+  - q: "Does the desktop app include a local Gateway now?"
+    a: "Yes — the Windows desktop app and fresh Tauri/macOS installs run a local Gateway out of the box. No separate `openclaw gateway` process needed. First-run setup chooses inference automatically."
+  - q: "What's the backup safety improvement?"
+    a: "Secret-redacted Git backups now cover PostgreSQL exports and omit identified bundled-plugin credentials, webhook tokens, and credential blobs while preserving non-secret plugin state. Existing Git history isn't rewritten; affected integrations must re-auth after restoring a redacted backup."
+  - q: "Is Codex updated?"
+    a: "Yes — the managed native CLI is upgraded to 0.164.0 with matching protocol projection and platform packages. This includes the eMudhra certificate fixes from upstream."
+  - q: "Does this fix Node 24/26 compatibility?"
+    a: "Yes — installs and updates work again on Node `>=24.16.0 <25 || >=26.1.0`. Node 24.22.1 or 26.12.1 remains the security recommendation. Node 26 workers no longer abort when stdin is a file."
+  - q: "How do I update?"
+    a: "Auto-update is enabled by default. Or: `npm update -g openclaw`, `docker pull ghcr.io/openclaw/openclaw:latest`, or download from GitHub Releases. Desktop apps update automatically."
+---
+
+**OpenClaw 2026.10.10 dropped November 2** — and it graduates the entire beta wave (beta.1 through beta.5) to stable. **Cloud sessions that move**, **local Gateway in desktop apps**, **secret-redacted PostgreSQL backups**, **Codex 0.164**, **Node 24/26 fixed**, **Gateway streaming fixed**, **cron catch-up**. The beta that finally worked is now the version you should run.
+
+If you tested 2026.10.10-beta.5 — this is the same feature set, hardened and blessed. If you waited for stable — here it is.
+
+---
+
+## The One-Line Summary
+
+**2026.10.10 (Nov 2, Stable) → Cloud sessions move local↔cloud, local Gateway in desktop apps, secret-redacted PostgreSQL backups, Codex 0.164, Node 24/26 installs work, Gateway streaming doesn't stall, cron catches up missed slots. The beta wave graduated.**
+
+---
+
+## The Headlines (What You'll Actually Feel)
+
+| Feature | Why It Matters |
+|---------|----------------|
+| **Cloud sessions** | Move sessions between local ↔ cloud from the session menu, organized by repo with environment recipes |
+| **Local Gateway in desktop apps** | Windows desktop app and fresh Tauri/macOS installs run a local Gateway — no separate setup |
+| **Secret-redacted PostgreSQL backups** | Git backups cover PG exports, strip credentials/tokens/webhooks, preserve plugin state |
+| **Codex 0.164 runtime** | Managed CLI upgraded with matching protocol — includes eMudhra cert fixes |
+| **Node 24/26 compatibility** | Installs/updates work on `>=24.16.0 <25 || >=26.1.0`; Node 26 workers don't abort on file stdin |
+| **Gateway streaming fixed** | Tool-call XML, partial HTML tags no longer stall the Gateway |
+| **Cron catch-up** | Missed slots with stale next-run times fire on startup instead of being dropped |
+| **Control UI modernization** | Compact nav rail, Solid overlays/tabs, wide-chat details, persistent New conversation |
+| **Mobile nodes** | Android adds system/photos/contacts/calendar/motion; iOS gets background presence beacon |
+| **MCP apps** | Plugin apps run across conversations and workspace files via principal-bound relay |
+| **Desktop onboarding** | Guided first-run: Windows/Tauri = local Gateway, macOS = dashboard setup |
+| **Secrets UX** | Secure-entry prompts reveal on demand; setup grants scope credential egress |
+| **Local models** | Managed llama.cpp OCR, vision, embedding-only join auto inference selection |
+| **Plugin runtime control** | Plugins fork live context for side questions, steer runs, override model fallbacks |
+| **Automations** | MCP events trigger automations; session hovercards expose schedules |
+| **Database engine** | PostgreSQL stores survive backups/updates, schema-drift checks, Workboard store |
+| **Diagnostics** | Message/run spans export prompts/answers; GC metrics by kind/worker |
+
+---
+
+## 1. Cloud Sessions: Your Work Moves With You
+
+**What it does:** Move sessions between local and cloud **from the session menu**. Organize cloud environments **by repository** with **environment recipes** and **verified Node toolchains**. See **snapshot progress** while sessions start before the first snapshot finishes uploading.
+
+**Before:** Cloud was a separate thing — you picked "cloud" or "local" at session start and that was it. Moving work meant manual export/import.
+
+**Now:** You're coding on your laptop → need more compute → **move to cloud in two clicks**. Come back later → **move back to local**. Environment (Node version, deps, secrets) travels with it via recipes.
+
+**Why beginners care:** No more "which environment am I in?" confusion. Your session *is* the project — it just runs wherever you need it.
+
+---
+
+## 2. Local Gateway in the Desktop App (Finally)
+
+**What it does:** The **Windows desktop app** and **fresh Tauri installs** now run a **local Gateway out of the box**. Fresh macOS installs start in **guided dashboard setup**. First-run setup **chooses inference automatically**. Missing native permissions are guided in chat.
+
+**Before:** You installed the desktop app → still had to run `openclaw gateway` separately → configure ports, auth, tunnels → "why is this so hard?"
+
+**Now:** Install desktop app → **open it → it works**. The Gateway runs inside. No separate process, no port conflicts, no "wait, which terminal had the Gateway?"
+
+**Why it matters:** This is the difference between "developer tool" and "app you give to your team." The Windows desktop app especially — just install and run.
+
+---
+
+## 3. Backup Safety: Secret-Redacted PostgreSQL Exports
+
+**What it does:** Git backups now cover **PostgreSQL exports** with `--exclude-secrets`. **Identified bundled-plugin credentials, OAuth tokens, signing keys, webhook tokens, hosted-media bearer records, and credential blobs are redacted**. Non-secret plugin state is preserved.
+
+**Before:** Restoring a Git backup could leak credentials from plugins, webhooks, media hosts. PostgreSQL data wasn't included.
+
+**Now:** Backups are **safe to share and restore**. The redaction is applied at backup time. Existing Git history isn't rewritten — if you restore a redacted backup, affected integrations just need to re-auth.
+
+**Why it matters:** If you run OpenClaw in production or share backups across environments, this is the safety layer you needed. Your secrets don't travel with your history.
+
+---
+
+## 4. Codex 0.164 — The eMudhra Certificate Fix Is Here
+
+**What it does:** The managed native Codex CLI is upgraded to **0.164.0** with matching protocol projection and platform packages.
+
+**Why it matters:** Codex 0.164.0 (released October 23) updates TLS root handling including the **eMudhra certificate compromise fixes** (Apple's notice: https://support.apple.com/en-us/149555). Certificates chaining to the compromised eMudhra intermediate CAs are no longer trusted.
+
+If you use OpenClaw's Codex integration, this upgrade is non-negotiable for security.
+
+---
+
+## 5. Node 24/26 Compatibility: Installs and Updates Work Again
+
+**What it does:** Node compatibility fixed for `>=24.16.0 <25 || >=26.1.0`. Node 24.22.1 or 26.12.1 is now a **security recommendation** instead of a hard requirement. Node 26 workers **no longer abort when stdin is a file**.
+
+**Before:** Node 24/26 users hit install failures, update failures, or worker aborts on file stdin.
+
+**Now:** Just works. The version check is advisory, not blocking.
+
+**Why beginners care:** You don't need to pin Node versions or downgrade. OpenClaw works on current LTS and current releases.
+
+---
+
+## 6. Gateway Streaming: Tool-Call XML and Partial HTML No Longer Stall
+
+**What it does:** Replies that **contain tool-call-like XML, look like tool calls, or end long HTML at a partial tag** no longer stall the Gateway.
+
+**Before:** Streaming a reply with `<tool>` tags, tool-call patterns, or truncated HTML would freeze the Gateway — turns would queue, UI would hang.
+
+**Now:** Gateway parses through these patterns without stalling. Missing-answer notices no longer follow streamed delivery. Side-question replies no longer disappear or repeat after tool sends. Multiline `/btw`, `/loop`, and `/acp` steer input is preserved. Compaction failures show instead of stale overflow advice.
+
+**Why it matters:** If you run agents that emit structured output or work with HTML-heavy tasks, the Gateway stays responsive. This was a daily paper cut for heavy users.
+
+---
+
+## 7. Cron: Missed Slots No Longer Dropped
+
+**What it does:** Missed cron slots with a **stale stored next run time are no longer dropped**. **Startup catch-up runs are admitted after a restart**.
+
+**Before:** If the Gateway was down when a cron should have fired, the slot was silently dropped. Restart didn't catch up.
+
+**Now:** Stored next-run-time is validated. If it's stale, the missed slot fires on startup. Your scheduled agents run when they should.
+
+---
+
+## 8. Control UI: Modernized Primary Workspace
+
+The Control UI gets a **new architecture**: compact navigation rail, native Solid overlays and tabs, wide-chat details, and persistent "New conversation" access. The primary session workspace feels like a modern app, not a developer tool.
+
+---
+
+## 9. Mobile Nodes: Android & iOS Capabilities
+
+- **Android** adds system, photos, contacts, calendar, and motion capabilities
+- **iOS** gains an authenticated background presence beacon
+
+Mobile is becoming a first-class surface for agent interaction.
+
+---
+
+## 10. MCP Apps: Plugin Apps Across Conversations
+
+Plugin apps can now **run across conversations and workspace files through a principal-bound relay**. This means an MCP app you install isn't tied to one conversation — it persists and operates across your workspace.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **2026.10.10** | **Nov 2, 2026** | **Stable (Latest)** | **Cloud sessions, local Gateway, secret-redacted PG backups, Codex 0.164, Node 24/26, streaming fixes, cron catch-up, Control UI, mobile, MCP apps — beta wave graduated** |
+| 2026.10.10-beta.5 | Oct 30, 2026 | Beta | Node 24/26, streaming, rollback, cron, security hardening |
+| 2026.10.10-beta.1 | Oct 15, 2026 | Beta | Cloud sessions, local Gateway, new models, Bun, Muse Code |
+| 2026.10.5-beta.1 | Oct 11, 2026 | Beta | Safer updates, restart-safe convos, faster Gateway |
+| 2026.10.1 | Oct 10, 2026 | Stable | Memory survival, Haiku 5.5, Workboard, MCP Apps |
+
+**The October arc:** 2026.10.1 fixed memory. 2026.10.5-beta.1 fixed updates. 2026.10.10-beta.1 added cloud + desktop. 2026.10.10-beta.5 hardened it. **2026.10.10 makes it stable.**
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Run OpenClaw in production** | **Yes** — cloud sessions + local Gateway + backup safety + Codex 0.164 = operational maturity |
+| **Want cloud without vendor lock-in** | **Yes** — move sessions local↔cloud freely, BYO cloud infra |
+| **Use the Windows/macOS desktop app** | **Yes** — local Gateway built in, guided first-run |
+| **Want latest Codex with cert fixes** | **Yes** — 0.164 includes eMudhra patches |
+| **Run on Node 24 or 26** | **Yes** — installs/updates/workers fixed |
+| **Hit Gateway streaming stalls** | **Yes** — tool-call XML/partial HTML no longer stall |
+| **Run cron jobs** | **Yes** — missed slots catch up on startup |
+| **On 2026.10.9 stable** | **Yes** — zero breaking changes, massive capability expansion |
+| **On 2026.10.10-beta.5** | **Yes** — same features, now stable-blessed |
+
+**No reason to wait.** This is the release the beta wave was building toward.
+
+---
+
+## How to Update
+
+```bash
+# Auto-update (enabled by default)
+# OpenClaw checks and updates on startup
+
+# Manual: npm
+npm update -g openclaw
+
+# Docker
+docker pull ghcr.io/openclaw/openclaw:latest
+
+# Desktop apps
+# Windows/macOS/Linux: updates automatically on restart
+# Or download from: https://github.com/openclaw/openclaw/releases/tag/v2026.10.10
+
+# Verify
+openclaw --version
+# Should show 2026.10.10
+```
+
+**First things to verify after update:**
+
+```bash
+# 1. Check version
+openclaw --version
+# 2026.10.10
+
+# 2. Test cloud session move
+# Session menu → "Move to Cloud" / "Move to Local" → verify state travels
+
+# 3. Test desktop app local Gateway
+# Fresh install desktop app → open → Gateway runs without separate process
+
+# 4. Test backup (staging)
+# Create Git backup → verify PG data included, credentials redacted
+
+# 5. Test Codex integration
+# Use Codex model → verify 0.164.0 runtime
+
+# 6. Test Node 24/26 install
+# On Node 24.22.1 or 26.12.1 → npm update openclaw → succeeds
+
+# 7. Test Gateway streaming
+# Agent emits tool-call-like XML → Gateway doesn't stall
+
+# 8. Test cron catch-up
+# Stop Gateway → wait past cron time → restart → missed slot fires
+```
+
+---
+
+## The Bottom Line
+
+**2026.10.1 fixed memory. 2026.10.5-beta.1 fixed updates. 2026.10.10-beta.1 added cloud + desktop. 2026.10.10-beta.5 hardened Node, streaming, rollback, cron. 2026.10.10 makes it all stable.**
+
+- **Cloud sessions** → your work moves with you
+- **Local Gateway in desktop** → install and run, no setup
+- **Secret-redacted backups** → safe to share, safe to restore
+- **Codex 0.164** → eMudhra cert fixes included
+- **Node 24/26** → current LTS and releases just work
+- **Gateway streaming** → structured output doesn't stall
+- **Cron catch-up** → scheduled agents run when they should
+
+The pattern holds: **OpenClaw doesn't chase features. It hardens the runtime, the supply chain, the recovery paths, the data integrity, the deployment story — the things that matter when you run agents on real infrastructure with real data.**
+
+For a beginner, that means **fewer "my agent ate my data" moments, fewer "update broke my config" disasters, fewer "disk full = manual recovery" weekends.** For an operator, it means **OpenClaw is becoming the agent runtime you trust with production workloads.**
+
+```bash
+# Update command
+npm update -g openclaw
+# 2026.10.10
+# Cloud sessions work
+# Local Gateway in desktop
+# Backups redact secrets
+# Codex 0.164
+# Node 24/26 fixed
+# Streaming doesn't stall
+# Cron catches up
+```
+
+---
+
+## Related Articles
+
+- [OpenClaw 2026.10.9 Just Patched the Supply Chain — Fast-URI, Zod, IMAP, MSAL All Hardened](/blog/openclaw-2026-10-9-supply-chain-security-patches/)
+- [OpenClaw 2026.10.10-beta.5 Just Fixed Node 24/26, Gateway Streaming, and Update Rollback](/blog/openclaw-v2026-10-10-beta1-cloud-sessions-local-gateway-new-models/)
+- [OpenClaw 2026.10.7 — Replay Safe Recovery](/blog/openclaw-2026-10-7-replay-safe-recovery/)
+- [OpenClaw 2026.10.5-beta.1 Just Made Updates Survive Everything](/blog/openclaw-v2026-10-5-beta1-safer-updates-restart-safe-conversations/)
+- [OpenClaw 2026.10.1 Just Made Agent Memory Survive Everything](/blog/openclaw-v2026-10-1-memory-workboard-mcp-apps/)
+- [OpenClaw vs Hermes: The Managed Codex Runtime Showdown](/blog/hermes-vs-openclaw/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+
+---
+
+*OpenClaw is open-source (MIT) and available at [github.com/openclaw/openclaw](https://github.com/openclaw/openclaw). Published November 3, 2026 — covers OpenClaw 2026.10.10 stable released November 2, 2026. Full changelog: [github.com/openclaw/openclaw/releases/tag/v2026.10.10](https://github.com/openclaw/openclaw/releases/tag/v2026.10.10)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
