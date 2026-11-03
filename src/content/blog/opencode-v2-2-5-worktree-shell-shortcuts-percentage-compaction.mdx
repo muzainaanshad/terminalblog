@@ -1,0 +1,241 @@
+---
+title: "OpenCode v2.2.5 Just Made Worktrees Feel Native — Plus Percentage Compaction That Actually Works"
+description: "OpenCode v2.2.5 (Oct 30) adds worktree/shell shortcuts (Ctrl+Alt+O/B), percentage compaction buffer (\"20%\"), MCP 10MiB message fixes, and guided Claude Agent setup. Desktop terminals now persist across restarts with scrollback intact."
+pubDate: 2026-11-03T14:00:00Z
+tags: ["opencode", "release", "v2.2.5", "worktree", "compaction", "desktop", "beginner", "open-source", "terminal-agent"]
+tool: "opencode"
+author: "Anshad"
+image: "/api/og?title=OpenCode+v2.2.5+Worktree+Shortcuts&tool=opencode"
+canonical: "https://terminalblog.com/blog/opencode-v2-2-5-worktree-shell-shortcuts-percentage-compaction/"
+faq:
+  - q: "What's the biggest workflow change in v2.2.5?"
+    a: "Worktree and shell mode shortcuts (Ctrl+Alt+O/B/X) — you can now switch worktrees and toggle shell mode without leaving the keyboard. It finally feels like a native IDE workflow."
+  - q: "How does percentage compaction work?"
+    a: "Set `\"compaction\": { \"buffer\": \"20%\" }` in opencode.json — it keeps 20% of each model's context window free. One setting works for both small and large context models. Token counts still work too."
+  - q: "Are Desktop terminals really persistent now?"
+    a: "Yes — they belong to the session, survive server restarts with full scrollback, and renamed terminals keep their names. Shared with TUI and other windows."
+  - q: "What's the guided Claude Agent setup?"
+    a: "Select 'Claude Agent' from the provider picker — it copies `claude auth login`, installs Claude Code, and verifies the connection before model selection. Removes the friction of manual setup."
+  - q: "Any breaking changes?"
+    a: "No known breaking changes. MCP servers with >10MiB messages now work (fixed), idle locations don't restart MCP servers unnecessarily, and LiteLLM context errors trigger compaction instead of stopping sessions."
+---
+
+**OpenCode v2.2.5 dropped October 30, 2026** — and it's the kind of release that makes you wonder how you lived without worktree shortcuts. **Ctrl+Alt+O** to pick a worktree. **Ctrl+Alt+B** for its base branch. **Ctrl+Shift+X** to toggle shell mode. Finally, terminal agent workflows that feel *native*.
+
+---
+
+## The One-Line Summary
+
+**v2.2.5 (Oct 30) → Worktree/shell shortcuts, percentage compaction buffer ("20%"), persistent Desktop terminals with scrollback, guided Claude Agent setup, MCP 10MiB message fix, LiteLLM compaction fallback. Zero breaking changes.**
+
+---
+
+## The Features You'll Actually Use Daily
+
+### 1. Worktree Shortcuts — `Ctrl+Alt+O` / `Ctrl+Alt+B` / `Ctrl+Shift+X`
+
+**What it is:** Three keyboard shortcuts that change how you navigate multi-worktree projects:
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+Alt+O` (Win/Linux) / `⌘⌥O` (Mac) | Choose a worktree |
+| `Ctrl+Alt+B` / `⌘⌥B` | Choose base branch for new worktree |
+| `Ctrl+Shift+X` / `⌘⇧X` | Toggle shell mode in composer |
+
+**Why it matters:** You're in a deep refactor across three worktrees. Old way: `opencode worktree list` → copy path → `cd` → restart. New way: `Ctrl+Alt+O` → pick → done. Shell mode toggle means you drop into a real shell *inside* the composer, run a quick command, toggle back. No context switch.
+
+```bash
+# In opencode.json — the shortcuts are built-in, but you can see them in Settings → Shortcuts
+# Desktop: tooltip shows the binding on hover
+# TUI: command palette has "Choose Worktree" and "Choose Base Branch"
+```
+
+**For beginners:** Worktrees = parallel working directories sharing one `.git`. You can have `main`, `feature-auth`, `hotfix-login` all checked out simultaneously. This release makes switching between them *instant*.
+
+---
+
+### 2. Percentage Compaction Buffer — `"buffer": "20%"`
+
+**What it is:** Set `compaction.buffer` as a **percentage of the model's context window** instead of a fixed token count.
+
+```json
+// opencode.json
+{
+  "compaction": {
+    "buffer": "20%"
+  }
+}
+```
+
+**Why it matters:** One setting works for *every* model. `20%` on a 32K model = 6.4K buffer. `20%` on a 1M model = 200K buffer. No more recalculating when you switch from Haiku to Opus to a local 128K model.
+
+**The old way:** `buffer: 8000` — works for small models, wastes space on large ones, crashes on huge ones.
+**The new way:** `buffer: "20%"` — scales automatically.
+
+---
+
+### 3. Persistent Desktop Terminals — Finally
+
+**What it is:** Desktop terminals now:
+- **Belong to the session** (not the server process)
+- **Survive server restarts** with full scrollback intact
+- **Stay synchronized** with TUI and other windows
+- **Keep renamed names** across restarts
+
+**Why it matters:** You named a terminal "prod-debug", ran a 3-hour log tail, server restarted for an update. Old way: terminal gone, scrollback gone, rename gone. New way: it's exactly where you left it.
+
+This is shared PTY infrastructure — the same terminal appears in Desktop, TUI, and any other connected window. Rename in one, reflects everywhere.
+
+---
+
+### 4. Guided Claude Agent Setup — Zero-Friction Onboarding
+
+**What it is:** Provider picker now has **"Claude Agent"** option. Select it → OpenCode:
+1. Copies `claude auth login` to clipboard
+2. Installs Claude Code if missing
+3. Verifies the connection works
+4. *Then* lets you pick the model
+
+**Why it matters:** The #1 friction point for new OpenCode users was "how do I connect my Claude subscription?" Now it's a guided wizard. Raw API key still works — this is just the easy path.
+
+---
+
+### 5. MCP 10MiB Message Fix — Large Contexts Just Work
+
+**What it was:** MCP servers sending stdio messages >10MiB got disconnected. Large file reads, big diffs, heavy tool outputs — all failed silently.
+
+**What it is now:** Messages up to **10MiB+** are read *faster* and *don't disconnect*. The streaming parser was rewritten for large payloads.
+
+**Why it matters:** If you use MCP servers for big repos (grep across 50K files, read massive logs), this was a hard blocker. Gone.
+
+---
+
+### 6. LiteLLM Context Errors → Compaction (Not Crash)
+
+**What it was:** LiteLLM context window errors stopped the session entirely. You'd lose momentum mid-task.
+
+**What it is now:** Context errors **trigger compaction automatically**. The session continues. You might not even notice.
+
+---
+
+## Small Wins That Matter
+
+| Fix | Impact |
+|-----|--------|
+| `read` error names missing folder + nearest existing | Debug missing paths in 1 second |
+| `edit` error shows closest lines / "already there" | No more guessing why `oldString` failed |
+| `bash` tool calls → run as `shell` with same permissions | Plugin `bash` still wins, but bare `bash` works |
+| Connect menu no longer lists MCP servers | Cleaner UI — MCP managed in its own place |
+| Prompt cursor styles preserved by plugins | Your custom cursor survives theme changes |
+| Right padding on diffs | Diffs readable at edge of terminal |
+| Session tab activity pulse full-width | See activity at a glance |
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **v2.2.5** | **Oct 30, 2026** | **Patch (Latest)** | **Worktree/shell shortcuts, % compaction, persistent terminals, guided Claude setup, MCP 10MiB, LiteLLM compaction fallback** |
+| v2.2.4 | Oct 30, 2026 | Patch | Persistent terminals, artifacts, guided Claude, base branch shortcut |
+| v2.2.3 | Oct 28, 2026 | Patch | MCP stdio fixes, compaction cap, LiteLLM trigger |
+| v2.2.2 | Oct 27, 2026 | Patch | Config override fixes, proxy keep-local, login instruction fix |
+| v2.2.1 | Oct 25, 2026 | Patch | TUI prompt cursor, diff padding, session tab pulse |
+| **v2.2.0** | **Oct 23, 2026** | **Minor** | **Breaking: native Windows PTY, todo tool, desktop plugins overhaul** |
+
+**v2.2.0 → v2.2.5 = 5 patches in 7 days.** The breaking release landed. These patches are the polish that makes it daily-driver ready.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Use worktrees daily** | **Yes** — `Ctrl+Alt+O/B` alone worth it |
+| **Switch models often** | **Yes** — `% compaction` = one config forever |
+| **Run Desktop for hours** | **Yes** — terminals survive restarts |
+| **Use Claude subscription** | **Yes** — guided setup removes friction |
+| **Hit MCP 10MiB limit** | **Yes** — hard blocker removed |
+| **On v2.2.0 and stable** | **Yes** — zero breaking changes since v2.2.0 |
+
+**No reason to wait.** This is the "v2.2.0 stable" you've been waiting for.
+
+---
+
+## How to Update
+
+```bash
+# CLI (auto-updates on next run)
+opencode update
+
+# Or re-run installer
+curl -fsSL https://opencode.ai/install | bash
+
+# Desktop: auto-updates via built-in updater
+# Docker:
+docker pull anomalyco/opencode:latest
+```
+
+**First things to try after update:**
+
+```bash
+# 1. Test worktree shortcuts
+# Open Desktop → Ctrl+Alt+O → pick worktree → instant switch
+# Ctrl+Alt+B → choose base branch for new worktree
+# Ctrl+Shift+X → toggle shell mode in composer
+
+# 2. Set percentage compaction
+# Settings → Compaction → buffer: "20%"
+# Switch models → watch buffer scale automatically
+
+# 3. Test persistent terminals
+# Rename a terminal → restart opencode serve → terminal + name + scrollback intact
+# Open TUI → same terminal there, synced
+
+# 4. Try guided Claude setup
+# Provider picker → "Claude Agent" → follow wizard
+# Raw API key still works if you prefer
+```
+
+---
+
+## The Bottom Line
+
+**v2.2.0 broke things (Windows PTY, todo tool, plugin system). v2.2.1–v2.2.5 fixed them and added the workflow polish that makes OpenCode feel like a *product*, not a project.**
+
+- **Worktree shortcuts** → multi-branch work feels native
+- **Percentage compaction** → one config, every model
+- **Persistent terminals** → your debug session survives updates
+- **Guided Claude setup** → subscription users onboard in 30 seconds
+- **MCP 10MiB fix** → large contexts just work
+- **LiteLLM compaction fallback** → sessions don't die on context errors
+
+The pattern holds: **OpenCode doesn't chase shiny. It hardens the terminal workflow until it disappears — you just code.**
+
+For a beginner, that means **less config, less "how do I...", more flow.** For a team, it means **OpenCode is the terminal agent you can standardize on — it works the same on every machine, every model, every repo.**
+
+```bash
+opencode update
+# Ctrl+Alt+O worktrees
+# 20% compaction everywhere
+# Terminals that persist
+# Claude in 30 seconds
+# MCP that handles 10MiB+
+# Sessions that compact, not crash
+```
+
+---
+
+## Related Articles
+
+- [OpenCode v2.2.0 — Breaking Changes: Native Windows PTY, Todo Tool, Desktop Plugins Overhaul](/blog/opencode-v2-2-desktop-plugins-breaking-changes/)
+- [OpenCode v1.19.5 — 382k Stars, One Release, 283 PRs](/blog/openclaw-283-prs-one-release/)
+- [OpenCode vs Claude Code — Free Agent Faceoff](/blog/opencode-vs-claude-code-free-agent/)
+- [Best Free AI Coding Agents 2026 — No Credit Card Required](/blog/best-free-ai-coding-agents-2026-no-credit-card/)
+- [State of Open Source Coding Agents 2026](/blog/state-of-open-source-coding-agents-2026/)
+
+---
+
+*OpenCode is open-source (MIT) and available at [github.com/anomalyco/opencode](https://github.com/anomalyco/opencode). Full changelog: [github.com/anomalyco/opencode/releases/tag/v2.2.5](https://github.com/anomalyco/opencode/releases/tag/v2.2.5). Published November 3, 2026 — covers OpenCode v2.2.5 released October 30, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*

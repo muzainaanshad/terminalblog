@@ -1,0 +1,277 @@
+---
+title: "Qwen Code v0.26.6 Just Dropped a Web Shell That Makes Browser Coding Real"
+description: "Qwen Code v0.26.6 (Nov 2) adds Web Shell sidebar with approval states, split view, per-model token usage charts, workflow mode chip, unified agent loop for ACP turns, mods running prompt.submit hooks in headless, Fedora 44/RHEL 10 RPMs, and 30+ bug fixes. No breaking changes."
+pubDate: 2026-11-03T15:00:00Z
+tags: ["qwen-code", "release", "v0.26.6", "web-shell", "browser", "acp", "desktop", "beginner", "open-source", "coding-agent"]
+tool: "qwen-code"
+author: "Anshad"
+image: "/api/og?title=Qwen+Code+v0.26.6+Web+Shell&tool=qwen-code"
+canonical: "https://terminalblog.com/blog/qwen-code-v0-26-6-web-shell-browser-coding/"
+faq:
+  - q: "What is the Web Shell and why does it matter?"
+    a: "The Web Shell is a browser-based sidebar activity view for trusted workspace conversations. It shows approval/input/error states, unread completions, running work, and bulk read/archive controls. You can code from a browser tab with full agent visibility — approval states, token usage per model, split view for side-by-side sessions."
+  - q: "Does this work with local models?"
+    a: "Yes — the Web Shell works with any provider Qwen Code supports (Ollama, OpenAI-compatible, Qwen OAuth, etc.). The per-model token usage panel shows success rate, output speed, first-token latency, and failure details by model — so you can see which local model is actually performing."
+  - q: "What's the unified agent loop for ACP?"
+    a: "With `experimental.unifiedAgentLoop` enabled, more ACP turns (channel prompts, Goal-proposal approvals) run on the shared loop instead of separate processes. This means smoother multi-agent coordination and less context fragmentation."
+  - q: "Can mods run hooks in headless mode now?"
+    a: "Yes — mods can now run `prompt.submit` hooks in headless runs for `-p` prompts and `stream-json` user messages. This allows prompt inspection or rewriting before submission in CI/automation pipelines."
+  - q: "Any breaking changes?"
+    a: "No known breaking changes. 30+ bug fixes including OAuth refresh lock cleanup, MCP duplicate tool name handling, LSP explicit failures, managed-agent recovery accuracy, Web Shell mobile layout, and VS Code companion session grouping fixes."
+---
+
+**Qwen Code v0.26.6 landed November 2, 2026** — and the headline isn't a feature. It's a **Web Shell** that turns your browser into a first-class coding workspace. Approval states. Split view. Per-model token charts. All in a sidebar you can open from any device.
+
+---
+
+## The One-Line Summary
+
+**v0.26.6 (Nov 2) → Web Shell sidebar (approvals, split view, per-model token charts), workflow mode chip, unified ACP agent loop, mods run prompt.submit hooks headless, Fedora 44/RHEL 10 RPMs, 30+ bug fixes. Zero breaking changes.**
+
+---
+
+## The Feature That Changes How You Work: Web Shell
+
+### What It Is
+
+A **browser-based sidebar activity view** for trusted workspace conversations. Open it in a tab. See everything:
+
+- **Approval/input/error states** — every agent action visible
+- **Unread completions** — know what finished while you were away
+- **Running work** — live progress, not a spinner
+- **Bulk read/archive controls** — manage sessions at scale
+
+### Why It Matters
+
+You're on a train. Phone only. Agent is refactoring a 50-file module back at your desk. Old way: wait, wonder, hope. New way: open Web Shell → see approvals pending → tap to approve → watch it continue. **Your agent runs on your machine. You steer from anywhere.**
+
+```bash
+# Start Qwen Code (any provider — local, cloud, OAuth)
+qwen
+
+# Web Shell is available at the configured web endpoint
+# Default: http://localhost:3000/web-shell (configurable)
+# Opens sidebar with: approvals, split view, token usage, workflow chip
+```
+
+### Split View — Side-by-Side Sessions
+
+**What it is:** "Add to Split View" in sidebar session menus. Open two sessions side-by-side in the browser. Compare outputs. Copy context. Review in parallel.
+
+**Why it matters:** You're debugging a flaky test in session A. Session B has the passing run. Split view → diff the outputs → find the race condition. No alt-tab. No copy-paste.
+
+### Per-Model Token Usage Charts — See What's Actually Fast
+
+**What it is:** Web Shell Token Usage panel plots:
+- **Per-request output speed** (tokens/sec)
+- **First-token latency** (ms)
+- **Failure details by model** (error type, count)
+- **Success rate per model** (%)
+
+**Why it matters:** You're routing between 5 models. One is 3x slower. One fails 12% of the time. The charts *show you*. No guessing. No manual benchmarking.
+
+```json
+// Enable in qwen-code config
+{
+  "experimental": {
+    "unifiedAgentLoop": true
+  }
+}
+```
+
+### Workflow Mode Chip — Dismissible, Informative
+
+**What it is:** Composer shows a **Workflow chip** that:
+- Turns Workflow mode off (dismissible)
+- Warns when tools are unavailable
+- Summarizes the mode in the `+` menu
+
+**Why it matters:** Workflow mode = agent proposes goals, you approve. The chip makes it *visible* — you always know which mode you're in. Dismiss → back to direct control.
+
+---
+
+## The Automation Power-Ups
+
+### Unified Agent Loop for ACP
+
+**What it is:** With `experimental.unifiedAgentLoop: true`, more ACP turns run on the **shared loop**:
+- Channel prompts
+- Goal-proposal approvals
+- Multi-agent coordination
+
+**Why it matters:** Less context fragmentation. Agents share state more naturally. Fewer "wait, which agent has the context?" moments.
+
+### Mods Run `prompt.submit` Hooks in Headless
+
+**What it is:** Mods (user extensions) can now intercept **headless prompts**:
+- `-p "prompt"` CLI calls
+- `stream-json` user messages
+
+**Why it matters:** CI pipeline sends a prompt → your mod rewrites it for security/compliance → agent sees the clean version. **Automated guardrails at the prompt level.**
+
+```bash
+# Example: mod that redacts secrets before submission
+# Runs on: qwen -p "deploy with API_KEY=sk-..." 
+# Agent sees: "deploy with API_KEY=***REDACTED***"
+```
+
+---
+
+## Desktop: Fedora 44 + RHEL 10 RPMs
+
+**What it is:** Desktop releases now publish **Fedora 44 and RHEL 10 x64 RPM installers** alongside existing Linux packages (AppImage, deb, tar.gz).
+
+**Why it matters:** Enterprise Linux users (RHEL, Rocky, Alma, Fedora) get native packages. `dnf install qwen-code` — no AppImage permissions, no manual updates.
+
+---
+
+## 30+ Bug Fixes (The Ones You'll Notice)
+
+| Fix | Impact |
+|-----|--------|
+| OAuth refresh lock cleanup — only owning process removes lock | No more active refresh locks deleted by exiting processes |
+| MCP tool discovery skips duplicate names, keeps unique tools | One name collision doesn't hide entire server's tools |
+| Web Shell Plugins page shows back control when rail unavailable | Navigate back from compact layouts |
+| LSP code-nav fails with explicit reason (no server ready) | No more empty results → confusion |
+| Verify report counts gate test-suite results separately | Assertion totals reflect only round checks |
+| Long `/btw` answers scroll in bounded panel | Mouse wheel, Shift+Up/Down, PageUp/Down, scrollbar |
+| Kimi K3 generation recognition → 1M token context | Supported IDs get full context; k3-256k keeps 256K |
+| Review command fixes plain-language re-review targeting | Re-reviews hit the right PR, not resume flags |
+| DejaVu fonts in sandbox → capture cards render legibly | Monospace font works in screenshots |
+| Workflow mode toggle moved to `+` menu | Less toolbar clutter, still accessible |
+| Managed-agent recovery blocks gap fills without evidence | Accuracy over false completion |
+| Managed-agent child result delivery status fixed | Consumed results not marked pending |
+| AI attribution notes for `git commit --amend` diff against amended commit | Correct blame on amended commits |
+| Loop-protection reminder delivery/telemetry settle on accepted request | No premature clearing/logging |
+| Shell permission: `2>&1` not treated as file write | FD duplication allowed |
+| Web Shell sanitizes goal approval text / edit-diff paths | Control/bidi chars escaped — no hidden controls |
+| Managed Session list failures → localized Retry notice | Request details shown, no empty state |
+| Invalid Javadoc fixed after module split | Managed-agent release profile builds docs |
+| Web Shell failure notice below Sessions/Archived tabs | Request ID not cut off |
+| qwen-managed-agent-upgrade reaches control plane | Uses server's resolved endpoint config |
+| Mobile composer layout tightened | Workspace controls aligned, names truncated, usage ring centered |
+| VS Code companion: This Week = current calendar week | Older sessions correctly placed in "Older" |
+| Bundled review skill uses `--since` + `--since-model` | Complete anchors, no retired range model |
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **v0.26.6** | **Nov 2, 2026** | **Patch (Latest)** | **Web Shell (approvals, split view, per-model charts), workflow chip, unified ACP loop, headless prompt hooks, Fedora 44/RHEL 10 RPMs, 30+ fixes** |
+| v0.26.5 | Oct 31, 2026 | Patch | Nightly + Desktop + SDK releases |
+| v0.26.4 | Oct 29, 2026 | Patch | Nightly + SDK |
+| v0.26.3 | Oct 2026 | Patch | Managed agent, desktop, workspace agents, mem0, A2A |
+| **v0.26.0** | **Oct 2026** | **Minor** | **Managed agent desktop, local SSH, workspace agents, mem0, A2A collaboration** |
+
+**v0.26.0 → v0.26.6 = 6 patches in ~3 weeks.** The managed-agent foundation landed. These patches are making it production-ready — especially the Web Shell.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Code from browser/phone** | **Yes** — Web Shell is the feature |
+| **Run multiple models** | **Yes** — per-model charts = data-driven routing |
+| **Automate with CI/headless** | **Yes** — prompt.submit hooks = guardrails |
+| **Use ACP/multi-agent** | **Yes** — unified loop = smoother coordination |
+| **Run Fedora/RHEL** | **Yes** — native RPMs |
+| **On v0.26.x and stable** | **Yes** — zero breaking changes, 30+ fixes |
+
+**No reason to wait.** The Web Shell alone makes this the first release where "coding from a browser" is *real*, not a demo.
+
+---
+
+## How to Update
+
+```bash
+# CLI (npm)
+npm update -g @qwen-code/qwen-code
+
+# Or re-run installer
+curl -fsSL https://qwen-code.ai/install | bash
+
+# Desktop: auto-updates via built-in updater
+# Download new RPM/AppImage/deb from releases
+
+# Docker:
+docker pull qwenlm/qwen-code:latest
+```
+
+**First things to try after update:**
+
+```bash
+# 1. Open Web Shell
+qwen
+# Browser → http://localhost:3000/web-shell (or your config)
+# See: approvals, running work, unread completions
+
+# 2. Try Split View
+# Sidebar → session menu → "Add to Split View"
+# Two sessions side-by-side → compare outputs
+
+# 3. Check Token Usage Panel
+# Web Shell → Token Usage tab
+# Switch models → watch success rate / speed / latency per model
+
+# 4. Test Workflow Chip
+# Enable Workflow mode → see chip in composer
+# Dismiss → back to direct control
+# + menu → shows mode summary
+
+# 5. Enable Unified Agent Loop (experimental)
+# Config: "experimental.unifiedAgentLoop": true
+# Run multi-agent task → smoother coordination
+
+# 6. Write a prompt.submit mod (headless guardrail)
+# Mod intercepts -p prompts → rewrites → agent sees clean version
+```
+
+---
+
+## The Bottom Line
+
+**v0.26.0 made Qwen Code a multi-agent platform. v0.26.6 makes it *accessible from anywhere*.**
+
+- **Web Shell** → your agent runs on your machine, you steer from browser/phone
+- **Split view** → parallel session debugging, no alt-tab
+- **Per-model charts** → route to the model that's actually fast/reliable
+- **Workflow chip** → always know your mode, dismiss to escape
+- **Unified ACP loop** → multi-agent coordination that doesn't fragment context
+- **Headless prompt hooks** → automated guardrails at the prompt level
+- **Fedora/RHEL RPMs** → enterprise Linux native
+- **30+ fixes** → the polish that makes it daily-driver reliable
+
+The pattern holds: **Qwen Code doesn't chase demos. It builds the infrastructure that makes agents *usable* — locally, remotely, from any device.**
+
+For a beginner, that means **you can start in the terminal, continue in the browser, finish on your phone — same session, same context, same agent.** For a team, it means **Qwen Code is the agent platform that runs on your infra, with your models, accessible from anywhere — no vendor cloud required.**
+
+```bash
+qwen update
+# Web Shell in browser
+# Split view sessions
+# Per-model token charts
+# Workflow chip visible
+# ACP unified loop
+# Headless prompt guardrails
+# Fedora/RHEL RPMs
+# 30+ fixes applied
+```
+
+---
+
+## Related Articles
+
+- [Qwen Code v0.26 — Managed Agent Desktop, Local SSH, Workspace Agents](/blog/qwen-code-v0-26-managed-agent-desktop-local-ssh/)
+- [Qwen Code v0.25 — Workspace Agents, mem0, A2A Collaboration](/blog/qwen-code-v0-25-workspace-agents-mem0-a2a-collaboration/)
+- [Qwen Code v0.24.7 — Managed Runtime Advisor Tool Breakthrough](/blog/qwen-code-v0-24-7-daemon-settings-fix-enter-key-permissions/)
+- [Best Free AI Coding Agents 2026 — No Credit Card Required](/blog/best-free-ai-coding-agents-2026-no-credit-card/)
+- [State of Open Source Coding Agents 2026](/blog/state-of-open-source-coding-agents-2026/)
+
+---
+
+*Qwen Code is open-source (Apache-2.0) and available at [github.com/QwenLM/qwen-code](https://github.com/QwenLM/qwen-code). Full changelog: [github.com/QwenLM/qwen-code/releases/tag/v0.26.6](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.6). Published November 3, 2026 — covers Qwen Code v0.26.6 released November 2, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*

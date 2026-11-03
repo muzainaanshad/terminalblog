@@ -1,0 +1,272 @@
+---
+title: "Cursor Just Gave You an Agent SDK — Build, Test, Deploy Custom Agents in Minutes"
+description: "Cursor's Agent SDK (Oct 20) lets you define agents as code folders: instructions.md for prompts, tools/ for typed actions, skills/ for procedures, mcp-connections/ for MCP servers, channels/ for GitHub/Slack/webhooks/cron. Deploy with `agent-sdk deploy`, test with `agent-sdk eval` and `agent-sdk github replay`. GA today."
+pubDate: 2026-11-03T16:00:00Z
+tags: ["cursor", "agent-sdk", "release", "agents", "automation", "github", "slack", "evals", "beginner", "coding-agent"]
+tool: "cursor"
+author: "Anshad"
+image: "/api/og?title=Cursor+Agent+SDK+Custom+Agents&tool=cursor"
+canonical: "https://terminalblog.com/blog/cursor-agent-sdk-custom-agents-deploy/"
+faq:
+  - q: "What is the Agent SDK and who is it for?"
+    a: "The Agent SDK lets you build custom software agents as code folders. It's for teams that want automated PR reviewers, security scanners, Linear/Jira triagers, deployment watchers — any repetitive task an agent can handle. You define the agent once, deploy it, and it runs on Cursor's infrastructure or your own."
+  - q: "Do I need to pay extra for this?"
+    a: "The Agent SDK is generally available today. Deployment to Cursor's infrastructure is included. You manage secrets and integrations from the dashboard. Local development with `agent-sdk dev` is free."
+  - q: "What can an agent actually do?"
+    a: "Agents wake on: PR/comment/CI events from GitHub/GitLab/Bitbucket, mentions/DMs in Slack, webhooks from any provider, cron schedules. Each conversation keeps its own session with complete message/tool history. Follow-ups on a PR or Slack thread resume the same session."
+  - q: "How do I test an agent before deploying?"
+    a: "Three ways: `agent-sdk dev` runs locally with a playground, `agent-sdk eval` sends fixed messages and asserts on tool calls/replies, `agent-sdk github replay <pr-url>` turns a real PR into signed webhook payloads for testing without waiting for a push. Save fixtures with `--dry-run --fixtures-dir fixtures/`."
+  - q: "Can I run agents on my own infrastructure?"
+    a: "Yes — `agent-sdk deploy` builds the agent and gives it a URL on Cursor's infrastructure, but the SDK is open. You can run the agent container anywhere. The dashboard manages secrets/integrations, but the agent runtime is portable."
+---
+
+**Cursor's Agent SDK went GA October 20, 2026** — and it's the first time "build your own agent" feels like *writing code*, not configuring YAML. **`npx @cursor/agent-sdk init ./my-bot`** → you have a folder. **`agent-sdk dev`** → it runs locally with a playground. **`agent-sdk deploy`** → it's live on Cursor's infra with secrets managed.
+
+---
+
+## The One-Line Summary
+
+**Agent SDK (Oct 20, GA) → Agents as code folders (instructions.md, tools/, skills/, mcp-connections/, channels/). Deploy with `agent-sdk deploy`. Test with `agent-sdk eval` + `agent-sdk github replay`. Wakes on GitHub/Slack/webhooks/cron. Sessions persist per conversation. GA today.**
+
+---
+
+## What This Actually Is
+
+### An Agent = A Project Folder
+
+```
+my-bot/
+├── instructions.md       # The prompt — what this agent does
+├── tools/                # Each file = one typed action the model can call
+│   ├── check-deploy.ts
+│   └── query-logs.ts
+├── skills/               # Procedures the model loads on demand
+│   └── security-review.md
+├── mcp-connections/      # Tools from MCP servers
+│   └── datadog.json
+├── channels/             # Where the bot receives/answers messages
+│   ├── github-pr.json
+│   └── slack-mentions.json
+└── package.json
+```
+
+**That's it.** No YAML hell. No dashboard-only configuration. The agent *is* code. Version it. Review it. Test it.
+
+---
+
+## The Commands You'll Use
+
+```bash
+# 1. Scaffold a new agent
+npx @cursor/agent-sdk init ./my-bot
+# Pick template: security-reviewer, owners-policy-approver, PR-autofixer, Linear-triager, Jira-triager
+
+# 2. Develop locally with playground
+cd my-bot
+agent-sdk dev
+# Opens localhost playground → chat with your agent → see tool calls live
+
+# 3. Validate the project
+agent-sdk validate
+# Checks: instructions.md exists, tools/ are valid TS, skills/ parse, channels/ configured
+
+# 4. See what was discovered
+agent-sdk info
+# Prints: tools, skills, MCP connections, channels, entry points
+
+# 5. Test with evals
+agent-sdk eval
+# Sends fixed messages → asserts on: which tools ran, with what input, reply shape
+
+# 6. Replay a REAL GitHub PR as test fixtures
+agent-sdk github replay <pr-url>
+# Turns real PR into signed webhook payloads → sends to your bot
+# --dry-run --fixtures-dir fixtures/ → saves payloads as eval fixtures
+
+# 7. Deploy to Cursor's infrastructure
+agent-sdk deploy
+# Builds agent → gives URL → starts on Cursor's infra
+# Manage secrets/integrations from dashboard
+# Same logs, evals, playground available locally
+```
+
+---
+
+## Channels — Where Agents Wake Up
+
+Your agent doesn't poll. It **wakes on events**:
+
+| Channel | Events | Auth |
+|---------|--------|------|
+| **GitHub** | PR opened, comment, CI events | Via your Cursor account (no public webhook URL) |
+| **GitLab** | MR, comment, pipeline | Via Cursor account |
+| **Bitbucket** | PR, comment, build | Via Cursor account |
+| **Slack** | Mentions, DMs, thread replies | Well-supported out of the box |
+| **Webhooks** | Any provider, any payload | App JWT + installation tokens |
+| **Cron** | Schedule (any cron expression) | Built-in |
+
+**Each conversation = its own session.** Complete record of every message and tool call. Follow-ups on a PR or Slack thread **resume the same session** — context preserved.
+
+---
+
+## Templates — Start in Seconds, Not Hours
+
+```bash
+npx @cursor/agent-sdk init ./my-bot --template security-reviewer
+# Creates: security-focused instructions.md, tools for SQL/command/template injection checks, auth bypass detection, secret scanning, SSRF, deserialization, dependency vulns
+
+npx @cursor/agent-sdk init ./my-bot --template owners-policy-approver
+# Creates: reads CODEOWNERS, matches changed files, approves/requests review
+
+npx @cursor/agent-sdk init ./my-bot --template pr-autofixer
+# Creates: runs linters/tests, proposes fixes, applies on approval
+
+npx @cursor/agent-sdk init ./my-bot --template linear-triager
+# Creates: reads Linear issue, categorizes, assigns, labels, comments
+
+npx @cursor/agent-sdk init ./my-bot --template jira-triager
+# Creates: same for Jira
+```
+
+**Each template is a working agent.** Customize `instructions.md` → add tools → deploy.
+
+---
+
+## Evals — Test Like You Mean It
+
+```bash
+# An eval = fixed message + assertions
+# Example: evals/security-injection.yaml
+
+test: "SQL injection in PR"
+send: "Review this PR for SQL injection"
+assert:
+  - tool: "query_database"
+    input_contains: "UNION SELECT"
+  - tool: "post_review_comment"
+    output_contains: "CRITICAL: SQL injection"
+  - reply_contains: "exploitable"
+```
+
+```bash
+# Run locally
+agent-sdk eval
+
+# Run in CI
+# GitHub Actions:
+# - uses: cursor/agent-sdk-eval@v1
+#   with: agent-path: ./my-bot
+```
+
+**`agent-sdk github replay <pr-url>`** is the killer feature: **turns a real PR into signed webhook payloads** and sends them to your bot. Test against *real* data without waiting for a push. `--dry-run --fixtures-dir fixtures/` saves the payloads as permanent eval fixtures.
+
+---
+
+## Real-World Agents You Can Build Today
+
+### 1. Security Reviewer (Template Exists)
+- Wakes on: PR opened
+- Checks: SQL/command/template injection, auth bypass, secrets, SSRF, deserialization, dependency vulns
+- Posts: One review comment per exploitable bug with severity + fix
+- Team rules: Add "external calls must go through X" → enforced on every PR
+
+### 2. Rollouts Monitor (Cursor's Own Bot)
+- Wakes on: Deploy events
+- Reads: Diff + systems touched → writes monitoring plan as PR comment
+- Tracks: Each environment separately (staging ✓, production ⚠)
+- Reports: Verdict per environment on PR
+- Action: Opens revert PR or hands to cloud agent for fix
+
+### 3. Linear/Jira Triager (Templates Exist)
+- Wakes on: Issue created, comment, label change
+- Reads: Issue context + codebase
+- Actions: Categorize, assign, label, comment, link related PRs
+
+### 4. Dependency Upgrade Bot
+- Wakes on: Cron (weekly) + Dependabot PRs
+- Checks: Changelogs, breaking changes, test results
+- Posts: Summary + risk assessment + auto-merge if safe
+
+### 5. On-Call Assistant
+- Wakes on: Slack mention + PagerDuty webhook
+- Reads: Current incident + relevant runbooks + recent deploys
+- Replies: "Last deploy touched payment-service. Runbook: runbook/payment-outage.md. Want me to check logs?"
+
+---
+
+## What This Means for Your Team
+
+### Before Agent SDK
+- Custom automation = GitHub Actions + bash + hope
+- PR reviewers = manual or generic linters
+- Incident response = human wakes up, reads, acts
+- Triaging = human clicks, labels, assigns
+
+### After Agent SDK
+- Custom automation = **TypeScript files in a folder** (versioned, reviewed, tested)
+- PR reviewers = **agents that understand your codebase** (security, style, architecture)
+- Incident response = **agent wakes on webhook, has context, proposes action**
+- Triaging = **agent reads issue + codebase, categorizes, assigns, comments**
+
+**The difference:** Agents have *context*. They read your codebase. They know your patterns. They're not generic — they're *yours*.
+
+---
+
+## Should You Use This?
+
+| If Your Team... | Verdict |
+|-----------------|---------|
+| **Reviews PRs manually for security** | **Yes** — Security Reviewer template deploys in 5 min |
+| **Triages Linear/Jira issues daily** | **Yes** — Triager templates = instant automation |
+| **Has custom deployment checks** | **Yes** — Write as tools, deploy as agent |
+| **Wants incident response automation** | **Yes** — Webhook channel + runbook skills |
+| **Builds internal developer tools** | **Yes** — Agents as code = maintainable, testable |
+| **Already uses Cursor** | **Yes** — Included, no extra cost, same dashboard |
+
+**Start with a template.** `npx @cursor/agent-sdk init ./my-bot --template security-reviewer` → `agent-sdk dev` → see it work → `agent-sdk deploy`. **15 minutes to a live security reviewer.**
+
+---
+
+## The Bottom Line
+
+**Cursor didn't just add "agents." They made agents *software engineering*.**
+
+- **Agents as code folders** → version, review, test, CI like any project
+- **`instructions.md` = prompt** → readable, diffable, collaborative
+- **`tools/` = typed actions** → TypeScript, validated, testable
+- **`skills/` = procedures** → load on demand, reusable
+- **`channels/` = event sources** → GitHub, Slack, webhooks, cron
+- **`agent-sdk dev`** → local playground with live tool calls
+- **`agent-sdk eval`** → assertions on tool calls + replies
+- **`agent-sdk github replay`** → real PRs as test fixtures
+- **`agent-sdk deploy`** → live on Cursor's infra, secrets in dashboard
+- **Sessions persist per conversation** → PR thread = one session, Slack thread = one session
+
+The pattern holds: **Cursor builds tools that feel like writing code — because they *are* writing code.**
+
+For a beginner, that means **you don't need to learn a new platform. You write TypeScript. You run `agent-sdk dev`. You see it work. You deploy.** For a team, it means **your automation becomes maintainable software — not brittle YAML, not dashboard-only config, not tribal knowledge. Code you can review, test, version, and trust.**
+
+```bash
+npx @cursor/agent-sdk init ./security-bot --template security-reviewer
+cd security-bot
+agent-sdk dev
+# Playground opens → test on a real PR
+agent-sdk deploy
+# Live. Reviews every PR. Posts exploitable bugs with fixes.
+```
+
+---
+
+## Related Articles
+
+- [Cursor October 2026 Wave — Origin Marketplace, Cloud Agent Canvases, Remote Control](/blog/cursor-october-2026-wave-origin-marketplace/)
+- [Cursor vs Claude Code — 2026 Comparison](/blog/cursor-vs-claude-code-2026-comparison/)
+- [Cursor Security Review Bot — Exploitable Bugs on Every PR](/blog/cursor-security-review-bot/)
+- [Rollouts — Cursor's Deployment Monitor That Watches Every Change](/blog/cursor-rollouts-deployment-monitor/)
+- [Best AI Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Cursor Agent SDK is available at [cursor.com/docs/agent-sdk](https://cursor.com/docs/agent-sdk). Full changelog: [cursor.com/changelog/agent-sdk](https://cursor.com/changelog/agent-sdk). Published November 3, 2026 — covers Cursor Agent SDK GA released October 20, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
