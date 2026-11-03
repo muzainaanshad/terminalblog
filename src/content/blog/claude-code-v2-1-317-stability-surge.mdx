@@ -1,0 +1,315 @@
+---
+title: "Claude Code v2.1.317 Just Fixed the Nested Session ID Leak — Plus 80+ Fixes That Make Daily Work Feel Smooth"
+description: "Claude Code v2.1.317 (Nov 3) adds CLAUDE_CODE_DISABLE_NESTED_SESSION_ID for self-hosted runners, fixes project/MCP server disconnects in Desktop, stops auto-mode failing on 403/422 gateway responses, fixes auth status race on slow token refresh, and 80+ other fixes. The quiet patch that makes sessions reliable."
+pubDate: 2026-11-03T06:00:00Z
+tags: ["claude-code", "release", "v2.1.317", "stability", "bug-fixes", "coding-agent", "beginner"]
+tool: "claude-code"
+author: "Anshad"
+image: "/api/og?title=Claude+Code+v2.1.317+Stability+Surge&tool=claude-code"
+---
+
+**Claude Code v2.1.317 dropped November 3** — hot on the heels of v2.1.316's 60+ fixes. This isn't a feature release. It's **80+ fixes** that sand down the last rough edges: nested session ID leaks in self-hosted runners, MCP servers disconnecting in Desktop, auto-mode choking on gateway 403/422 responses, auth status race conditions, and the thousand paper cuts that make you hesitate before running `claude` in production.
+
+If you're on v2.1.316 and thought "it mostly works" — this is the patch that makes "mostly" disappear.
+
+---
+
+## The One-Line Summary
+
+**v2.1.317 (Nov 3) → 80+ fixes: nested session ID leak fixed for self-hosted runners, project/MCP disconnects in Desktop solved, auto-mode survives gateway 403/422, auth status no longer races slow token refresh, effortLevel respected in pre-started sessions, cloud session titles persist, screen reader subagent announcements fixed, 5xx recovery hardened, OpenTelemetry proxy timeouts, Windows path limit fixed, artifact sharing scales past 200. The quiet reliability patch.**
+
+---
+
+## The Fixes You'll Actually Notice
+
+### 1. Nested Session ID Leak Fixed — Self-Hosted Runners Finally Work Right
+
+**Before:** You run `claude -p` inside a self-hosted runner session. It **shares that session's ID and transcript**. A restart resumes the wrong conversation. Your session history gets polluted with print-mode noise.
+
+**After (v2.1.317):** Set `CLAUDE_CODE_DISABLE_NESTED_SESSION_ID=1` on your self-hosted runner. Now `claude -p` inside a session **creates its own session ID and transcript**. Clean separation. Restarts resume the right conversation.
+
+```bash
+# On your self-hosted runner:
+export CLAUDE_CODE_DISABLE_NESTED_SESSION_ID=1
+
+# Now:
+claude -p "quick task"  # Creates its own session, doesn't pollute parent
+```
+
+**Why it matters:** If you run self-hosted runners for CI/CD or automation, this was a silent data corruption bug. Fixed.
+
+---
+
+### 2. Project & Local MCP Servers No Longer Disconnect After First Turn (Desktop)
+
+**Before:** In some Claude Desktop sessions, your project MCP servers and local MCP servers **disconnect after the first turn**. You lose your tools mid-conversation. Restart Desktop to reconnect.
+
+**After:** Fixed. MCP connections **stay alive** across turns. Your tools work the whole session.
+
+---
+
+### 3. Auto-Mode Survives Gateway 403/422 Responses
+
+**Before:** You run an LLM gateway as your base URL. It returns 403 or 422 on its server-side safety check. Auto-mode **fails every single turn**. Session unusable.
+
+**After:** Fixed. Auto-mode **handles gateway safety check failures gracefully**. Session continues. (Note: 403 with `apiKeyHelper` is unchanged — that's auth, not safety.)
+
+---
+
+### 4. `claude auth status` No Longer Races Slow Token Refresh
+
+**Before:** Your token refresh is slow (network latency, proxy). `claude auth status` **exits before the refresh saves**. Next run signs you out. You log in again. And again.
+
+**After:** Fixed. Auth status **waits for token refresh to complete** before exiting. You stay logged in.
+
+---
+
+### 5. `effortLevel` Setting Finally Respected in Pre-Started Sessions
+
+**Before:** You open a new session in Claude Desktop's Code tab. The app starts the session *ahead of time*, then opens it in your project. Your project's `effortLevel` setting? **Ignored**. Session runs at default effort.
+
+**After:** Fixed. Pre-started sessions **respect the project's `effortLevel`**. Your config works everywhere.
+
+---
+
+### 6. Cloud Session Titles No Longer Lost During Generation
+
+**Before:** A new message or Stop arrives while the session title is generating. The title **gets lost**. Cloud and SDK sessions end up with generic titles.
+
+**After:** Fixed. Title generation **handles concurrent events**. Your session keeps its meaningful title.
+
+---
+
+### 7. Screen Readers Stop Announcing Subagent Token Counts Every Change
+
+**Before:** In screen reader mode, a running subagent's elapsed time and token count **announce on every change**. Audio spam. Unusable for accessibility.
+
+**After:** Fixed. Subagent progress **announced appropriately, not every delta**.
+
+---
+
+### 8. Region/Network Blocks (HTTP 403) No Longer Masquerade as Sign-In Failures
+
+**Before:** Your network blocks Anthropic (corporate firewall, country block). HTTP 403. Claude says **"sign-in failed"**. You troubleshoot auth. It's not auth.
+
+**After:** Fixed. 403 from region/network block **explains the block**. You know it's network, not credentials.
+
+---
+
+### 9. `claude -p` Exits 1 (Not 0) When Disk Full / Quota Exhausted
+
+**Before:** Full disk or quota loses transcript or `~/.claude.json` writes. `claude -p` **exits 0** (success). Your CI passes. Data lost silently.
+
+**After:** Fixed. Exits **1 with error message**. In text/JSON output, you see the failure. CI catches it. (Full NFS exports may still be missed.)
+
+---
+
+### 10. Settings File Edits at Launch Take Effect Immediately
+
+**Before:** You edit a settings file in the first second after launch. Changes **don't apply** until another settings file changes. Confusing.
+
+**After:** Fixed. Early edits **take effect immediately**. Your config changes work on first try.
+
+---
+
+## The Fixes That Stop Daily Paper Cuts
+
+| Fix | Why You'll Notice |
+|-----|-------------------|
+| **Old transcripts cleaned up on machines that skip cleanup** | No more disk bloat from `--setting-sources` runs |
+| **Deleted agent team inboxes stay deleted** | No ghost inboxes from late teammate messages |
+| **Re-created teammate not removed by earlier shutdown approval** | Team membership stable |
+| **Scheduled tasks listable/deletable after turning off** | Task management works |
+| **Claude doesn't delete wrong `/team-onboarding` guide** | Correct guide deleted when unnamed |
+| **`/team-onboarding` delete refusal shown correctly** | You know when server refuses |
+| **Bedrock "Input too long" error surfaced (not hidden)** | Sessions compact instead of failing every turn |
+| **Self-hosted runner sessions keep conversation on restart during plan wait** | No lost turns when plan pending approval |
+| **"Prompt too long" after compaction with huge CLAUDE.md fixed** | Large CLAUDE.md handled gracefully |
+| **High memory/slow startup with many command-registering plugins fixed** | Plugin-heavy sessions start fast |
+| **stdio MCP servers get unset (not empty) `AWS_BEARER_TOKEN_BEDROCK`** | Servers use machine's own AWS creds |
+| **TLS proxy cert renewal cert issues fixed** | `unable to get local issuer certificate` gone |
+| **Very long conversations keep earlier summary during compaction** | History preserved |
+| **PDF metadata no longer makes Read/@-mentions undercount pages** | Accurate page counts |
+| **Prompt caching disable flags work on all model spellings** | `[1m]`, other-region, undated spellings respected |
+| **Artifact sharing works past 200 own artifacts** | No more empty shared list at scale |
+| **Grep/Glob partial results at timeout handled correctly** | Search timeout returns what it found |
+| **OpenTelemetry HTTPS proxy exports sent (not stuck behind in-progress)** | Telemetry works behind proxies |
+| **OpenTelemetry HTTP proxy 403 flood stopped** | No connection storm |
+| **OpenTelemetry proxy timeout 10s (configurable to 30s)** | No indefinite hangs |
+| **Resumed sessions don't re-tell Claude about known file changes** | Less noise, faster context |
+| **Built-in tools work in resumed session after earlier failure** | Tool availability restored |
+| **`/remote-control` says "turned off" not "unknown command"** | Clear error message |
+| **Agent teammates start in lead session's mode (not auto)** | Consistent mode across tmux/iTerm2 panes |
+| **Background session permission mode changes persist on upgrade/retire** | Mode changes stick |
+| **Ctrl+C clears typed text without stopping background agents** | Standard terminal behavior |
+| **`/feedback` doesn't show "Enter to confirm" while sending** | UI accuracy |
+| **Child processes of stopped shell command get SIGTERM once (not twice)** | Cleanup runs correctly |
+
+---
+
+## Windows-Specific Fixes
+
+| Fix | Impact |
+|-----|--------|
+| **Every tool call refused on volumes with native path lookup failure** | Working-directory check uses folder identity — tool calls work everywhere |
+| **Session scratchpad/temp paths don't grow with project path length** | Repos in deep paths no longer hit 260-char limit |
+
+---
+
+## Gateway & Enterprise Fixes
+
+| Fix | Impact |
+|-----|--------|
+| **Status line & `/usage` show correct spend limit (not 100% after pool exhausted)** | Accurate budget display |
+| **Self-hosted runner: interrupted tool call visible after session moves runners** | Debugging works across runner migrations |
+| **Self-hosted runner: MCP server off-switch persists when session moves machines** | Config survives migration |
+| **Remote Control fork names improved** | `(fork)`, `(fork 2)` naming clarity |
+
+---
+
+## VSCode Integration Fixes
+
+| Fix | Impact |
+|-----|--------|
+| **Forked conversations don't drop messages** | Parallel tool calls preserved; compaction keeps last messages |
+| **Message loss on slow Claude start fixed** | Extension retries before error |
+| **Sign-in screen doesn't open on region/network block** | Correct error surface |
+| **Account panel plan name casing fixed** | Proper capitalization |
+| **File links in Claude tab open in new editor group** | Not on top of chat |
+| **Attachment chips/menus/banners/dialogs scale with `chat.fontSize`** | Accessibility |
+| **`ultrathink` raises effort + shows rainbow when telemetry off** | Feature works without telemetry |
+
+---
+
+## Cloud Session Improvements
+
+| Fix | Impact |
+|-----|--------|
+| **Link card for MCP server auth requests** | Open/decline instead of silent cancel |
+| **Admin settings org env dialog matches personal short layout** | Consistent UX |
+| **Add network secret refuses duplicate host (points to existing)** | No silent replacement |
+| **New scheduled tasks respect org default environment** | Not forced to Anthropic-hosted default |
+| **Remote Control: idle session answers after restart within 1 minute** | No missed messages |
+
+---
+
+## Version Context — The November Stability Arc
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **v2.1.317** | Nov 3, 2026 | **Patch (Latest)** | **80+ fixes: nested session ID, MCP disconnects, gateway 403/422, auth race, effortLevel, titles, screen reader, 5xx recovery, OTel, Windows paths, artifacts** |
+| v2.1.316 | Oct 31, 2026 | Patch | 60+ fixes: shell leaks, bash/PowerShell, network, Vertex/Bedrock, auto-mode, cloud sessions |
+| v2.1.315 | Oct 29, 2026 | Patch | Safety event telemetry |
+| v2.1.314 | Oct 28, 2026 | Patch | Permissions block writes, idle compaction |
+| v2.1.312 | Oct 25, 2026 | Patch | 80 fixes you actually feel |
+
+**Three patch releases in five days.** Each one sanding down friction. v2.1.317 is the capstone — the release where self-hosted runners, Desktop MCP, and gateway deployments all work reliably.
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Run self-hosted runners with `claude -p`** | **Yes** — `CLAUDE_CODE_DISABLE_NESTED_SESSION_ID=1` fixes session pollution |
+| **Use Claude Desktop with project/local MCP servers** | **Yes** — disconnects fixed |
+| **Run LLM gateway as base URL** | **Yes** — auto-mode survives 403/422 |
+| **Hit slow token refresh on auth status** | **Yes** — no more phantom sign-outs |
+| **Use Desktop Code tab with project effortLevel** | **Yes** — setting now respected |
+| **Rely on screen readers** | **Yes** — subagent spam fixed |
+| **Behind corporate firewall/region block** | **Yes** — clear error messages |
+| **Run `claude -p` in CI/CD** | **Yes** — exit codes now accurate |
+| **On v2.1.316 and happy** | **Yes** — these fixes compound daily |
+
+---
+
+## How to Update
+
+```bash
+# Auto-update (usually handles it)
+claude update
+
+# Or check manually
+# Help → Check for Updates (in desktop app)
+
+# Verify
+claude --version
+# Should show 2.1.317
+```
+
+**First things to verify after update:**
+
+```bash
+# 1. Test nested session isolation (self-hosted runners)
+export CLAUDE_CODE_DISABLE_NESTED_SESSION_ID=1
+claude -p "test"  # Should create own session
+
+# 2. Test Desktop MCP persistence
+# Start Desktop → open project with MCP → multi-turn → tools stay connected
+
+# 3. Test gateway 403/422 handling
+# Configure gateway returning 403 on safety → auto-mode should continue
+
+# 4. Test auth status with slow refresh
+# Add network latency → claude auth status → should wait and succeed
+
+# 5. Test effortLevel in Desktop Code tab
+# Set project effortLevel → open Code tab new session → check effort used
+```
+
+---
+
+## The Bottom Line
+
+**v2.1.316 fixed the plumbing. v2.1.317 fixes the edge cases that plumbing missed.**
+
+- **Self-hosted runners** → nested sessions isolated
+- **Desktop MCP** → connections persist
+- **Gateway deployments** → auto-mode survives safety checks
+- **Auth** → no more race conditions
+- **Pre-started sessions** → respect your config
+- **Accessibility** → screen reader spam gone
+- **Enterprise** → clear errors, reliable recovery
+- **Windows** → deep paths work
+- **Scale** → 200+ artifacts shared
+
+This isn't a feature release. It's the **reliability layer** that makes every deployment scenario — self-hosted, Desktop, gateway, cloud, CI/CD — actually usable in production.
+
+```bash
+claude update
+# Self-hosted runners clean
+# Desktop MCP stays connected
+# Gateway 403/422 handled
+# Auth status waits
+# EffortLevel respected
+# Titles persist
+# Screen readers quiet
+# 5xx recovery hardened
+# OTel proxy works
+# Windows deep paths work
+# Artifacts scale
+```
+
+---
+
+## Related Articles
+
+- [Claude Code v2.1.316 Just Fixed 60+ Bugs — The Stability Release Youve Been Waiting For](/blog/claude-code-v2-1-316-stability-release-youve-been-waiting-for/)
+- [Claude Code v2.1.312 — 80 Fixes You Actually Feel](/blog/claude-code-v2-1-312-80-fixes-you-feel/)
+- [Claude Code v2.1.314 — Permissions Block Writes, Idle Compaction](/blog/claude-code-v2-1-314-permissions-block-writes-idle-compaction/)
+- [Claude Code Just Fixed the Streaming Crash That Stole Your Work](/blog/claude-code-just-fixed-the-streaming-crash-that-stole-your-work/)
+- [Beware: Claude Code's Approval Preview Unicode Spoof](/blog/beware-claude-code-approval-preview-unicode-spoof/)
+
+---
+
+## Related articles
+
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Qwen Code v0.26 Just Became a Full Multi-Agent Platform — Local, Remote, and Everything In Between](/blog/qwen-code-v0-26-managed-agent-desktop-local-ssh/)
+
+---
+
+*Claude Code is available at [claude.ai/code](https://claude.ai/code) and [github.com/anthropics/claude-code](https://github.com/anthropics/claude-code). Published November 3, 2026 — covers Claude Code v2.1.317 stable released November 3, 2026. Full changelog: [github.com/anthropics/claude-code/releases/tag/v2.1.317](https://github.com/anthropics/claude-code/releases/tag/v2.1.317)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
