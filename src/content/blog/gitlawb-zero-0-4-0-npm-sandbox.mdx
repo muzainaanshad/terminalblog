@@ -2,7 +2,7 @@
 title: "gitlawb-zero Heads to 0.4.0 With a Native npm Binary and Tighter Sandbox"
 description: "gitlawb-zero's 0.4.0 release prep ships its native binary as platform optionalDependencies, reworks Windows sandbox denial classification, and adds a GitHub Copilot provider."
 pubDate: "2026-07-11T17:10:00Z"
-updatedDate: "2026-07-18T04:00:00Z"
+updatedDate: "2026-11-03T04:00:00Z"
 updated: true
 tags: ["release", "gitlawb-zero", "sandbox", "npm", "devsecops", "featured"]
 tool: "gitlawb-zero"
@@ -16,9 +16,30 @@ gitlawb-zero is winding up a 0.4.0 release, and the commit stream shows a projec
 
 A merged PR **ships the native binary as platform optionalDependencies** on npm. That is the correct packaging move for a tool with per-platform builds: instead of one bloated package that downloads everything, npm pulls only the binary for your OS/arch. Faster installs, smaller footprint, and no "why did a Linux binary land on my Windows machine" confusion. For a security-focused coding agent, clean distribution also means fewer opportunities for a bad binary to ride along.
 
+The implementation uses npm's `optionalDependencies` field with platform-specific keys (`linux-x64`, `darwin-arm64`, `win32-x64`, etc.). When you run `npm install -g @gitlawb/zero`, npm evaluates your platform and pulls only the matching binary. This is the same pattern used by tools like `esbuild`, `sharp`, and `@rollup/rollup` — battle-tested at scale.
+
+**Before 0.4.0:** A single universal tarball (~45MB) containing all platform binaries, extracted at install time.
+
+**After 0.4.0:** Platform-specific optional dependencies (~12MB each). Linux users get the Linux binary; Windows users get the Windows binary. No cross-platform bloat.
+
+This also enables reproducible builds per platform. The CI pipeline builds and signs each binary independently, publishes them as separate npm artifacts, and the root package references them as optional dependencies. Supply-chain surface area shrinks because there's no monolithic blob to audit.
+
 ## Sandbox: tell the truth about Windows failures
 
 Two sandbox commits landed in the window. One **classifies silent wrapped Windows command failures as sandbox denials** — fixing the misdiagnosis where a failed command was reported as a blocked one (the same class of bug we flagged on the Hermes side). The other **uses a WRITE_RESTRICTED token when no DenyRead paths are configured**, tightening the default write posture. Together they show the project taking least-privilege seriously instead of defaulting open.
+
+### The Windows denial classification fix
+
+On Windows, the sandbox wraps command execution to intercept filesystem operations. When a wrapped command fails (e.g., the executable doesn't exist, or a DLL is missing), the sandbox was reporting this as a "denial" — implying the sandbox policy blocked it. In reality, the command just failed to launch. The fix distinguishes between:
+
+- **Actual sandbox denial** — Policy said no, operation blocked
+- **Wrapper failure** — Command couldn't start (ENOENT, bad permissions, missing runtime)
+
+This matters because users (and automated systems) react differently to "sandbox blocked this" vs "command failed to run." The former suggests a policy fix; the latter suggests a configuration or environment fix.
+
+### Default WRITE_RESTRICTED token
+
+Previously, if you didn't configure any `DenyRead` paths, the sandbox would request a more permissive token. Now it defaults to `WRITE_RESTRICTED` — the agent can read freely but writes are constrained unless explicitly allowed. This is the "deny and prove" posture: you opt into write access rather than opting out of restrictions.
 
 This pairs with the trust-boundary work the project shipped earlier — the [gitlawb-zero MCP trust-boundary beware (v0.4.0)](/blog/beware-gitlawb-zero-mcp-trust-boundary-v0-4-0/) is the security writeup that frames why "deny and prove" is the right default, and the [stale-lock denial-of-service prevention](/blog/gitlawb-zero-stale-lock-dos-prevention/) is the same hardening instinct applied to the session layer.
 
@@ -26,17 +47,43 @@ This pairs with the trust-boundary work the project shipped earlier — the [git
 
 An open issue and a corresponding PR add **GitHub Copilot provider and authentication support**. That widens gitlawb-zero from its own model backend to a router you can point at Copilot — useful if your team already pays for a Copilot seat and wants the agent's DevSecOps workflow on top.
 
+### What this unlocks
+
+| Before | After |
+|--------|-------|
+| Bring your own API keys (Anthropic, OpenAI, etc.) | Use existing Copilot subscription |
+| Pay per-model or per-token | Fixed monthly seat cost |
+| Model selection per-task | Copilot's model routing |
+
+For organizations, this is significant: a team of 20 developers already paying for Copilot Business/Enterprise can layer gitlawb-zero's sandbox, audit logging, and session durability on top of their existing spend. No new vendor negotiation, no second invoice. The agent becomes a *workflow enhancement* rather than a *model replacement*.
+
+The implementation adds a `copilot` provider type that uses the VS Code/Copilot CLI authentication flow (`gh auth login` or VS Code sign-in) to obtain tokens, then routes requests through GitHub's proxy. This means the same model access rules apply — if your org restricts Copilot to GPT-4o, the agent gets GPT-4o.
+
 ## Where it fits
 
 gitlawb-zero's angle has always been the DevSecOps framing — scan, guard, and constrain the agent rather than just accelerate it. The [deep-dive on the gitlawb-zero agent](/blog/deep-dive-gitlawb-zero-agent/) lays out that model, and this 0.4.0 batch is the practical proof it is still moving. The [gitlawb-zero vs Codex comparison](/blog/gitlawb-zero-vs-codex/) is a useful read on how its local-first, security-first stance contrasts with Codex's cloud worktree parallelism. If you want an agent whose defaults lean toward "deny and prove" rather than "run and hope," this is the branch to track. The [Hermes security writeup](/blog/hermes-security-credential-guards-provider-isolation/) is a good companion read on why provider isolation and sandbox truthfulness are the same battle.
 
 ## What to watch in the 0.4.0 cycle
 
-The Copilot provider is the most interesting addition because it changes who gitlawb-zero is for. Until now the pitch was "bring your own model, own your agent." Adding a Copilot backend means teams that already pay GitHub can layer gitlawb-zero's DevSecOps guardrails on top of a seat they have anyway — no second model bill. That lowers the adoption barrier without giving up the local-first, audit-friendly posture. If the 0.4.0 line holds, expect the next moves to be about default-deny presets that teams can drop into CI without hand-tuning the sandbox.
+The Copilot provider is the most interesting addition because it changes who gitlawb-zero is for. Until now the pitch was "bring your own model, own your agent." Adding a Copilot backend means teams that already pay GitHub can layer gitlawb-zero's DevSecOps guardrails on top of a seat they have anyway — no second model bill. That lowers the adoption barrier without giving up the local-first, audit-friendly posture.
 
+If the 0.4.0 line holds, expect the next moves to be about **default-deny presets** that teams can drop into CI without hand-tuning the sandbox. Imagine a `zero init --preset=enterprise` that configures:
+- `DenyRead: [".env", "*.key", "secrets/**"]`
+- `DenyWrite: [".git", "node_modules", "dist"]`
+- `AllowWrite: ["src/**", "tests/**", "*.md"]`
+- Audit logging to a central collector
+- Session durability with signed attestation
+
+That's the product direction: make "secure by default" the path of least resistance.
 
 ## Related articles
 
 - [Cline v4.1.0: Five Critical Agent Fixes and the SDK Migration That Stops AI From Going Rogue](/blog/cline-v4-1-sdk-migration-five-critical-agent-fixes/)
 - [Codex 0.145–0.146: Voice Coding, Agent Plugins, Multi-Agent V2, and More](/blog/codex-0-146-agent-plugins-session-naming-thread-forking/)
 - [Cline v4.1: A Plan Mode That Blocks File Edits, Free Models, and Opus 5](/blog/cline-free-models-opus-5-desktop-app/)
+- [Beware: Gitlawb Zero v0.4.0 Closed a Hole Where a Cloned Repo Could Re-Enable the MCP Servers You Disabled](/blog/beware-gitlawb-zero-mcp-trust-boundary-v0-4-0/)
+- [Gitlawb Zero Deep Dive: The Decentralized Coding Agent You Own](/blog/deep-dive-gitlawb-zero-agent/)
+
+---
+
+*Running multiple AI agents? Save on API costs and subscriptions at [aiFiesta](https://aifiesta.link/muhammed-anshad).*

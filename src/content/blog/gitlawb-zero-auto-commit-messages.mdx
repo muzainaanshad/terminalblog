@@ -2,7 +2,7 @@
 title: "Gitlawb Zero Can Now Write Your Commit Messages — And They're Actually Good"
 description: "Zero added a --auto flag that generates LLM-powered commit messages from your staged changes. Finally, good commit messages without the effort."
 pubDate: "2026-07-04T01:30:00Z"
-updatedDate: "2026-10-10T04:00:00Z"
+updatedDate: "2026-11-03T04:00:00Z"
 updated: true
 tags: ["gitlawb-zero", "commit-messages", "git", "auto-flag", "viral"]
 tool: "gitlawb-zero"
@@ -23,6 +23,7 @@ When you stage your changes and run `zero --auto`, the agent:
 4. Applies it via `git commit -m`
 
 The result is messages like:
+
 ```
 feat(auth): add OAuth token refresh flow for ChatGPT integration
 fix(tui): keep profile name on /model switch so stored key resolves
@@ -36,6 +37,19 @@ Each message follows conventional commits format, making them useful for changel
 The `--auto` flag (PR #423) works through Zero's existing git integration. It doesn't replace your editor — it augments it. You can still write custom messages for important commits, but for the routine ones, `--auto` handles it.
 
 The flag is model-agnostic. Zero uses whatever provider you have configured to generate the message, so the quality scales with your model choice.
+
+### Under the hood: the prompt pipeline
+
+The commit message generation isn't a single prompt — it's a small pipeline:
+
+1. **Diff extraction** — `git diff --staged --no-color` captures the exact changes
+2. **Context enrichment** — File paths, recent commit history (last 5), and `.gitmessage` template if present
+3. **Structured prompt** — A system prompt enforcing conventional commits format, scoped to your repo's patterns
+4. **Model call** — Your configured provider (Claude, GPT, local, Copilot, etc.)
+5. **Validation** — Regex check for `type(scope): description` format; retry on failure
+6. **Apply** — `git commit -m "<message>"` with the validated output
+
+This pipeline runs in ~2-3 seconds on a typical staged diff. The validation step is key — it catches hallucinated formats before they pollute history.
 
 ## Why This Matters
 
@@ -66,16 +80,31 @@ zero commit --auto --type=refactor
 zero commit --auto --model=claude-3-5-sonnet
 ```
 
+### Advanced: repo-level configuration
+
+You can persist defaults in `.zero/commit.yaml`:
+
+```yaml
+auto:
+  default_model: "claude-3-5-sonnet"  # Override global model for commits
+  template: ".gitmessage"             # Use existing commit template
+  max_files: 20                       # Skip auto if diff touches >20 files
+  require_scope: true                 # Reject messages without (scope)
+```
+
+This lets teams enforce standards — e.g., requiring scopes on all commits, or using a specific model for commit quality.
+
 ## Comparison with Other Tools
 
-| Tool | Integration | Model Support | Custom Types | Dry Run |
-|------|-------------|---------------|--------------|---------|
-| Zero `--auto` | Native TUI | Any configured | ✅ | ✅ |
-| Claude Code `/commit` | Slash command | Claude only | ❌ | ❌ |
-| OpenCode plugins | Community | Any | Varies | ❌ |
-| git-ai-commit (standalone) | CLI wrapper | Any | ✅ | ✅ |
+| Tool | Integration | Model Support | Custom Types | Dry Run | Repo Config |
+|------|-------------|---------------|--------------|---------|-------------|
+| Zero `--auto` | Native TUI | Any configured | ✅ | ✅ | ✅ |
+| Claude Code `/commit` | Slash command | Claude only | ❌ | ❌ | ❌ |
+| OpenCode plugins | Community | Any | Varies | ❌ | ❌ |
+| git-ai-commit (standalone) | CLI wrapper | Any | ✅ | ✅ | ⚠️ |
+| aicommit (npm) | Git hook | OpenAI only | ⚠️ | ❌ | ❌ |
 
-Zero's native integration wins on workflow friction — no context switching, no plugin maintenance, no extra dependencies.
+Zero's native integration wins on workflow friction — no context switching, no plugin maintenance, no extra dependencies. The repo-level config is a force multiplier for teams.
 
 ## When to Use (and When Not To)
 
@@ -83,13 +112,50 @@ Zero's native integration wins on workflow friction — no context switching, no
 - Routine feature work, bug fixes, documentation updates
 - Refactoring batches where each commit follows the same pattern
 - Keeping history clean on feature branches before PR
+- Chores: dependency updates, formatting, renames
 
 **Write manually for:**
 - Breaking changes that need detailed rationale
 - Security fixes requiring audit trail
 - Architecture decisions future maintainers will thank you for
+- Multi-file refactors where the "why" isn't obvious from the diff
 
 The 80/20 rule applies: let `--auto` handle the 80% of routine commits, invest your attention on the 20% that matter.
+
+## Real-World Workflow: Feature Branch Hygiene
+
+A common pattern with `--auto`:
+
+```bash
+# Start feature
+zero session --name "feat/payment-retry"
+
+# Work... make changes... stage incrementally
+git add src/payment/retry.ts
+zero commit --auto --dry-run    # Preview
+zero commit --auto              # Commit: feat(payment): add exponential backoff for failed transactions
+
+git add tests/payment/retry.test.ts
+zero commit --auto              # Commit: test(payment): cover retry backoff and max-attempts
+
+git add docs/payment.md
+zero commit --auto              # Commit: docs(payment): document retry configuration
+
+# Push and PR — history is clean, messages are useful
+git push origin feat/payment-retry
+```
+
+Contrast with the typical "commit at the end with 'feat: payment retry stuff'" — the incremental approach gives you bisectable history, meaningful changelogs, and zero cognitive overhead.
+
+## The Broader Picture: AI-Native Git Workflows
+
+Commit message generation is the tip of the iceberg. The same diff-analysis capability powers:
+
+- **PR description generation** — `zero pr create --auto` drafts the PR body from commits
+- **Changelog drafting** — `zero changelog --since=v1.2.0` generates release notes
+- **Code review summaries** — `zero review --auto` summarizes what changed and why
+
+Zero's architecture — durable local sessions + git-native + model-agnostic — makes these compose. The commit message is just the first node in a graph of git-aware AI assistance.
 
 ## Related articles
 
@@ -97,3 +163,9 @@ The 80/20 rule applies: let `--auto` handle the 80% of routine commits, invest y
 - [Gitlawb Zero Deep Dive: The Decentralized Coding Agent You Own](/blog/deep-dive-gitlawb-zero-agent/)
 - [Beware: Your Coding Agents Sandbox Was Leaking Its Own Credentials to Spawned Commands](/blog/beware-coding-agent-sandbox-leaks-own-credentials/)
 - [Hermes Git PR Automation and Code-Review Workflow](/blog/hermes-git-pr-automation-code-review-workflow/)
+- [Gitlawb Zero Stopped Letting Flags Eat Your Filenames — And It's a Relief](/blog/gitlawb-zero-cli-flag-parsing-fix/)
+- [Zero Now Detects Git Branches Even When You Start From a Subdirectory](/blog/gitlawb-zero-subdirectory-git-branch-detection/)
+
+---
+
+*Sometimes Claude writes better code. Sometimes GPT does. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** lets you compare both instantly in one chat for $12/mo — plus 7 more premium models.*
