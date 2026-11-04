@@ -1,8 +1,8 @@
 ---
-title: "What Developers Think About AI Coding Agents — From 500+ HN Comments (Oct 2026 Update)"
-description: "New October 2026 threads reveal tooling layer eating the model layer, trust/verification crises, stale context problems, and the convergence problem. Updated from August's harness/brainrot analysis."
+title: "What Developers Think About AI Coding Agents — From 500+ HN Comments (Nov 2026 Update)"
+description: "November 2026 threads reveal the joy crisis, trust-as-lever data from 51K sessions, QA agent benchmarks, and why planning is the on-switch. Updated from October's harness/trust analysis."
 pubDate: 2026-08-14
-updatedDate: 2026-10-24
+updatedDate: 2026-11-04
 author: "Anshad"
 tags: ["coding-agents", "claude-code", "cursor", "ai-coding", "developer-experience", "hacker-news", "ci-cd", "code-quality"]
 tool: "industry"
@@ -19,6 +19,12 @@ faq:
     a: "All coding agents are converging on the same capabilities: skills/plugins, MCP, background agents, model routing, local inference. The differentiation is shifting from features to UX, reliability, and ecosystem. As one commenter noted: 'They all do the same things now. The question is which one doesn't break your workflow.'"
   - q: "How do you prevent stale context in long agent sessions?"
     a: "Use agentic compaction (Cline default), explicit /compact commands, and session summarization. Cline v0.0.42 added /compact; Codex v0.166.0 added keyboard transcript selection; Claude Code v2.1.288 added auto-compaction instead of prompt floods. The key is making context management explicit, not automatic."
+  - q: "What did 51,000 coding-agent sessions reveal about top performers?"
+    a: "Top-quartile engineers aren't better prompters — they send the same 3 prompts/session as everyone else. The difference: they hand the agent a task and walk away, getting 15x more agent minutes per human minute. The gap is trust, not skill: top quartile lets the agent commit (paying $3/agent-commit vs $21), plans 31% of sessions (vs 9%), and gets 7.8 agent minutes per hands-on minute vs 0.5."
+  - q: "Why do developers feel less joy coding with AI?"
+    a: "The 'joy crisis' stems from partial delegation — you're still in the loop for every decision, reviewing 2000-line PRs, acting as a 'glorified meat proxy.' Engineers who enjoy it have crossed the trust threshold: they plan, hand off, and walk away. Self-employed/founders building greenfield projects report more satisfaction than employees at large companies."
+  - q: "Are QA agents better than coding agents at finding bugs?"
+    a: "Momentic's Mo agent found 269 bugs in 60 minutes vs Codex's 86 and Claude Code's 59 on the same 4 apps (1,396 human-labeled bugs). Tradeoff: Mo costs $2.67/bug vs $0.80 for Codex. Mo uses a DAG exploration graph with parallel sub-agents and 100s of concurrent browsers — it's a harness that lets the model run longer without human intervention, not a better model."
 ---
 
 If you only read launch posts and press releases, coding agents look like unstoppable progress. But spend time in the comment threads where developers actually use these tools daily, and a messier picture emerges: **harness fatigue, benchmark skepticism, brainrot anxiety, trust crises, and a quiet migration toward open-weight models.**
@@ -245,6 +251,90 @@ This mirrors how human teams work — and developers are discovering that **pers
 
 ---
 
+## 14. The Joy Crisis: Why Developers Are Losing Enjoyment (November 2026)
+
+A November Ask HN thread — *"Does anyone enjoy work anymore?"* — struck a nerve with 25 upvotes and 23 comments. The original poster put it plainly:
+
+> "Now that all I do is basically prompt AI all day, I'm struggling to actually enjoy work anymore. I don't get in the flow like I used with coding, which was when I loved the job the most."
+
+The responses split along employment lines:
+
+**Employees at large companies** described the joy draining away:
+- A 14-year veteran: "Code has turned into an unintelligible mush that only other agents can understand... We're back at the rat wheel era, where the more PRs and the more slop you churn, the more 'productive' you are."
+- Another: "Most are just rubber stamping PRs sometimes after ignoring them for days (because who wants to review 2000 lines of slop and ridiculous unit tests)."
+- A translator facing displacement: "Ten years at the computer... all soon to be gone. I have probably stopped living a while ago and am just going through the motions."
+
+**Founders and freelancers** building greenfield projects reported the opposite:
+- "AI has made my job a lot easier... It frees up the drudgery and lets me think high level. I can try different ideas and throw out ones that don't work without expending much effort."
+- "Actually building NEW systems is what I enjoy, and that's exactly what self employment gave me more of."
+
+The pattern: **partial delegation creates misery**. When you're still in the loop for every decision — reviewing, approving, fixing — you get the worst of both worlds: the responsibility without the craft. Engineers who've crossed the trust threshold (plan → hand off → walk away) report satisfaction. Those stuck in "glorified meat proxy" mode don't.
+
+---
+
+## 15. Trust Is the Lever — Data from 51,000 Sessions (November 2026)
+
+Alon Bochman's ConductorScore analyzed 51,000 coding-agent sessions from 190 engineers (640B tokens). The logs revealed something counterintuitive: **the best users aren't better prompters.**
+
+### Same effort, 15x the return
+- Every quartile sends ~3 substantive prompts/session
+- Every quartile spends 5–6 hands-on minutes/session
+- Time per prompt: 4.4 min (top) vs 5.6 min (bottom) — correlation with score: zero
+
+**What differs is what comes back:**
+| Metric | Top Quartile | Bottom Quartile |
+|--------|--------------|-----------------|
+| Agent messages per prompt | 116 | 75 |
+| Agent minutes per hands-on minute | 7.8 | 0.5 |
+| Agent commits per hands-on hour | 90x more | baseline |
+
+The top quartile hands the agent a **task and walks away**. The bottom quartile hands it a **question**.
+
+### The trust gap shows up in commits
+- Top quartile: ~$3 tokens per **agent commit** (agent ran `git commit`)
+- Bottom quartile: ~$21 tokens per **agent commit** — 7x the cost
+
+The metric only counts commits the agent ran through a shell tool. Human-typed commits never appear in transcripts.
+
+**The bottom quartile doesn't ship less code.** Their agents edit thousands of lines — then the human takes the wheel back and commits by hand, outside the transcript. The "5,556 agent-edited lines per agent commit" isn't commit size. It's how much work the agent did before the human said "I'll take it from here."
+
+Cost per commit is a **trust gauge**, not an efficiency metric.
+
+### Planning is the on-switch
+Only 19% of sessions start with a plan. But the within-person comparison (same engineer, same tools, same codebase) was stark:
+
+| Metric | Unplanned | Planned |
+|--------|-----------|---------|
+| Unattended agent minutes (median) | 0 | 29 |
+| Sessions with any unattended time | 37% | 62% |
+| Agent minutes per hands-on minute | 0.0 | 1.4 |
+| Lines edited per session (median) | 25 | 894 |
+
+**Planning isn't one good habit. It's the mechanism behind "let it run."** Without a plan, the agent mostly never runs.
+
+Even top-quartile engineers only plan 31% of sessions. Bottom quartile: 9%.
+
+---
+
+## 16. QA Agents vs Coding Agents: The Momentic Benchmark (November 2026)
+
+Momentic launched **Mo**, a QA agent that autonomously explores apps and finds bugs. Their benchmark on 4 open-source apps (Gitea, Metabase, Twenty, Saleor — 1,396 human-labeled bugs):
+
+| Agent | Bugs Found | Recall | Precision | Cost/Bug |
+|-------|------------|--------|-----------|----------|
+| Mo | 269 | 19.3% | 84% | $2.67 |
+| Codex (GPT-6.1 Sol + Playwright MCP) | 86 | 6.2% | 86% | $0.80 |
+| Claude Code (Opus 5.5 + Playwright MCP) | 59 | 4.2% | 80% | $4.09 |
+| Devin | 27 | 1.9% | 84% | $3.89 |
+
+**Key insight:** Mo isn't a better model. It's a **harness that lets the model run longer without human intervention**. Mo builds a DAG exploration graph, forks parallel sub-agents, runs 100s of concurrent browsers. From 30 to 60 minutes, Mo found 52% more bugs while Codex gained only 16%.
+
+As one HN commenter put it: *"What decides whether I keep an agent in the loop isn't how many bugs it finds, it's whether I trust the red result without redoing the check myself."*
+
+The tradeoff: **recall over precision**, **autonomy over cost**. Mo costs 3x more per bug than Codex but finds 3x more bugs. For teams where missed bugs are expensive, that math works.
+
+---
+
 ## What This Means for You
 
 ### If you're choosing a coding agent today:
@@ -253,6 +343,7 @@ This mirrors how human teams work — and developers are discovering that **pers
 2. **Expect guardrail friction** if you do security, systems, or low-level work with Claude/Codex. Have a fallback (Kimi, GLM, local) ready.
 3. **Budget for multiple subscriptions.** Developers report $50–200/mo across Claude, OpenAI, Cursor, and specialized tools.
 4. **Try OpenCode or a custom harness** if you hit workflow walls with Claude Code/Cursor. The learning curve pays off in control.
+5. **Plan mode is non-negotiable.** 19% of sessions use it; those get 36x more lines edited. If you're not planning, you're using the agent as autocomplete.
 
 ### If you're building on agents:
 
@@ -260,12 +351,14 @@ This mirrors how human teams work — and developers are discovering that **pers
 2. **Design for multi-agent from day one.** Planner/coder/reviewer separation isn't optional for complex work.
 3. **Persist knowledge explicitly.** MEMORY.md files, shared folders, episodic logs — agents don't remember what you don't store.
 4. **Build verification layers.** The "watcher AI" pattern and adversarial review (Claude writes, Codex refutes) catch happy-path failures.
+5. **Trust is a learned behavior.** Let the agent commit on a throwaway branch. Push the boundary daily. Cost per agent-commit is your trust metric.
 
 ### If you're managing a team:
 
 1. **The brainrot problem is real.** Schedule "no-agent" deep-work blocks. Pair junior devs with seniors who *can* verify AI output.
 2. **Standardize on a harness, not a model.** Models rotate; your workflow tooling should be portable.
 3. **Track *verified* output, not just velocity.** Lines of code shipped by agents that pass review without human fixes — that's the metric.
+4. **The joy crisis is a delegation problem.** Engineers stuck in partial delegation (review every line) burn out. Engineers who plan → hand off → walk away stay engaged. Structure work to enable the latter.
 
 ---
 
@@ -294,4 +387,4 @@ The conversation has moved past "agents vs. no agents." It's now: *Which harness
 
 ---
 
-*Sources: Hacker News discussions from August–October 2026. Key threads: [Bullet Launch](https://news.ycombinator.com/item?id=49283063) (74 comments), [GLM-5.3 Release](https://news.ycombinator.com/item?id=49294997) (190+ comments), [Ask HN: Preventing Brainrot](https://news.ycombinator.com/item?id=49294529) (10 comments), [Show HN: Neal](https://news.ycombinator.com/item?id=49286252), [Show HN: Taurus Agents](https://news.ycombinator.com/item?id=49289464), [Linear CI Bottlenecks](https://news.ycombinator.com/item?id=49782341) (175 comments), [Quality Management Debate](https://news.ycombinator.com/item?id=49812345) (166 comments), [Corgi Agent Multiplexer](https://news.ycombinator.com/item?id=50214373) (95 pts), [Trust in AI Coding](https://news.ycombinator.com/item?id=50209084), [Claude Code CTRL-C](https://news.ycombinator.com/item?id=50214693) (8 pts), [Mnemolith Stale Memory](https://news.ycombinator.com/item?id=50199581), [Halv Token Reduction](https://news.ycombinator.com/item?id=50198250) (6 pts), [AI Security Tool Reliability](https://news.ycombinator.com/item?id=50196829), [AI Loop Convergence](https://news.ycombinator.com/item?id=50211080). All quotes paraphrased from original comments.*
+*Sources: Hacker News discussions from August–November 2026. Key threads: [Bullet Launch](https://news.ycombinator.com/item?id=49283063) (74 comments), [GLM-5.3 Release](https://news.ycombinator.com/item?id=49294997) (190+ comments), [Ask HN: Preventing Brainrot](https://news.ycombinator.com/item?id=49294529) (10 comments), [Show HN: Neal](https://news.ycombinator.com/item?id=49286252), [Show HN: Taurus Agents](https://news.ycombinator.com/item?id=49289464), [Linear CI Bottlenecks](https://news.ycombinator.com/item?id=49782341) (175 comments), [Quality Management Debate](https://news.ycombinator.com/item?id=49812345) (166 comments), [Corgi Agent Multiplexer](https://news.ycombinator.com/item?id=50214373) (95 pts), [Trust in AI Coding](https://news.ycombinator.com/item?id=50209084), [Claude Code CTRL-C](https://news.ycombinator.com/item?id=50214693) (8 pts), [Mnemolith Stale Memory](https://news.ycombinator.com/item?id=50199581), [Halv Token Reduction](https://news.ycombinator.com/item?id=50198250) (6 pts), [AI Security Tool Reliability](https://news.ycombinator.com/item?id=50196829), [AI Loop Convergence](https://news.ycombinator.com/item?id=50211080), [Ask HN: Does anyone enjoy work?](https://news.ycombinator.com/item?id=50344065) (23 comments), [Launch HN: Momentic](https://news.ycombinator.com/item?id=50339913) (126 comments), [Ask HN: How to Keep the Edge](https://news.ycombinator.com/item?id=50362698), [ConductorScore: Seven Things I Believed](https://alonbochman.substack.com/p/seven-things-i-believed-about-coding). All quotes paraphrased from original comments.*
