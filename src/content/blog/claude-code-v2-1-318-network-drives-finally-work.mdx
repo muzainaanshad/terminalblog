@@ -1,0 +1,127 @@
+---
+title: "Claude Code v2.1.318 Just Dropped — 100+ Fixes, Network Drives Finally Work"
+description: "Anthropic shipped 100+ fixes in v2.1.318. The headline: network home directories (NAS, corporate mounts) finally stop eating your config. Here's what matters."
+pubDate: 2026-11-04
+updatedDate: 2026-11-04
+heroImage: "/claude-code-v2-1-318-hero.png"
+tags: ["claude-code", "release", "coding-agents"]
+tools: ["claude-code"]
+author: "Anshad"
+canonical: true
+---
+
+Claude Code v2.1.318 landed ~15 hours ago. If you're counting, that's **4 versions in the last week** (315 → 316 → 317 → 318). Anthropic is in full stability mode.
+
+The changelog is *long* — 100+ bullet points. Most are "fixed X edge case." But three changes genuinely improve daily life, especially if you've ever lost work to a flaky filesystem.
+
+## The Three Fixes You'll Actually Notice
+
+### 1. Network Home Directories Stop Eating Your Config
+
+If you run Claude Code on a NAS, corporate network mount, or any shared filesystem — **this is the big one.**
+
+- `~/.claude.json`, settings files, and the stored login **survive saves** instead of being deleted, briefly emptied, or replaced by older/near-empty copies
+- Sessions on network drives **retry** when config is wrongly reported as missing — so fewer sessions start without your MCP servers and trusted folders
+- The stored login **stops being replaced by an empty file** when the disk fills up but still accepts new files
+- An empty `~/.claude.json` with no backup **no longer reports as corrupted** — Claude Code starts as if the file is missing
+- Non-interactive launches (`claude -p`, SDK apps) **stop rewriting `~/.claude.json` on every run** when nothing changed
+
+**Translation:** Your config survives a flaky NFS mount. Your MCP servers stay connected. Your login persists. This is the "it just works on my corporate drive" release.
+
+### 2. MCP Servers Stop Spamming Version Probes
+
+- stdio MCP servers that exit on the version probe **stop being re-probed on every start**
+- A server that dies in under 3 seconds for its own reason gets **pinned to the legacy handshake for 7 days**
+
+**Translation:** If you have a slow-starting MCP server, Claude Code stops hammering it on every session start. It learns "this one is slow" and backs off for a week.
+
+### 3. `claude -p` and SDK Apps Stop Thrashing Your Config
+
+- Unattended runs (`claude -p`, SDK apps) **stop rewriting `~/.claude.json` on every run** when nothing in it changed
+- Custom slash commands that fail, or that only Claude can invoke, **now print output in `claude -p` and SDK sessions** (they were silent before)
+- `claude -p` and Agent SDK sessions **report success correctly** when an API error cuts off a reply while a mod hooks `turn.step`
+
+**Translation:** Your automation scripts run cleaner. Less config churn. Less "why did my script think it succeeded when it failed?"
+
+## The Rest (Scannable)
+
+**Authentication & Login:**
+- Added the date a stored claude.ai sign-in ends to `claude auth status` (`loginExpiresAt`) and to `claude -p` JSON results (`credential_expires_at`)
+- Added a one-line stderr warning to `claude -p` text output, starting **10 days before** a stored sign-in ends
+- Fixed the sign-in failure when a stored claude.ai login reaches its time limit — it now says so, and names `claude auth login` and `claude setup-token`
+- Fixed tokens from `setup-token` being refused on machines with `forceLoginOrgUUID` when the token belongs to a permitted organization
+
+**MCP & Tools:**
+- `claude mcp add` and `remove` now **wait for the config lock or exit 1** (another job's save can still replace a saved server)
+- Fixed `claude plugin` commands exiting before a slow token refresh was saved (could sign you out on next run)
+- Fixed `claude plugin validate` passing custom-named marketplace files that `claude plugin marketplace add` rejects
+- `deniedMcpServers` URL entries now also block Anthropic-provided servers whose upstream URL matches, and connectors in cloud sessions/self-hosted runners
+- Improved MCP tool errors: a call made before the tool loads now returns its input schema
+
+**Permissions & Prompts:**
+- Fixed permission prompts being answered by keys typed **just after sending a message**, or **before a slow prompt appeared**
+- Changed the `/permissions` rule details, built-in rules, and delete confirmation views to use the standard dialog — pressing Ctrl+C twice now goes back/cancels instead of quitting
+- Improved "You should know" toasts to say "try again" instead of "press 2" (which only works in terminal)
+
+**Session & Conversation:**
+- Fixed `--continue` sometimes losing the earlier conversation after a malformed tool call's retries ran out (regression in 2.1.314)
+- Fixed macOS sessions with many running Bash commands stalling while memory grew
+- Fixed a deleted session transcript being re-created with its last prompt when an idle non-interactive session exited
+- Fixed a message sent right after a model change still running after Stop in headless sessions — Stop now cancels/stops it properly
+- Fixed idle compaction replacing a conversation with a reply that was not a summary
+- Fixed the "Now using usage credits" notice reappearing every ~30 seconds while a background subagent runs
+- Fixed a restarted session re-sending a message that failed with an API error, ahead of the newer message waiting behind it
+- Fixed a restarted session dropping its interrupted turn when the restart came right after Claude read a large image or retried a tool call
+
+**Cloud & Remote:**
+- Fixed cloud sessions being stopped mid-turn when the service refuses uploads for several minutes
+- Fixed variables a `Setup` hook writes to `CLAUDE_ENV_FILE` not reaching the Bash tool in some cloud sessions
+- Fixed the iPhone app showing a cloud session's turn as finished while it kept running
+- Improved how fast remote sessions reconnect after a pause or sleep
+- Improved the reliability of git commits and PR creation when Bash runs macOS's built-in `/bin/bash`
+
+**VS Code Extension:**
+- Fixed a long prompt expanded with "Show more" covering the whole chat panel — pinned prompt now capped at 40% and scrolls
+- Fixed dictation failing behind a TLS-inspecting proxy when `NODE_EXTRA_CA_CERTS` is set only in `~/.claude/settings.json` — now also follows `CLAUDE_CODE_CERT_STORE`
+- Changed the "still open somewhere else" notice to cover a Claude process left over from an extension restart (usually ends within ~10 minutes)
+- Added a notice on the microphone button when voice dictation stops by itself (15s without speech, or 2-minute limit) — says why and keeps text so far
+
+**Self-Hosted Runners:**
+- Changed checkout hooks to be stopped after 30 minutes by default, failing the session's setup (raise `--checkout-hook-timeout-min` or set to `0` if yours needs longer)
+- Changed the certificate file built for Anthropic-managed git to filter trusted certificates as the CLI does
+
+**Other:**
+- Fixed every connection failing when `NODE_EXTRA_CA_CERTS` file is empty, not PEM, or starts with a damaged certificate — readable certs now used with warning
+- Fixed workflows re-running finished agents when resumed after a usage limit
+- Fixed `/mcp` in cloud sessions counting tools the model can't use — a server's row now shows how many tools are available
+- Fixed a duplicate notification when Claude left the status field out of a PushNotification call
+- Fixed the error for a too-large image in a request with >20 images always saying the limit was 2000px — now shows the API's actual limit
+- Fixed the runtime in background shell details not updating while the dialog is open
+- Fixed retention cleanup leaving a home that only runs `claude -p` with no `~/.claude.json` backup — now takes a fresh backup before deleting the last good one
+- Changed subagents to **stop instead of switching models** when "Switch models when a message is flagged" is set to "Ask each time"
+- Changed background subagents to **move a shell command to the background after 3 minutes** on all providers, so the prompt cache doesn't expire while it runs
+- Changed subagent progress summaries on Bedrock, Vertex, Foundry, or with telemetry off: on a cold prompt cache, one can now wait up to 5 minutes for the subagent's pending response
+- Changed what a mod attaches at `prompt.submit` to stay in the user's turn rather than go out as a system message
+- Changed Claude Code to **no longer install or update the IDE extension** when started in an IDE terminal — use `/ide` from an outside terminal or your editor's extensions view
+- Improved auto-update reliability: brief network failure while verifying a release is now retried right away instead of waiting for the next check
+
+## Should You Update?
+
+**Yes.** Zero breaking changes. Pure fixes.
+
+```bash
+# Auto-updates on next check, or force it:
+claude update
+```
+
+## The Pattern
+
+v2.1.315 (Nov 1) → v2.1.316 (Nov 2) → v2.1.317 (Nov 3) → **v2.1.318 (Nov 4)**
+
+Anthropic is shipping daily stability patches. The 315-318 window is ~150 fixes total. If you've been on v2.1.310 or earlier, **update now** — the network filesystem fixes alone are worth it.
+
+---
+
+*v2.1.318 released November 4, 2026. Full changelog: [github.com/anthropics/claude-code/releases/tag/v2.1.318](https://github.com/anthropics/claude-code/releases/tag/v2.1.318).*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
