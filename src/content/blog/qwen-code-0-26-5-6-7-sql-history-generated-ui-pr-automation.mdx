@@ -1,0 +1,284 @@
+---
+title: "Qwen Code Just Made SQL History Searchable, Generated UI Default, and PR Automation Smarter — 0.26.5 Through 0.26.7"
+description: "Three patch releases in four days (Nov 1-4): SQL history pagination, Generated UI enabled by default with interactive context cards, Web Shell keyboard shortcuts, PR verification improvements, Helm deployment, and autofix-pr retry budgets. The quiet compounding wave."
+pubDate: 2026-11-04T10:00:00Z
+tags: ["qwen-code", "release", "v0.26.5", "v0.26.6", "v0.26.7", "sql", "generated-ui", "pr-automation", "web-shell", "beginner"]
+tool: "qwen-code"
+author: "Anshad"
+image: "/api/og?title=Qwen+Code+0.26.5-0.26.7+SQL+UI+PR&tool=qwen-code"
+canonical: "https://terminalblog.com/blog/qwen-code-0-26-5-6-7-sql-history-generated-ui-pr-automation/"
+faq:
+  - q: "What's the biggest user-facing change in 0.26.5-0.26.7?"
+    a: "Generated UI is now enabled by default — agents can show interactive cards (charts, forms, tables) that you continue chatting with. The context from those cards stays attached above the composer."
+  - q: "Does SQL history pagination work for both local and hosted databases?"
+    a: "Yes — bounded SQL history queries work for Managed local H2 and Hosted MySQL. You get paged recent messages, journal transactions, and exact operation/command lookups."
+  - q: "What's the autofix-pr retry budget?"
+    a: "A check left failing after three fix pushes is handed to a human and shown in /autofix-pr status. No more infinite retry loops."
+  - q: "Are there breaking changes?"
+    a: "No known breaking changes across 0.26.5, 0.26.6, or 0.26.7."
+  - q: "How do I update?"
+    a: "npm i -g @qwen-code/qwen-code@latest — or the Web Shell / Desktop auto-updater will prompt you."
+---
+
+**Qwen Code shipped three patch releases in four days (Nov 1–4)** — 0.26.5, 0.26.6, 0.26.7. No fanfare. Just **compounding polish** that makes daily workflows smoother: SQL history you can actually search, Generated UI that's now *on by default* with interactive context cards, Web Shell shortcuts that feel native, PR automation that knows when to hand off to a human, and a one-command Helm deployment for teams.
+
+If you're on 0.26.x — this is the update that makes the Web Shell feel like a real platform.
+
+---
+
+## The One-Line Summary
+
+**0.26.5 (Nov 1):** SQL history pagination, Generated UI default + context cards, Web Shell shortcuts, Russian locale, daemon updates for pnpm/yarn/bun/sudo, background agent counts, PR verification cleanups, Helm deployment, autofix-pr in-place mode, context memory clickable, autofix-pr retry budget, Workflow switch, QQ moderation tools, batch session snapshots, exact-version CLI updates, improved code-review skill.
+
+**0.26.6 (Nov 2):** Web Shell sidebar activity view, Add to Split View, token usage per-model metrics, Workflow chip in composer, unified agent loop for more ACP turns, mods prompt.submit hooks in headless, Fedora 44/RHEL 10 RPMs, GitHub channel config usable, verify-pr consent inheritance, PR review canary endpoints.
+
+**0.26.7 (Nov 4):** Managed agent runtime backends optional, config sync bound to attachment, full model config at session creation, Channel event timeline, verify-pr local Docker recipe, remote access from settings without restart, cron/background turns on shared loop, Anthropic transport timeout honored, web-shell image paste handling, explicit trust for project frontmatter/LSP.
+
+---
+
+## The Features You'll Actually Notice
+
+### 1. Generated UI — Now ON by Default, With Context Cards That Stick
+
+**What it is:** Agents can now render **interactive UI cards** (charts, forms, tables, dashboards) directly in the chat. You continue the conversation *with the card's values attached as removable context* above the composer.
+
+**Why it matters:** Before: agent shows a chart → you ask a follow-up → context lost. Now: the chart's data **stays attached**. You say "filter this by region" and the agent sees the exact values.
+
+```bash
+# In Web Shell or Desktop:
+# Agent renders a Generated UI card (e.g., a sales dashboard)
+# Card shows: "Revenue by Region" with interactive filters
+# You click "APAC" → value attaches above composer as context chip
+# You type: "show me quarterly trend for this region"
+# Agent has the filtered data — no re-explanation needed
+```
+
+**For beginners:** This is the moment the chat becomes a **workspace**. The agent's output isn't read-only — it's a living artifact you build on.
+
+---
+
+### 2. SQL History Pagination — Finally Searchable
+
+**What it is:** Managed local H2 and Hosted MySQL now support **bounded, paged SQL history queries** (#15839, #15865). You get:
+- Recent messages (latest 100 live, then paged upward)
+- Journal transactions
+- Exact operation or command lookups
+
+**Why it matters:** Your agent session history was a black box. Now you can **query it like a database** — "show me the last 50 tool calls," "find the transaction where I deleted the users table," "page back to yesterday's debugging session."
+
+---
+
+### 3. Web Shell Keyboard Shortcuts — Split View, Session Overview
+
+**What it is:** Web Shell now has **keyboard shortcuts** for Session Overview and Split View (#14179). Plus "Add to Split View" in sidebar session menus (#15956).
+
+**Why it matters:** You're comparing two agent sessions side by side. Old way: open new tab → navigate → resize. New way: `Ctrl+Shift+S` (or menu) → instant split. Session Overview gives you a bird's-eye view of all running work.
+
+---
+
+### 4. PR Automation That Knows When to Stop
+
+**What it is:** `/autofix-pr` now has a **retry budget** (#15985). After **three fix pushes** on a failing check, it hands off to a human and shows the blockage in `/autofix-pr status`. Also: posts a PR comment when blocked (#15978) stating what was attempted, what blocks it, and what human action is needed.
+
+**Why it matters:** No more infinite retry loops burning API credits. The agent tries, learns, and **escalates cleanly**.
+
+```bash
+# Workflow:
+/autofix-pr 123
+# Round 1: pushes fix → CI still fails
+# Round 2: pushes fix → CI still fails  
+# Round 3: pushes fix → CI still fails
+# → Agent stops, posts comment: "Blocked: X needs human review"
+# → Shows in /autofix-pr status with exact blockage
+```
+
+---
+
+### 5. One-Command Helm Deployment for Managed Agent
+
+**What it is:** Experimental Helm chart deploys **Managed Agent + Hosted Harness + MySQL + local execution + authenticated gateway** in one command (#15492).
+
+**Why it matters:** Teams wanting self-hosted Qwen Code infrastructure had to wire 5+ components. Now: `helm install qwen-code ./chart` — done.
+
+---
+
+### 6. Context Memory Files Clickable in Usage Panel
+
+**What it is:** Files in the Context Usage panel (like `AGENTS.md`) are now **clickable → open read-only preview** (#15932).
+
+**Why it matters:** You see "AGENTS.md (2.3MB)" in the panel. Click → read it. No more guessing what's eating your context window.
+
+---
+
+### 7. Background Agent Count in Status Bar
+
+**What it is:** Web Shell and Desktop now show **active background agent counts** in the status-bar task pill (#14002).
+
+**Why it matters:** You fire off a background task. The pill shows "2 agents running." You know at a glance — no need to hunt for a process list.
+
+---
+
+### 8. Remote Access Toggle Without Restart
+
+**What it is:** Enable remote access from Settings → takes effect **without restarting** the server (#15887).
+
+**Why it matters:** You're in a session, realize you need to share it. Toggle → share URL works. No "wait for restart" friction.
+
+---
+
+### 9. Anthropic Transport Timeout Honored
+
+**What it is:** Core now respects **Anthropic's configured transport timeout** instead of using its own (#16193).
+
+**Why it matters:** Long-running Claude requests (large file reads, complex reasoning) no longer get cut off by a mismatch between Qwen Code's timeout and Anthropic's.
+
+---
+
+### 10. Explicit Trust for Project Frontmatter & LSP
+
+**What it is:** Project frontmatter and LSP configurations now require **explicit trust** (#16182). No more silent execution of untrusted config.
+
+**Why it matters:** Security hardening. You clone a repo → Qwen Code asks before running its `.qwen/` config or LSP settings. Supply chain attack surface reduced.
+
+---
+
+## The Small Wins That Compound
+
+| Fix | Why You'll Notice |
+|-----|-------------------|
+| **Russian locale** for Web Shell Goal card + Goals dialog | Non-English teams get first-class UX |
+| **Daemon updates** for pnpm, yarn, bun, sudo-prefixed npm | One-click updates work regardless of package manager |
+| **Workflow chip** in composer dismissible, warns on unavailable tools | Workflow mode visible, toggleable, honest |
+| **Token usage panel** per-model success rate, output speed, colors | Debug which model is slow/failing at a glance |
+| **Unified agent loop** for more ACP turns (channels, Goal approvals) | Fewer context switches, smoother delegation |
+| **Mods prompt.submit hooks** in headless `-p` and Ink terminal | Prompt rewriting/inspection works everywhere |
+| **Fedora 44 / RHEL 10 RPMs** | Enterprise Linux distros get native packages |
+| **GitHub channel config usable** | Webhook-based GitHub automation works in Web Shell |
+| **Verify-pr consent inheritance** | Re-verify same PR without re-prompting |
+| **Channel event timeline** | See webhook events chronologically in Web Shell |
+| **Verify-pr local Docker recipe** | Run PR verification locally with host-side model proxy |
+| **Cron/background turns on shared loop** | Scheduled work shares the unified execution path |
+| **Image URL paste handling** | Paste images directly into Web Shell composer |
+| **Managed agent full model config at session creation** | Specify exact model params per session, not global |
+| **Runtime backends optional Maven modules** | Lighter builds, faster CI for managed agent |
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **0.26.7** | **Nov 4, 2026** | **Patch (Latest)** | Managed agent modularity, config sync fix, full model config, Channel timeline, verify-pr Docker, remote access no-restart, cron on shared loop, Anthropic timeout, image paste, explicit trust |
+| **0.26.6** | **Nov 2, 2026** | **Patch** | Web Shell activity view, Split View, token usage per-model, Workflow chip, unified agent loop, mods headless hooks, Fedora/RHEL RPMs, GitHub channel, verify-pr consent, canary endpoints |
+| **0.26.5** | **Nov 1, 2026** | **Patch** | **SQL pagination, Generated UI default + context cards, Web Shell shortcuts, Russian locale, daemon updates, background counts, PR verify cleanups, Helm deploy, autofix-pr in-place/retry budget, context clickable, code-review skill** |
+| 0.26.4 | Oct 28, 2026 | Patch | Web Shell browser coding, managed agent desktop/SSH |
+
+**0.26.5–0.26.7 = the "Web Shell becomes a platform" arc.** Three releases, four days. Each removes a reason to leave the browser.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Use Web Shell daily** | **Yes** — shortcuts, activity view, split view, Generated UI, token metrics |
+| **Run background agents** | **Yes** — status bar count, unified loop for cron |
+| **Automate PR fixes** | **Yes** — retry budget, blocked comments, status visibility |
+| **Self-host Managed Agent** | **Yes** — Helm deploy, optional runtime backends, full model config |
+| **Need SQL history search** | **Yes** — pagination, journal transactions, exact lookups |
+| **On 0.26.4 and stable** | **Yes** — zero breaking changes, pure compounding polish |
+
+**No reason to wait.** This is the patch wave that makes 0.26.x the daily driver you've been waiting for.
+
+---
+
+## How to Update
+
+```bash
+# CLI
+npm i -g @qwen-code/qwen-code@latest
+# Verify: qwen --version → 0.26.7
+
+# Web Shell / Desktop
+# Auto-updater will prompt on next launch
+# Or: Settings → About → Check for updates
+
+# Docker
+docker pull qwenlm/qwen-code:latest
+```
+
+**First things to try after update:**
+
+```bash
+# 1. Test Generated UI
+qwen
+# Ask: "show me a chart of my git commits by author"
+# Click the card → context chip appears → ask follow-up
+
+# 2. Test SQL history pagination
+# In Web Shell: Settings → History → page back, search operations
+
+# 3. Test Split View
+# Web Shell: Ctrl+Shift+S or sidebar → "Add to Split View"
+
+# 4. Test autofix-pr retry budget
+/autofix-pr <pr-number>
+# Watch it escalate after 3 failed pushes
+
+# 5. Test remote access toggle
+# Settings → Remote Access → toggle → share URL works instantly
+```
+
+---
+
+## The Bottom Line
+
+**0.26.4 gave you browser coding. 0.26.5–0.26.7 make the browser a platform.**
+
+- **Generated UI + context cards** → chat becomes workspace
+- **SQL history pagination** → your history is queryable
+- **Web Shell shortcuts + split view** → browser feels native
+- **Autofix-pr retry budget** → automation that knows its limits
+- **Helm one-command deploy** → teams get infrastructure in minutes
+- **Remote access no-restart** → sharing is instant
+- **Explicit trust** → security by default
+
+The pattern holds: **Qwen Code doesn't chase demos. It hardens the Web Shell until it's the only terminal you need — in the browser, on desktop, or over SSH.**
+
+For a beginner: **open qwen.ai → code with interactive cards → split view → share → done.**  
+For a team: **Helm deploy → managed agents → PR automation → audit trail → sleep.**
+
+```bash
+npm i -g @qwen-code/qwen-code@latest
+# Generated UI on
+# SQL history searchable
+# Split view native
+# PR automation honest
+# Helm one-liner
+# Remote instant
+# Trust explicit
+```
+
+---
+
+## Related Articles
+
+- [Qwen Code v0.26 Just Became a Full Multi-Agent Platform — Local, Remote, and Everything In Between](/blog/qwen-code-v0-26-managed-agent-desktop-local-ssh/)
+- [Qwen Code v0.26.6 Web Shell Browser Coding — Split Panes, Browser in Terminal](/blog/qwen-code-v0-26-6-web-shell-browser-coding/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+- [Qwen Code vs Copilot CLI](/blog/kilo-vs-copilot-cli/)
+- [Qwen Code vs Codex](/blog/kilo-vs-codex/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+
+---
+
+*Qwen Code is available at [qwen.ai/code](https://qwen.ai/code) and [github.com/QwenLM/qwen-code](https://github.com/QwenLM/qwen-code). Full changelogs: [0.26.5](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.5) · [0.26.6](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.6) · [0.26.7](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.7). Published November 4, 2026 — covers Qwen Code 0.26.5 (Nov 1), 0.26.6 (Nov 2), 0.26.7 (Nov 4) 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
