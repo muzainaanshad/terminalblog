@@ -1,0 +1,215 @@
+---
+title: "Claude Code Just Fixed 50+ Bugs You've Been Yelling About"
+description: "v2.1.318 is the stability release that finally kills the permission prompt race condition, fixes network home directory corruption, and stops idle compaction from eating your conversation"
+pubDate: 2026-11-04
+updatedDate: 2026-11-04
+heroImage: "/blog/claude-code-v2-1-318-stability-release-50-fixes/hero.png"
+tags: ["claude-code", "release", "stability", "bug-fixes"]
+tools: ["claude-code"]
+---
+
+Claude Code v2.1.318 dropped today. It's not a feature release. It's the "we heard you screaming" release.
+
+Fifty-seven bug fixes. Nineteen improvements. Nine new capabilities. Zero new features you'll screenshot for Twitter.
+
+But if you've lost work to a permission prompt race condition, watched your macOS session stall while memory ballooned, or had idle compaction replace your conversation with a useless summary — this is the release you've been waiting for.
+
+---
+
+## The Headline Fixes
+
+### Permission Prompts Answered by Ghost Keystrokes — Fixed
+
+You type a message. A permission prompt appears *slowly*. You keep typing. Your keystrokes answer the prompt before you see it.
+
+```bash
+# Before: your "y" meant "yes, delete that file"
+# After: prompt ignores keys typed during its arrival
+```
+
+This was the most reported UX bug in the last month. Fixed in v2.1.318.
+
+### Network Home Directory Corruption — Fixed
+
+Shared network homes (`/home` on NFS, corporate OneDrive, mounted SMB) have been a minefield:
+
+- Config files briefly emptied during saves
+- Stored login replaced by near-empty copies
+- `~/.claude.json` deleted, then restored from a stale backup
+- MCP servers and trusted folders vanishing at startup
+
+The fix: writes now survive network hiccups. Files are "less often deleted, briefly emptied or replaced by a near-empty or older copy." Not perfect — but dramatically better.
+
+### Idle Compaction Eating Conversations — Fixed
+
+Background subagent runs. Idle compaction triggers. Your conversation gets replaced by a reply that *wasn't a summary* — just a random model output.
+
+```bash
+# Before: compaction could substitute any reply
+# After: compaction only accepts actual summaries
+```
+
+### The `--continue` Regression — Fixed
+
+v2.1.314 broke `--continue` after malformed tool call retries exhausted. You'd lose the earlier conversation entirely. Restored.
+
+### macOS Memory Growth with Many Bash Commands — Fixed
+
+Long-running sessions with heavy Bash usage would stall while RSS climbed. Root cause: subprocess handling in macOS's built-in `/bin/bash`. Patched.
+
+---
+
+## The "Finally" Features
+
+### Credential Expiration Visibility
+
+```bash
+claude auth status
+# Now shows: loginExpiresAt: "2026-11-14T00:00:00Z"
+
+claude -p "hello" --output-format json
+# Now includes: credential_expires_at
+```
+
+Plus a one-line stderr warning **10 days before expiry** in `claude -p` text output. No more surprise logouts mid-deployment.
+
+### Mod Effort Control
+
+```json
+{
+  "model": {
+    "fork": {
+      "effort": "low"
+    }
+  }
+}
+```
+
+A mod's side job can now run at `low` effort regardless of the session's effort setting. The result reports what effort was actually sent. Huge for cost control on quick subtasks.
+
+### AWS `assume_role` for Gateway
+
+```yaml
+# mantle upstream config
+assume_role: "arn:aws:iam::123456789012:role/DeveloperRole"
+```
+
+Per-developer AWS cost attribution via the Claude Apps Gateway. Enterprise teams have been asking for this since gateway launch.
+
+---
+
+## Cloud Session Quality-of-Life
+
+| Change | Why It Matters |
+|--------|----------------|
+| **No repository option** | Start cloud sessions without picking a repo — for scratch work, learning, prototypes |
+| **Chrome names exposed** | `google-chrome` and `CHROME_PATH` now work — tools beyond Playwright can find Chromium |
+| **New session button on deleted env** | Environment gone? One click to restart instead of navigating back |
+| **GitHub Actions logs readable** | `gh run view --log` works in most environments instead of redirect loops |
+| **Create PR failures explain themselves** | "Try again" → actual reason or GitHub link |
+| **Connector search honesty** | Tells Claude "this only covers part of the directory" |
+
+---
+
+## Self-Hosted Runner & Remote Control
+
+- `CLAUDE_RUNNER_SPAWN_REASON` in orchestrator hook env — know *why* Anthropic spawned you (`runner_lost`, `resumed`)
+- Startup warnings for malformed `--release-idle-session-min` args
+- Orchestrator logs now on stdout at all levels with `reason=` fields — update your parsing scripts
+- Remote Control: "spawn error: ENOENT" now names the missing folder
+- Fork titles: "Name (fork 2)" instead of duplicate names
+
+---
+
+## The Quiet Killers (Fixed)
+
+These didn't make headlines but caused daily friction:
+
+- **Custom slash commands failing silently** in `claude -p` and SDK — now they print output
+- **SDK sessions reporting success** when API error cut off a reply during `turn.step` hook — now fail properly
+- **Stop in headless sessions** now cancels messages sent right after model changes
+- **Deleted transcript re-creation** on idle non-interactive exit — stopped
+- **Version cleanup deleting live binaries** — `sudo claude` processes no longer treated as dead
+- **`NODE_EXTRA_CA_CERTS` empty/damaged** — readable certs used with stderr warning instead of total failure
+- **Workflows re-running finished agents** after usage limit resume — fixed
+- **`/mcp` in cloud sessions** counting unusable tools — now shows available count
+- **Duplicate PushNotification** when status field missing — deduplicated
+- **Too-large image error** always saying "2000px limit" — now shows actual API limit
+- **Retention cleanup** leaving `claude -p` homes without backup — takes fresh backup first
+- **Stored login replaced by empty file** on full network disk — handled gracefully
+- **Setup tokens refused** on `forceLoginOrgUUID` machines — fixed
+- **Non-interactive launches** corrupting `~/.claude.json` — now fails with restore instructions
+- **Empty `~/.claude.json` reported as corrupted** — now starts like missing file
+- **Restore command naming bad backups** — fixed
+- **Sign-in failure at time limit** — now says `claude auth login` / `claude setup-token`
+
+---
+
+## What Changed (Behavior Shifts)
+
+| Before | After |
+|--------|-------|
+| IDE extension auto-installed/updated in IDE terminals | **Disabled** — use `/ide` from outside terminal or editor's extensions view |
+| Subagents switch models when "Ask each time" | **Stop instead** — no silent model swap |
+| Background subagents hold shell foreground indefinitely | **Move to background after 3 min** — preserves prompt cache |
+| Subagent progress on cold cache (Bedrock/Vertex/Foundry/telemetry-off) | **Up to 5 min wait** — was shorter |
+| Mod `prompt.submit` attachment goes to system message | **Stays in user's turn** — cleaner context |
+| `deniedMcpServers` URL entries block only exact matches | **Also block Anthropic-provided servers & connectors** with matching upstream URL |
+| `/permissions` dialogs: Ctrl+C twice = quit | **Ctrl+C twice = back/cancel** — standard dialog behavior |
+| Managed agent onboarding: MCP tools default to `auto` permission | **Matches Claude Console** — say "run without asking" to opt out |
+| Resume pre-2.1.286 conversations: kept earlier thinking | **Thinking can now be dropped** — 2.1.288 fix removed |
+
+---
+
+## Gateway & Enterprise
+
+- Google federation token expiry warning in logs
+- `listen.trusted_proxies` hints now say: "list only a proxy that adds connecting address to `X-Forwarded-For` itself"
+- AWS CountTokens failure on Bedrock: message says "Claude Code counts after 501" and points at IAM only on deny
+- VS Code: sign-in screen shows what Claude Code printed on status check failure
+- VS Code: long error words no longer push close button out of view
+- VS Code: window with refused org sign-in no longer spawns background process every minute
+- Code Review analytics: retries once on failure, shows "Try again" banner instead of empty cards
+
+---
+
+## Should You Update?
+
+**Yes.** This is a pure stability release. No breaking changes. No migration needed.
+
+```bash
+claude update
+# or re-run the installer one-liner
+```
+
+If you're on v2.1.314–317, you're living with the `--continue` regression and the permission prompt race condition. Update today.
+
+If you're on v2.1.311 (stable) or earlier, you're missing months of fixes. The jump is safe.
+
+---
+
+## The Bigger Picture
+
+Anthropic shipped 430+ releases since v2.1.0. Most were small. v2.1.318 is the first in a while that feels like a *consolidation* — they stopped adding, started fixing.
+
+The pattern is clear: **Claude Code is maturing from "move fast" to "don't break user trust."**
+
+Permission prompt races. Network home corruption. Silent data loss on compaction. These aren't bugs — they're trust violations. Each one makes a developer hesitate before letting the agent run unattended.
+
+v2.1.318 doesn't add capabilities. It *restores confidence*.
+
+That's worth more than any feature.
+
+---
+
+## TL;DR
+
+- **57 bug fixes** — permission races, network corruption, compaction data loss, `--continue` regression, macOS memory growth
+- **19 improvements** — credential visibility, mod effort control, AWS assume_role, cloud session UX
+- **9 new capabilities** — mostly enterprise/gateway/runner observability
+- **Zero breaking changes** — safe to update immediately
+- **Run `claude update`** — or your package manager's equivalent
+
+---
+
+*Updated November 4, 2026 — covers all v2.1.318 changes from the official changelog. If you spot something missing, ping me on X.*
