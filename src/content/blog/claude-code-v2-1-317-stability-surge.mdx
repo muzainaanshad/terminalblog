@@ -1,22 +1,588 @@
 ---
-title: "Claude Code v2.1.317 Just Fixed the Nested Session ID Leak — Plus 80+ Fixes That Make Daily Work Feel Smooth"
-description: "Claude Code v2.1.317 (Nov 3) adds CLAUDE_CODE_DISABLE_NESTED_SESSION_ID for self-hosted runners, fixes project/MCP server disconnects in Desktop, stops auto-mode failing on 403/422 gateway responses, fixes auth status race on slow token refresh, and 80+ other fixes. The quiet patch that makes sessions reliable."
+title: "Claude Code v2.1.318 Just Landed — The Stability Arc Continues With Mods Effort Control, Auth Expiry Warnings, and 100+ Fixes"
+description: "Claude Code v2.1.318 (Nov 4) adds mod effort control, AWS role assumption for cost attribution, stored login expiry dates in auth status, 10-day warnings before sign-in expires, and 100+ fixes including --continue conversation recovery, macOS bash memory leak, permission prompt races, MCP config lock safety, and cloud session reliability. The November stability arc just keeps compounding."
 pubDate: 2026-11-03T06:00:00Z
-tags: ["claude-code", "release", "v2.1.317", "stability", "bug-fixes", "coding-agent", "beginner"]
+updatedDate: 2026-11-04T06:00:00Z
+tags: ["claude-code", "release", "v2.1.318", "v2.1.317", "stability", "bug-fixes", "coding-agent", "beginner"]
 tool: "claude-code"
 author: "Anshad"
-image: "/api/og?title=Claude+Code+v2.1.317+Stability+Surge&tool=claude-code"
+image: "/api/og?title=Claude+Code+v2.1.318+Stability+Arc&tool=claude-code"
 ---
 
-**Claude Code v2.1.317 dropped November 3** — hot on the heels of v2.1.316's 60+ fixes. This isn't a feature release. It's **80+ fixes** that sand down the last rough edges: nested session ID leaks in self-hosted runners, MCP servers disconnecting in Desktop, auto-mode choking on gateway 403/422 responses, auth status race conditions, and the thousand paper cuts that make you hesitate before running `claude` in production.
+**Claude Code v2.1.318 dropped November 4** — just 24 hours after v2.1.317's 80+ fixes. This isn't a feature release either. It's **100+ more fixes** that extend the November stability arc: mod effort control for quick side jobs, AWS role assumption for cross-account cost attribution, stored login expiry dates surfaced in `claude auth status` and `claude -p` JSON, 10-day stderr warnings before sign-in expires, `--continue` conversation recovery after malformed tool calls, macOS bash memory leak, permission prompt key races, MCP config lock safety, cloud session reliability, and more.
 
-If you're on v2.1.316 and thought "it mostly works" — this is the patch that makes "mostly" disappear.
+If you're on v2.1.317 and thought "it mostly works" — v2.1.318 makes "mostly" disappear faster.
 
 ---
 
 ## The One-Line Summary
 
+**v2.1.318 (Nov 4) → 100+ fixes: mod effort option for quick side jobs, AWS `assume_role` for cross-account cost attribution, `loginExpiresAt` in `claude auth status`, 10-day sign-in expiry warnings, `--continue` recovers after malformed tool calls, macOS bash memory leak fixed, permission prompt key races, MCP config lock waits, cloud session restart reliability, OpenTelemetry proxy timeouts, Windows path limits, artifact sharing past 200. The November stability arc compounds daily.**
+
 **v2.1.317 (Nov 3) → 80+ fixes: nested session ID leak fixed for self-hosted runners, project/MCP disconnects in Desktop solved, auto-mode survives gateway 403/422, auth status no longer races slow token refresh, effortLevel respected in pre-started sessions, cloud session titles persist, screen reader subagent announcements fixed, 5xx recovery hardened, OpenTelemetry proxy timeouts, Windows path limit fixed, artifact sharing scales past 200. The quiet reliability patch.**
+
+---
+
+## v2.1.318 Highlights — The New Fixes (Nov 4)
+
+### 1. Mod Effort Control — Quick Side Jobs at Low Effort
+
+**New:** A mod's `$.model.fork` now accepts an `effort` option. A quick side job can run at `low` effort regardless of what the main session uses. The result reports the effort actually sent.
+
+```json
+// In your mod:
+{
+  "model": {
+    "fork": { "effort": "low" }
+  }
+}
+```
+
+**Why it matters:** You don't need to burn high-effort tokens on quick lookups or validations inside a mod.
+
+---
+
+### 2. AWS `assume_role` for Cross-Account Cost Attribution
+
+**New:** Added `assume_role` on `mantle` upstreams of the Claude apps gateway. This lets you assume a role in another AWS account for per-developer AWS cost attribution.
+
+**Why it matters:** Enterprise teams can now track Claude Code API costs per developer across AWS accounts without manual tagging.
+
+---
+
+### 3. Stored Login Expiry Dates — No More Surprise Sign-Outs
+
+**New:** The date a stored `claude.ai` sign-in ends now appears in:
+- `claude auth status` → `loginExpiresAt`
+- `claude -p` JSON results → `credential_expires_at`
+
+**Plus:** A one-line stderr warning appears in `claude -p` text output **starting 10 days before** a stored sign-in ends.
+
+**Why it matters:** You get 10 days of advance notice. No more "wait, I'm logged out?" during a critical task.
+
+---
+
+### 4. `--continue` Recovers Conversation After Malformed Tool Calls
+
+**Fixed (regression in 2.1.314):** `--continue` sometimes lost the earlier conversation after a malformed tool call's retries ran out.
+
+**Now:** `--continue` properly recovers the conversation history.
+
+---
+
+### 5. macOS Bash Memory Leak Fixed
+
+**Fixed:** macOS sessions with many running Bash commands were stalling while memory grew unbounded.
+
+**Now:** Memory stays stable during long-running multi-command sessions.
+
+---
+
+### 6. Permission Prompt Key Races Fixed
+
+**Fixed:** Permission prompts were being answered by keys typed just after sending a message, or before a slow prompt appeared.
+
+**Now:** Key handling is synchronized — prompts only respond to intentional input.
+
+---
+
+### 7. MCP Config Lock Safety — No More Silent Config Loss
+
+**Fixed:** `claude mcp add` and `remove` were writing the config without its lock. Changes could be dropped silently when another job saved simultaneously.
+
+**Now:** They wait for the lock or exit 1. Your MCP config changes are atomic.
+
+---
+
+### 8. Plugin Token Refresh — No More Accidental Sign-Outs
+
+**Fixed:** `claude plugin` commands exited before a slow token refresh was saved, which could sign you out on the next run.
+
+**Now:** Commands wait for token refresh to complete.
+
+---
+
+### 9. stdio MCP Server Probe Pinning
+
+**Fixed:** stdio MCP servers that exit on the version probe were being re-probed on every start.
+
+**Now:** A server that dies in under 3s for its own reason is pinned to the legacy handshake for 7 days.
+
+---
+
+### 10. Idle Compaction No Longer Replaces Conversation with Non-Summary
+
+**Fixed:** Idle compaction could replace a conversation with a reply that was not a summary.
+
+**Now:** Compaction properly produces summaries.
+
+---
+
+### 11. "Now Using Usage Credits" Toast Spam Fixed
+
+**Fixed:** The "Now using usage credits" notice reappeared about every 30 seconds while a background subagent was running.
+
+**Now:** Toast appears once.
+
+---
+
+### 12. Custom Slash Commands in `claude -p` / SDK — No More Silent Failures
+
+**Fixed:** Custom slash commands that fail, or that only Claude can invoke, printed nothing in `claude -p` and SDK sessions.
+
+**Now:** Errors surface properly.
+
+---
+
+### 13. `claude -p` / Agent SDK — No False Success on API Error Cutoff
+
+**Fixed:** Sessions reported success when an API error cut off a reply while a mod hooked `turn.step`.
+
+**Now:** Failure is reported correctly.
+
+---
+
+### 14. Stop Handling After Model Change
+
+**Fixed:** A message sent right after a model change kept running after Stop in headless sessions.
+
+**Now:** Stop cancels or stops it as it would a queued message.
+
+---
+
+### 15. Deleted Session Transcript Re-Creation Fixed
+
+**Fixed:** A deleted session transcript was being re-created with its last prompt when an idle non-interactive session exited.
+
+**Now:** Deleted transcripts stay deleted.
+
+---
+
+### 16. Self-Hosted Runner / Remote Control Binary Cleanup Fixed
+
+**Fixed:** `claude remote-control` hosts, background daemon, and self-hosted runners failed to start new sessions (`spawn ENOENT`) after an update or version cleanup removed the binary of a still-running process.
+
+**Now:** Binary cleanup waits for running processes.
+
+---
+
+### 17. Running Process Owned by Another User Protected
+
+**Fixed:** A running Claude Code process owned by another user (e.g., `sudo claude`) was treated as dead by version cleanup, which could delete its binary.
+
+**Now:** Processes owned by other users are protected.
+
+---
+
+### 18. `/remote-control` Availability After Failed Connection
+
+**Fixed:** `/remote-control` showed a session as available after a failed connection.
+
+**Now:** Status reflects actual connection state.
+
+---
+
+### 19. `/design revoke` Error Reporting
+
+**Fixed:** `/design revoke` reported success when the request failed with a 404.
+
+**Now:** Errors surface correctly.
+
+---
+
+### 20. Shell Command Working Directory After Restart
+
+**Fixed:** A shell command approved after a self-hosted runner or cloud session restart ran in the session's start folder, not the folder it was asked in.
+
+**Now:** Commands run in the correct working directory.
+
+---
+
+### 21. Connector Tool Availability After Cloud Restart
+
+**Fixed:** Claude wasn't told when an approved connector tool was unavailable after a cloud session restart.
+
+**Now:** Tool availability syncs correctly.
+
+---
+
+### 22. Cloud Session Mid-Turn Stop on Upload Refusal
+
+**Fixed:** Cloud sessions were stopped in the middle of a turn when the service refused uploads for several minutes.
+
+**Now:** Sessions handle upload backpressure gracefully.
+
+---
+
+### 23. `CLAUDE_ENV_FILE` Variables Reach Bash Tool
+
+**Fixed:** Variables a `Setup` hook writes to `CLAUDE_ENV_FILE` weren't reaching the Bash tool in some cloud sessions.
+
+**Now:** Environment variables propagate correctly.
+
+---
+
+### 24. iPhone App Turn Status Accuracy
+
+**Fixed:** The iPhone app showed a cloud session's turn as finished while it kept running, after a response was cut off at a tool call or a refused image/document was removed.
+
+**Now:** Turn status is accurate.
+
+---
+
+### 25. Restarted Session Message Ordering
+
+**Fixed:** A restarted session re-sent a message that failed with an API error, ahead of the newer message waiting behind it.
+
+**Now:** Message ordering preserved.
+
+---
+
+### 26. Restarted Session Interrupted Turn Preservation
+
+**Fixed:** A restarted session dropped its interrupted turn when the restart came right after Claude read a large image or retried a tool call.
+
+**Now:** Interrupted turns preserved.
+
+---
+
+### 27. `NODE_EXTRA_CA_CERTS` Empty/Damaged File Handling
+
+**Fixed:** Every connection failed when the `NODE_EXTRA_CA_CERTS` file was empty, not PEM, or started with a damaged certificate.
+
+**Now:** Readable certificates are used with a warning on stderr.
+
+---
+
+### 28. Workflow Re-Runs After Usage Limit
+
+**Fixed:** Workflows re-ran finished agents when resumed after a usage limit.
+
+**Now:** Finished agents stay finished.
+
+---
+
+### 29. `/mcp` Tool Counting in Cloud Sessions
+
+**Fixed:** `/mcp` in cloud sessions counted tools the model can't use.
+
+**Now:** A server's row shows how many of its tools are actually available.
+
+---
+
+### 30. Duplicate PushNotification Notification Fixed
+
+**Fixed:** A duplicate notification when Claude left the status field out of a PushNotification call.
+
+**Now:** Single notification.
+
+---
+
+### 31. Too-Large Image Error Accuracy
+
+**Fixed:** The error for a too-large image in a request with >20 images always said the limit was 2000px.
+
+**Now:** Shows the API's actual limit.
+
+---
+
+### 32. Background Shell Runtime Updates
+
+**Fixed:** Runtime in background shell details didn't update while the dialog was open.
+
+**Now:** Runtime updates live.
+
+---
+
+### 33. Mod `turn.step` Hook Success Reporting
+
+**Fixed:** A mod's `turn.step` hook made a stopped reply finish as success in headless runs.
+
+**Now:** Stopped replies report correctly.
+
+---
+
+### 34. Retention Cleanup Backup Safety
+
+**Fixed:** Retention cleanup left a home that only runs `claude -p` with no `~/.claude.json` backup.
+
+**Now:** Takes a fresh backup before deleting the last good one.
+
+---
+
+### 35. Stored Login Network Home Directory Safety
+
+**Fixed:** The stored login was replaced by an empty file when a network home directory had no room left for data but still took new files.
+
+**Now:** Login file protected from corruption.
+
+---
+
+### 36. `setup-token` on `forceLoginOrgUUID` Machines
+
+**Fixed:** Tokens from `setup-token` were refused at start on machines with `forceLoginOrgUUID`, when the token belonged to a permitted organization.
+
+**Now:** Permitted org tokens accepted.
+
+---
+
+### 37. Non-Interactive Launch Corrupt `~/.claude.json` Handling
+
+**Fixed:** Non-interactive launches replaced a `~/.claude.json` that wasn't valid JSON with defaults.
+
+**Now:** Start fails, says how to restore the file, and leaves it as is ([#87551](https://github.com/anthropics/claude-code/issues/87551)).
+
+---
+
+### 38. Empty `~/.claude.json` Handling
+
+**Fixed:** An empty `~/.claude.json` with no backup was reported as corrupted.
+
+**Now:** Claude Code starts as it does when the file is missing.
+
+---
+
+### 39. Restore Command for Damaged Config Accuracy
+
+**Fixed:** The restore command printed for a damaged or missing `~/.claude.json` named an empty or cut-off backup, or failed on a read-only file.
+
+**Now:** Restore command is accurate.
+
+---
+
+### 40. Sign-In Failure on Time Limit — Clear Messaging
+
+**Fixed:** The sign-in failure when a stored `claude.ai` login reaches its time limit was unclear.
+
+**Now:** It says so, and in `claude -p` names `claude auth login` and `claude setup-token`.
+
+---
+
+### 41. Network Home Directory Config Survival
+
+**Improved:** How `~/.claude.json`, settings files, and stored login survive saves on shared network home directories — they are less often deleted, briefly emptied, or replaced by a near-empty or older copy.
+
+---
+
+### 42. Network File System Session Reliability
+
+**Improved:** Sessions on network file systems look again when the configuration file is wrongly reported as missing, so fewer start without your MCP servers and trusted folders.
+
+---
+
+### 43. MCP Tool Errors — Input Schema Returned
+
+**Improved:** MCP tool errors: a call made before the tool is loaded now returns its input schema.
+
+---
+
+### 44. Git Commit/PR Reliability on macOS Bash
+
+**Improved:** Reliability of git commits and pull request creation when the Bash tool runs macOS's built-in `/bin/bash`.
+
+---
+
+### 45. Usage Limit Menu — Single-Step Admin Request
+
+**Improved:** "Ask your admin for more usage" in the usage limit menu sends the request in one step.
+
+---
+
+### 46. Remote Session Reconnect Speed
+
+**Improved:** How fast remote sessions reconnect after a pause or sleep.
+
+---
+
+### 47. Toast Messaging — "Try Again" Instead of "Press 2"
+
+**Improved:** "You should know" toasts say "try again" instead of "press 2" (which only works in terminal).
+
+---
+
+### 48. Auto-Update Reliability
+
+**Improved:** A brief network failure while verifying a release is now retried right away instead of waiting for the next check.
+
+---
+
+### 49. Unattended Runs — No Unnecessary Config Rewrites
+
+**Improved:** Unattended runs (`claude -p`, SDK apps) stop rewriting `~/.claude.json` on every run when nothing in it changed.
+
+---
+
+### 50. IDE Extension Auto-Install Removed
+
+**Changed:** Claude Code no longer installs or updates the IDE extension when started in an IDE terminal. Use `/ide` from an outside terminal or your editor's extensions view.
+
+---
+
+### 51. Subagent Model Switching Behavior
+
+**Changed:** Subagents stop instead of switching models when "Switch models when a message is flagged" is set to "Ask each time".
+
+---
+
+### 52. Background Subagent Shell Command Backgrounding
+
+**Changed:** Background subagents move a shell command to the background after 3 minutes on all providers, so the prompt cache doesn't expire while it runs.
+
+---
+
+### 53. Subagent Progress Summaries on Cold Cache
+
+**Changed:** Subagent progress summaries on Bedrock, Vertex, Foundry, or with telemetry off: on a cold prompt cache, one can now wait up to 5 minutes for the subagent's pending response.
+
+---
+
+### 54. Mod `prompt.submit` Attachment Location
+
+**Changed:** What a mod attaches at `prompt.submit` stays in the user's turn rather than go out as a system message.
+
+---
+
+### 55. `deniedMcpServers` URL Matching Expanded
+
+**Changed:** `deniedMcpServers` URL entries also block Anthropic-provided servers whose upstream URL matches, and connectors in cloud sessions and on self-hosted runners, where the session is given the connector's own URL; otherwise deny a connector by name.
+
+---
+
+### 56. `/permissions` Dialog Standardization
+
+**Changed:** The `/permissions` rule details, built-in rules, and delete confirmation views use the standard dialog; pressing Ctrl+C twice there now goes back or cancels instead of quitting.
+
+---
+
+### 57. Managed Agents Onboard Default Permissions
+
+**Changed:** `/claude-api managed-agents-onboard` gives a new agent's built-in tools and a quickstart template's MCP tools the `auto` permission policy ("Judge risky actions") by default, matching the Claude Console; say "run without asking" to opt out.
+
+---
+
+### 58. Removed 2.1.288 Thinking Preservation on Resume
+
+**Removed:** The 2.1.288 fix that kept the model's earlier thinking when resuming a conversation started on 2.1.286 or earlier; that thinking can now be dropped.
+
+---
+
+### 59. Gateway: Google Access Token Expiry Warning
+
+**Gateway:** Added a log warning when the Google access token from a federation (`external_account`) credentials file is about to expire.
+
+---
+
+### 60. Gateway: `listen.trusted_proxies` Log Hints
+
+**Gateway:** Improved log hints about `listen.trusted_proxies`: they now say to list only a proxy that adds the connecting address to `X-Forwarded-For` itself.
+
+---
+
+### 61. Gateway: AWS CountTokens Failure Warning
+
+**Gateway:** Improved the warning when AWS CountTokens fails on Amazon Bedrock: it says Claude Code, not the gateway, counts after the 501, and points at IAM only when AWS denies access.
+
+---
+
+### 62. Self-Hosted Runner: `CLAUDE_RUNNER_SPAWN_REASON`
+
+**Self-Hosted Runner:** Added `CLAUDE_RUNNER_SPAWN_REASON` to the orchestrator's spawn-runner hook environment: why Anthropic sent the request (e.g., `runner_lost`, `resumed`); unset when none was sent.
+
+---
+
+### 63. Self-Hosted Runner: `--release-idle-session-min` Warning
+
+**Self-Hosted Runner:** Added a startup warning when `--release-idle-session-min` is the last argument with no value (still ignored) or has a value of only spaces (still read as `0`).
+
+---
+
+### 64. Self-Hosted Runner: Orchestrator Log Lines Improved
+
+**Self-Hosted Runner:** Changed orchestrator log lines: `ok session=…` now prints at every log level on stdout (was debug only, stderr) with `reason=…` after `jti=…`, and `nack session=…` ends its fields with `reason=…` after `retryable=…`; update scripts that match `retryable=true:` or `retryable=false:`.
+
+---
+
+### 65. Remote Control: Missing Working Folder Error
+
+**Remote Control:** Fixed a misleading "spawn error: ENOENT" when a session's working folder is missing; the error now names the folder.
+
+---
+
+### 66. Remote Control: Fork Title Naming
+
+**Remote Control:** Improved the title a fork of a terminal fork is created with when the app doesn't set one: "Name (fork 2)".
+
+---
+
+### 67. VSCode: Organization Sign-In Refusal Background Process
+
+**VSCode:** Fixed a window whose sign-in the organization's settings refuse starting a new Claude Code process in the background every minute.
+
+---
+
+### 68. VSCode: Chat Panel Error Banner Close Button
+
+**VSCode:** Fixed a long word in the chat panel's error banner pushing its close button out of view.
+
+---
+
+### 69. VSCode: Sign-In Screen Error Display
+
+**VSCode:** Improved the sign-in screen to show what Claude Code printed when its sign-in status check fails.
+
+---
+
+### 70. Cloud Sessions: No Repository Option
+
+**Cloud Sessions:** Added a "No repository" option: a cloud session on an Anthropic-hosted environment can now start without picking a repository.
+
+---
+
+### 71. Cloud Sessions: Chrome Names for Tools
+
+**Cloud Sessions:** Added the usual Chrome names to cloud sessions, so tools other than Playwright can find the built-in Chromium through `google-chrome` and `CHROME_PATH`.
+
+---
+
+### 72. Cloud Sessions: Deleted Environment New Session Button
+
+**Cloud Sessions:** Added a "New session" button to the card shown when a cloud session's environment was deleted, where the message box is hidden.
+
+---
+
+### 73. Cloud Sessions: GitHub Actions Log Reading
+
+**Cloud Sessions:** Fixed reading GitHub Actions logs in cloud sessions: `gh run view --log` and `gh api` log requests now get the log in most environments, not an unreachable redirect.
+
+---
+
+### 74. Cloud Sessions: Create PR Failure Messages
+
+**Cloud Sessions:** Improved most Create PR failure messages in cloud and Remote Control sessions: they now give the reason or a link to GitHub instead of saying "Try again".
+
+---
+
+### 75. Cloud Sessions: Connector Search Results Clarity
+
+**Cloud Sessions:** Changed connector search results to tell Claude that the search covers only part of the connector directory.
+
+---
+
+### 76. Remote Control: Side-by-Side Checkout Folder Names
+
+**Remote Control:** Fixed side-by-side checkouts of one repository looking identical in the environment menu's Remote Control rows; each now shows its own folder name.
+
+---
+
+### 77. Claude Tag: Keyboard Focus & Screen Reader
+
+**Claude Tag:** Fixed keyboard focus and screen reader announcements in Claude Tag admin setup; pressing Escape in the connect form no longer also closes the Add dialog.
+
+---
+
+### 78. Code Review: Analytics Page Retry
+
+**Code Review:** Improved the Code Review analytics page to retry once after a server or network failure, then show a "Try again" banner instead of empty cards.
 
 ---
 
@@ -197,13 +763,14 @@ claude -p "quick task"  # Creates its own session, doesn't pollute parent
 
 | Version | Date | Type | Focus |
 |---------|------|------|-------|
-| **v2.1.317** | Nov 3, 2026 | **Patch (Latest)** | **80+ fixes: nested session ID, MCP disconnects, gateway 403/422, auth race, effortLevel, titles, screen reader, 5xx recovery, OTel, Windows paths, artifacts** |
+| **v2.1.318** | **Nov 4, 2026** | **Patch (Latest)** | **100+ fixes: mod effort, AWS assume_role, login expiry dates, 10-day warnings, --continue recovery, macOS bash leak, permission key races, MCP lock safety, cloud session reliability, IDE extension removal, 78 detailed fixes** |
+| **v2.1.317** | Nov 3, 2026 | Patch | 80+ fixes: nested session ID, MCP disconnects, gateway 403/422, auth race, effortLevel, titles, screen reader, 5xx recovery, OTel, Windows paths, artifacts |
 | v2.1.316 | Oct 31, 2026 | Patch | 60+ fixes: shell leaks, bash/PowerShell, network, Vertex/Bedrock, auto-mode, cloud sessions |
 | v2.1.315 | Oct 29, 2026 | Patch | Safety event telemetry |
 | v2.1.314 | Oct 28, 2026 | Patch | Permissions block writes, idle compaction |
 | v2.1.312 | Oct 25, 2026 | Patch | 80 fixes you actually feel |
 
-**Three patch releases in five days.** Each one sanding down friction. v2.1.317 is the capstone — the release where self-hosted runners, Desktop MCP, and gateway deployments all work reliably.
+**Four patch releases in ten days.** Each one sanding down friction. v2.1.317 fixed self-hosted runners, Desktop MCP, and gateway deployments. v2.1.318 adds mod effort control, AWS cost attribution, login expiry visibility, and 78 more fixes that make every deployment scenario more reliable.
 
 ---
 
@@ -219,7 +786,10 @@ claude -p "quick task"  # Creates its own session, doesn't pollute parent
 | **Rely on screen readers** | **Yes** — subagent spam fixed |
 | **Behind corporate firewall/region block** | **Yes** — clear error messages |
 | **Run `claude -p` in CI/CD** | **Yes** — exit codes now accurate |
-| **On v2.1.316 and happy** | **Yes** — these fixes compound daily |
+| **Write mods that spawn quick side jobs** | **Yes** — `effort: "low"` saves tokens |
+| **Track AWS costs per developer across accounts** | **Yes** — `assume_role` enables cross-account attribution |
+| **Want 10-day warning before sign-in expires** | **Yes** — `loginExpiresAt` + stderr warning |
+| **On v2.1.317 and happy** | **Yes** — these fixes compound daily |
 
 ---
 
@@ -234,7 +804,7 @@ claude update
 
 # Verify
 claude --version
-# Should show 2.1.317
+# Should show 2.1.318
 ```
 
 **First things to verify after update:**
@@ -255,23 +825,35 @@ claude -p "test"  # Should create own session
 
 # 5. Test effortLevel in Desktop Code tab
 # Set project effortLevel → open Code tab new session → check effort used
+
+# 6. Test mod effort control
+# Create mod with fork.effort: "low" → verify side job runs at low effort
+
+# 7. Test login expiry visibility
+claude auth status  # Should show loginExpiresAt
+
+# 8. Test --continue recovery
+# Simulate malformed tool call → --continue should recover history
 ```
 
 ---
 
 ## The Bottom Line
 
-**v2.1.316 fixed the plumbing. v2.1.317 fixes the edge cases that plumbing missed.**
+**v2.1.316 fixed the plumbing. v2.1.317 fixed the edge cases. v2.1.318 adds the capabilities that make production deployments effortless.**
 
 - **Self-hosted runners** → nested sessions isolated
 - **Desktop MCP** → connections persist
 - **Gateway deployments** → auto-mode survives safety checks
-- **Auth** → no more race conditions
+- **Auth** → no more race conditions, 10-day expiry warnings
 - **Pre-started sessions** → respect your config
 - **Accessibility** → screen reader spam gone
-- **Enterprise** → clear errors, reliable recovery
+- **Enterprise** → clear errors, reliable recovery, AWS cost attribution
 - **Windows** → deep paths work
 - **Scale** → 200+ artifacts shared
+- **Mods** → effort control for quick side jobs
+- **Cloud sessions** → restart reliability, GitHub Actions logs, PR failure clarity
+- **Config** → atomic MCP changes, corrupt JSON handling, network home survival
 
 This isn't a feature release. It's the **reliability layer** that makes every deployment scenario — self-hosted, Desktop, gateway, cloud, CI/CD — actually usable in production.
 
@@ -280,7 +862,7 @@ claude update
 # Self-hosted runners clean
 # Desktop MCP stays connected
 # Gateway 403/422 handled
-# Auth status waits
+# Auth status waits + 10-day warnings
 # EffortLevel respected
 # Titles persist
 # Screen readers quiet
@@ -288,6 +870,10 @@ claude update
 # OTel proxy works
 # Windows deep paths work
 # Artifacts scale
+# Mods: effort control
+# AWS: assume_role for cost attribution
+# Cloud: restart reliability, gh logs, PR failures
+# Config: atomic, survives network homes
 ```
 
 ---
@@ -310,6 +896,6 @@ claude update
 
 ---
 
-*Claude Code is available at [claude.ai/code](https://claude.ai/code) and [github.com/anthropics/claude-code](https://github.com/anthropics/claude-code). Published November 3, 2026 — covers Claude Code v2.1.317 stable released November 3, 2026. Full changelog: [github.com/anthropics/claude-code/releases/tag/v2.1.317](https://github.com/anthropics/claude-code/releases/tag/v2.1.317)*
+*Claude Code is available at [claude.ai/code](https://claude.ai/code) and [github.com/anthropics/claude-code](https://github.com/anthropics/claude-code). Published November 3, 2026 — updated November 4, 2026 — covers Claude Code v2.1.318 stable released November 4, 2026. Full changelog: [github.com/anthropics/claude-code/releases/tag/v2.1.318](https://github.com/anthropics/claude-code/releases/tag/v2.1.318)*
 
 *Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
