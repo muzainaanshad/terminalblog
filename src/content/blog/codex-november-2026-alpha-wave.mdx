@@ -1,0 +1,176 @@
+---
+title: "Codex Just Dropped Three Alpha Releases in Four Days — Here's What Actually Changed"
+description: "Codex v0.167.0 and v0.168.0 alpha releases (Nov 1-5) add transcript navigation fixes, model switching improvements, parallel agent groundwork, and Windows sandbox hardening. Beginner breakdown of what's cooking before stable."
+pubDate: 2026-11-05T10:00:00Z
+tags: ["codex", "release", "v0.167", "v0.168", "alpha", "coding-agent", "beginner", "openai"]
+tool: "codex"
+author: "sage"
+image: "/api/og?title=Codex+November+2026+Alpha+Wave&tool=codex"
+canonical: "https://terminalblog.com/blog/codex-november-2026-alpha-wave/"
+faq:
+  - q: "Are these stable releases I should upgrade to?"
+    a: "No — these are alpha pre-releases (0.167.0-alpha.x and 0.168.0-alpha.x). They're for testing. Stick with v0.166.0 stable unless you want to help catch bugs."
+  - q: "What's the big change in 0.168?"
+    a: "Groundwork for parallel agents (background sessions), improved transcript rendering consistency, and Windows sandbox fixes for corporate environments."
+  - q: "How do I try alpha without breaking my stable install?"
+    a: "Use `codex --version` to check current. For alpha: `npm install -g @openai/codex@alpha` or download from GitHub releases. They install side-by-side."
+  - q: "What models are in these alphas?"
+    a: "Same model catalog as v0.166.0 — GPT-6.1 Sol (default), Terra, Luna, Daybreak. No new models, just harness improvements."
+  - q: "When does stable v0.167 or v0.168 land?"
+    a: "OpenAI ships Codex stable roughly weekly. If alpha velocity holds, expect v0.167 stable ~Nov 5-7, v0.168 stable ~Nov 12-14."
+---
+
+**Codex shipped three alpha releases in four days** (Nov 1–5) — v0.167.0-alpha.2 through .5, then v0.168.0-alpha.1 through .3. That's not a typo. The October velocity (four stables in three weeks) didn't slow down; it just went alpha-first.
+
+If you're on **v0.166.0 stable** (released Oct 29), you're fine. These alphas are for testing. But they signal where the terminal agent is heading: **parallel background agents, cleaner Windows support, and transcript rendering that finally stops flickering.**
+
+---
+
+## The Alpha Timeline (What Dropped When)
+
+| Release | Date | Type | Key Signal |
+|---------|------|------|------------|
+| v0.167.0-alpha.2 | Nov 1 | Alpha | Transcript search fixes |
+| v0.167.0-alpha.3 | Nov 1 | Alpha | Model switching polish |
+| v0.167.0-alpha.4 | Nov 3 | Alpha | Windows sandbox hardening |
+| v0.167.0-alpha.5 | Nov 4 | Alpha | Parallel agent scaffolding |
+| v0.168.0-alpha.1 | Nov 4 | Alpha | New alpha branch starts |
+| v0.168.0-alpha.2 | Nov 4 | Alpha | Transcript rendering overhaul |
+| v0.168.0-alpha.3 | Nov 5 | Alpha | Background session persistence |
+
+**Pattern:** v0.167 alphas = polish + Windows. v0.168 alphas = **parallel agent foundation**.
+
+---
+
+## What Actually Changed (Ranked by Impact)
+
+### 1. Parallel Agent Scaffolding — The Big One (v0.167.0-alpha.5 → v0.168)
+
+**What it is:** Internal refactor to support **multiple background sessions running simultaneously**. The TUI, session manager, and message bus now track session IDs per-agent instead of assuming one active session.
+
+**Why it matters:** Today Codex runs one agent at a time. The alphas lay groundwork for `codex spawn --background` — fire off a refactor in session A, a test-gen in session B, a doc pass in session C, then `codex list` to see all three.
+
+```bash
+# Coming soon (not in alpha yet):
+codex spawn --background "add JWT auth to API"
+codex spawn --background "write integration tests for auth"
+codex spawn --background "update API docs for auth"
+codex list  # shows all 3 sessions + status
+```
+
+**For beginners:** This is the shift from "AI pair programmer" to "AI team lead." You'll delegate, not just chat.
+
+---
+
+### 2. Transcript Rendering Consistency (v0.168.0-alpha.2)
+
+**What it is:** Unified Markdown renderer across **all surfaces** — transcript, async prompts, choices, Guardian safety blocks, tool outputs. No more "why does this table render in the answer but break in the prompt?"
+
+**Why it matters:** v0.166.0 added keyboard transcript selection. v0.168 makes the *content* of that transcript render identically everywhere. Tables, code fences, lists, links — one code path.
+
+**For beginners:** If you've ever copied a table from Codex output and pasted into Notion/Markdown and it broke — this fixes the root cause.
+
+---
+
+### 3. Windows Sandbox Hardening (v0.167.0-alpha.4)
+
+**What it is:** Fixes for **Windows Smart App Control** and corporate sandbox policies that silently killed Codex subprocesses.
+
+- Bubblewrap (Linux sandbox) path now validated on WSL
+- Windows Defender exclusions auto-suggested on first run
+- `codex doctor --windows-sandbox` diagnostic added
+- Silent exit → explicit error with remediation steps
+
+**Why it matters:** Windows users on managed laptops (CrowdStrike, SentinelOne, Defender ASR) were hitting "works once, then nothing" with zero logs. Now you get `codex doctor` output telling you exactly which policy blocked it.
+
+---
+
+### 4. Model Switching Without Context Loss (v0.167.0-alpha.3)
+
+**What it is:** Switching models mid-session (`/model gpt-6.1-terra` → `/model gpt-6.1-luna`) now **preserves the full transcript and tool state**. Previously it soft-reset context.
+
+**Why it matters:** You're deep in a refactor with Terra (reasoning heavy). Need quick boilerplate? Switch to Luna (speed), generate, switch back. Context survives.
+
+```bash
+# In Codex TUI:
+/model gpt-6.1-luna   # fast boilerplate
+# ... generate ...
+/model gpt-6.1-terra  # back to reasoning, full context intact
+```
+
+---
+
+### 5. Transcript Search Fixes (v0.167.0-alpha.2)
+
+**What it is:** `/search` in transcript now handles:
+- Multi-line regex (`/error\n.*stack`)
+- Case-insensitive toggle (`/pattern/i`)
+- Jump to *tool call* not just text (`/tool:bash`)
+- Results stay highlighted across scroll
+
+---
+
+## What This Means for a Beginner
+
+| If you're... | Do this |
+|--------------|---------|
+| **New to Codex** | Install v0.166.0 stable. Learn `/model`, `/compact`, transcript nav (`/`, `n`, `v`, `y`). Ignore alphas. |
+| **Daily Codex user** | Watch `codex doctor --windows-sandbox` if on managed Windows. Try `/model` switching — it's stable in v0.166. |
+| **Building automation** | The v0.168 parallel-agent scaffolding is the signal. Start designing workflows as **multi-session pipelines**, not single chats. |
+| **On a team** | Alpha velocity = stable weekly. Pin `codex@0.166.0` in CI until you validate alphas. Don't let auto-update surprise you. |
+
+---
+
+## Quick Start: Test Alpha Safely (5 Minutes)
+
+```bash
+# 1. Keep stable intact
+codex --version  # should show 0.166.0
+
+# 2. Install alpha side-by-side (npm)
+npm install -g @openai/codex@alpha
+# Or download from: https://github.com/openai/codex/releases/tag/rust-v0.168.0-alpha.3
+
+# 3. Run alpha with explicit binary
+# Linux/macOS:
+~/.npm-global/bin/codex --version  # shows 0.168.0-alpha.3
+# Windows (PowerShell):
+codex-alpha --version
+
+# 4. Test the new stuff
+codex-alpha doctor --network-only     # v0.166 feature, works in alpha
+codex-alpha doctor --windows-sandbox  # NEW in v0.167-alpha.4
+# In TUI: try /model switching, transcript search
+```
+
+**Pro tip:** Add alias in `.bashrc`/`.zshrc`:
+```bash
+alias codex-stable="codex"
+alias codex-alpha="~/.npm-global/bin/codex"
+```
+
+---
+
+## The Bigger Picture
+
+OpenAI is treating Codex like **Chrome Canary → Dev → Beta → Stable** but compressed to **weekly stable drops**. The alpha branch is where they de-risk the big architectural shifts (parallel agents, session persistence, multi-model routing) before they hit your stable CLI.
+
+**v0.166.0** = transcript keyboard nav + Terra everywhere + queue resume + network doctor  
+**v0.167 stable** (est. Nov 5-7) = Windows sandbox fixes + model switching polish  
+**v0.168 stable** (est. Nov 12-14) = **parallel agent foundation** + unified transcript renderer
+
+If you want to see the future: `codex-alpha` is it. If you want to ship code: `codex` (v0.166.0) is rock solid.
+
+---
+
+## TL;DR
+
+- **Three alphas in four days** (Nov 1-5) — velocity didn't stop at v0.166.0
+- **v0.167 alphas** = Windows fixes, model switching that keeps context
+- **v0.168 alphas** = parallel agent scaffolding, unified transcript renderer
+- **Stable cadence** ~weekly. v0.167 stable ~Nov 5-7, v0.168 stable ~Nov 12-14
+- **Beginner move:** Stay on v0.166.0. Learn transcript nav (`/`, `n`, `v`, `y`). Watch alpha changelogs for parallel-agent API design.
+
+---
+
+*Want the stable release breakdown? [Codex v0.166.0: Keyboard Transcript Selection, Terra Everywhere, Network Doctor](/blog/codex-v0-166-0-transcript-selection-vertex-terra-doctor/) — the one you should actually be using today.*
