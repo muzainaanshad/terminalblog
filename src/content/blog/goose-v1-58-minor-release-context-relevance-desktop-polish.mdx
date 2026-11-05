@@ -1,0 +1,247 @@
+---
+title: "Goose v1.58 Just Added Context Relevance Scoring, Collapsed Thinking by Default, and Cleaned Up Desktop UX"
+description: "Goose v1.58.0 (Nov 3) is a minor release adding opt-in context relevance operation, desktop thinking collapse by default with a setting, removed tool-specific call titles, fixed computer controller screenshot tool leak, and merged 27 commits since v1.57. The polish that makes the agent feel intentional."
+pubDate: 2026-11-05T10:00:00Z
+tags: ["goose", "release", "v1.58.0", "context-relevance", "desktop", "thinking", "coding-agent", "beginner", "open-source"]
+tool: "goose"
+author: "Anshad"
+image: "/api/og?title=Goose+v1.58+Context+Relevance&tool=goose"
+canonical: "https://terminalblog.com/blog/goose-v1-58-minor-release-context-relevance-desktop-polish/"
+faq:
+  - q: "What's the biggest new feature in v1.58?"
+    a: "Opt-in context relevance operation (#12589) — a new way to measure and surface how relevant context is to the current task, helping the agent focus on what matters."
+  - q: "What changed with thinking in the desktop app?"
+    a: "Thinking is now collapsed by default with a new setting to control it (#12660). Cleaner UI, less visual noise, you expand when you want to see the reasoning."
+  - q: "Are there breaking changes?"
+    a: "No. This is a minor version bump (1.57 → 1.58) with polish, new opt-in features, and 27 merged commits. Safe to upgrade."
+  - q: "What was the 'screenshot tool exists' fix?"
+    a: "The computer controller was telling the model a screenshot tool exists even when it wasn't available (#13279). Fixed — the model only sees tools that are actually usable."
+  - q: "How do I upgrade?"
+    a: "CLI: `goose upgrade` or re-run installer. Desktop: auto-updater handles it. Docker: `docker pull ghcr.io/block/goose:latest`. Windows: NSIS installer from releases."
+---
+
+**Goose v1.58.0 dropped November 3, 2026** — and this minor release (1.57 → 1.58) ships 27 commits of polish that make the agent feel *intentional*. **Context relevance scoring (opt-in). Thinking collapsed by default in Desktop. Tool call titles cleaned up. Computer controller stopped lying about screenshot tools.**
+
+If v1.57 hardened security (HTTPS allowlist, redirect validation) and fixed embedding (caller-supplied session IDs) — v1.58 refines the *experience* of using Goose daily.
+
+---
+
+## The One-Line Summary
+
+**v1.58.0 (Nov 3) → Context relevance operation (opt-in), Desktop thinking collapsed by default + setting, tool call titles removed, computer controller screenshot fix, 27 commits since v1.57. Zero breaking changes.**
+
+---
+
+## The Headline Features (Ranked by Daily Impact)
+
+### 1. Context Relevance Operation — Opt-In, Measures What Matters
+
+**What it is:** A new **opt-in context relevance operation** (#12589) that scores how relevant retrieved context is to the current task. The agent can now evaluate whether the context it pulled actually helps — or if it's just noise.
+
+**Why it matters:** RAG and context retrieval often dump irrelevant files into the prompt. This gives the agent a **relevance signal** — it can deprioritize or discard low-score context, keeping the context window focused.
+
+```bash
+# Enable in config (opt-in)
+# goose.json
+{
+  "contextRelevance": {
+    "enabled": true,
+    "threshold": 0.7  # only keep context above 70% relevance
+  }
+}
+```
+
+**For beginners:** You don't need to configure this. It's opt-in. But when you hit "why is the agent hallucinating from irrelevant files?" — this is the knob you'll want.
+
+---
+
+### 2. Desktop: Thinking Collapsed by Default + Setting to Control It
+
+**What it is:** **Thinking/reasoning blocks are now collapsed by default** in the Desktop app (#12660), with a new setting to toggle the behavior.
+
+**Why it matters:** 
+- **Cleaner UI** — you see the answer first, expand thinking only when you want to audit the reasoning
+- **Configurable** — if you *like* seeing the raw reasoning stream, flip the setting back
+- **Less visual noise** — especially on smaller screens or when running multiple agents side-by-side
+
+```bash
+# Settings → Desktop → "Collapse thinking by default" (now ON by default)
+# Toggle OFF if you prefer the v1.57 behavior (always expanded)
+```
+
+**For beginners:** This is the "it just looks cleaner" update. You'll notice the chat feels less cluttered immediately.
+
+---
+
+### 3. Desktop: Tool Call Titles Removed — Cleaner Conversation Flow
+
+**What it is:** **Tool-specific tool call titles have been dropped** in the Desktop UI (#13107). Instead of verbose titles like "Read file: src/auth/login.ts" or "Bash: npm test", you now get cleaner, consistent tool call display.
+
+**Why it matters:** 
+- **Less visual clutter** in long agent sessions
+- **Consistent formatting** — tool calls look uniform regardless of type
+- **Easier scanning** — your eye catches the *action*, not the label
+
+---
+
+### 4. Computer Controller: Stopped Lying About Screenshot Tool
+
+**What it is:** The computer controller was **telling the model a screenshot tool exists** even when it wasn't available (#13279). Fixed — the model now only sees tools that are actually usable in the current environment.
+
+**Why it matters:** 
+- **No more hallucinated tool calls** — the agent won't try to call `screenshot` if it's not configured
+- **Cleaner tool schema** — only real capabilities exposed
+- **Trust** — the model's tool awareness matches reality
+
+---
+
+## The 27-Commit Polish Layer (What You'll Feel)
+
+| Commit | What It Fixed | Why You'll Notice |
+|--------|---------------|-------------------|
+| `feat: context relevance operation` (#12589) | New relevance scoring for retrieved context | Agent stays focused on relevant files |
+| `feat(desktop): collapse thinking by default` (#12660) | Thinking blocks collapsed + setting | Cleaner chat UI, configurable |
+| `refactor(desktop): drop tool-specific titles` (#13107) | Uniform tool call display | Less noise in long sessions |
+| `fix(computercontroller): screenshot tool leak` (#13279) | Model only sees real tools | No phantom tool calls |
+| `fix(providers): replay OpenAI Responses reasoning` (#13222) | Reasoning preserved across tool turns | Consistent reasoning in multi-turn |
+| `fix(bedrock): route bare GPT IDs to Mantle` (#13211) | Correct routing for OpenAI-compatible | Azure/OpenAI endpoints work reliably |
+| `fix(litellm): use supports_vision from /model/info` (#13239) | Accurate vision capability detection | Vision models work without config |
+| `fix(openrouter): classify context_length_exceeded` (#13154) | Proper overflow handling | Compaction triggers correctly |
+| `fix(providers): honor Retry-After on 429s` (#12986) | Respects rate limit headers | Fewer failed requests, auto-backoff |
+| `feat: context window report and viewer` (#10462) | Visual context window usage | See token budget in real-time |
+| `fix(desktop): keep session load on replay fast path` (#13190) | Faster session resume | Instant restart, no loading spinner |
+| `fix(providers): replace retired Spark X2` (#12772) | Updated iFlytek provider | Provider catalog stays current |
+| `feat: AIHubMix declarative provider` (#12997) | New provider support | More model options |
+| `feat(providers): RouterPlex declarative provider` (#13068) | New provider support | More routing options |
+| `fix: show current session ID in /status` (#12607) | Session ID visible in CLI status | Easier debugging, embedding |
+| `docs: GDK navigation and developer guides` (#13165) | Better GDK docs | Easier to build on Goose |
+| `docs: feature GDK on main website` (#13245) | GDK visibility | Platform awareness |
+| `docs: code not the only way to contribute` (#13292) | Contributor onboarding | Community growth |
+| `fix(deps): cargo-deny advisories` (#13309) | Security dependency updates | Supply chain hygiene |
+| ...and 8 more fixes | Various stability | Smoother daily operation |
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **v1.58.0** | **Nov 3, 2026** | **Minor (Latest)** | **Context relevance, thinking collapse, tool title cleanup, screenshot fix, 27 commits** |
+| v1.57.0 | Oct 28, 2026 | Patch | HTTPS allowlist, redirect validation, caller session IDs, Linux icons, OpenRouter variants, Windows build |
+| v1.56.0 | Oct 23, 2026 | Patch | Automatic thinking, resume subagents, Windows NSIS, Boa JS, IO Intelligence |
+| v1.55.0 | Oct 16, 2026 | Patch | AI Gateway, ACP, session stop, x-request-id, leaner loop |
+| v1.54.0 | Oct 8, 2026 | Patch | HTML export, adaptive thinking, GPT-6.1-Sol aliases, system Node.js on Windows |
+
+**v1.57 hardened the boundaries. v1.58 refines the experience.**
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Want cleaner Desktop UI** | **Yes** — thinking collapsed, tool titles cleaned up |
+| **Hit context pollution (irrelevant files in prompt)** | **Yes** — enable context relevance operation |
+| **Use computer controller / desktop automation** | **Yes** — screenshot tool leak fixed |
+| **Embed Goose (IDE plugin, CI bot)** | **Yes** — session ID in `/status`, cleaner ACP |
+| **Use OpenRouter / LiteLLM / Bedrock** | **Yes** — provider fixes for routing, vision, rate limits |
+| **On v1.57 and stable** | **Yes** — zero breaking changes, pure polish |
+
+**No reason to wait.** This is the "v1.57 stable, now with better UX" release.
+
+---
+
+## How to Upgrade
+
+```bash
+# CLI
+goose upgrade
+
+# Or re-run the installer
+curl -fsSL https://raw.githubusercontent.com/block/goose/main/scripts/install.sh | bash
+
+# Desktop: auto-updater handles it (enabled since v1.49)
+# Windows: download NSIS installer from releases page
+# https://github.com/aaif-goose/goose/releases/tag/v1.58.0
+
+# Docker
+docker pull ghcr.io/block/goose:latest
+```
+
+**First things to try after update:**
+
+```bash
+# 1. Check Desktop thinking collapse
+# Launch Desktop → thinking blocks collapsed by default
+# Settings → toggle "Collapse thinking by default" to test both modes
+
+# 2. Enable context relevance (if you want it)
+# Edit goose.json → add contextRelevance.enabled: true
+# Watch agent discard low-relevance context
+
+# 3. Test computer controller
+# Ask agent to "take a screenshot" → only works if tool actually available
+# No more phantom tool in schema
+
+# 4. Check session ID in status
+goose status
+# Should show current session ID — useful for embedding
+
+# 5. Verify provider fixes
+# OpenRouter: test context overflow → proper compaction trigger
+# LiteLLM: vision models → auto-detected
+# Bedrock: bare GPT IDs → routed correctly
+```
+
+---
+
+## The Bottom Line
+
+**v1.57 said "security first." v1.58 says "experience matters too."**
+
+- **Context relevance** → agent focuses on what matters (opt-in, but powerful)
+- **Thinking collapsed** → Desktop feels cleaner, less overwhelming
+- **Tool titles gone** → conversation flow stays readable
+- **Computer controller honest** → model sees only real tools
+- **27 commits** → provider fixes, session visibility, GDK docs, dependency hygiene
+
+The pattern holds: **Goose isn't chasing shiny. It's hardening the security layer, the embedding layer, the desktop layer, the thinking layer, and now the *context quality layer* — the things that matter when you run agents in production.**
+
+For a beginner, that means **fewer config surprises, fewer "why did it do that?" moments, a Desktop that feels polished.** For a builder, it means **Goose is becoming a platform you can ship on top of — securely, cleanly, intentionally.**
+
+```bash
+goose upgrade
+# Desktop: thinking collapsed, tool calls clean
+# Context relevance: opt-in focus
+# Computer controller: honest tools
+# Session ID: visible in status
+# Providers: routing fixed, vision detected, rate limits respected
+```
+
+---
+
+## Related Articles
+
+- [Goose v1.57 Just Made Thinking Automatic, Added HTTPS Allowlist Security, and Fixed Windows Build](/blog/goose-v1-57-automatic-thinking-windows-installer-security/)
+- [Goose v1.56 Just Learned to Think Automatically, Resume Crashed Subagents, and Got a Real Windows Installer](/blog/goose-v1-56-automatic-thinking-resume-subagents-windows-installer/)
+- [Goose v1.55 Just Gave You AI Gateway, Smarter ACP, and a Session That Stops When You Say Stop](/blog/goose-v1-55-ai-gateway-acp-session-control/)
+- [Goose Just Made Your Sessions Portable — HTML Export, Adaptive Thinking, and the v1.54 Wave](/blog/goose-v1-53-54-html-export-adaptive-thinking-wave/)
+- [Goose Just Got GPT-6 Astra and Web Search Built In — the September Wave Is Huge](/blog/goose-v1-50-gpt6-astra-web-search-security-wave/)
+- [Beware: Goose Review Arbitrary Command Execution via fsmonitor](/blog/beware-goose-review-arbitrary-command-execution-fsmonitor/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+- [Goose vs Claude Code: Extensibility Showdown](/blog/claude-code-vs-goose-extensibility-showdown/)
+- [Codex vs Goose: Parallel vs Extensible](/blog/codex-vs-goose-parallel-vs-extensible/)
+
+---
+
+## Related articles
+
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [Coding Agent Security Checklist 2026 — The Operators Hardening Guide](/blog/coding-agent-security-checklist-2026/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+
+---
+
+*Goose is open-source (Apache-2.0) and available at [github.com/aaif-goose/goose](https://github.com/aaif-goose/goose). Full changelog: [github.com/aaif-goose/goose/releases/tag/v1.58.0](https://github.com/aaif-goose/goose/releases/tag/v1.58.0). Published November 5, 2026 — covers Goose v1.58.0 stable released November 3, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
