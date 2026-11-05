@@ -1,0 +1,196 @@
+---
+title: "Zed v1.28.0-pre Just Made Git Fetch Automatic — And AI Agents Finally Stop Losing Context"
+description: "Zed's latest pre-release adds optional auto-fetch for Git, resizable Refs column in Git Graph, dragging Git Panel files into terminals, and mouse-wheel font zoom. The real win: Agent context compaction fixes that stop your AI from blowing past context limits mid-task."
+pubDate: 2026-11-05
+tags: ["zed", "release", "v1.28.0", "git", "ai-agents", "context-compaction", "beginner", "editor"]
+tool: "zed"
+author: "Anshad"
+image: "/api/og?title=Zed+v1.28.0-pre+Auto+Fetch+Agent+Fixes&tool=zed"
+canonical: "https://terminalblog.com/blog/zed-v1-28-0-pre-auto-git-fetch-agent-improvements/"
+---
+
+**Zed v1.28.0-pre dropped 7 hours ago** — and it's the kind of release that quietly fixes the things that make you want to throw your keyboard. Optional automatic Git fetching. A resizable Refs column in the Git Graph. Drag Git Panel files straight into your terminal. And the headline for AI users: **Agent context compaction finally works correctly.**
+
+---
+
+## The One-Line Summary
+
+**v1.28.0-pre (Nov 4) → Optional auto Git fetch, resizable Refs column, drag Git Panel files to terminal/editor, mouse-wheel font zoom in diffs/terminals, Agent compaction fixes (no more double-compaction, prompt cache reuse for ChatGPT, context window respect). Pre-release — install via Zed's pre-release channel.**
+
+---
+
+## The AI Agent Fixes (Why You're Here)
+
+### 1. Auto-Compaction No Longer Runs Once and Quits
+
+**What it was:** During a long agent turn, auto-compaction ran **once** — then stopped. Your thread could blow past the model's context window silently. Next thing you know: truncated context, lost reasoning, broken task.
+
+**What it is now:** Auto-compaction **repeats as needed** throughout long turns. It respects the context window continuously.
+
+```bash
+# Before: One compaction at turn start → hope it lasts
+# After:  Compaction triggers whenever context grows too large → stays in bounds
+```
+
+**Why it matters:** You can run hour-long refactors without babysitting the context window.
+
+---
+
+### 2. Prompt Cache Finally Reused for ChatGPT Subscriptions
+
+**What it was:** ChatGPT subscription models (via OpenAI) **never reused the prompt cache** during compaction. Every compaction = full reprocess = slower, more expensive.
+
+**What it is now:** Prompt cache **works for ChatGPT subs** during compaction. Compaction is faster, cheaper, and doesn't reset the model's "memory" of your project.
+
+---
+
+### 3. Agent `read_file` Output Truncated at 2,000 Chars/Line
+
+**What it was:** Agent reads a minified file or huge log line → 50,000 character line → context window explosion.
+
+**What it is now:** Lines >2,000 chars **auto-truncated** in `read_file` output. You get the signal, not the noise.
+
+---
+
+### 4. Agent Client Protocol (ACP) Compatibility Improved
+
+**What it is:** Better handling of:
+- Missing sessions (no more crashes)
+- Plan updates from agents
+- Diff format variations
+- Cancellation of permission requests
+
+**Why it matters:** If you use external agents (Claude Agent, OpenCode, etc.) via ACP — they integrate more reliably.
+
+---
+
+## The Git Workflow Upgrades (Daily Driver Stuff)
+
+### 5. Optional Automatic Git Fetching
+
+```json
+// settings.json
+{
+  "git.auto_fetch.enabled": true,
+  "git.auto_fetch.interval_secs": 60  // default
+}
+```
+
+**What it does:** Every 60 seconds (configurable), Zed fetches:
+- Current branch's upstream remote
+- Default branch's remote
+
+**Why it matters:** Your Git Graph, branch list, and status **stay current without you pressing Fetch**. No more "wait, my colleague pushed 20 minutes ago and I'm looking at stale branches."
+
+**Default: OFF.** Enable it if you want it.
+
+---
+
+### 6. Resizable "Refs" Column in Git Graph
+
+**What it is:** The Git Graph now has a **resizable Refs column** (toggle from column header context menu). Branch names, tags, remotes — all visible, sized how you want.
+
+---
+
+### 7. Drag Git Panel Files → Terminal / Editor
+
+**What it is:** Drag a file from the **Git Panel** (staged/unstaged changes) directly into:
+- A terminal pane → path pasted, ready to run
+- An editor pane → file opens
+
+**Why it matters:** "Copy path → cd → open" becomes **drag → drop → done**.
+
+---
+
+### 8. Search by Branch Name in Worktree Picker
+
+**What it is:** Worktree picker now has **branch name search**. Type "feat-auth" → see matching branches instantly.
+
+---
+
+## The Quality-of-Life Polish
+
+| Feature | What It Does |
+|---------|--------------|
+| **Mouse-wheel font zoom** | `Cmd+Scroll` (Mac) / `Ctrl+Scroll` (Linux/Win) in diffs & terminals |
+| **Debugger default size** | `debugger.default_width` / `debugger.default_height` settings |
+| **Call hierarchy spacing** | Readable spacing between item names and details |
+| **Linux NVIDIA startup** | Faster window startup on NVIDIA GPUs |
+| **Download reliability** | Checksum verification, failed HTTP rejection, partial cleanup |
+| **Windows session restore** | Fixed: launching Zed while running no longer blocks previous session restore |
+| **Tree-sitter crash** | Fixed: syntax highlighting failure no longer crashes editor |
+| **Vim visual-block hang** | Fixed: wrapped file edge case |
+| **Forgejo/Codeberg PRs** | Fixed: creating PRs from Zed now works |
+| **MCP servers on thread create** | Fixed: external agents get MCP config even if project folder still loading |
+| **Helix mode clipboard** | Fixed: `vim.use_system_clipboard: "always"` no longer overwrites system clipboard |
+| **Remote workspace files** | Fixed: local files no longer open as empty buffers |
+| **Remote project skills** | Fixed: mention/share/delete project skills in remote workspaces |
+| **Project Search pane focus** | Fixed: buttons in unfocused splits affect correct pane |
+| **npm agent install** | Fixed: `ERR_MODULE_NOT_FOUND` after interrupted/concurrent install |
+| **Windows SSH + Nushell** | Fixed: remote terminals/tasks work on Nushell default shell |
+| **Remote workspace merge** | Fixed: shared directory remotes no longer merge after restart |
+| **Multibuffer LSP data** | Fixed: stale language server data cleared |
+| **Remote Markdown SVG** | Fixed: SVG images render in Markdown previews |
+| **Windows synthetic mouse** | Fixed: cursor no longer jumps on window repaint |
+| **Git Panel empty state** | Fixed: "No Git Repositories" false positive after folder removal |
+| **Wayland busy cursor** | Fixed: global busy cursor lingers on GNOME |
+| **Remote skill creator** | Fixed: project skills save to remote, not local |
+| **Wide submenus** | Fixed: popovers no longer cover parent menu/button |
+| **Restricted mode hooks** | Fixed: worktree task hooks don't run in restricted mode |
+| **Open Remote scrollbar** | Fixed: missing scrollbar hidden additional servers |
+| **Org removal AI cleanup** | Fixed: AI features/edit predictions stop using removed org |
+| **Terminal panel reopen** | Fixed: `pane: reveal in project panel` no longer unexpectedly reopens terminal |
+| **Git Graph author alignment** | Fixed: names/avatars vertically aligned |
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Use AI agents heavily** | **Yes** — compaction fixes alone worth it |
+| **Work in team with frequent pushes** | **Yes** — auto-fetch keeps Git Graph current |
+| **Use ChatGPT subscription for agents** | **Yes** — prompt cache reuse = faster/cheaper compaction |
+| **Drag files from Git Panel often** | **Yes** — workflow speedup |
+| **Prefer stable only** | **Wait** — this is a pre-release |
+| **On v1.27.0 and happy** | **Optional** — pre-release channel only |
+
+**How to get it:** Enable pre-release updates in Zed settings, or install from the pre-release channel.
+
+---
+
+## The Bottom Line
+
+**Zed v1.28.0-pre is a "fix the paper cuts" release that happens to include the most important AI agent fix in months: context compaction that actually works for long tasks.**
+
+- **Auto Git fetch** → your Git Graph is never stale
+- **Drag Git Panel → terminal** → workflow muscle memory finally works
+- **Agent compaction repeats** → hour-long tasks don't blow context
+- **ChatGPT prompt cache** → compaction doesn't reset your project context
+- **ACP improvements** → external agents integrate cleaner
+
+For a beginner: **less "why is my agent confused?", less "where's the latest branch?", less manual fetching.** For a team: **shared Git state stays synced automatically.**
+
+```bash
+# Enable pre-release in Zed settings
+# Turn on auto-fetch:
+# settings.json → "git.auto_fetch.enabled": true
+# Drag a file from Git Panel to terminal
+# Watch agent run 2 hours without context issues
+```
+
+---
+
+## Related Articles
+
+- [Zed v1.27.0-pre — Go 1.27, AI Commits, Memory](/blog/zed-v1-27-0-pre-go127-ai-commits-memory/)
+- [Zed v1.26.1-pre — Pyrefly, Dwarf Debugging](/blog/zed-v1-26-1-pre-pyrefly-dwarf-debugging/)
+- [Zed v1.25-pre — Automatic Unfolding, Inlay Hints, Gemini Argon](/blog/zed-v1-25-pre-automatic-unfolding-inlay-hints-gemini-argon/)
+- [Zed Just Dropped GPT-6 Astra and Claude Opus 5.5 BYOK](/blog/zed-just-dropped-gpt6-astra-and-claude-opus-55-byok/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Zed v1.28.0-pre released November 4, 2026. Full changelog: [github.com/zed-industries/zed/releases/tag/v1.28.0-pre](https://github.com/zed-industries/zed/releases/tag/v1.28.0-pre). Pre-release — enable in settings to install.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
