@@ -1,0 +1,466 @@
+---
+title: "Beware: Trojanized Claude Code Extension in Cursor Marketplace Installed SSH Backdoors on 5,000+ Developers (Oct 29, 2026)"
+description: "A malicious Anthropic.claude-code extension (versions 2.1.312 and 2.1.313) was distributed through Cursor's official VS Code Extension Marketplace for 11 hours on October 29, 2026. It stole host credentials, planted an SSH backdoor, and attempted persistent reverse shells. Cursor confirmed up to 5,000 users received it. Here's what happened, IOCs, and how to check if you're compromised."
+pubDate: 2026-11-05
+tags: ["beware", "security", "cursor", "supply-chain", "ssh-backdoor", "marketplace", "trojanized-extension", "rce"]
+tool: "cursor"
+category: "Security"
+author: "Anshad"
+heroImage: "/api/og?title=Beware:%20Cursor%20Marketplace%20SSH%20Backdoor&tool=Cursor"
+canonical: "https://terminalblog.com/blog/beware-cursor-marketplace-trojanized-claude-code-extension-ssh-backdoor/"
+---
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Beware: Trojanized Claude Code Extension in Cursor Marketplace Installed SSH Backdoors on 5,000+ Developers (Oct 29, 2026)",
+  "description": "A malicious Anthropic.claude-code extension (versions 2.1.312 and 2.1.313) was distributed through Cursor's official VS Code Extension Marketplace for 11 hours on October 29, 2026. It stole host credentials, planted an SSH backdoor, and attempted persistent reverse shells. Cursor confirmed up to 5,000 users received it. Here's what happened, IOCs, and how to check if you're compromised.",
+  "datePublished": "2026-11-05",
+  "dateModified": "2026-11-05",
+  "author": {
+    "@type": "Person",
+    "name": "Anshad"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "TerminalBlog",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://terminalblog.com/favicon.ico"
+    }
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://terminalblog.com/blog/beware-cursor-marketplace-trojanized-claude-code-extension-ssh-backdoor/"
+  }
+})} />
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Which extension versions were malicious?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Anthropic.claude-code versions 2.1.312 and 2.1.313 for Windows (win32-x64) and macOS (darwin-arm64), distributed via the Cursor VS Code Extension Marketplace on October 29, 2026 between 02:27 PT and 13:35 PT."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I check if I'm affected?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Run the check commands below for your OS. Look for the 'svc-telemetry' SSH key in ~/.ssh/authorized_keys. If found, you're compromised."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Was Anthropic compromised?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Cursor confirmed these malicious versions were NOT developed by Anthropic. The attacker uploaded tampered VSIX packages to Cursor's marketplace, not to the official VS Code marketplace or Anthropic's distribution channels."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does uninstalling the extension fix it?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. The payload drops standalone persistence scripts (LaunchAgents on macOS, Scheduled Tasks on Windows) that keep running after extension removal. You must run the official remediation scripts."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What credentials should I rotate?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "All credentials accessible from the affected host: GitHub/GitLab tokens, AWS keys, SSH keys, API keys in ~/.env files, cloud CLI credentials (~/.aws, ~/.config/gcloud), and any secrets the backdoor could have accessed during its dwell time."
+      }
+    }
+  ]
+})} />
+
+## TL;DR
+
+**On October 29, 2026, a supply chain attack compromised Cursor's official VS Code Extension Marketplace.** A malicious actor uploaded trojanized versions of the popular `Anthropic.claude-code` extension (versions **2.1.312** and **2.1.313**) that were available for **11 hours (02:27–13:35 PT)**. Up to **5,000 developers** installed them.
+
+The malicious extension:
+- **Steals host reconnaissance data** (hostname, username, OS, public IP, Git email, working directories, environment variables)
+- **Plants an SSH backdoor** (adds attacker's `svc-telemetry` ed25519 key to `authorized_keys`)
+- **Attempts persistent reverse SSH tunnels** (every 60 seconds via LaunchAgent/macOS or Scheduled Task/Windows)
+- **Drops standalone persistence scripts** that survive extension uninstallation
+
+**Cursor has published official remediation scripts and IOCs.** If you installed or updated `Anthropic.claude-code` from the Cursor marketplace on Oct 29, **you must check for compromise immediately** — uninstalling the extension is NOT sufficient.
+
+---
+
+## What Happened
+
+### The Incident Timeline
+
+| Time (PT) | Event |
+|-----------|-------|
+| **Oct 29, 02:27** | Malicious `Anthropic.claude-code` 2.1.312 published to Cursor marketplace |
+| **Oct 29, ~09:00** | Version 2.1.313 published (updated payload) |
+| **Oct 29, 13:35** | Cursor detects and removes malicious versions; shuts down marketplace |
+| **Oct 29, evening** | Marketplace rebuilt, keys rotated, brought back online |
+| **Oct 30, 11:30** | Cursor publishes security notice with IOCs and remediation scripts |
+
+### How the Attack Worked
+
+The attacker **did not compromise Anthropic or the official VS Code Marketplace**. They targeted **Cursor's proprietary extension marketplace** (`cursor.com/marketplace`), which hosts VS Code-compatible extensions curated by Cursor.
+
+1. **Attacker created tampered VSIX packages** — Took the legitimate `Anthropic.claude-code` extension, injected malicious code into `extension.js`, repackaged as versions 2.1.312 and 2.1.313.
+2. **Published to Cursor marketplace** — The malicious packages were signed and distributed through Cursor's official channels.
+3. **Developers installed/updated normally** — `Cursor → Extensions → Anthropic.claude-code → Install/Update` — no warning, no suspicion.
+4. **Payload executed on activation** — The malicious code ran immediately when the extension loaded in Cursor.
+
+### Why This Is Critical
+
+This is a **classic supply chain attack** on a trusted distribution channel:
+
+- **Official marketplace, official publisher name** — The extension appeared as `Anthropic.claude-code` from "Anthropic"
+- **No user interaction required beyond normal update flow** — Auto-update or manual "Update" click
+- **High-value target** — Cursor has 1M+ daily active developers; Claude Code is the primary Anthropic integration
+- **Persistence survives remediation** — Uninstalling the extension doesn't remove the SSH keys, LaunchAgents, or Scheduled Tasks
+- **Attacker infrastructure was live** — C2 server at `134[.]209[.]82[.]225` was operational during the window
+
+---
+
+## Who Is Affected
+
+### Directly Affected
+
+| Group | Condition |
+|-------|-----------|
+| **Cursor users on macOS (Apple Silicon)** | Installed/updated `Anthropic.claude-code` 2.1.312 or 2.1.313 (darwin-arm64) on Oct 29, 02:27–13:35 PT |
+| **Cursor users on Windows (x64)** | Installed/updated `Anthropic.claude-code` 2.1.312 or 2.1.313 (win32-x64) on Oct 29, 02:27–13:35 PT |
+| **Teams using Cursor fleet-wide** | Any developer on the team who updated during the window |
+
+### Potentially Affected (Secondary)
+
+- **Shared dev containers/VMs** where the extension was installed
+- **CI/CD runners** using Cursor with the marketplace extension
+- **Anyone who synced extensions** via Cursor's settings sync from an affected machine
+
+### NOT Affected
+
+- Users who install Claude Code via **official VS Code Marketplace** (`marketplace.visualstudio.com`)
+- Users who install via **Anthropic's official distribution** (`claude.ai/code` or `npm install -g @anthropic-ai/claude-code`)
+- Cursor users who **did not update/install** the extension on Oct 29 during the window
+- Linux users (no malicious Linux build was published)
+- Users of other Cursor extensions (Cursor audited and confirmed no other tampered extensions)
+
+---
+
+## How to Check If You're Compromised
+
+### Quick Check: Look for the Unauthorized SSH Key
+
+The payload adds a distinct SSH public key with comment `svc-telemetry` to your `authorized_keys`.
+
+#### macOS / Linux
+
+```bash
+# Check for the malicious key
+grep -qs "svc-telemetry" ~/.ssh/authorized_keys && echo "❌ COMPROMISED: svc-telemetry key found" || echo "✅ No key found; machine not impacted"
+```
+
+#### Windows (PowerShell)
+
+```powershell
+# Check user and system authorized_keys locations
+$files = "$HOME\.ssh\authorized_keys", "C:\ProgramData\ssh\administrators_authorized_keys" | Where-Object { Test-Path $_ }
+if ($files -and (Select-String "svc-telemetry" $files)) {
+    "❌ COMPROMISED: svc-telemetry key found"
+} else {
+    "✅ No key found; machine not impacted"
+}
+```
+
+**If the key is found → You are compromised. Proceed to remediation immediately.**
+
+### Verify Extension Version
+
+```bash
+# Check installed extension version (Cursor stores extensions in ~/.cursor/extensions)
+ls ~/.cursor/extensions/ | grep anthropic.claude-code
+
+# Or via Cursor: Help → About → Extensions → Anthropic.claude-code
+# Malicious versions: 2.1.312 or 2.1.313
+# Safe versions: < 2.1.312 or > 2.1.313 (after marketplace rebuild)
+```
+
+### Check for Persistence Artifacts
+
+#### macOS
+
+```bash
+# Check for LaunchAgent persistence
+ls -la ~/Library/LaunchAgents/com.apple.sysmond.plist 2>/dev/null && echo "❌ Malicious LaunchAgent found"
+
+# Check for dropped files
+ls -la ~/.config/.smt ~/.config/.smtk 2>/dev/null && echo "❌ Malicious config files found"
+ls -la $TMPDIR/.stk_* 2>/dev/null && echo "❌ Malicious temp files found"
+```
+
+#### Windows
+
+```powershell
+# Check for Scheduled Task persistence
+Get-ScheduledTask -TaskName "SysMon" -ErrorAction SilentlyContinue | Select-Object TaskName, State, Actions
+
+# Check for Startup folder fallback
+Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\sysmon.cmd" && "❌ Malicious startup script found"
+
+# Check for dropped files
+Test-Path "$env:USERPROFILE\.config\smt.cmd" && "❌ Malicious config found"
+Test-Path "$env:USERPROFILE\.config\smtk" && "❌ Malicious config found"
+Test-Path "$env:TEMP\.stk_*" && "❌ Malicious temp files found"
+```
+
+### Network Indicators (Check Firewall/EDR Logs)
+
+| Indicator | Value |
+|-----------|-------|
+| **Attacker C2 IP** | `134.209.82.225` |
+| **Reverse SSH** | `tunnel@134.209.82.225:22` |
+| **HTTP Beacon** | `http://134.209.82.225:8099/beacon` (POST) |
+| **Loopback Beacon** | `http://127.0.0.1:8099/beacon` (POST) |
+| **Public IP Lookups** | `ifconfig.me`, `api.ipify.org` (legitimate services, but unexpected from extension) |
+
+---
+
+## Remediation: If You're Compromised
+
+**Cursor provides official remediation scripts.** Run these **exactly as instructed** — they remove the malicious extension, persistence mechanisms, tunnel processes, and attacker SSH key.
+
+### macOS Remediation
+
+```bash
+# 1. Download the official script (verify SHA256 if possible)
+curl -O https://cursor.com/static/security/claude-code-extension/remediate-macos.sh
+
+# 2. Run as the AFFECTED USER (not root), from the download folder
+bash remediate-macos.sh
+
+# 3. Script exits non-zero if anything remains — re-run until clean
+```
+
+### Windows Remediation
+
+```powershell
+# 1. Download the official script
+Invoke-WebRequest -Uri "https://cursor.com/static/security/claude-code-extension/remediate-windows.ps1" -OutFile "remediate-windows.ps1"
+
+# 2. Run from PowerShell opened as ADMINISTRATOR, from the download folder
+powershell -ExecutionPolicy Bypass -File .\remediate-windows.ps1
+
+# 3. Script exits non-zero if anything remains — re-run until clean
+```
+
+### Post-Remediation: Rotate Credentials
+
+**Do this from a CLEAN, TRUSTED machine** — not the potentially compromised host.
+
+| Credential Type | Rotation Action |
+|-----------------|-----------------|
+| **GitHub/GitLab tokens** | `gh auth refresh` / GitLab Settings → Access Tokens → Revoke & Regenerate |
+| **AWS credentials** | `aws configure` / IAM Console → Create new access keys, delete old |
+| **SSH keys** | Generate new keypair (`ssh-keygen -t ed25519`), add to GitHub/GitLab/servers, remove old |
+| **Cloud CLIs** | `gcloud auth revoke && gcloud auth login` / `az account clear && az login` |
+| **API keys in ~/.env** | Regenerate at each provider dashboard |
+| **Docker/registry auth** | `docker logout && docker login` |
+| **npm/pypi tokens** | Regenerate at registry websites |
+
+### Verify Clean State
+
+```bash
+# Re-run the SSH key check
+grep -qs "svc-telemetry" ~/.ssh/authorized_keys && echo "❌ STILL COMPROMISED" || echo "✅ Key removed"
+
+# Verify extension is clean version
+ls ~/.cursor/extensions/anthropic.claude-code-*
+# Should show version != 2.1.312 and != 2.1.313
+```
+
+---
+
+## IOCs (Indicators of Compromise)
+
+### Package Hashes (Malicious VSIX)
+
+| Version | Platform | SHA-256 | MD5 |
+|---------|----------|---------|-----|
+| 2.1.312 | darwin-arm64 | `fcbb327e38e61c4fec795e0d0591f52cd1014b813d20a5912104953c3a17c364` | `e0d64d53e802a0217ba6f0e656ed2f20` |
+| 2.1.312 | win32-x64 | `3de1722901165769893bef57c72594e9a54459faa23f3091b136b79966edd081` | `bd3b71ddf3d0cc3af76249afd2c0eda1` |
+| 2.1.313 | darwin-arm64 | `80402fdcad8799285fd93044976973ca000da7995fb93363f819bb8e4f84ee6c` | `34e491161e056c9b899a79b602ac73b9` |
+| 2.1.313 | win32-x64 | `6786ec90cbd45949695bd7805c9fbb26cfc91bc5fc897de0183d9bcb9cb21731` | `7838a3be2ca0ff08c1bdb160ef516d39` |
+
+### Payload Hashes
+
+| Artifact | SHA-256 | MD5 |
+|----------|---------|-----|
+| Malicious `extension.js` (both versions, both platforms) | `ecb58cb29078d9646ad1dcdbe51526f2d9cfea06be5fb2ab183e8ecc3ab6bf15` | `f49bcd657ef1e626e85ce858958c1769` |
+
+### Network IOCs
+
+```
+134.209.82.225                          # Attacker C2 / SSH / HTTP beacon
+tunnel@134.209.82.225:22                # Reverse SSH tunnel
+http://134.209.82.225:8099/beacon       # External beacon (POST)
+http://127.0.0.1:8099/beacon            # Local beacon attempt (POST)
+```
+
+### SSH IOCs
+
+```
+Unauthorized public key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDdvylCEJ/k2TpezcTfedrkHyFSK9IZ3vmP6vhY4Ss0P svc-telemetry
+Key fingerprint (SHA256): 0Z6R+DF64Do2nwQic8a7kkfDLNNk4IiK+2U2Rci4htk
+Reverse-tunnel key fingerprint: KOAU57+ZG6u3MG4WwzPzPX2O5YEe9qdOC1Bl+6MVyDQ
+Key comment: svc-telemetry
+```
+
+### File/Process IOCs
+
+**macOS/Linux:**
+- `~/.ssh/authorized_keys` (added `svc-telemetry` key)
+- `~/.config/.smt`, `~/.config/.smtk`
+- `$TMPDIR/.stk_<10 hex>`
+- `~/Library/LaunchAgents/com.apple.sysmond.plist` (label `com.apple.sysmond`)
+- Cron: `@reboot /bin/sh "<HOME>/.config/.smt"`
+- Processes: `ssh -N -R '*:0:localhost:22'`, `autossh -M 0`
+
+**Windows:**
+- `%USERPROFILE%\.ssh\authorized_keys`, `C:\ProgramData\ssh\administrators_authorized_keys`
+- `%USERPROFILE%\.config\smt.cmd`, `%USERPROFILE%\.config\smtk`
+- `%TEMP%\.stk_<10 hex>`
+- Scheduled Task: `SysMon` (attempts SYSTEM), fallback `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\sysmon.cmd`
+- Commands: `schtasks /create /tn SysMon`, `Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0`, `systemsetup -setremotelogin on`
+
+---
+
+## Why This Matters: The Extension Marketplace Trust Problem
+
+### Cursor's Marketplace ≠ VS Code Marketplace
+
+Cursor operates its **own extension marketplace** (`cursor.com/marketplace`), separate from Microsoft's official VS Code Marketplace (`marketplace.visualstudio.com`). This incident reveals critical gaps:
+
+| Aspect | VS Code Marketplace | Cursor Marketplace (Compromised) |
+|--------|---------------------|----------------------------------|
+| **Publisher verification** | Microsoft verifies publisher identity | Cursor's verification failed — attacker published as "Anthropic" |
+| **Package scanning** | Automated malware scanning | Malicious VSIX passed undetected for 11 hours |
+| **Supply chain integrity** | Signed packages, transparency logs | No evidence of sigstore/slsa verification |
+| **Incident response** | Established process | 11-hour detection window; marketplace shutdown required |
+
+### The "Official Publisher" Deception
+
+The malicious extension appeared as:
+- **Name:** `Anthropic.claude-code`
+- **Publisher:** `Anthropic` (display name)
+- **Versions:** 2.1.312, 2.1.313 (sequential, plausible)
+
+**Developers had no visual indication this wasn't legitimate.** The attacker exploited trust in:
+1. The **Cursor brand** (official marketplace)
+2. The **Anthropic brand** (publisher display name)
+3. **Version sequencing** (2.1.312 → 2.1.313 looks like a patch release)
+
+### Lessons for Every Developer
+
+1. **Marketplace ≠ Safe** — Curated marketplaces get compromised. The official VS Code Marketplace has had malicious extensions too (e.g., `Dracula Official` typo-squat, `Prettier` impersonators).
+2. **Pin extension versions** — Use `extensions.json` with exact versions + hashes in team repos. Don't auto-update.
+3. **Verify publisher ownership** — Check if the marketplace links to the publisher's verified domain (Anthropic's real extensions link to `anthropic.com`).
+4. **Monitor extension changes** — `cursor --list-extensions --show-versions` in CI to detect unexpected version bumps.
+5. **Treat extensions as third-party code** — They run with full user privileges. Audit what you install.
+
+---
+
+## Cursor's Response Assessment
+
+### ✅ What Cursor Did Well
+
+- **Detected and removed** within 11 hours (after internal detection)
+- **Shut down marketplace** to prevent further spread
+- **Audited all extensions** — confirmed no other tampered packages
+- **Rotated keys, rebuilt marketplace** — clean infrastructure
+- **Worked with cloud provider** to take down C2 server
+- **Published detailed security notice** with IOCs, remediation scripts, and timeline
+- **Provided platform-specific remediation scripts** that actually clean persistence
+
+### ⚠️ Gaps That Remain
+
+- **No public post-mortem** on how the malicious VSIX passed publication review
+- **No verification mechanism** for users to confirm extension authenticity (e.g., sigstore signatures)
+- **No automatic notification** to affected users — relies on developers reading the blog
+- **Marketplace was down for hours** — availability impact on legitimate users
+- **Root cause not disclosed** — Was it compromised publisher account? Insider? Build pipeline?
+
+### Questions to Ask Cursor (and Every Marketplace Operator)
+
+1. **How did a tampered VSIX with 134.209.82.225 hardcoded pass automated scanning?**
+2. **What publisher identity verification exists?** (The attacker published as "Anthropic")
+3. **Will you implement sigstore/cosign signing for all marketplace extensions?**
+4. **How will affected users be proactively notified next time?**
+5. **What's the SLA for marketplace security incident disclosure?**
+
+---
+
+## Your Action Checklist
+
+### Immediate (Do Now)
+
+- [ ] **Run the SSH key check** for your OS (commands above)
+- [ ] **If compromised:** Run official remediation script (macOS/Windows)
+- [ ] **Verify extension version** — must NOT be 2.1.312 or 2.1.313
+- [ ] **Check persistence artifacts** (LaunchAgent, Scheduled Task, startup scripts)
+
+### Within 1 Hour (If Compromised)
+
+- [ ] **Rotate ALL credentials** from a clean machine (GitHub, AWS, SSH, cloud CLIs, API keys)
+- [ ] **Check network logs** for connections to `134.209.82.225:22` or `:8099`
+- [ ] **Scan for lateral movement** — the backdoor had 11+ hours on some machines
+
+### This Week
+
+- [ ] **Pin extension versions** in team `extensions.json` with exact versions
+- [ ] **Audit all installed Cursor extensions** — remove unused, verify publishers
+- [ ] **Enable extension signature verification** if/when Cursor adds it
+- [ ] **Add marketplace supply chain risk** to your vendor assessment questionnaire
+
+---
+
+## Related Reading
+
+- [Beware: Cursor's Git.exe Zero-Day — Opening a Cloned Repo on Windows Runs Attacker Code](/blog/beware-cursor-git-exe-zero-day-rce/) — Another Cursor RCE (binary planting, unpatched for 7 months)
+- [Beware: Cursor DuneSlide — Two Critical RCE Vulnerabilities (CVE-2026-50548, CVE-2026-50549)](/blog/beware-cursor-duneslide-rce-cve-2026-50548-50549/) — Cursor sandbox escapes
+- [Beware: Malicious .git Configs Can Make Your AI Agent Run Attacker Code — 7 Agents Affected](/blog/beware-malicious-git-configs-run-attacker-code-claude-codex-cursor/) — Git config injection across agents
+- [Cursor Security Notice: Malicious Anthropic.claude-code Extension](https://cursor.com/blog/claude-code-extension-security-notice) — Official source
+- [SANS Stormcast Nov 2, 2026: Trojanized Claude Code Extension in Cursor Marketplace](https://isc.sans.edu/diary/Trojanized+Claude+Code+Extension+in+Cursor+Marketplace/33478) — Independent analysis
+
+---
+
+## Summary
+
+**This was a textbook supply chain attack on a trusted developer tool marketplace.** The attacker didn't need to phish, exploit a zero-day, or compromise Anthropic — they just uploaded a tampered extension to Cursor's marketplace and waited for developers to do what they do every day: click "Update."
+
+**5,000+ developers** had an SSH backdoor planted on their machines for up to 11 hours. The persistence mechanisms survive extension uninstall. The C2 server was live. The only reason this isn't worse is that the attacker's reverse shell had bugs (failed on non-admin Windows/macOS) and Cursor took the C2 offline.
+
+**If you use Cursor and updated extensions on Oct 29, assume compromise until proven clean.** Run the checks. Run the remediation. Rotate your credentials.
+
+*Cursor users: This is the second critical RCE in Cursor in 2026 (after the Git.exe zero-day and DuneSlide). The marketplace attack shows the *entire supply chain* is a target. Harden accordingly.*
+
+---
+
+## Related articles
+
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+- [Best Coding Agents 2026 — Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Coding Agent Security Checklist 2026 — The Operators Hardening Guide](/blog/coding-agent-security-checklist-2026/)
+
+---
+
+*Source: [Cursor Security Notice (Oct 29-30, 2026)](https://cursor.com/blog/claude-code-extension-security-notice), [SANS ISC Diary](https://isc.sans.edu/diary/Trojanized+Claude+Code+Extension+in+Cursor+Marketplace/33478), [ThreatDefence Advisory](https://threatdefence.com/article/claude-code-openvsx-extension-backdoor-advisory). IOCs and remediation scripts from Cursor official notice.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
