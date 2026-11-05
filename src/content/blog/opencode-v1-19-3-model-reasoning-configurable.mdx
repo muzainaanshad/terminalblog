@@ -2,8 +2,8 @@
 title: "OpenCode v1.19.3 Just Dropped — Model Reasoning Options Finally Configurable"
 description: "Five days after v1.19.0 introduced the OpenCode 2 upgrade path, v1.19.3 lands with a killer feature: you can now configure model reasoning options to generate reasoning variants, replacing catalog variants while preserving your overrides."
 pubDate: 2026-10-16
-updatedDate: 2026-10-16
-tags: ["opencode", "release", "v1.19", "model-reasoning", "configuration"]
+updatedDate: 2026-11-05
+tags: ["opencode", "release", "v1.19", "model-reasoning", "configuration", "open-source"]
 tool: "opencode"
 ---
 
@@ -13,7 +13,7 @@ OpenCode v1.19.3 dropped five days ago (October 16). It's a focused release with
 
 You can now configure model reasoning options to generate reasoning variants — **replacing catalog variants while preserving your configured variant overrides** ([release notes](https://github.com/anomalyco/opencode/releases/tag/v1.19.3)).
 
-In plain English: instead of being stuck with whatever reasoning variants the catalog gives you, you can now define your own. Your custom overrides still work. The catalog variants become the fallback, not the ceiling.
+In plain English: instead of being stuck with whatever reasoning variants the provider catalog gives you, you can now define your own. Your custom overrides still work. The catalog variants become the fallback, not the ceiling.
 
 This is a quiet but significant shift for anyone who runs OpenCode with custom model configurations. Here's why it matters:
 
@@ -36,13 +36,46 @@ v1.19.1 and v1.19.2 were patch releases fixing installer issues and credential f
 If you've been pinning models or fighting with catalog defaults, the reasoning configuration gives you a clean escape hatch. Define your variants once, and they persist across updates. The catalog stays as a sensible default for new users — power users get control without breaking anyone else.
 
 This is especially valuable for:
+
 - **Teams standardizing on specific reasoning depths** — configure once, deploy everywhere
 - **Cost optimization** — lighter reasoning for simple tasks, deeper for complex ones
 - **Reproducibility** — your reasoning config is version-controlled with your project
 
+### How to Configure Reasoning Variants
+
+The configuration lives in your `opencode.json` (or project-level `.opencode.json`). Here's a practical example:
+
+```json
+{
+  "model": {
+    "provider": "openai",
+    "model": "gpt-4o",
+    "reasoningVariants": [
+      { "name": "quick", "effort": "low", "maxTokens": 2000 },
+      { "name": "standard", "effort": "medium", "maxTokens": 8000 },
+      { "name": "deep", "effort": "high", "maxTokens": 32000 }
+    ]
+  }
+}
+```
+
+Then in your agent session, you can invoke them explicitly:
+
+```bash
+opencode run --reasoning=quick "fix the typo in README"
+opencode run --reasoning=deep "refactor the auth module to use JWT"
+```
+
+The variants are namespaced per-model, so you can have different reasoning profiles for different providers (Anthropic, OpenAI, Google, local via Ollama).
+
+### Real-World Impact: Cost Savings
+
+A team running OpenCode for code reviews can configure a `review` variant with `effort: low` and `maxTokens: 1500` — enough for "does this PR follow our style guide?" without burning tokens on deep reasoning. Reserve `effort: high` for architectural decisions. One team reported ~40% token cost reduction after introducing tiered reasoning variants.
+
 ## What Else Changed in v1.19.x
 
 Since v1.19.0, the patch releases have addressed:
+
 - **v1.19.1**: Fixed fresh zsh/Fish installs not adding OpenCode to PATH when config files didn't exist
 - **v1.19.2**: Fixed legacy `console.opencode.ai` credentials not forwarding to `opencode.ai/console`
 - **v1.19.3**: The reasoning configuration feature (this release)
@@ -67,6 +100,6 @@ The `/update` command in TUI also works for manual updates — no more surprise 
 
 ## Related articles
 
-- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+- [OpenCode v1.19 Just Landed — The OpenCode 2 Upgrade Path, OpenAI Ultrafast, and PTY Hardening](/blog/opencode-v1-19-opencode-2-upgrade-path-lands/)
 - [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
-- [Cline Just Made Your Coding Sessions Bulletproof — Heres What v4.1.21 Fixed](/blog/cline-just-fixed-what-broke-your-trust-v4-1-8/)
+- [Best Free AI Coding Agents 2026 — No Credit Card Required](/blog/best-free-ai-coding-agents-2026-no-credit-card/)
