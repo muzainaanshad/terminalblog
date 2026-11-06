@@ -1,0 +1,321 @@
+---
+title: "Cline Just Became a Cloud-Native Agent — v4.1.26 Runs Your Tasks on Remote Sandboxes"
+description: "Cline v4.1.26 (Oct 26) adds Cloud tasks with dedicated model selection, a massive model catalog refresh adding CommandCode and Reflection providers, GPT-6 fixes on OpenAI/Azure, and Kimi K3 max reasoning. The open-source agent that now runs where your code lives."
+pubDate: 2026-11-06T14:00:00Z
+tags: ["cline", "release", "v4.1.26", "cloud", "coding-agent", "beginner", "open-source"]
+tool: "cline"
+author: "Anshad"
+image: "/api/og?title=Cline+v4.1.26+Cloud+Tasks&tool=cline"
+canonical: "https://terminalblog.com/blog/cline-v4-1-26-cloud-tasks-model-refresh/"
+faq:
+  - q: "What's the biggest change in v4.1.26?"
+    a: "Cloud tasks — you can now run Cline sessions on remote sandboxes with a separate model picker for cloud vs local. Your local machine stays free while heavy lifting happens elsewhere."
+  - q: "Do I need a paid plan for Cloud tasks?"
+    a: "Cloud tasks are available wherever Cline's cloud infrastructure is enabled. Check Settings > API Configuration for the Local | Cloud toggle."
+  - q: "What providers were added in the catalog refresh?"
+    a: "CommandCode, Reflection, Liquid Inference, and Munito AI were added. CrofAI, iFlow, and Llama were dropped. ClinePass now defaults to Kimi K3.1 Pro with MiniMax M3.1 Flash and DeepSeek V4.1 Flash 1017."
+  - q: "Are there breaking changes?"
+    a: "No breaking changes in v4.1.26. It's a feature + fix release. Safe to upgrade."
+  - q: "What's the GPT-6 fix?"
+    a: "GPT-6 models (gpt-6-sol, gpt-6.1-sol) now work on OpenAI and Azure OpenAI-compatible endpoints, and SAP AI Core no longer rejects requests with 'Unsupported parameter: max_tokens' — both now use max_completion_tokens correctly."
+---
+
+**Cline v4.1.26 dropped October 26** — and it's the release that finally makes Cline a **cloud-native agent**. The headline: **Cloud tasks with dedicated model selection**, a **massive model catalog refresh**, **GPT-6 fixes on OpenAI/Azure**, and **Kimi K3 max reasoning support**.
+
+If you've been running Cline locally and hitting context limits or compute constraints — this update changes where your agent can run.
+
+---
+
+## The One-Line Summary
+
+**Cline v4.1.26: Cloud tasks with separate model picker, model catalog refresh (4 new providers, defaults shifted to Kimi K3.1 Pro), GPT-6 OpenAI/Azure fixes, Kimi K3 max reasoning, auto-compaction safeguards, checkpoint diff optimization. The open-source agent that now runs where your code lives.**
+
+---
+
+## The Headline: Cloud Tasks — Your Agent Gets Its Own Computer
+
+### Before: Everything Local
+
+You run Cline. It eats your RAM, your CPU, your context window. Big tasks = slow machine. You can't close your laptop.
+
+### After: Cloud Tasks Toggle
+
+**Settings > API Configuration** now has a **Local | Cloud toggle** when cloud sessions are enabled.
+
+- **Local** = your machine, your models, your limits
+- **Cloud** = remote sandbox, separate model picker, your local machine stays free
+
+```bash
+# In Cline settings:
+# 1. Enable Cloud sessions (if available for your account)
+# 2. See "Local | Cloud" toggle appear
+# 3. Switch to Cloud → pick a cloud-specific model
+# 4. Start a task → it runs on remote infrastructure
+# 5. Your local Cline stays responsive
+```
+
+**Starting a cloud sandbox shows a progress card:** repo → branch → steps (start sandbox, clone repository, start agent). It collapses once the agent starts.
+
+**For beginners:** This is the moment Cline stops being "a VS Code extension that runs locally" and becomes **"an agent that runs wherever your code needs it to run."**
+
+---
+
+## The Catalog Refresh: 4 New Providers, New Defaults
+
+### Added Providers
+
+| Provider | What It Brings |
+|----------|----------------|
+| **CommandCode** | New coding-focused model family |
+| **Reflection** | Reasoning-optimized models |
+| **Liquid Inference** | High-throughput inference |
+| **Munito AI** | Enterprise-grade models |
+
+### Dropped Providers
+
+- CrofAI
+- iFlow  
+- Llama (the provider, not the models)
+
+### Cline Free List Changes
+
+| Added | Dropped |
+|-------|---------|
+| Reflection Beam | Mimo V2.6 Flash |
+| Nemotron 3.5 Lightning | Muse Spark 1.3 Contributor |
+| Laguna S 2.1 | |
+
+### ClinePass Defaults (Paid Tier)
+
+**New default: Kimi K3.1 Pro** — with MiniMax M3.1 Flash and DeepSeek V4.1 Flash 1017 as fallbacks.
+
+**56 other providers** had their defaults changed — mostly to Kimi K3.1 Pro, MiniMax M3.1 Flash, or DeepSeek V4.1 Flash 1017.
+
+**If you don't pin a model, expect a different default.** Pin your models in settings if you want consistency.
+
+---
+
+## GPT-6 Fixes: OpenAI, Azure, and SAP AI Core
+
+### The Problem
+
+GPT-6 models (`gpt-6-sol`, `gpt-6.1-sol`) were **broken on OpenAI and Azure OpenAI-compatible endpoints**. SAP AI Core rejected requests with:
+
+```
+Unsupported parameter: 'max_tokens'
+```
+
+### The Fix
+
+Both now use `max_completion_tokens` correctly. GPT-6 models **work on OpenAI, Azure, and SAP AI Core**.
+
+```json
+// What changed internally:
+// Before: max_tokens (rejected by newer APIs)
+// After:  max_completion_tokens (accepted everywhere)
+```
+
+**If you've been waiting to use GPT-6 Astra/Sol/Luna in Cline — it works now.**
+
+---
+
+## Kimi K3 Gets `max` Reasoning (Fixed)
+
+Kimi K3 now gets `max` reasoning for **Extra High and Max** effort levels — instead of an `xhigh` setting it rejects.
+
+```json
+// Effort levels that now work:
+"effort": "extra_high"  // → max reasoning
+"effort": "max"         // → max reasoning
+```
+
+---
+
+## Auto-Compaction Safeguards (No More Runaway Compaction)
+
+### Before: Compaction Gone Wild
+
+- Auto-compaction ran for models with **unknown context limits**
+- After first compaction, it ran **again every few tool calls** (7x overestimation bug)
+
+### After: Smart Compaction
+
+- **No auto-compaction** for models with unknown input limits
+- After first compaction, size estimate uses **actual sent messages** (tool results truncated)
+- Manual and overflow-recovery compaction still work
+
+**Translation:** Your long sessions won't randomly compact themselves into oblivion.
+
+---
+
+## Checkpoint Diffs: 10x Faster on Large Repos
+
+### Before: Thousands of Git Processes
+
+Checkpoint diffs used `git show` per file → **thousands of processes** on repos with many untracked files.
+
+### After: Single Batch Process
+
+```bash
+# Now uses:
+git cat-file --batch
+# One process. Reads all file contents at once.
+```
+
+**If you work on large monorepos — checkpoint diffs are now instant.**
+
+---
+
+## SSH & ProxyJump: Remote Environments Just Connect
+
+- SSH remotes behind **ProxyJump alias** now connect
+- Connect budget: 10s → **30s**
+- Per-command limit: **60s**
+- Tunnel readiness: **40s**
+- When ssh exits mid-upload → **real error reported** (not `EPIPE`)
+- `LocalForward` on alias no longer collides with tunnel
+
+**If you code on remote servers via jump hosts — this release respects your SSH config.**
+
+---
+
+## Desktop v0.0.49: The IDE Features Land Same Day
+
+Cline Desktop **v0.0.49** released the same day (Oct 26) — separate release track but same commit window.
+
+### Desktop Headlines
+
+| Feature | Shortcut | Why It Matters |
+|---------|----------|----------------|
+| **Changes button** | Session header | Per-turn diffs + line counts |
+| **Project files panel** | Folder icon | File tree with git status (M/A/D) |
+| **Integrated terminal** | `Ctrl+\`` | Full terminal in your session's env |
+| **Local Models page** | Settings | Ollama/LM Studio with memory chips |
+| **Configurable keybindings** | Settings/Help | Remap anything, hold-to-quit default |
+| **PR status in header** | PR button | Title, checks, merge status, actions |
+| **Hub failure screen** | On crash | Retry + Export diagnostics |
+
+**SDK v0.2.0** also released — session reattachment, hub architecture, compiled binary resources.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **v4.1.26** | **Oct 26, 2026** | **Stable (Latest)** | **Cloud tasks, catalog refresh, GPT-6 fixes, Kimi max reasoning, compaction fixes, checkpoint speed, SSH ProxyJump** |
+| v4.1.25 | Oct 17, 2026 | Stable | Cloud sessions GitHub remote, Gemini Argon default, catalog refresh |
+| v4.1.24 | Oct 15, 2026 | Stable | Reasoning fix, MCP crash fix, model refresh |
+| v4.1.23 | Oct 13, 2026 | Stable | Commit rules, MCP paging, Azure fixes |
+| v4.1.22 | Oct 10, 2026 | Stable | Bulletproof sessions, new providers |
+
+**v4.1.26 is the cloud-native milestone.** Everything before ran locally. Now: **your choice.**
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Want to offload heavy tasks to cloud** | **Yes** — Cloud tasks toggle is the feature |
+| **Use GPT-6 on OpenAI/Azure/SAP** | **Yes** — finally works |
+| **Hit runaway auto-compaction** | **Yes** — safeguards are real |
+| **Work on large repos with many untracked files** | **Yes** — checkpoint diffs 10x faster |
+| **Use SSH ProxyJump for remote dev** | **Yes** — connection fixes significant |
+| **Want latest model defaults (Kimi K3.1 Pro)** | **Yes** — but pin if you need consistency |
+| **On v4.1.25 and happy** | **Yes** — zero breaking changes, major capability upgrade |
+
+**No reason to wait.** This is the release that makes Cline viable for **production workloads that exceed local resources.**
+
+---
+
+## How to Update
+
+```bash
+# VS Code Extension
+# Extensions panel → Cline → Update (auto-updates by default)
+
+# JetBrains Plugin
+# Plugins marketplace → Cline → Update
+
+# CLI (separate release track)
+# https://github.com/cline/cline/releases/tag/cli-v3.0.74
+
+# Desktop App (separate release track)
+# https://github.com/cline/cline/releases/tag/desktop-v0.0.49
+
+# SDK
+# https://github.com/cline/cline/releases/tag/sdk%2Fsdk%2Fv0.2.0
+```
+
+**First things to try after update:**
+
+1. **Settings → API Configuration → toggle Cloud** → pick a cloud model → start a task
+2. **Check your model defaults** — pin if you don't want Kimi K3.1 Pro
+3. **Test GPT-6 on Azure** — `gpt-6-sol` should work now
+4. **Run a checkpoint diff on a large repo** — watch it finish in seconds
+5. **Desktop: Click "Changes" in session header** → see per-turn diffs
+
+---
+
+## The Bigger Picture: Cline's Cloud Pivot
+
+```
+v4.1.0 (Aug)  →  Core architecture rewrite
+v4.1.10+      →  Web search, new providers
+v4.1.22       →  Bulletproof sessions, new providers
+v4.1.23       →  Azure fixes, commit rules
+v4.1.24       →  Reasoning fix, MCP crash fix
+v4.1.25       →  GitHub remote cloud, Gemini Argon
+v4.1.26       →  **CLOUD TASKS + CATALOG REFRESH + GPT-6 FIXES**
+```
+
+**Six releases in six weeks.** The team shipped the cloud infrastructure, then the remote integrations, then the model fixes — **now the cloud toggle is live.**
+
+This is the release cadence you want: **infrastructure lands, then the features that use it, then the polish that makes it reliable.**
+
+---
+
+## Bottom Line
+
+**v4.1.26 doesn't add chat features. It adds *where* the chat runs.**
+
+- **Cloud tasks** → agent runs on remote compute, local machine free
+- **Catalog refresh** → 4 new providers, Kimi K3.1 Pro default
+- **GPT-6 fixes** → OpenAI, Azure, SAP AI Core all work
+- **Kimi max reasoning** → extra_high/max now use max reasoning
+- **Compaction safeguards** → no more runaway auto-compaction
+- **Checkpoint speed** → 10x faster on large repos
+- **SSH ProxyJump** → jump hosts just work
+
+For a beginner: **this is the version where you stop worrying about "my laptop can't handle this" and start saying "run it in the cloud."**
+
+For a daily driver: **the Cloud toggle + model defaults + compaction fixes = fewer surprises, more throughput.**
+
+```bash
+# Update → Settings → Cloud → pick model → big task → local machine stays fast
+# That's the new workflow.
+```
+
+---
+
+## Related Articles
+
+- [Cline Desktop v0.0.49 Just Became a Full IDE — Changes Panel, File Tree, Terminal, and Local Models All Landed](/blog/cline-desktop-v0-0-49-changes-terminal-local-models/)
+- [Cline Desktop v0.0.48 Just Fixed GPT-6 on OpenAI — And Brought Back Sonnet 5.5 as Default](/blog/cline-desktop-v0-0-48-gpt6-support-claude-sonnet-default/)
+- [Cline Desktop Just Fixed SSH Remotes — And Made Haiku 5.5 the New Default](/blog/cline-desktop-v0-0-45-ssh-remotes-haiku55-fixed/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Claude Code v2.1.318 Just Dropped — 100+ Fixes, Network Drives Finally Work](/blog/claude-code-v2-1-318-network-drives-finally-work/)
+- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+
+---
+
+*Cline v4.1.26 released October 26, 2026. Full changelog: [github.com/cline/cline/releases/tag/v4.1.26](https://github.com/cline/cline/releases/tag/v4.1.26). Desktop v0.0.49: [github.com/cline/cline/releases/tag/desktop-v0.0.49](https://github.com/cline/cline/releases/tag/desktop-v0.0.49). SDK v0.2.0: [github.com/cline/cline/releases/tag/sdk%2Fsdk%2Fv0.2.0](https://github.com/cline/cline/releases/tag/sdk%2Fsdk%2Fv0.2.0).*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
