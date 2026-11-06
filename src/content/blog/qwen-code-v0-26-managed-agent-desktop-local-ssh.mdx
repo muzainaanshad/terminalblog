@@ -1,9 +1,9 @@
 ---
 title: "Qwen Code v0.26 Just Became a Full Multi-Agent Platform — Local, Remote, and Everything In Between"
-description: "Qwen Code v0.26.5 (November 1) adds bounded SQL history for managed agents, Generated UI enabled by default with attached context, keyboard shortcuts for Web Shell, Russian locale, extended daemon updates, background agent counts in status bar, managed WebShell live paging, improved PR verify flow, archive management, PR watch stale base merge, one-command Helm deployment, in-place PR-watch mode, skill argument hints, clickable context memory files, autofix PR comments on blocked rounds, retry budget, Workflow switch in Web Shell, channel adapter tools, batch session snapshots, exact-version CLI updates, and improved code-review skill. The patch wave that takes managed-agent platform from operable to production-ready."
+description: "Qwen Code v0.26.7 (November 4) adds Web Shell Channel events page, local /verify-pr Docker recipe, mods running prompt.submit hooks headless, managed Web Shell host entry, remote connections to qwen serve, ACP unified loop for cron/background turns, concurrent workspace uploads, GitHub events for bound PRs, Web Shell channel editor, OpenRouter :exacto model IDs, folder trust for project hooks, and 30+ bug fixes. The patch wave (v0.26.1–7) takes managed-agent platform from operable to production-ready."
 pubDate: 2026-10-24T10:00:00Z
-updatedDate: 2026-11-01T15:00:00Z
-tags: ["qwen-code", "release", "v0.26", "v0.26.5", "v0.26.4", "v0.26.3", "managed-agent", "desktop", "multi-agent", "workspace-agents", "coding-agents", "beginner"]
+updatedDate: 2026-11-06T15:00:00Z
+tags: ["qwen-code", "release", "v0.26", "v0.26.7", "v0.26.6", "v0.26.5", "v0.26.4", "v0.26.3", "managed-agent", "desktop", "multi-agent", "workspace-agents", "coding-agents", "beginner", "web-shell"]
 tool: "qwen-code"
 author: "sage"
 image: "/api/og?title=Qwen+Code+v0.26+Managed+Agent+Platform&tool=qwen-code"
@@ -195,6 +195,8 @@ qwen-code --managed --check
 
 || Version | Date | Type | Focus ||
 |---------|------|------|-------|
+| **v0.26.7** | **Nov 4, 2026** | **Stable Patch** | **Channel events page, local /verify-pr Docker, Web Shell polish, Anthropic tool-choice fix, touch navigation, tenant lock reductions, 20+ bug fixes** |
+| **v0.26.6** | **Nov 2, 2026** | **Stable Patch** | **Web Shell (approvals, split view, per-model charts), workflow chip, unified ACP loop, headless prompt hooks, Fedora 44/RHEL 10 RPMs, 30+ bug fixes** |
 | **v0.26.5** | **Nov 1, 2026** | **Stable Patch** | **Bounded SQL history, Generated UI by default, Web Shell keyboard shortcuts, Russian locale, extended daemon updates, background agent counts, managed WebShell live paging, improved PR verify, archive management, PR watch stale base merge, Helm deployment, in-place PR-watch, skill hints, clickable context files, autofix PR comments, retry budget, Workflow switch, channel adapter tools, batch snapshots, exact-version CLI, improved code-review skill** |
 | **v0.26.4** | **Oct 29, 2026** | **Stable Patch** | **Theme-aware UI, unscoped npm extensions, independent worktrees, re-verify on update, model timing inline, macOS CUA PiP, ACP stop chain** |
 | **v0.26.3** | **Oct 28, 2026** | **Stable Patch** | **Persistent workflow mode, generated UI card persistence, 1M context detection, XML tool call recovery, ACP identity preservation** |
@@ -207,7 +209,7 @@ qwen-code --managed --check
 | v0.24.7 | Sep 29 | Patch | Daemon settings isolation, Enter key fix, cross-dir permissions, broker hardening |
 | v0.24.6 | Sep 26 | Feature | Managed runtime, durable sessions, failover, advisor tool, Java SDK, 60% faster startup |
 
-**v0.24.6 built the infrastructure. v0.24.7 hardened it. v0.25.0 made it a platform. v0.26.0 makes it operable. v0.26.1–3 harden it for production. v0.26.4 polishes the DX. v0.26.5 makes it production-ready.**
+**v0.24.6 built the infrastructure. v0.24.7 hardened it. v0.25.0 made it a platform. v0.26.0 makes it operable. v0.26.1–3 harden it for production. v0.26.4 polishes the DX. v0.26.5 makes it production-ready. v0.26.6 adds the Web Shell. v0.26.7 polishes and secures it.**
 
 ---
 
@@ -264,9 +266,51 @@ qwen-code --managed --check
 
 **For beginners:** v0.26.5 is the "production hardening" patch. Bounded SQL history means managed agents scale to long-running workloads. Generated UI by default means interactive cards just appear. Web Shell shortcuts mean power users fly. Helm deployment means Kubernetes teams can deploy the full stack in one command. Autofix PR comments and retry budget mean you never wonder "what happened?" when a PR fix stalls. The code-review skill improvements mean `/verify-pr` becomes a reliable CI gate.
 
-## The Patch Series: v0.26.1 → v0.26.2 → v0.26.3 → v0.26.4 → v0.26.5 (Oct 24 – Nov 1)
+## v0.26.6 (Nov 2) — Web Shell, Split View, Per-Model Token Charts, Unified ACP Loop, Headless Prompt Hooks, Fedora 44/RHEL 10 RPMs
 
-Four patches in eight days — the team is moving fast to harden the platform for production use.
+| Feature | PR | What It Means |
+|---------|-----|---------------|
+| **Web Shell sidebar** | [#15928](https://github.com/QwenLM/qwen-code/pull/15928), [#16106](https://github.com/QwenLM/qwen-code/pull/16106) | Browser-based sidebar with approval states, split view, per-model token charts, workflow chip — code from any device |
+| **Split view in Web Shell** | [#15928](https://github.com/QwenLM/qwen-code/pull/15928) | Side-by-side sessions in browser — compare outputs, copy context, debug in parallel |
+| **Per-model token usage charts** | [#15928](https://github.com/QwenLM/qwen-code/pull/15928) | Output speed, first-token latency, failure details, success rate per model — route to the model that's actually fast |
+| **Workflow mode chip** | [#15928](https://github.com/QwenLM/qwen-code/pull/15928) | Dismissible chip shows mode, warns on unavailable tools, summarizes in `+` menu |
+| **Unified agent loop for ACP** | [#16131](https://github.com/QwenLM/qwen-code/pull/16131), [#16190](https://github.com/QwenLM/qwen-code/pull/16190) | Channel prompts, Goal approvals, cron/background turns run on shared loop — smoother multi-agent coordination |
+| **Mods run prompt.submit hooks headless** | [#16180](https://github.com/QwenLM/qwen-code/pull/16180) | Mods intercept `-p` prompts and `stream-json` messages — automated guardrails at prompt level |
+| **Managed Web Shell host entry** | [#15928](https://github.com/QwenLM/qwen-code/pull/15928) | Improved managed empty-state layout, consolidated notices above composer |
+| **Remote connections to qwen serve** | [#15887](https://github.com/QwenLM/qwen-code/pull/15887) | Settings → Connections → Allow remote connections — remote access, token use, client disconnects without restart |
+| **Concurrent workspace uploads** | [#16212](https://github.com/QwenLM/qwen-code/pull/16212) | Uploads proceed concurrently while preserving directory occupancy protections |
+| **GitHub events for bound PRs** | [#16117](https://github.com/QwenLM/qwen-code/pull/16117) | Events go to associated session as untrusted prompts; replies stay private unless published |
+| **Web Shell channel editor** | [#16149](https://github.com/QwenLM/qwen-code/pull/16149) | Edit GitHub repository access, mention behavior, notification polling from Web Shell |
+| **OpenRouter :exacto model IDs** | [#16165](https://github.com/QwenLM/qwen-code/pull/16165) | `qwen/qwen3-coder:exacto` keeps 262K token window instead of 200K |
+| **Folder trust for project hooks** | [#16182](https://github.com/QwenLM/qwen-code/pull/16182), [#16196](https://github.com/QwenLM/qwen-code/pull/16196) | Explicit trust required for repo-supplied hooks, permissions, language servers — safer untrusted projects |
+| **Fedora 44 + RHEL 10 RPMs** | [#16154](https://github.com/QwenLM/qwen-code/pull/16154) | Native packages for enterprise Linux — `dnf install qwen-code` |
+| **30+ bug fixes** | Various | OAuth refresh lock cleanup, MCP duplicate tool handling, LSP explicit failures, managed-agent recovery, mobile layout, VS Code companion fixes |
+
+**For beginners:** v0.26.6 is the "Web Shell" release. You can now code from a browser tab on your phone/tablet with full agent visibility — approval states, split view, per-model performance charts. The unified ACP loop and headless prompt hooks make multi-agent and CI workflows smoother. Fedora/RHEL RPMs mean enterprise Linux gets native packages.
+
+## v0.26.7 (Nov 4) — Channel Events, Local Verify PR Docker, Web Shell Polish, Security Hardening
+
+| Feature | PR | What It Means |
+|---------|-----|---------------|
+| **Channel events page in Web Shell** | [#16106](https://github.com/QwenLM/qwen-code/pull/16106) | Filterable, auto-refreshing timeline of Channel activity, skip reasons, replies, task transitions, poll results |
+| **Local /verify-pr Docker recipe** | [#16077](https://github.com/QwenLM/qwen-code/pull/16077) | Runs untrusted PR code in container while keeping model credentials on host via chat-completion proxy |
+| **Web Shell managed host entry + polish** | [#15928](https://github.com/QwenLM/qwen-code/pull/15928) | Improves managed empty-state layout, consolidates session-failure/unconfirmed-submission notices |
+| **Anthropic tool-choice fix** | [#15558](https://github.com/QwenLM/qwen-code/pull/15558) | Fixes tool-choice failures on Claude Opus 5.5, Sonnet 5.5, Fable 5.1, Mythos 5.1 by avoiding unsupported forced selection |
+| **Web Shell paste fix** | [#16179](https://github.com/QwenLM/qwen-code/pull/16179) | Single copied image with HTTP(S) URL attaches; unavailable file pastes show warning |
+| **Anthropic transport timeout honored** | [#16193](https://github.com/QwenLM/qwen-code/pull/16193) | Prevents premature request aborts when longer API timeout configured |
+| **Remote-access error handling** | [#16199](https://github.com/QwenLM/qwen-code/pull/16199) | Hides internal error details, fixes reliability/security defects |
+| **Touch device navigation** | [#16198](https://github.com/QwenLM/qwen-code/pull/16198) | Keeps focus on chat pane instead of opening composer keyboard |
+| **Generated UI MCP server in Electron** | [#16064](https://github.com/QwenLM/qwen-code/pull/16064) | Bundled server runs correctly in Node mode when CLI launched from Electron IDE companion |
+| **Performance: tenant placement lock reductions** | [#16217](https://github.com/QwenLM/qwen-code/pull/16217), [#16223](https://github.com/QwenLM/qwen-code/pull/16223), [#16221](https://github.com/QwenLM/qwen-code/pull/16221) | Managed Agent resident runtime claim/release, turn submission admission, Harness admission avoid tenant lock — faster without changing behavior |
+| **CI/mirror reliability** | [#16218](https://github.com/QwenLM/qwen-code/pull/16218), [#16260](https://github.com/QwenLM/qwen-code/pull/16260) | Faster Debian mirror selection, VPC intranet mirror preference |
+| **RHEL 10 desktop smoke tests** | [#16211](https://github.com/QwenLM/qwen-code/pull/16211) | Headless without Xvfb |
+| **20+ bug fixes** | Various | ACP bridge cleanup, workspace lock reductions, embedded-webview guard failures, GitHub/GitLab/DWS polling cursors scoped per workspace, monitor/workflow notifications attributed to registering turn, shell permission grep flags, CI sandbox reliability |
+
+**For beginners:** v0.26.7 is the "polish and security" patch. Channel events page gives you full visibility into Web Shell activity. Local `/verify-pr` Docker recipe lets you safely test PR code in isolation. The Anthropic tool-choice fix unblocks latest Claude models. Touch navigation and paste fixes make mobile Web Shell usable. Performance work removes lock contention in managed agents.
+
+## The Patch Series: v0.26.1 → v0.26.2 → v0.26.3 → v0.26.4 → v0.26.5 → v0.26.6 → v0.26.7 (Oct 24 – Nov 4)
+
+Seven patches in eleven days — the team is moving fast to harden the platform for production use.
 
 ### v0.26.5 (Nov 1) — Bounded SQL History, Generated UI by Default, Web Shell Shortcuts, Helm Deployment, Autofix PR Comments, Retry Budget
 *See detailed table above — 20+ features from bounded SQL history to improved code-review skill*
@@ -348,6 +392,15 @@ qwen-code --version
 13. **New in v0.26.5:** Run `/autofix-pr` on a failing PR → watch it post comments on blocked rounds and retry up to 3 times
 14. **New in v0.26.5:** Settings → Archived conversations → see inline Export/Restore buttons
 15. **New in v0.26.5:** Context Usage panel → click a memory file (AGENTS.md) → read-only preview opens
+16. **New in v0.26.6:** Open Web Shell in browser → `http://localhost:3000/web-shell` → see approvals, split view, per-model token charts
+17. **New in v0.26.6:** Web Shell → "Add to Split View" → two sessions side-by-side
+18. **New in v0.26.6:** Web Shell → Token Usage tab → switch models → watch success rate/speed/latency per model
+19. **New in v0.26.6:** Config → `"experimental.unifiedAgentLoop": true` → smoother multi-agent coordination
+20. **New in v0.26.6:** Write a `prompt.submit` mod → intercepts `-p` prompts in CI → agent sees clean version
+21. **New in v0.26.7:** Web Shell → Channel events page → filterable timeline of all activity
+22. **New in v0.26.7:** Run `/verify-pr` with Docker → tests PR in container, keeps credentials on host
+23. **New in v0.26.7:** Test Claude Opus 5.5/Sonnet 5.5 → tool-choice failures fixed
+24. **New in v0.26.7:** Mobile Web Shell → paste images, touch navigation works
 
 ---
 
@@ -385,6 +438,6 @@ The question isn't "which agent should I use?" It's **"why would I pay for a clo
 
 ---
 
-*Qwen Code is open-source (Apache-2.0) and available at [github.com/QwenLM/qwen-code](https://github.com/QwenLM/qwen-code). Full changelog: [v0.26.5 release notes](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.5), [v0.26.4](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.4), [v0.26.3](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.3), [v0.26.2](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.2), [v0.26.1](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.1), [v0.26.0](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.0) and [desktop-v0.26.0](https://github.com/QwenLM/qwen-code/releases/tag/desktop-v0.26.0). Updated November 1, 2026 — covers Qwen Code v0.26.5 released November 1, 2026.*
+*Qwen Code is open-source (Apache-2.0) and available at [github.com/QwenLM/qwen-code](https://github.com/QwenLM/qwen-code). Full changelog: [v0.26.7 release notes](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.7), [v0.26.6](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.6), [v0.26.5](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.5), [v0.26.4](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.4), [v0.26.3](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.3), [v0.26.2](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.2), [v0.26.1](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.1), [v0.26.0](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.0) and [desktop-v0.26.0](https://github.com/QwenLM/qwen-code/releases/tag/desktop-v0.26.0). Updated November 6, 2026 — covers Qwen Code v0.26.7 released November 4, 2026.*
 
 *Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
