@@ -1,0 +1,202 @@
+---
+title: "Kilo Code Just Patched Every Critical Security Advisory — And Added Cloud Worktree Sync"
+description: "Kilo Code v7.8.26-27 drops a massive security wave (zero high-severity advisories left) plus Agent Manager now lets you continue local worktrees in the cloud with full conversation sync. The open-source agent just got enterprise-grade hardening."
+pubDate: 2026-11-06T11:00:00Z
+tags: ["kilocode", "release", "security", "agent-manager", "cloud-sync", "worktree", "coding-agent", "beginner"]
+tool: "kilocode"
+author: "Anshad"
+image: "/api/og?title=Kilo+Code+Security+Patch+Cloud+Sync&tool=kilocode"
+canonical: "https://terminalblog.com/blog/kilocode-v7-8-26-security-cloud-sync/"
+---
+
+Kilo Code **v7.8.26-27** (Nov 4-5) lands a **complete security remediation** — zero high-severity advisories remaining — plus **Agent Manager cloud worktree sync** that lets you pick up a local worktree in the cloud with full conversation history.
+
+---
+
+## The One-Line Summary
+
+**Kilo Code just became the most security-hardened open-source coding agent. Every critical/high CVE patched. Plus: your local worktree now follows you to the cloud with full context.**
+
+---
+
+## The Security Wave: Zero High-Severity Advisories Left
+
+This is rare for any open-source project, let alone a coding agent with 500+ dependencies. The v7.8.26-27 releases systematically eliminated **every high-severity security advisory** across the entire dependency tree.
+
+### What Got Patched
+
+| Package | CVE / Advisory | Severity | Fixed In |
+|---------|----------------|----------|----------|
+| `node-forge` | Multiple | High | v7.8.26 |
+| `brace-expansion` | ReDoS | High | v7.8.26 |
+| `js-yaml` | Code execution | High | v7.8.26 |
+| `follow-redirects` | SSRF | High | v7.8.26 |
+| `body-parser` | Prototype pollution | High | v7.8.26 |
+| `zod` | ReDoS | High | v7.8.26 |
+| `express` | Multiple | **Critical** | v7.8.26 |
+| `proxy-addr` | IP spoofing | **Critical** | v7.8.26 |
+| `shell-quote` | Command injection | **Critical** | v7.8.26 |
+| `axios` | SSRF | High | v7.8.26 |
+| `fast-uri` / `fastify` | Multiple | High | v7.8.26 |
+| `fast-xml-parser` | XXE / DoS | High | v7.8.26 (dropped vulnerable copy) |
+| `glob` | Cancellation bypass | High | v7.8.26 |
+| `hono` | Header injection | High | v7.8.26 |
+| `seroval` | Prototype pollution | High | v7.8.26 |
+| `undici` | SSRF / header smuggling | High | v7.8.26 |
+| `@xmldom/xmldom` | XML injection | High | v7.8.26 |
+| `OpenTelemetry` + AI SDK providers | Multiple | Moderate/Low | v7.8.26 |
+| `Playwright` | Runtime issues | Moderate | v7.8.26 |
+
+### What This Means for You
+
+**If you run Kilo Code locally:** Your agent no longer pulls in dependencies with known critical exploits. The supply chain surface is clean.
+
+**If you run Kilo Code in a team:** Compliance scans (Dependabot, Snyk, GitHub CodeQL) will now pass clean. No more "high severity" noise drowning real issues.
+
+**If you're evaluating agents:** Ask for the dependency audit. Most agents have 10-50+ high-severity advisories they've ignored for months. Kilo just proved it can be done.
+
+---
+
+## Agent Manager: Continue Local Worktrees in the Cloud
+
+The headline feature: **Agent Manager now bridges local ↔ cloud seamlessly.**
+
+### How It Works
+
+1. You're working in a local worktree (git worktree, not just a branch)
+2. Open Agent Manager → see the worktree listed
+3. Click **"Continue in Cloud"**
+4. Kilo:
+   - Validates the branch
+   - Syncs open conversations
+   - Opens a cloud workspace in browser (or gives you the link)
+   - Retries balance/partial-creation failures automatically
+
+```markdown
+# Real scenario
+
+You're on a plane, working in a local worktree `feature/payment-refactor`.
+Landing → open laptop → click "Continue in Cloud" → 
+full conversation history, open files, agent context → 
+pick up exactly where you left off on a cloud GPU instance.
+```
+
+### Why Worktrees (Not Just Branches)
+
+Git worktrees = **isolated working directories** sharing the same `.git`. Each worktree:
+- Has its own checked-out files
+- Runs its own agent sessions
+- Maintains independent conversation history
+
+Agent Manager now treats each worktree as a **first-class sync unit** — not just "the repo."
+
+---
+
+## OpenShell-Ready Docker Image: `ghcr.io/kilo-org/kilocode:<version>-openshell`
+
+For teams running **OpenShell** (the open-source sandbox/orchestration layer):
+
+- Kilo's own sandbox **disabled** (OpenShell handles it)
+- Model catalog fetch **skipped** (OpenShell blocks it)
+- Cloud session upload/presence **disabled**
+- Drop-in replacement for OpenShell workloads
+
+```dockerfile
+# Your Dockerfile
+FROM ghcr.io/kilo-org/kilocode:v7.8.27-openshell
+# No Kilo sandbox config needed
+# No model catalog config needed
+# Just works inside OpenShell
+```
+
+---
+
+## Other Notable Changes in v7.8.26-27
+
+### VS Code
+- **"Show Open Tabs" command** — opens the open-tabs switcher in chat (PR #14782)
+- **Agent Manager splash** — new default-off experimental option (PR #15776)
+- **Inline image rendering** — Google Nano Banana / image generation tools now render in chat (PR #15741)
+- **Playwright 1.64.1** — updated bundled runtime
+
+### CLI
+- **Nix overlay restored** — `nix run github:Kilo-Org/kilocode` works again while preserving `opencode` attribute (PR #15571)
+
+---
+
+## What This Means for Beginners
+
+### If You're New to Kilo Code
+- **Security posture** is now best-in-class for open-source agents
+- **Agent Manager** gives you a visual dashboard for all your agent work (local + cloud)
+- **Worktree support** means you can parallelize: one worktree for feature, one for bugfix, one for experiment — each with its own agent context
+
+### If You're Coming from Cursor / Copilot
+- **No vendor lock-in** — Kilo is open-source, runs your models (OpenRouter, local, BYOK)
+- **Worktrees > branches** for agent work — isolate contexts completely
+- **Cloud sync** means you're not tied to one machine
+
+---
+
+## Quick Start: Try the Cloud Worktree Sync
+
+```bash
+# 1. Update Kilo
+kilocode update  # or your package manager
+
+# 2. Create a worktree for a feature
+git worktree add ../my-feature-worktree feature/payment-refactor
+cd ../my-feature-worktree
+
+# 3. Open Kilo, do some agent work
+kilocode
+
+# 4. Open Agent Manager (Cmd/Ctrl+Shift+P → "Kilo: Open Agent Manager")
+# 5. Click "Continue in Cloud" on your worktree
+# 6. Opens browser → cloud workspace with full conversation history
+```
+
+---
+
+## The Bigger Picture: Kilo's Maturation
+
+| Phase | Focus | Result |
+|-------|-------|--------|
+| v7.0-7.5 | OpenCode fork + features | Feature parity + innovations |
+| v7.6-7.8 | Stability + security | **Zero high-sev advisories** |
+| v7.8.26+ | Cloud integration | **Local ↔ cloud worktree sync** |
+
+Kilo isn't just "keeping up" — it's **setting the baseline** for what a secure, cloud-native open-source agent looks like.
+
+---
+
+## What's Still Missing (Honest Assessment)
+
+- **Agent Manager cloud sync** — UI still experimental (default-off)
+- **OpenShell image** — niche; most users won't need it
+- **Nix overlay** — community-maintained; may lag behind releases
+- **Self-hosted cloud** — no "run your own Kilo Cloud" yet (OpenCode has this)
+
+---
+
+## Related Reading
+
+- [Kilo Code v7.8.18 — Chat Copy Fix, Security Patches, Cloud Sessions](/blog/kilocode-v7-8-18-fix-chat-copy-focus/)
+- [Kilo Code v7.8.10 — Search Ignored Paths, GREP Fix, MCP Windows](/blog/kilocode-v7-8-10-search-ignored-paths-grep-fix-mcp-windows/)
+- [Deep Dive: Kilo Code CLI — Lightweight LLM Orchestrator](/blog/deep-dive-kilo-code-cli-lightweight-llm-orchestrator/)
+- [Kilo vs AmpCode](/blog/kilo-vs-ampcode/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Claude Code vs Kilo Code](/blog/claude-code-vs-kilo/)
+- [Goose vs Kilo Code](/blog/goose-vs-kilo/)
+- [OpenCode vs Kilo Code](/blog/opencode-vs-kilo/)
+
+---
+
+*Kilo Code v7.8.26 (pre-release) Nov 4, 2026 | v7.8.27 (release) Nov 5, 2026. Source: [github.com/Kilo-Org/kilocode/releases](https://github.com/Kilo-Org/kilocode/releases)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*

@@ -1,0 +1,180 @@
+---
+title: "AmpCode Just Connected Your Agent to GitLab — Merge Requests, Reviews, Self-Hosted Instances"
+description: "AmpCode's November 5 GitLab Integration lets your agent work directly on GitLab.com and self-managed GitLab instances. Create merge requests, review code, resolve vulnerabilities — all from your Amp thread."
+pubDate: 2026-11-06T10:00:00Z
+tags: ["ampcode", "release", "gitlab", "integration", "merge-requests", "code-review", "coding-agent", "beginner"]
+tool: "ampcode"
+author: "Anshad"
+image: "/api/og?title=AmpCode+GitLab+Integration&tool=ampcode"
+canonical: "https://terminalblog.com/blog/ampcode-gitlab-integration-november-2026/"
+---
+
+AmpCode **November 5** dropped **GitLab Integration** — your agent can now connect to GitLab.com and your self-managed GitLab instances. Create merge requests, review code, resolve vulnerabilities, all from inside your Amp thread.
+
+---
+
+## The One-Line Summary
+
+**Your Amp agent just became a GitLab power user. Point it at a GitLab repo — it creates MRs, reviews code, fixes vulnerabilities, and ships. Works on GitLab.com and your self-hosted instance.**
+
+---
+
+## What the GitLab Integration Actually Does
+
+Each person connects GitLab in **Settings → Integrations & MCP → GitLab**. Once connected:
+
+1. **Your agent sees your GitLab projects** — no manual repo cloning
+2. **Creates merge requests** — writes code, opens MR, describes changes
+3. **Reviews merge requests** — reads diffs, leaves comments, suggests fixes
+4. **Resolves vulnerabilities** — GitLab SAST/DAST findings become agent tasks
+5. **Works on self-hosted GitLab** — not just GitLab.com; your on-prem instance works too
+
+---
+
+## Why This Matters for Teams on GitLab
+
+### Before: Context Switching Hell
+- See vulnerability in GitLab → copy details → switch to Amp → explain context → agent fixes → copy back → create MR → wait for review
+
+### After: Agent Lives in GitLab
+- GitLab SAST flags SQL injection → **agent picks it up automatically** → reads code → writes fix → opens MR with description → you review → merge
+
+```markdown
+# Real workflow from Amp's team
+
+Thread: "Fix GitLab SAST finding GL-SAST-1234"
+1. Agent: "I see the finding in project `team/payments`. Reading the vulnerable file..."
+2. Agent: *opens `src/auth/token.rs`, finds the unsanitized input*
+3. Agent: "Creating fix and opening MR..."
+4. → MR #847 created: "Fix SQL injection in token validation"
+5. You: *review diff, click Approve*
+6. Agent: "Merged. Vulnerability resolved in GitLab."
+```
+
+---
+
+## Self-Hosted GitLab: Your Instance, Your Agent
+
+This isn't GitLab.com only. **Self-managed GitLab works the same way:**
+
+- Connect your `gitlab.company.com` instance
+- Agent uses your existing OAuth/tokens
+- MRs, reviews, CI pipelines — all internal
+- No data leaves your network (orbs run in your infra if you use self-hosted orbs)
+
+```bash
+# Setup (one-time per workspace member)
+# 1. In Amp: Settings → Integrations & MCP → GitLab
+# 2. Enter your GitLab URL (https://gitlab.company.com)
+# 3. Authorize with OAuth or Personal Access Token
+# 4. Select projects the agent can access
+
+# Now in any thread:
+amp thread create "Review MR #1234 in team/backend"
+amp thread create "Fix all Critical SAST findings in team/api"
+amp thread create "Create MR for JIRA ticket PAY-567"
+```
+
+---
+
+## What Your Agent Can Do on GitLab
+
+| Action | Example Prompt |
+|--------|----------------|
+| **Create MR** | "Add request validation to `POST /payments` in team/payments, open MR" |
+| **Review MR** | "Review MR #847 in team/backend — focus on error handling and tests" |
+| **Fix vulnerabilities** | "Resolve all Critical SAST findings in team/api project" |
+| **Update MR** | "Address review comments on MR #847 — add integration test for edge case" |
+| **Read CI logs** | "Why did the pipeline fail on MR #847? Fix and push" |
+| **Manage labels/milestones** | "Add `security` label and `v2.4` milestone to MR #847" |
+
+---
+
+## The Bigger Picture: AmpCode's November Infrastructure Trilogy
+
+Three features in four days that complete the "agents as team infrastructure" thesis:
+
+| Date | Feature | What It Enables |
+|------|---------|-----------------|
+| **Nov 2** | **Artifacts** | Durable memory — specs, runbooks, diagrams co-edited by team + agent |
+| **Nov 3** | **Service Accounts** | Durable identity — threads owned by team, not person; survives offboarding |
+| **Nov 5** | **GitLab Integration** | **Durable workflow** — agent participates in your actual GitLab flow |
+
+**Nov 2-3:** "Run agents as team members."
+**Nov 5:** "Run agents **inside your GitLab workflow**."
+
+---
+
+## What This Means for Your Team
+
+### If You're on GitLab.com
+- **Zero setup friction** — OAuth connect, pick projects, go
+- **Vulnerability remediation** becomes "agent, fix this" not "dev, investigate this"
+- **Code review bottleneck** → agent does first-pass review, you approve
+
+### If You're on Self-Hosted GitLab
+- **Full parity** — same features, your network, your compliance
+- **OIDC/SAML** — integrate with your existing auth
+- **Air-gapped orbs** — pair with self-hosted orbs for zero-egress agent runs
+
+### If You're Evaluating AmpCode
+This is the **enterprise readiness signal**. Other agents chat. AmpCode with:
+- **Orbs** = compute anywhere
+- **Artifacts** = memory anywhere  
+- **Service Accounts** = identity anywhere
+- **GitLab/GitHub** = **workflow everywhere**
+
+The agent isn't a side tool. It's **in the flow**.
+
+---
+
+## Quick Start: Your First GitLab-Powered Thread
+
+```bash
+# 1. Connect GitLab (one-time)
+# Settings → Integrations & MCP → GitLab → Connect
+
+# 2. Create a vulnerability-fixer thread
+amp thread create --service-account team-amp \
+  "Monitor GitLab SAST in team/payments, auto-fix Critical/High findings"
+
+# 3. Create a code-review thread
+amp thread create --service-account team-amp \
+  "Review all open MRs in team/backend with label 'needs-review'"
+
+# 4. Create a feature-thread
+amp thread create "Implement JIRA PAY-567: idempotency keys for /payments"
+# → Agent reads JIRA (if connected), writes code, opens MR on GitLab
+```
+
+---
+
+## What's Still Missing (Honest Assessment)
+
+- **GitLab CI/CD variables** — agent can't read masked/protected variables yet (security)
+- **Group-level MR policies** — agent respects but can't configure approval rules
+- **Multi-repo MRs** — single MR per repo; no cross-repo atomic changes yet
+- **GitLab Pages preview** — no automatic preview deployment from agent MRs (coming)
+
+---
+
+## Related Reading
+
+- [AmpCode Just Made Threads Team Property — Service Accounts + Artifacts Change Everything](/blog/ampcode-service-accounts-artifacts-november-2026/)
+- [AmpCode Just Turned Your Agent Into a Data Visualizer — Charts, Diagrams, Mockups In-Thread](/blog/ampcode-visualize-this-october-2026/)
+- [AmpCode Just Gave Your Agent a Mac — Build iOS Apps Without Owning One](/blog/ampcode-macos-satellites-october-2026/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Claude Code vs AmpCode: Unconstrained Challenge](/blog/claude-code-vs-ampcode-unconstrained-challenge/)
+- [Cursor vs AmpCode](/blog/cursor-vs-ampcode/)
+- [Codex vs AmpCode](/blog/codex-vs-ampcode/)
+
+---
+
+*AmpCode GitLab Integration announced November 5, 2026. Source: [ampcode.com/news/gitlab](https://ampcode.com/news/gitlab)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
