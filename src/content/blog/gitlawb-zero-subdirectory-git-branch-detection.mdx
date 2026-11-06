@@ -74,6 +74,63 @@ Zero now works correctly from any directory in your repository. No more "detache
 
 This fix also enables better integration with other tools. When Zero spawns subprocesses (linters, formatters, test runners), they inherit the correct working directory and repository context. The session metadata stored in `~/.zero/sessions/` now accurately reflects the branch, making session resumption and cross-session correlation reliable.
 
+## Real-World Impact: Before vs After
+
+**Before the fix (launching from `src/components/auth/`):**
+```
+$ zero
+# Session shows: "detached HEAD at a1b2c3d"
+# Git diff shows: "diff --git a/src/components/auth/Login.tsx b/src/components/auth/Login.tsx"
+# Commit metadata: branch = "unknown"
+```
+
+**After the fix (same location):**
+```
+$ zero
+# Session shows: "feature/oauth-login (ahead 3)"
+# Git diff shows: "diff --git a/src/components/auth/Login.tsx b/src/components/auth/auth/Login.tsx"
+# Commit metadata: branch = "feature/oauth-login"
+```
+
+## Common Workflows That Now Work
+
+**Launch from any subdirectory — Zero finds the repo root:**
+```bash
+cd ~/project/src/components/auth
+zero  # Correctly detects "feature/oauth-login"
+```
+
+**Worktrees — each worktree gets its own branch context:**
+```bash
+git worktree add ../hotfix main
+cd ../hotfix/src/api
+zero  # Shows "hotfix/payment-bug" not "main"
+```
+
+**Submodules — Zero respects submodule boundaries:**
+```bash
+cd ~/project/vendor/ui-lib/src
+zero  # Detects ui-lib's branch, not parent repo
+```
+
+**Bare repos & `--git-dir` — handled by Git's own discovery:**
+```bash
+cd ~/project
+GIT_DIR=../bare.git zero  # Works if git can resolve it
+```
+
+## Why Other Agents Still Get This Wrong
+
+| Agent | Repo Discovery | Subdir Launch | Worktrees | Submodules |
+|-------|---------------|---------------|-----------|------------|
+| **Gitlawb Zero** | `git rev-parse --show-toplevel` | ✅ | ✅ | ✅ |
+| **Claude Code** | Internal (Bun-based) | ✅ | ✅ | ⚠️ |
+| **OpenCode** | Custom walker | ✅ | ❌ | ❌ |
+| **Aider** | `git rev-parse` | ✅ | ✅ | ✅ |
+| **Cursor** | VS Code workspace | ✅ | ❌ | ❌ |
+
+Zero's approach is the most robust because it delegates entirely to Git's battle-tested discovery — the same logic that makes `git status` work from anywhere. Custom walkers (OpenCode) fail on worktrees and symlinked repos. Editor-based discovery (Cursor) only works inside the IDE.
+
 ## Related Work
 
 This fix complements the [CLI flag parsing fix](/blog/gitlawb-zero-cli-flag-parsing-fix/) — both are about making Zero behave correctly when invoked from real-world developer workflows, not just the idealized "run from repo root" scenario. The [deep-dive on the gitlawb-zero agent](/blog/deep-dive-gitlawb-zero-agent/) covers the session architecture that makes these contextual improvements possible.
