@@ -1,0 +1,275 @@
+---
+title: "OpenClaw 2026.11.1 Just Fixed the Mac Settings That Kept Breaking — Plus Channel Replies That Actually Survive"
+description: "OpenClaw 2026.11.1 (Nov 5) stable release fixes Mac config saves overwriting secrets, Tailscale exposure killing Gateway auth, channel replies dropping after handlers finish, conversation interruptions losing history, update recovery getting stuck, and subagent follow-ups breaking across model changes."
+pubDate: 2026-11-07T15:00:00Z
+tags: ["openclaw", "release", "2026.11.1", "mac", "channel-replies", "conversations", "update-recovery", "subagents", "coding-agent", "beginner", "stable"]
+tool: "openclaw"
+author: "Anshad"
+image: "/api/og?title=OpenClaw+2026.11.1+Mac+Settings+Channel+Replies&tool=openclaw"
+canonical: "https://terminalblog.com/blog/openclaw-2026-11-1-mac-settings-channel-replies/"
+---
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "OpenClaw 2026.11.1 Just Fixed the Mac Settings That Kept Breaking — Plus Channel Replies That Actually Survive",
+  "description": "OpenClaw 2026.11.1 (Nov 5) stable release fixes Mac config saves overwriting secrets, Tailscale exposure killing Gateway auth, channel replies dropping after handlers finish, conversation interruptions losing history, update recovery getting stuck, and subagent follow-ups breaking across model changes.",
+  "image": "https://terminalblog.com/api/og?title=OpenClaw+2026.11.1+Mac+Settings+Channel+Replies&tool=openclaw",
+  "datePublished": "2026-11-07T15:00:00Z",
+  "dateModified": "2026-11-07T15:00:00Z",
+  "author": {
+    "@type": "Person",
+    "name": "Anshad"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "TerminalBlog",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://terminalblog.com/favicon.ico"
+    }
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://terminalblog.com/blog/openclaw-2026-11-1-mac-settings-channel-replies/"
+  }
+})} />
+
+**OpenClaw 2026.11.1 dropped November 5, 2026** — and it's the stable release that fixes the things that made you restart the app, lose your Gateway auth, or wonder why your Telegram bot stopped responding. The headline: **Mac config saves no longer overwrite secrets**, **channel replies actually survive handler completion**, **conversations survive interruptions**, **update recovery gets unstuck**, and **subagents keep their follow-ups across model changes**.
+
+If you run OpenClaw on Mac, use messaging channels (Telegram, Discord, webhooks), or hit update issues — this is the release you've been waiting for.
+
+---
+
+## The Headline Fixes (Ranked by "Finally!")
+
+### 1. Safer Mac Settings — Secrets Stay Secret, Tailscale Stops Killing Auth
+
+**What was broken:** Failed config saves on Mac would overwrite your secrets. Turning off Tailscale exposure would kill Gateway authentication.
+
+**What's fixed:** 
+- Failed config saves **no longer overwrite secrets** ([#187734](https://github.com/openclaw/openclaw/pull/187734))
+- Turning off Tailscale exposure **keeps Gateway authentication intact** ([#187664](https://github.com/openclaw/openclaw/pull/187664))
+- Fixes [#187600](https://github.com/openclaw/openclaw/issues/187600), [#187597](https://github.com/openclaw/openclaw/issues/187597)
+
+**Why it matters:** You configure something, it fails silently, and suddenly your API keys are gone. Or you toggle Tailscale and your Gateway auth dies. Both are fixed — config is now atomic, and network changes don't nuke auth.
+
+---
+
+### 2. Channel Replies That Actually Arrive
+
+**What was broken:** Telegram, Discord, and webhook conversations would stop reaching the agent after request handlers or earlier turns finished. The agent would just... go silent.
+
+**What's fixed:** Conversations **keep reaching the agent after request handlers or earlier turns finish** ([#179200](https://github.com/openclaw/openclaw/pull/179200), [#179385](https://github.com/openclaw/openclaw/pull/179385), [#179704](https://github.com/openclaw/openclaw/pull/179704), [#189457](https://github.com/openclaw/openclaw/pull/189457))
+- Fixes [#178554](https://github.com/openclaw/openclaw/issues/178554)
+
+**Why it matters:** You send a message, the agent processes it, sends a reply — and the reply never arrives in Telegram/Discord. That's the "channel reply" bug. Fixed at the delivery layer.
+
+---
+
+### 3. Conversations That Survive Interruptions
+
+**What was broken:** Oversized turns lost history. Stopping the first Claude CLI turn would start the next message from scratch — losing context.
+
+**What's fixed:**
+- **Oversized turns retain useful history** ([#191146](https://github.com/openclaw/openclaw/pull/191146))
+- **Stopping the first Claude CLI turn no longer starts the next message from scratch** ([#181966](https://github.com/openclaw/openclaw/pull/181966), [#186380](https://github.com/openclaw/openclaw/pull/186380))
+- Fixes [#191133](https://github.com/openclaw/openclaw/issues/191133), [#181945](https://github.com/openclaw/openclaw/issues/181945)
+
+**Why it matters:** Long conversations don't get amnesia. Interrupting a turn doesn't reset the session. Your context persists.
+
+---
+
+### 4. Update Recovery That Gets Unstuck
+
+**What was broken:** Crashed or canceled updaters would leave the system in a broken state. Windows Gateway failed verification and wouldn't recover. Large-state checks did repeated full-database copying.
+
+**What's fixed:**
+- **Update recovery gets unstuck after crashed or canceled updaters** ([#177932](https://github.com/openclaw/openclaw/pull/177932))
+- **Restores the Windows Gateway after failed verification** ([#186787](https://github.com/openclaw/openclaw/pull/186787))
+- **Avoids repeated full-database copying during large-state checks** ([#189647](https://github.com/openclaw/openclaw/pull/189647))
+- Fixes [#177684](https://github.com/openclaw/openclaw/issues/177684), [#184893](https://github.com/openclaw/openclaw/issues/184893), [#189620](https://github.com/openclaw/openclaw/issues/189620)
+
+**Why it matters:** Updates used to be a gamble. If something went wrong, you'd manually fix it. Now the system self-recovers.
+
+---
+
+### 5. Subagents Keep Their Follow-Ups Across Model Changes
+
+**What was broken:** Subagents would lose their follow-up tasks when models changed or sessions switched. Parent sessions wouldn't receive child approvals with custom session stores.
+
+**What's fixed:**
+- **Subagents keep their follow-ups through model and session changes** ([#186238](https://github.com/openclaw/openclaw/pull/186238))
+- **Parent sessions receive child approvals even with a custom session store** ([#183501](https://github.com/openclaw/openclaw/pull/183501), [#189827](https://github.com/openclaw/openclaw/pull/189827))
+- Fixes [#179289](https://github.com/openclaw/openclaw/issues/179289), [#189823](https://github.com/openclaw/openclaw/issues/189823)
+
+**Why it matters:** Multi-agent workflows don't break when you switch models or use custom storage. The delegation chain holds.
+
+---
+
+## Other Notable Changes
+
+### Claude CLI Improvements
+- **Saved subscription accounts** can make configured models available without separate native login ([#179203](https://github.com/openclaw/openclaw/pull/179203), [#183765](https://github.com/openclaw/openclaw/pull/183765))
+- **Operators can opt into native Agent and Workflow orchestration** through `plugins.entries.anthropic.config.managedNativeTools` (default off, restricted runs keep existing tool limits)
+
+### Anthropic Provider
+- **API-key setup records optional Anthropic workspace ID** ([#186976](https://github.com/openclaw/openclaw/pull/186976))
+- Existing workspace headers preserved, workspace-scoped keys need no extra setting
+
+### Google Provider
+- **Interactions requests honor managed proxy and TLS settings** ([#189395](https://github.com/openclaw/openclaw/pull/189395))
+- **Rotate eligible API keys before streaming after rate limit**
+- **Preserve native video input, forward nucleus sampling consistently**
+- Choose `google-generative-ai` when explicit Gemini cache handles required ([#190695](https://github.com/openclaw/openclaw/pull/190695))
+
+### Bedrock Mantle
+- **Discovered numbered OpenAI GPT models select Responses route automatically**
+- GPT-OSS keeps Chat Completions, Claude keeps Anthropic Messages
+
+### Control UI
+- **Model picker shows configured active context budget** (not just model maximum) ([#180870](https://github.com/openclaw/openclaw/pull/180870))
+- **Short session links retain intended navigation target** ([#183148](https://github.com/openclaw/openclaw/pull/183148))
+
+### Update Diagnostics
+- **Detailed readiness separates ready core from channel outages** 
+- Repaired updaters finish with named channel warnings without hiding HTTP 503
+
+---
+
+## Security Fixes (Important)
+
+- **Network and tool safety:** ClickClack and ClawHub reject redirects into unrelated private services, Discord CDN downloads no longer inherit browser private-network access, FIFO native-hook credentials rejected without hanging agent ([#190944](https://github.com/openclaw/openclaw/pull/190944), [#190939](https://github.com/openclaw/openclaw/pull/190939), [#191458](https://github.com/openclaw/openclaw/pull/191458), [#191423](https://github.com/openclaw/openclaw/pull/191423))
+- **Doctor consent and access policy:** Noninteractive checks no longer download plugins without repair consent, explicitly empty group allowlists remain empty ([#191523](https://github.com/openclaw/openclaw/pull/191523), [#174787](https://github.com/openclaw/openclaw/pull/174787))
+- **Secret egress:** Reject chains relying on distrusted emSign ECC G3 root in managed proxy and exported subprocess CA bundle ([#179249](https://github.com/openclaw/openclaw/pull/179249))
+- **Recovery data:** Malformed UTF-8 legacy imports rejected instead of replacing original content, failed skill restore rollbacks preserve original copy ([#180861](https://github.com/openclaw/openclaw/pull/180861), [#173954](https://github.com/openclaw/openclaw/pull/173954), [#174195](https://github.com/openclaw/openclaw/pull/174195), [#176362](https://github.com/openclaw/openclaw/pull/176362))
+- **Log redaction:** Malformed custom entries no longer disable valid rules or built-in secret protection ([#173471](https://github.com/openclaw/openclaw/pull/173471))
+
+---
+
+## macOS Connectivity Fixes
+
+- **Configured credentials take precedence over stale app environment** ([#191468](https://github.com/openclaw/openclaw/pull/191468))
+- **Typed environment secret references resolve correctly** ([#185141](https://github.com/openclaw/openclaw/pull/185141))
+- **Remote Settings respects Control UI base path** ([#128175](https://github.com/openclaw/openclaw/pull/128175))
+- Fixes [#164596](https://github.com/openclaw/openclaw/issues/164596)
+
+---
+
+## Mac Tools and Messaging
+
+- **iMessage remains usable after app updates without re-granting Automation** ([#186107](https://github.com/openclaw/openclaw/pull/186107))
+- **Peekaboo window inspection accepts valid snapshot references** ([#172116](https://github.com/openclaw/openclaw/pull/172116))
+- **Node exec preserves results for commands configured without timeout** ([#190729](https://github.com/openclaw/openclaw/pull/190729))
+- Fixes [#178719](https://github.com/openclaw/openclaw/issues/178719)
+
+---
+
+## Channel Delivery Improvements
+
+- **Feishu keeps text from before and after tool calls in the same streaming card**
+- **Synology confirms delivery only from recipient-matched message IDs**
+- **Twitch targets and Zalo unsupported-event text follow their channel handling**
+- **iMessage storage:** Recovery cursor keys no longer contain PostgreSQL-incompatible NUL separator ([#184919](https://github.com/openclaw/openclaw/pull/184919))
+- Fixes [#184862](https://github.com/openclaw/openclaw/issues/184862)
+
+---
+
+## Version Context
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **2026.11.1** | **Nov 5, 2026** | **Stable (Latest)** | **Mac settings safety, channel reply reliability, conversation interruption survival, update recovery unstuck, subagent follow-up persistence, security hardening** |
+| 2026.10.10-beta.5 | Oct 2026 | Beta | Terminal output escaping, Claude CLI fixes |
+| 2026.10.7 | Oct 2026 | Stable | Cross-platform app-managed upgrades, native state repair |
+| 2026.9.x | Sep 2026 | Stable | Control plane, browser network safety |
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Run OpenClaw on macOS** | **Yes** — config saves safe, Tailscale won't kill auth, iMessage survives updates |
+| **Use Telegram/Discord/webhook channels** | **Yes** — replies actually arrive now |
+| **Hit update recovery issues** | **Yes** — self-healing updates |
+| **Run multi-agent workflows (subagents)** | **Yes** — follow-ups persist across model changes |
+| **Use custom session stores** | **Yes** — parent receives child approvals |
+| **On 2026.10.x stable** | **Yes** — zero breaking changes, pure fixes |
+
+---
+
+## How to Update
+
+```bash
+# OpenClaw updates via its built-in updater
+# Check Settings → Updates → Check for updates
+
+# Or download from: https://github.com/openclaw/openclaw/releases/tag/v2026.11.1
+
+# Docker
+docker pull ghcr.io/openclaw/openclaw:2026.11.1
+
+# Verify
+openclaw --version
+# Should show: 2026.11.1
+```
+
+**First things to verify after update:**
+
+```bash
+# 1. Mac config test
+# Change a setting → save → verify secrets intact
+# Toggle Tailscale exposure → verify Gateway auth still works
+
+# 2. Channel test
+# Send Telegram/Discord message → agent replies → verify delivery
+
+# 3. Interruption test
+# Start long turn → interrupt → verify context preserved
+
+# 4. Subagent test
+# Launch subagent → switch model → verify follow-ups kept
+```
+
+---
+
+## The Bottom Line
+
+**2026.10.x got the cross-platform upgrade system working. 2026.11.1 makes it *reliable* — Mac settings that don't eat secrets, channels that don't drop replies, conversations that don't get amnesia, updates that don't brick, subagents that don't lose the plot.**
+
+The pattern holds: OpenClaw isn't chasing "agent of the week" features. It's hardening the **personal AI assistant infrastructure** until the things that used to break — just don't anymore.
+
+For a Mac user: **Config saves are atomic. Tailscale toggle doesn't kill auth.**
+For a channel user: **Telegram replies arrive. Discord messages don't vanish.**
+For an operator: **Updates self-heal. Subagents remember their tasks.**
+
+```bash
+# If you're updating
+openclaw --version
+# 2026.11.1
+
+# Mac config → secrets safe
+# Tailscale → auth intact
+# Telegram → replies arrive
+# Interrupt → context kept
+# Subagent → follow-ups persist
+# Update → self-recovers
+```
+
+---
+
+## Related Articles
+
+- [OpenClaw 2026.10.10 Stable Release](/blog/openclaw-2026-10-10-stable-release/)
+- [OpenClaw 2026.10.7 — Cross-Platform Upgrades, Recovery Snapshots](/blog/openclaw-2026-10-7-replay-safe-recovery/)
+- [OpenClaw 2026.10.6 Security Patch](/blog/openclaw-2026-10-6-security-patch/)
+- [OpenClaw 2026.10.3 — Update Blockers Fixed, Saved Sign-ins, Doctor](/blog/openclaw-2026-10-3-update-blockers-fixed-saved-signins-doctor/)
+- [OpenClaw ACP — Future Agent Communication](/blog/openclaw-acp-future-agent-communication/)
+- [Beware: OpenClaw Git Backup RCE](/blog/beware-openclaw-git-backup-rce-path-traversal-sql-injection/)
+
+---
+
+*OpenClaw 2026.11.1 released November 5, 2026. Source: [github.com/openclaw/openclaw/releases/tag/v2026.11.1](https://github.com/openclaw/openclaw/releases/tag/v2026.11.1) · OpenClaw is open-source at [github.com/openclaw/openclaw](https://github.com/openclaw/openclaw)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
