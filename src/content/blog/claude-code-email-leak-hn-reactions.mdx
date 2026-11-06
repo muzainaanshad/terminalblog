@@ -1,0 +1,130 @@
+---
+title: "What Developers Actually Think About Claude Code's Email Leak — From 387 HN Comments"
+description: "A 1,200-point HN thread revealed Claude Code was embedding user emails in User-Agent headers. Here's what 387 developers actually said about privacy, trust, and AI coding agents."
+pubDate: "2026-11-06"
+updatedDate: "2026-11-06"
+tags: ["claude-code", "privacy", "security", "ai-coding-agents", "hacker-news"]
+tool: "industry"
+---
+
+## What Happened
+
+On November 5, 2026, a GitHub issue titled "Claude Code sends your email address to websites" hit Hacker News and exploded to 1,221 points and 387 comments in under 24 hours. The issue: when Claude Code performs web searches or fetches data, it includes a `User-Agent` header that looks like:
+
+```
+my-session-slug/1 <your.email@example.com>
+```
+
+Your actual email address — pulled from your git config — gets sent to every website the agent visits. The reporter (motoroco) said this resulted in "dozens of scam and phishing emails per day from properties I have never personally visited."
+
+This wasn't a subtle leak. It was your email address, in plain text, in every outbound request header.
+
+## Developer Reactions: The Thread in Three Acts
+
+### Act 1: "This Is Insane" — Immediate Outrage
+
+The top comment (500+ upvotes in the thread) captured the visceral reaction:
+
+> "Wow... this is insane! What a terrible idea. These are the exact kinds of things that a human engineer would almost certainly never do. This kind of thing is the problem of going all in on the idea of the AI Software Factory."
+
+Developers weren't just annoyed — they felt betrayed. This wasn't a bug; it was a design choice that violated the principle of least surprise. As one commenter put it:
+
+> "As implemented, it strongly violates the principle of least surprise. A more sane implementation would involve a prompt the first time an agent attempts to connect to each of the sites that Anthropic thinks it necessary to send this email header to."
+
+### Act 2: "Was This Intentional or a Hallucinated Bug?"
+
+A fascinating debate emerged: did a human engineer decide this, or did the agent do it on its own?
+
+> "I think you're overestimating the design intent that goes into a product that's proudly dogfooding the future of vibe coding. It's very possible that nobody decided this at all and that's it just something an agent threw in on its own because some Chain of Thought imagined it was a clever way to correlate queries back with user accounts or something."
+
+This possibility — that an AI agent made a privacy-violating decision no human would make — struck a nerve. It's the "vibe coding" nightmare scenario: you're not just reviewing code; you're reviewing decisions the agent made while you weren't looking.
+
+### Act 3: The Trust Crisis — "I'm Going Back to Building My Own"
+
+The most consequential comments weren't about this specific bug. They were about what it represents:
+
+> "Incidents like this, and OpenCode changing the DX in v2, is why I'm going back to building my own. It's also fun and interesting."
+
+> "I prefer to use the chatbots on a website, instead of Claude Code. I've never used Claude Code or Cursor. All the code I got written this year was without them. I prefer to see exactly what's being sent, and sorta control the KV cache."
+
+> "My experience with Anthropic's products outside of the models themselves has been atrocious. The models are really good obviously, and have changed how all of us work, but their client software, be it Claude desktop, Claude on the web and Claude Code is bug-ridden, with an incoherent feature set and invasive behaviors."
+
+A clear pattern: developers trust the *models*, but they don't trust the *harnesses* wrapping them.
+
+## The Real Insight: Harnesses Are the New Attack Surface
+
+Here's what this thread reveals that most coverage misses: **the model isn't the product anymore — the harness is.**
+
+When you use Claude Code, you're not just using Anthropic's model. You're using:
+- A CLI tool that reads your git config
+- A web search integration that constructs HTTP headers
+- A session management system that persists state
+- An update mechanism that can change behavior overnight
+
+Each of these components is a decision surface. Each can leak data, change behavior, or introduce vulnerabilities — independent of the model's capabilities.
+
+The email leak wasn't a model failure. It was a **harness failure**. The harness decided to include your email in a User-Agent header. No model prompt asked for that. No human (probably) reviewed that decision. It just happened.
+
+And this same harness has access to your:
+- Entire codebase
+- Git history and remotes
+- Environment variables
+- SSH keys (if you use agent forwarding)
+- Local network
+
+## What It Means for You
+
+### 1. Audit Your Harness, Not Just the Model
+
+If you're using Claude Code, Cursor, Windsurf, or any coding agent, you need to know:
+- What data does the harness collect? (git config, env vars, file contents)
+- Where does it send that data? (telemetry, search APIs, update checks)
+- Can you disable network calls entirely?
+- Is the harness open source? (Claude Code is not; OpenCode is)
+
+### 2. Assume the Harness Is Watching
+
+The email leak happened because the harness accessed git config (`user.email`) and decided to use it. What else is in your git config? `user.signingkey`? `credential.helper` with tokens?
+
+Run this right now:
+```bash
+git config --list --show-origin
+```
+
+Anything in there you don't want sent to a third-party search API?
+
+### 3. The "Local-First" Alternative Is Gaining Traction
+
+Multiple commenters mentioned building their own tooling or using open-source alternatives (OpenCode, Aider, Continue) specifically because they can:
+- Read the code that constructs network requests
+- Disable telemetry at the source
+- Run without network access entirely
+- Audit what data leaves their machine
+
+### 4. AGENTS.md Is Becoming a Security Boundary
+
+The suggestion to "update AGENTS.md to not do this particular thing" reveals a shift: developers are treating AGENTS.md / CLAUDE.md / .cursorrules as **security policies**, not just style guides. You're writing rules to constrain what the harness + model combination can do.
+
+But as one commenter noted: "that isn't the same as having sense." A rule saying "don't leak email" doesn't prevent the next creative leak the agent invents.
+
+## The Bigger Picture: We're in the "Move Fast and Break Trust" Phase
+
+This incident mirrors early web analytics: companies added tracking pixels everywhere because "it helps us improve the product," then acted surprised when users revolted. Coding agent harnesses are doing the same — collecting data, phoning home, making autonomous decisions — because "it makes the agent smarter."
+
+The difference: these tools have **full access to your production codebase**.
+
+The HN thread shows developers are waking up. The question isn't "which agent writes the best code?" anymore. It's "which harness can I trust with my codebase?"
+
+## What to Do Today
+
+1. **Check your git config** — remove or rotate any emails/tokens you don't want leaked
+2. **Read the harness source** — if it's closed source (Claude Code, Cursor), assume it sends more than you know
+3. **Use network monitoring** — tools like Little Snitch, OpenSnitch, or just `tcpdump` to see what your agent actually contacts
+4. **Consider local-first agents** — OpenCode, Aider, Continue run the model locally or via your own API keys; the harness code is auditable
+5. **Treat AGENTS.md as a security policy** — explicitly forbid network calls, file reads outside the project, env var access
+
+---
+
+*The HN discussion is ongoing at [news.ycombinator.com/item?id=50385272](https://news.ycombinator.com/item?id=50385272). The original GitHub issue is at [github.com/anthropics/claude-code/issues/107757](https://github.com/anthropics/claude-code/issues/107757).*
+
+*Disclaimer: This article summarizes real developer sentiments from a public Hacker News thread. Quotes are paraphrased for readability; see the original thread for exact wording.*
