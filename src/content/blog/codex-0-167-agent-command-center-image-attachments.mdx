@@ -1,0 +1,183 @@
+---
+title: "Codex 0.167 Just Gave You a Command Center — And Your Images Finally Work in Chat"
+description: "OpenAI Codex 0.167.0 ships the agent command center with unread markers, local image preview in composer, backend switching that keeps your drafts, and Vertex AI setup wizard. The daily-driver release that makes Codex feel like a complete IDE."
+pubDate: 2026-11-07
+tags: ["codex", "openai", "release", "0.167.0", "command-center", "image-attachments", "vertex-ai", "backend-switching", "coding-agent", "beginner"]
+tools: ["codex"]
+author: "Anshad"
+image: "/api/og?title=Codex+0.167+Command+Center&tool=codex"
+canonical: "https://terminalblog.com/blog/codex-0-167-agent-command-center-image-attachments/"
+---
+
+**Codex 0.167.0 dropped yesterday** — and it's the release that finally makes Codex feel like a complete daily driver. Agent command center with unread markers. Local image attachments that actually preview. Backend switching that preserves your drafts. Vertex AI setup built into onboarding. Plus `Ctrl+L` to clear the screen without losing history.
+
+---
+
+## The One-Line Summary
+
+**Codex 0.167.0 (Nov 6) → Agent command center (`codex agents --no-daemon`) with unread result markers, local image preview in composer, backend switching with draft preservation, Vertex AI/GCP setup wizard, macOS/Windows system proxy opt-in, expandable patch details in approval prompts. Plus `Ctrl+L` for clean display, saved chats survive model switch, network approvals one-at-a-time, realtime V3 speech saved to history, smarter context compaction. Run `npm install -g @openai/codex@latest`.**
+
+---
+
+## Feature 1: Agent Command Center — Your Mission Control
+
+**What it is:** A new TUI dashboard: `codex agents --no-daemon`
+
+- **Session picker** shows all your agent sessions
+- **Unread markers** — bold sessions have new results waiting
+- **No daemon mode** — runs without background service, purely interactive
+
+```bash
+# Open command center
+codex agents --no-daemon
+
+# Navigate with arrows, Enter to resume, 'q' to quit
+```
+
+**Why it matters:** Before 0.167, finding which background agent finished meant checking each session manually. Now: **one view, instant signal**. The unread markers alone save 30 seconds per context switch.
+
+---
+
+## Feature 2: Local Image Attachments — Finally, Screenshots Work
+
+**What it is:** Drag or paste an image into the composer. It **previews inline** while you type. Click the transcript path to open the full image.
+
+```bash
+# In Codex TUI:
+# 1. Paste screenshot (Cmd+V / Ctrl+V)
+# 2. See thumbnail preview in composer
+# 3. Send — image goes with your prompt
+# 4. Later: click transcript path → opens full image
+```
+
+**Supported terminals:** Works on terminals with image protocol support (iTerm2, Kitty, WezTerm, Ghostty, VS Code terminal, Warp).
+
+**Why it matters:** \"Here's the error\" + screenshot used to mean: save file → describe path → hope agent finds it. Now: **paste → send → agent sees it**. Beginner-friendly, expert-fast.
+
+---
+
+## Feature 3: Backend Switching That Keeps Your Drafts
+
+**What it is:** Switch between connected backends (OpenAI, Azure, Vertex, Bedrock, etc.) from the session picker. **Your unsent draft survives the switch.**
+
+```bash
+# In session picker:
+# 1. Highlight session
+# 2. Press 'b' for backend menu
+# 3. Select new provider
+# 4. Your draft is still there
+```
+
+**Why it matters:** Testing model behavior across providers used to mean: copy draft → switch → paste → repeat. Now: **switch → same draft → compare results instantly**.
+
+---
+
+## Feature 4: Vertex AI Setup Wizard Built Into Onboarding
+
+**What it is:** New \"Sign in another way\" menu includes **Google Cloud Vertex AI**. Enable `gcp_setup_wizard` and it walks you through:
+
+- Application Default Credentials (ADC)
+- Service account key file
+- Project/region selection
+
+```bash
+# Enable in Codex:
+/experimental gcp_setup_wizard true
+
+# Then: Sign in another way → Google Cloud Vertex AI
+```
+
+**Why it matters:** Vertex AI setup used to be \"read docs, configure gcloud, pray.\" Now: **wizard does it**. GCP teams can onboard in 2 minutes.
+
+---
+
+## Feature 5: System Proxy Support (macOS/Windows)
+
+**What it is:** Opt into your OS proxy settings from `/experimental`:
+
+```bash
+/experimental system_proxy true
+```
+
+Codex now respects your system proxy (corporate, VPN, etc.) without manual `HTTP_PROXY`/`HTTPS_PROXY` env vars.
+
+**Why it matters:** Enterprise users behind proxies no longer need IT tickets to configure Codex. **It just works**.
+
+---
+
+## Feature 6: Expandable Patch Details in Approval Prompts
+
+**What it is:** When an approval prompt opens (tool call needs permission), you can now **expand the patch/diff inline** to see exactly what changes.
+
+```bash
+# Before: "Allow edit to src/auth.ts?" → [Allow] [Deny]
+# After:  "Allow edit to src/auth.ts?"
+#         [▼ Show diff] → shows unified diff inline
+#         [Allow] [Deny]
+```
+
+**Why it matters:** Blind approvals are how bugs ship. **See the change, then decide**.
+
+---
+
+## The Quality-of-Life Fixes You'll Use Daily
+
+| Fix | Before | After |
+|-----|--------|-------|
+| **`Ctrl+L` clears display** | Clear = lose history | `Ctrl+L` = clean screen, `Ctrl+T` = history back |
+| **Saved chats survive model switch** | Switch model = lose chat | Chat stays, shows \"can't resume\" banner + editable prompt to continue |
+| **Network approvals one-at-a-time** | Concurrent requests = prompt flood | Same endpoint = sequential prompts |
+| **Realtime V3 speech → history** | Speech vanished | Completed speech saved to chat history |
+| **Smarter context compaction** | Missed failed response tokens | Accounts for retained output + missing token data |
+
+---
+
+## How to Update
+
+```bash
+npm install -g @openai/codex@latest
+# Verify
+codex --version
+# Should show 0.167.0
+```
+
+**Or download** from [github.com/openai/codex/releases/tag/rust-v0.167.0](https://github.com/openai/codex/releases/tag/rust-v0.167.0) — 196 assets across platforms.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Run background agents** | **Yes** — command center + unread markers |
+| **Share screenshots with agents** | **Yes** — image preview finally works |
+| **Test across model providers** | **Yes** — backend switch keeps drafts |
+| **Use GCP/Vertex AI** | **Yes** — setup wizard removes friction |
+| **Behind corporate proxy** | **Yes** — system proxy support |
+| **Review tool calls before approve** | **Yes** — expandable diffs in prompts |
+| **On 0.166 and happy** | **Yes** — pure upgrades, no breaking changes |
+
+---
+
+## The Pattern
+
+```
+0.164 (Oct 22) → 0.165 (Oct 28) → 0.166 (Oct 29) → 0.167 (Nov 6)
+```
+
+OpenAI is shipping **weekly stable releases** now. 0.166 was UX polish. 0.167 is **workflow completion** — the pieces that make Codex a full daily driver are finally here.
+
+---
+
+*Codex 0.167.0 released November 6, 2026. Full changelog: [github.com/openai/codex/releases/tag/rust-v0.167.0](https://github.com/openai/codex/releases/tag/rust-v0.167.0). Codex CLI is Apache-2.0 open source.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
+
+## Related Articles
+
+- [Codex 0.166 Just Made Transcript Navigation Keyboard-First, Added GPT-6.1 Terra Everywhere, and Shipped a Network Doctor](/blog/codex-0-166-transcript-navigation-gpt6-terra-doctor/)
+- [Codex 0.165 Just Got Built-In Vertex AI, Memory V2 Default, and Reasoning Effort That Works Mid-Conversation](/blog/codex-0-165-vertex-ai-memory-v2-reasoning/)
+- [Beware: Codex MultiAgentV2 Encrypts Subagent Instructions — Audit Trail Gone](/blog/beware-codex-multiagentv2-encrypts-subagent-instructions/)
+- [Beware: Codex Desktop Subagent MCP Resource Crisis on Windows](/blog/beware-codex-desktop-subagent-mcp-resource-crisis/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Complete Guide to AI Coding Agents 2026](/blog/complete-guide-ai-coding-agents-2026/)
