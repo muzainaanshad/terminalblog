@@ -1,0 +1,212 @@
+---
+title: "Claude Code Just Made MCP Tools Background-Ready — Your Long-Running Tasks Finally Work Right"
+description: "v2.1.319 ships background MCP tasks, deny-instead-of-prompt permissions, latency optimization, spend tracking, and the ability to reopen finished subagents. Here's what actually matters."
+pubDate: 2026-11-07
+tags: ["claude-code", "release", "mcp", "auto-mode", "coding-agents", "beginner"]
+tools: ["claude-code"]
+author: "Anshad"
+image: "/api/og?title=Claude+Code+v2.1.319+MCP+Background&tool=claude-code"
+canonical: "https://terminalblog.com/blog/claude-code-v2-1-319-mcp-tasks-background-auto-mode/"
+---
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Claude Code Just Made MCP Tools Background-Ready — Your Long-Running Tasks Finally Work Right",
+  "description": "v2.1.319 ships background MCP tasks, deny-instead-of-prompt permissions, latency optimization, spend tracking, and the ability to reopen finished subagents. Here's what actually matters.",
+  "image": "https://terminalblog.com/api/og?title=Claude+Code+v2.1.319+MCP+Background&tool=claude-code",
+  "datePublished": "2026-11-07",
+  "dateModified": "2026-11-07",
+  "author": {
+    "@type": "Person",
+    "name": "Anshad"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "TerminalBlog",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://terminalblog.com/favicon.ico"
+    }
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://terminalblog.com/blog/claude-code-v2-1-319-mcp-tasks-background-auto-mode/"
+  }
+})} />
+
+**Claude Code v2.1.319 dropped 10 hours ago.** It's the 5th release in a week (315 → 316 → 317 → 318 → 319). Most are pure fixes. This one ships **five features you'll actually use.**
+
+---
+
+## The Five Things That Matter
+
+### 1. MCP Tools Finally Run in the Background
+
+**This is the big one.** When an MCP server runs a long tool call (think: massive grep across 50K files, database migration, LLM inference), Claude Code used to block the entire session until it finished.
+
+**Now:** The tool moves to the background immediately. Claude gets the result when it's done. You keep working.
+
+```bash
+# Before: session frozen for 3 minutes
+> run-massive-migration
+
+# After: instant return, result arrives when ready
+> run-massive-migration
+# ... you keep coding ...
+# [MCP task completed] Migration applied: 12,847 rows
+```
+
+**Opt out** if you need synchronous behavior:
+```bash
+export CLAUDE_CODE_DISABLE_MCP_TASK_BACKGROUND=1
+```
+
+---
+
+### 2. `permissions.denyInsteadOfPrompting` — Automation Just Got Real
+
+Ever tried running `claude -p` in CI and had it hang on a permission prompt? New setting:
+
+```json
+{
+  "permissions": {
+    "denyInsteadOfPrompting": true
+  }
+}
+```
+
+Any tool call that would prompt **gets denied automatically**, and the turn continues. Works in terminal sessions, subagents, and teammates.
+
+**Translation:** Your automation scripts no longer stall on "Do you want to allow this?" They fail fast and move on.
+
+---
+
+### 3. `/claude-api latency-optimize` — Find Where Your API Calls Make People Wait
+
+New command that profiles your Claude API usage and suggests faster settings against your eval:
+
+```bash
+/claude-api latency-optimize
+```
+
+It tells you exactly which calls are slow and what to change. If you're building user-facing features with the API, this is free performance engineering.
+
+---
+
+### 4. Spend Tracking in `/usage` — Today, This Week, This Month
+
+If you're behind a Claude Apps gateway with no hard spend limit, you now get:
+
+```
+/usage
+# Shows:
+# Today: $12.47
+# This week: $67.23
+# This month: $234.18
+```
+
+No more surprise bills. Works when the gateway runs v2.1.319+.
+
+---
+
+### 5. "Earlier in This Session" — Reopen Finished Subagents
+
+`/tasks` now shows a row listing **finished subagents from this session**. Click one → reopen the thread → keep talking to it even after it left the list or you restarted.
+
+```bash
+/tasks
+# Earlier in this session:
+# 1. security-reviewer (finished 14 min ago) → [Reopen]
+# 2. migration-runner (finished 2 hours ago) → [Reopen]
+# 3. test-generator (finished yesterday) → [Reopen]
+```
+
+Your subagent work is no longer disposable.
+
+---
+
+## The Auto Mode Changes (If You Run Behind Gateways)
+
+Two behavior changes for LLM gateway users:
+
+| Scenario | Old Behavior | New Behavior |
+|----------|-------------|--------------|
+| Telemetry/feature flags OFF | Fallback to built-in classifier | **Ask or deny** — no fallback |
+| Behind LLM gateway | Server-side check optional | `CLAUDE_CODE_AUTO_MODE_SERVER=1` **forces it on** |
+
+**Workarounds:**
+```bash
+# Keep old fallback behavior
+export CLAUDE_CODE_AUTO_MODE_SERVER=0
+
+# Force server-side check even with experimental betas disabled
+export CLAUDE_CODE_AUTO_MODE_SERVER=1
+```
+
+Bedrock, Vertex, and Foundry are **unchanged**.
+
+---
+
+## The Fixes You'll Notice (Scannable)
+
+**Network filesystem survivors** (from v2.1.318, carried forward):
+- Config survives saves on NFS/SMB/Lustre instead of being deleted/emptied
+- Sessions retry when config wrongly reported missing
+- Login stops being replaced by empty file when disk fills
+
+**Authentication:**
+- 401 login loop fixed — request failing with 401 no longer refreshes login on every retry
+- Sign-in expiry warning appears 10 days early in `claude -p`
+- `claude auth status` shows `loginExpiresAt`
+
+**MCP & Tools:**
+- Older handshake MCP servers stop failing to connect or returning empty results
+- Long-running MCP tool calls on claude.ai connector now report results after `--resume`
+- `deniedMcpServers` URL entries now block matching Anthropic-provided servers too
+
+**Session & Conversation:**
+- `/diff` pane no longer opens blank after 64+ turns edited files
+- Slash commands after leading space/tab/newline now run instead of being sent as plain text
+- `/context` sends only the table to Claude, not the full visual grid
+- `claude -p` exits 1 (not 0) in auto mode when actions refused due to unavailable safety check
+
+**Agents View (VS Code/Desktop):**
+- Preview no longer cuts off long commands/results without ellipsis
+- Draft saved by another agent view no longer removed on exit
+- Agent view no longer returns with another view's input text after update restart
+
+---
+
+## Should You Update?
+
+**Yes.** Zero breaking changes. Pure fixes + 5 genuinely useful features.
+
+```bash
+# Auto-updates on next check, or force it:
+claude update
+```
+
+If you're on v2.1.310 or earlier, **the 315-319 window is ~200 fixes total**. The network filesystem fixes alone are worth it.
+
+---
+
+## The Pattern
+
+```
+v2.1.315 (Nov 1) → v2.1.316 (Oct 31) → v2.1.317 (Nov 3) → v2.1.318 (Nov 4) → v2.1.319 (Nov 6)
+```
+
+Anthropic is shipping daily stability patches. This is the first one in the streak with **new user-facing features** instead of pure fixes.
+
+---
+
+*v2.1.319 released November 6, 2026. Full changelog: [github.com/anthropics/claude-code/releases/tag/v2.1.319](https://github.com/anthropics/claude-code/releases/tag/v2.1.319).*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
+
+## Related articles
+
+- [Claude Code v2.1.318 Just Dropped — 100+ Fixes, Network Drives Finally Work](/blog/claude-code-v2-1-318-network-drives-finally-work/)
+- [Claude Code v2.1.318 Just Landed — The Stability Arc Continues With Mods Effort Control, Auth Expiry Warnings, and 100+ Fixes](/blog/claude-code-v2-1-317-stability-surge/)
+- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
