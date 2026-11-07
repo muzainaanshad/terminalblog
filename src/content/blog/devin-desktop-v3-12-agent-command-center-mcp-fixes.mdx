@@ -1,0 +1,269 @@
+---
+title: "Devin Desktop v3.12 Just Put MCP Controls in Your Session Header — And Local Agent Rejections Got a Second Chance"
+description: "Devin Desktop v3.12.17 (Nov 6) adds MCP server management per session, local agent rejection recovery, VS Code 1.141/Electron 43.8 security, and Markdown previews in Agent Command Center. The quality-of-life wave that makes daily agent work smoother."
+pubDate: 2026-11-07T15:00:00Z
+tags: ["devin-desktop", "windsurf", "release", "v3.12", "mcp", "agent-command-center", "security", "coding-agent", "beginner"]
+tool: "devin-desktop"
+author: "Anshad"
+image: "/api/og?title=Devin+Desktop+v3.12+MCP+Session+Controls&tool=devin-desktop"
+canonical: "https://terminalblog.com/blog/devin-desktop-v3-12-agent-command-center-mcp-fixes/"
+---
+
+**Devin Desktop v3.12.17 dropped November 6** — just a week after the massive v3.11 Agent Window overhaul. This isn't a feature splash. It's the **polish wave that makes v3.11 feel finished**. MCP controls in the session header. Local agent rejections that give you a second try. Chromium security fixes. Markdown that actually renders in the Command Center.
+
+If you updated to v3.11 and hit rough edges — this is the release that sands them down.
+
+---
+
+## The Feature You'll Use Daily: MCP Controls in the Session Header
+
+### The Problem: MCP Management Was Buried
+
+You're in a session. Need to toggle an MCP server. Re-authenticate one. Check which servers are active.
+
+**Before v3.12:** Settings → MCP → find the server → toggle → back to session. Context lost. Flow broken.
+
+### The Fix: Three Dots, One Click
+
+**v3.12 adds an MCP menu to the session header** (the "…" menu in each session tab):
+
+- **See all MCP servers for that session** — no guessing
+- **Turn one on/off** — instant, no settings detour
+- **Re-authenticate** — expired tokens fixed in place
+
+```markdown
+# Real workflow
+Session header → "…" → MCP Servers → [github] → Toggle off
+Session header → "…" → MCP Servers → [slack] → Re-authenticate
+# Back to coding in 2 seconds
+```
+
+**Why it matters:** MCP servers are per-session infrastructure. Managing them *in the session* — not in a global settings panel — is how it should have worked from day one.
+
+---
+
+## The Feature That Saves Your Prompt: Local Agent Rejection Recovery
+
+### The Problem: "Rejected" Meant "Retype Everything"
+
+Local agent rejects your first prompt (permission denied, tool unavailable, sandbox violation). The prompt vanishes. You retype from memory. Frustration compounds.
+
+### The Fix: Prompt Returns to Composer with the Reason
+
+**v3.12: If a local agent rejects the first prompt, Desktop puts the text back in the composer and shows *why* it was rejected.**
+
+```markdown
+You: "Refactor the auth module to use OAuth 2.1"
+Agent: [Rejected] "Permission denied: cannot write to src/auth/legacy/"
+Composer: "Refactor the auth module to use OAuth 2.1"  ← YOUR PROMPT IS BACK
+          ↑ "Permission denied: cannot write to src/auth/legacy/"
+You: [Edit prompt to target allowed paths] → Resend
+```
+
+**You correct and resend without retyping.** The rejection becomes a hint, not a wall.
+
+---
+
+## The Security Baseline: VS Code 1.141 + Electron 43.8 + Chromium Fixes
+
+**v3.12.17 updates the editor foundation:**
+
+- **VS Code 1.141.2** — upstream editor fixes and improvements
+- **Electron 43.8.3** — **Chromium security patches** (CVE fixes from October/November)
+- **Node.js** updated accordingly
+
+**Why it matters for beginners:** You're running an agent that executes code, reads files, and talks to the network. The Electron/Chromium layer is your sandbox boundary. Keeping it current isn't optional — it's hygiene. v3.12 does it automatically.
+
+---
+
+## The IDE Mode Polish: Settings Opens in an Editor Tab
+
+### The Problem: Settings Ejected You from Your Workflow
+
+In IDE mode, opening settings **switched modes** — you left your session, landed in a separate settings view, lost your place.
+
+### The Fix: Settings Opens as an Editor Tab
+
+**v3.12: In IDE mode, opening Devin settings opens an editor tab instead of switching modes.**
+
+```markdown
+# Before
+Cmd+, → Mode switch → Settings view → Lose session context → Cmd+W to return
+
+# After
+Cmd+, → New tab in editor → Settings → Edit → Close tab → Back to session
+```
+
+**Muscle memory preserved.** Settings is just another file now.
+
+---
+
+## The Visual Polish: Chat Diffs + Code Blocks Use Your Theme
+
+### Chat Diffs Match Your Editor Colors
+
+**Before:** Hardcoded diff colors (green/red) that clashed with your theme.
+
+**Now:** Chat diffs use **your editor theme's diff colors**. Dracula diffs look like Dracula. GitHub Dark diffs look like GitHub Dark.
+
+### Shell Commands + Code Blocks Get Syntax Highlighting
+
+**Before:** Plain text in transcript.
+
+**Now:** Shell commands and code blocks use **your editor's syntax highlighting**.
+
+```bash
+# Before: Monochrome wall of text
+npm run build
+# > webpack 5.94.0 compiled with 3 errors
+
+# After: Highlighted like your terminal
+npm run build
+# > webpack 5.94.0 compiled with 3 errors
+```
+
+**Small change. Big readability win** when you're scanning a 200-turn transcript.
+
+---
+
+## The Fixes You'll Actually Notice (Scannable)
+
+### Local Sessions
+- **Reopened Local session keeps working directory** — no more "wait, where was I?"
+- **Closing tab no longer removes session from Past Conversations** — history preserved
+- **Click filename on Local plan approval card** → read full plan before approving
+- **Windows: local edits save even with different filename capitalization** — `Auth.ts` vs `auth.ts` no longer loses writes
+
+### ACP / Third-Party Agents
+- **Permission requests from third-party ACP agents no longer crash conversation view** — was a hard blocker for Claude Agent, OpenCode, etc.
+- **Sessions with pending ACP requests reopen correctly** — no more stuck states
+
+### Remote / SSH
+- **Remote SSH connects to hosts defined ONLY in custom `remote.devinSSH.configFile`** — respects your SSH config isolation
+
+### Agent Command Center
+- **Markdown previews now supported** — Wiki, Review, Automations render properly instead of raw markdown
+
+---
+
+## Version Context
+
+| Version | Date | Highlights |
+|---------|------|------------|
+| **v3.12.17** | **Nov 6, 2026** | **MCP controls in session header, local rejection recovery, VS Code 1.141, Electron 43.8, settings tab in IDE mode, Markdown in Command Center** |
+| v3.11.238 | Oct 30, 2026 | Anthropic Cyber Verification toggle, 4 MB diagnostic logs |
+| v3.11.212 | Oct 23, 2026 | **Agent Window overhaul** — side-by-side sessions, terminal per tab, Dev Containers, IDE button |
+
+**v3.11 was the architecture. v3.12 is the craft.**
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Use MCP servers daily** | **Yes** — session-header MCP menu alone saves clicks every session |
+| **Hit local agent rejections** | **Yes** — prompt recovery = less retyping, less frustration |
+| **Run third-party ACP agents (Claude, OpenCode)** | **Yes** — permission crash fixed, sessions reopen |
+| **Care about security baseline** | **Yes** — Electron 43.8 = Chromium CVEs patched |
+| **Use IDE mode** | **Yes** — settings as tab = workflow preserved |
+| **On v3.11 and everything works** | **When convenient** — but the MCP menu is the kind of feature you'll use 10x/day |
+
+**Zero breaking changes. Pure quality-of-life.**
+
+---
+
+## How to Update
+
+```bash
+# Auto-update (usually happens in background)
+# Devin Desktop → Settings → Check for Updates → Restart
+
+# Or direct downloads (v3.12.17):
+
+# macOS Apple Silicon
+# https://windsurf-stable.codeiumdata.com/darwin-arm64/stable/d23bb600ed8f90d7d985cef5ceca9b9235e88911/Devin-darwin-arm64-3.12.17.dmg
+
+# macOS Intel
+# https://windsurf-stable.codeiumdata.com/darwin-x64/stable/d23bb600ed8f90d7d985cef5ceca9b9235e88911/Devin-darwin-x64-3.12.17.dmg
+
+# Windows x64 (User Installer)
+# https://windsurf-stable.codeiumdata.com/win32-x64-user/stable/d23bb600ed8f90d7d985cef5ceca9b9235e88911/DevinUserSetup-x64-3.12.17.exe
+
+# Windows x64 (System Installer)
+# https://windsurf-stable.codeiumdata.com/win32-x64/stable/d23bb600ed8f90d7d985cef5ceca9b9235e88911/DevinSetup-x64-3.12.17.exe
+
+# Linux x64
+# https://windsurf-stable.codeiumdata.com/linux-x64/stable/d23bb600ed8f90d7d985cef5ceca9b9235e88911/Devin-linux-x64-3.12.17.tar.gz
+
+# Linux Debian
+# https://windsurf-stable.codeiumdata.com/linux-x64-deb/stable/d23bb600ed8f90d7d985cef5ceca9b9235e88911/Devin-linux-x64-3.12.17.deb
+
+# Verify
+devin --version
+# Should show: 3.12.17
+```
+
+---
+
+## First Things to Try After Update
+
+```bash
+# 1. Open a session → click "…" in session header → MCP Servers
+#    Toggle one off → toggle back on → notice: no settings detour
+
+# 2. In a local session: send a prompt that'll be rejected
+#    (e.g., "Write to /etc/passwd")
+#    Watch: prompt returns to composer with reason
+
+# 3. Open settings in IDE mode (Cmd+,)
+#    Notice: opens as editor tab, not mode switch
+
+# 4. Check a chat diff — colors match your theme
+#    Check a code block — syntax highlighted
+
+# 5. Open Agent Command Center → Wiki/Review → Markdown renders
+```
+
+---
+
+## The Bottom Line
+
+**v3.11 made Devin Desktop an IDE. v3.12 made it a *polished* IDE.**
+
+- **MCP controls where they belong** — in the session, not settings
+- **Rejection recovery** — your prompt survives "no"
+- **Security baseline current** — Electron 43.8, Chromium patched
+- **Settings as a tab** — IDE mode workflow intact
+- **Markdown in Command Center** — Wiki/Review actually readable
+- **ACP permission crashes fixed** — third-party agents work reliably
+
+This is the release you update for, then forget you updated — because everything just works a little better.
+
+```bash
+# Update → session header MCP → rejection recovery → settings tab → done
+# That's the v3.12 feeling.
+```
+
+---
+
+## Related Articles
+
+- [Devin Desktop v3.11 Just Replaced Your IDE — Agent Window, Side-by-Side Sessions, and Terminal in Every Tab](/blog/devin-desktop-v3-11-agent-window-ide/)
+- [Devin Desktop v3.10.67 — MCP Enterprise, Private Preview Remote MCPs](/blog/windsurf-devin-desktop-3-10-67-mcp-enterprise/)
+- [Windsurf Wave 14 — Arena Mode, Plan Mode, Cascade Overhaul](/blog/windsurf-wave-14-arena-mode-plan-mode/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Claude Code v2.1.319 Just Landed — Background MCP Tasks, Expanded Auto Mode, Gateway Controls](/blog/claude-code-v2-1-319-mcp-tasks-background-auto-mode/)
+- [Opencode v2.2.6 Just Made MCP Connections Shared — And Plugins Got Themes, Mobile Got a Dock, Worktrees Got Scriptable](/blog/opencode-v2-2-6-shared-mcp-plugin-themes-mobile-worktrees/)
+- [GitHub Copilot CLI v1.0.108 Just Gave Your Agent a Search Index — /index Commands + Shared tgrep Land in Pre-Release](/blog/github-copilot-cli-1-0-108-pre-release-indexing/)
+
+---
+
+*Devin Desktop v3.12.17 released November 6, 2026. Full changelog: [docs.devin.ai/desktop/changelog](https://docs.devin.ai/desktop/changelog) · Devin Desktop is proprietary (requires Devin subscription). Formerly Windsurf.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
