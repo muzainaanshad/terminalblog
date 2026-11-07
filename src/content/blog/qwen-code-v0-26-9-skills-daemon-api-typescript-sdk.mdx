@@ -1,0 +1,299 @@
+---
+title: "Qwen Code v0.26.9 Just Made Skill Management Industrial-Grade — Daemon APIs, TypeScript SDK, and Bulk Activation"
+description: "Qwen Code v0.26.9 (Nov 6) lands the platform-grade Skill infrastructure: PUT /skills/activation for 1-100 skills in one call, daemon APIs for large ZIP uploads with receipts, TypeScript SDK for programmatic installs, and WebShell upload UI. The v0.26 series hits 8 patches in 16 days."
+pubDate: 2026-11-07T15:00:00Z
+tags: ["qwen-code", "release", "v0.26.9", "skills", "daemon", "typescript-sdk", "managed-agent", "coding-agent", "beginner"]
+tool: "qwen-code"
+author: "Anshad"
+image: "/api/og?title=Qwen+Code+v0.26.9+Skill+Management&tool=qwen-code"
+canonical: "https://terminalblog.com/blog/qwen-code-v0-26-9-skills-daemon-api-typescript-sdk/"
+---
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Qwen Code v0.26.9 Just Made Skill Management Industrial-Grade — Daemon APIs, TypeScript SDK, and Bulk Activation",
+  "description": "Qwen Code v0.26.9 (Nov 6) lands the platform-grade Skill infrastructure: PUT /skills/activation for 1-100 skills in one call, daemon APIs for large ZIP uploads with receipts, TypeScript SDK for programmatic installs, and WebShell upload UI. The v0.26 series hits 8 patches in 16 days.",
+  "image": "https://terminalblog.com/api/og?title=Qwen+Code+v0.26.9+Skill+Management&tool=qwen-code",
+  "datePublished": "2026-11-07T15:00:00Z",
+  "dateModified": "2026-11-07T15:00:00Z",
+  "author": {
+    "@type": "Person",
+    "name": "Anshad"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "TerminalBlog",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://terminalblog.com/favicon.ico"
+    }
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://terminalblog.com/blog/qwen-code-v0-26-9-skills-daemon-api-typescript-sdk/"
+  }
+})} />>
+
+**Qwen Code v0.26.9 dropped 20 hours ago (November 6, 2026)** — the **8th patch in 16 days** for the v0.26 series. The team isn't slowing down.
+
+This release is about **Skill infrastructure going production-grade**. Not "skills work" — *skills work at team scale, with automation, with recovery guarantees*.
+
+---
+
+## The One-Line Summary
+
+**v0.26.9 (Nov 6) → Bulk skill activation (1-100 in one call), daemon APIs for large ZIP uploads with receipts, TypeScript SDK for programmatic installs, WebShell upload UI, durable managed-agent questions, automation enabled by default. Zero breaking changes. 8 patches in 16 days.**
+
+---
+
+## The Headline Features (Ranked by "This Changes How Teams Operate")
+
+### 1. Bulk Skill Activation — One API Call for 100 Skills
+
+**What it is:** `PUT /skills/activation` (and `setUserSkillsActivation` SDK method) lets you **enable or disable 1–100 user Skills in a single request** ([#16186](https://github.com/QwenLM/qwen-code/pull/16186)). Preferences saved. Propagation status returned.
+
+**Why it matters:**
+
+- **Team onboarding** — new dev joins → one API call provisions their full skill set
+- **CI/CD pipelines** — `qwen-code skill activate --all --config team-skills.json` in your deploy script
+- **Environment parity** — dev/staging/prod skill configs version-controlled, applied identically
+- **Rollback** — disable 50 skills in one call if a bad one slips through
+
+```bash
+# Before: 100 skills = 100 CLI commands or manual UI clicks
+# After: One call
+curl -X PUT http://localhost:3000/skills/activation \
+  -H "Content-Type: application/json" \
+  -d '{"activations": [{"skillId": "skill-1", "enabled": true}, {"skillId": "skill-2", "enabled": true}, ...]}'
+
+# Or via TypeScript SDK (see below)
+```
+
+**For beginners:** Skills are reusable agent capabilities (code review, test generation, deployment, etc.). Before, you toggled them one by one. Now you manage them like infrastructure.
+
+---
+
+### 2. Daemon APIs for Large Skill ZIPs — Upload, Install, Get Receipts
+
+**What it is:** New daemon routes for **installing large Skill ZIP archives** by upload or host file path, plus **installation receipt lookup after failures** ([#16421](https://github.com/QwenLM/qwen-code/pull/16421), [#16422](https://github.com/QwenLM/qwen-code/pull/16422)).
+
+**Why it matters:**
+
+- **Large skills** (ML models, heavy binaries) no longer hit upload limits — disk-based ZIP handling with recovery-backup protection
+- **Failure recovery** — install fails? Query the receipt. Know exactly what succeeded, what didn't, and resume from there
+- **Automation-friendly** — CI uploads skill artifacts → daemon installs → receipt confirms → deploy continues
+
+```bash
+# Upload a large skill ZIP directly to daemon
+curl -X POST http://localhost:3000/daemon/skills/install \
+  -F "zip=@my-heavy-skill-v2.3.zip" \
+  -F "attemptId=deploy-20261107-001"
+
+# Later, check the receipt
+curl http://localhost:3000/daemon/skills/receipt/deploy-20261107-001
+# Returns: { status: "completed", skillId: "skill-xyz", version: "2.3", installedAt: "..." }
+```
+
+---
+
+### 3. TypeScript SDK — Programmatic Skill Installs from File, Blob, Bytes, or Path
+
+**What it is:** **First-class TypeScript SDK support** for installing Skill ZIPs from `File`, `Blob`, `bytes`, or host path — with attempt IDs and receipt lookup ([#16423](https://github.com/QwenLM/qwen-code/pull/16423)).
+
+**Why it matters:**
+
+- **Embed Qwen Code in your own tools** — build internal platforms, IDE extensions, CLI wrappers
+- **Type-safe** — full TypeScript types for every parameter and response
+- **Unified interface** — same SDK works for browser (File/Blob) and Node (fs paths/bytes)
+
+```typescript
+import { QwenCodeClient } from '@qwen-code/sdk';
+
+const client = new QwenCodeClient({ baseUrl: 'http://localhost:3000' });
+
+// From a file input in browser
+const result = await client.skills.installFromFile(fileInput.files[0], {
+  attemptId: 'web-upload-001'
+});
+
+// From Node.js filesystem
+const result = await client.skills.installFromPath('/artifacts/skill-v2.3.zip', {
+  attemptId: 'ci-deploy-001'
+});
+
+// Check receipt anytime
+const receipt = await client.skills.getReceipt('ci-deploy-001');
+console.log(receipt.status); // 'completed' | 'failed' | 'pending'
+```
+
+**This is the API layer that lets Qwen Code become a platform, not just a tool.**
+
+---
+
+### 4. WebShell Skill Upload UI — Drag, Drop, Done
+
+**What it is:** WebShell's Skills page now has **ZIP upload with daemon limits shown and uncertain results checkable** ([#16424](https://github.com/QwenLM/qwen-code/pull/16424)).
+
+**Why it matters:**
+
+- **Non-technical team members** install skills without CLI
+- **Visual feedback** — daemon size limits displayed, installation progress shown
+- **Uncertain results** — if upload flakes, "Check Result" button queries the receipt
+
+---
+
+### 5. Durable Structured User Questions — Managed Agents That Wait for You
+
+**What it is:** Managed agents now support **durable structured user questions** ([#16433](https://github.com/QwenLM/qwen-code/pull/16433)). The agent pauses, presents a structured question (choices, text, files), persists it, and resumes when answered — even across restarts.
+
+**Why it matters:**
+
+- **Human-in-the-loop at scale** — "Deploy to prod? [yes/no/dry-run]" survives agent restart
+- **Audit trail** — every question and answer logged with timestamps
+- **Multi-step approvals** — chain questions: security review → compliance → deploy
+
+---
+
+### 6. Managed Agent Automation Enabled by Default
+
+**What it is:** **Automation is now on by default** for managed agents ([#16448](https://github.com/QwenLM/qwen-code/pull/16448)). No config flip needed.
+
+**Why it matters:**
+
+- **Out-of-the-box CI/CD** — `qwen-code run --managed "nightly refactor"` just works
+- **Scheduled jobs** — cron, GitHub Actions, GitLab CI all trigger managed runs without extra setup
+- **Team adoption** — zero friction to start automating
+
+---
+
+### 7. Performance: Activation Renewals, Lock Reduction, History Caching
+
+**What it is:** Three infrastructure wins ([#16336](https://github.com/QwenLM/qwen-code/pull/16336), [#16410](https://github.com/QwenLM/qwen-code/pull/16410), [#16337](https://github.com/QwenLM/qwen-code/pull/16337)):
+
+| Improvement | What Changed | Impact |
+|-------------|--------------|--------|
+| **Activation renewals** | Locate lease more efficiently | Faster renewals, less overhead |
+| **Tenant guard locks removed** | Native journal snapshot publication unlocked | **Managed agent throughput up, contention down** |
+| **Session history caching** | Message bodies cached per process | Hosted turns faster, less repeated reads |
+
+**Translation:** Managed agents at team scale (20+ concurrent workspaces) just got noticeably snappier.
+
+---
+
+## The v0.26 Patch Series: 8 Patches in 16 Days
+
+| Version | Date | Focus |
+|---------|------|-------|
+| **v0.26.9** | **Nov 6, 2026** | **Bulk skill activation, daemon APIs, TS SDK, WebShell upload, durable questions, automation default, perf** |
+| v0.26.8 | Nov 5, 2026 | Qwen subscription, Ink TUI shared loop, WebShell PR links, concurrent rewinds, role templates, Mods submit prompts |
+| v0.26.7 | Nov 4, 2026 | Channel events page, local /verify-pr Docker, WebShell polish, Anthropic tool-choice fix |
+| v0.26.6 | Nov 2, 2026 | WebShell approvals/split view/charts, unified ACP loop, headless hooks, Fedora/RHEL RPMs |
+| v0.26.5 | Nov 1, 2026 | Bounded SQL history, Generated UI default, WebShell shortcuts, Helm, autofix PR comments |
+| v0.26.4 | Oct 29, 2026 | Theme-aware UI, unscoped npm extensions, independent worktrees, re-verify on update |
+| v0.26.3 | Oct 28, 2026 | Persistent workflow mode, generated UI persistence, 1M context detection, XML recovery |
+| v0.26.2 | Oct 27, 2026 | Cloud sessions model refresh, managed agent crash fixes |
+| **v0.26.0** | **Oct 21, 2026** | **Managed agent platform launch: durable sessions, failover, desktop, SSH, --check, systemd** |
+
+**Eight patches. Sixteen days. Zero breaking changes. Every patch = production hardening.**
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Manage skills across a team** | **Yes** — bulk activation, daemon APIs, TS SDK = skill infrastructure |
+| **Build internal tools on Qwen Code** | **Yes** — TypeScript SDK is the integration layer you've waited for |
+| **Run managed agents at scale** | **Yes** — lock reduction, history caching, automation default |
+| **Use WebShell for skill management** | **Yes** — drag-drop upload with receipts |
+| **Need human-in-the-loop for managed runs** | **Yes** — durable structured questions |
+| **On v0.26.8 and stable** | **Yes** — zero breaking changes, pure capability adds |
+| **Pinned to v0.25.x** | **Test in staging** — but the platform gap is now a canyon |
+
+**No reason to wait.** This is the "skills become infrastructure" release.
+
+---
+
+## How to Update
+
+```bash
+# CLI (npm - recommended)
+npm i -g @qwen-code/qwen-code@latest
+
+# Verify
+qwen-code --version
+# Should show 0.26.9
+
+# Desktop app (check for updates in-app)
+# Or download from https://github.com/QwenLM/qwen-code/releases
+
+# VS Code extension
+# Auto-updates, or: Extensions → Qwen Code → Update
+```
+
+**After upgrade, try:**
+
+```bash
+# 1. Test bulk skill activation (if you have multiple skills)
+qwen-code skill list --json | jq '.[] | {skillId, enabled}' > team-skills.json
+# Edit enabled flags, then:
+qwen-code skill activate --config team-skills.json
+
+# 2. Try TypeScript SDK in a quick script
+# npm i @qwen-code/sdk
+# node -e "
+# const { QwenCodeClient } = require('@qwen-code/sdk');
+# const c = new QwenCodeClient({ baseUrl: 'http://localhost:3000' });
+# c.skills.list().then(console.log);
+# "
+
+# 3. WebShell skill upload
+# Open http://localhost:3000/web-shell → Skills → Upload ZIP
+
+# 4. Test durable question in managed run
+qwen-code run --managed "Deploy to staging? Ask for confirmation first."
+# Watch agent pause with structured question
+```
+
+---
+
+## The Bigger Picture: Qwen Code Is Building the "Linux of Agent Platforms"
+
+| Release | Shift |
+|---------|-------|
+| v0.20–v0.23 | Single-agent CLI, great at coding |
+| v0.24.6 | **Managed runtime** — durable sessions, failover, advisor |
+| v0.24.7 | **Hardening** — settings isolation, permission fixes |
+| **v0.25.0** | **Platform** — workspace agents, Mem0, A2A, private MCP, cold restore, broker auth, models.dev catalog |
+| **v0.26.0** | **Operable platform** — desktop, SSH workspaces, --check preflight, systemd units, 8 MiB attachments |
+| **v0.26.1–9** | **Production hardening** — 9 patches, 500+ fixes, subscription auth, TUI shared loop, WebShell, skill infrastructure, TS SDK |
+
+**Every release fills a gap. No rewrites. No "v2 coming soon." Just steady compounding.**
+
+Now with v0.26.9: **a local-first multi-agent platform with industrial-grade skill management, TypeScript SDK for embedders, traceable WebShell, team-scale concurrency, and unified subscription auth.**
+
+The question isn't "which agent should I use?" It's **"why would I pay for a cloud agent platform when Qwen Code runs the same patterns locally, free, with my data on my machine, with an SDK to embed it in my own products, and now with the skill infrastructure to operate it at enterprise scale?"**
+
+---
+
+## Related Articles
+
+- [Qwen Code v0.26.8 Just Added Qwen Subscription Support, TUI Polish, and Channel Editor Links](/blog/qwen-code-v0-26-8-subscription-support-tui-polish/)
+- [Qwen Code v0.26 Just Became a Full Multi-Agent Platform — Local, Remote, and Everything In Between](/blog/qwen-code-v0-26-managed-agent-desktop-local-ssh/)
+- [Qwen Code v0.25.0 — Workspace Agents, Mem0, A2A Collaboration](/blog/qwen-code-v0-25-workspace-agents-mem0-a2a-collaboration/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Claude Code v2.1.319 Just Made MCP Tools Background-Ready](/blog/claude-code-v2-1-319-mcp-tasks-background-auto-mode/)
+- [Opencode v2.2.6 Just Made MCP Connections Shared](/blog/opencode-v2-2-6-shared-mcp-plugin-themes-mobile-worktrees/)
+- [Kilo Code v7.8.27 Just Patched Critical Supply-Chain Vulnerabilities](/blog/kilocode-v7-8-27-critical-security-patch/)
+
+---
+
+*Qwen Code is open-source (Apache-2.0) and available at [github.com/QwenLM/qwen-code](https://github.com/QwenLM/qwen-code). Full changelog: [v0.26.9 release notes](https://github.com/QwenLM/qwen-code/releases/tag/v0.26.9). Published November 7, 2026 — covers Qwen Code v0.26.9 released November 6, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
