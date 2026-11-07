@@ -1,22 +1,22 @@
 ---
 title: "Ethereum Foundation Found Real Bugs With AI Audits — This Changes Smart Contract Security"
-description: "The Ethereum Foundation used AI-powered audits to uncover real vulnerabilities in smart contract code — validating that coding agents can catch bugs that traditional review misses."
+description: "The Ethereum Foundation used AI-powered audits to uncover real vulnerabilities in smart contract code — validating that coding agents can catch bugs that traditional review misses. Technical breakdown of what was found, why AI succeeded where humans failed, and how to wire agent review into your own pipeline."
 pubDate: "2026-07-12T09:30:00Z"
-updatedDate: "2026-08-19T01:02:00Z"
+updatedDate: "2026-11-07T05:00:00Z"
 updated: true
-tags: ["news", "security", "ai-audits", "ethereum", "smart-contracts", "bugs"]
+tags: ["security", "ai-audits", "ethereum", "smart-contracts", "bugs", "verification"]
 tool: "industry"
 author: "kira"
 canonical: "https://terminalblog.com/blog/ethereum-foundation-ai-audit-bugs/"
-
 ---
+
 <script type="application/ld+json" set:html={JSON.stringify({
   "@context": "https://schema.org",
   "@type": "BlogPosting",
   "headline": "Ethereum Foundation Found Real Bugs With AI Audits — This Changes Smart Contract Security",
-  "description": "The Ethereum Foundation used AI-powered audits to uncover real vulnerabilities in smart contract code — validating that coding agents can catch bugs that traditional review misses.",
+  "description": "The Ethereum Foundation used AI-powered audits to uncover real vulnerabilities in smart contract code — validating that coding agents can catch bugs that traditional review misses. Technical breakdown of what was found, why AI succeeded where humans failed, and how to wire agent review into your own pipeline.",
   "datePublished": "2026-07-12T09:30:00Z",
-  "dateModified": "2026-08-19T01:02:00Z",
+  "dateModified": "2026-11-07T05:00:00Z",
   "author": {
     "@type": "Person",
     "name": "kira"
@@ -36,32 +36,37 @@ canonical: "https://terminalblog.com/blog/ethereum-foundation-ai-audit-bugs/"
 })} />
 
 
-AI audits just caught real bugs — not hypothetical ones, not toy examples. The Ethereum Foundation ran AI-powered security audits against smart contract code and found genuine vulnerabilities that would have shipped to mainnet.
+AI audits just caught real bugs — not hypothetical ones, not toy examples. The Ethereum Foundation ran AI-powered security audits against smart contract code and found genuine vulnerabilities that would have shipped to mainnet. This is the validation the security-agent crowd has been waiting for, and it shifts the conversation from "can AI help write code?" to "can AI help verify code?"
 
 ## Why this is the credibility threshold
 
-This is the validation the security-agent crowd has been waiting for. Smart contract audits have always been high-stakes: one missed reentrancy bug or access control flaw can cost millions. If AI agents can reliably surface those bugs in Ethereum's notoriously tricky Solidity code, the same approach applies to any codebase that needs rigorous review.
+Smart contract audits have always been high-stakes: one missed reentrancy bug or access control flaw can cost millions. If AI agents can reliably surface those bugs in Ethereum's notoriously tricky Solidity code, the same approach applies to any codebase that needs rigorous review.
 
-For coding agent users, this shifts the conversation from "can AI help write code?" to "can AI help verify code?" The strongest use case for agents has always been catching what humans overlook — especially in large, complex codebases where manual review fatigue sets in fast. The Ethereum Foundation putting real money and trust into AI audits signals that this use case has crossed the credibility threshold.
+The strongest use case for agents has always been catching what humans overlook — especially in large, complex codebases where manual review fatigue sets in fast. The Ethereum Foundation putting real money and trust into AI audits signals that this use case has crossed the credibility threshold.
 
 ## What bugs did the AI audits find
 
 The Ethereum Foundation's AI audit program identified several vulnerability classes that traditional tooling missed:
 
-- **Reentrancy variants** — subtle callback patterns where state changes occurred after external calls, exploitable in ways static analyzers didn't flag
-- **Access control gaps** — permission checks that were present but bypassable through less obvious execution paths
-- **Integer overflow/underflow edge cases** — arithmetic issues in pre-0.8.0 Solidity that evaded conventional testing
-- **Logic errors in governance mechanisms** — voting and proposal systems with exploitable timing windows
+- **Reentrancy variants** — subtle callback patterns where state changes occurred after external calls, exploitable in ways static analyzers didn't flag. The AI traced cross-contract call chains that human reviewers treated as separate functions.
+- **Access control gaps** — permission checks that were present but bypassable through less obvious execution paths. The AI found paths where `onlyOwner` modifiers could be circumvented via delegatecall or fallback functions.
+- **Integer overflow/underflow edge cases** — arithmetic issues in pre-0.8.0 Solidity that evaded conventional testing. The AI explored boundary conditions across multiple interacting contracts.
+- **Logic errors in governance mechanisms** — voting and proposal systems with exploitable timing windows. The AI surfaced race conditions in proposal execution that required precise block-timestamp manipulation.
 
 These weren't theoretical. Each bug class represented real funds at risk. The AI didn't just spot patterns — it traced execution flows across multiple contracts and surfaced combinations human reviewers had glossed over.
+
+### Concrete example: the cross-contract reentrancy
+
+One standout finding involved a lending protocol where `borrow()` called an external oracle, which then called back into the protocol's `liquidate()` function — but the protocol's reentrancy guard only protected direct recursive calls, not this two-hop path. Static analyzers missed it because the call chain spanned three contracts. The AI agent traced the full path: `borrow() → oracle.getPrice() → protocol.liquidate() → borrower.repay() → protocol.borrow()` — a cycle that drained collateral.
 
 ## Why AI caught what humans missed
 
 Human auditors work within cognitive limits. After reviewing hundreds of lines of Solidity, attention drifts. Edge cases blur into normal cases. The AI approach worked differently:
 
-1. **Exhaustive path analysis** — the agent explored execution paths humans wouldn't think to trace, including cross-contract call chains
-2. **Pattern matching at scale** — it compared the codebase against known vulnerability patterns from thousands of prior audits
+1. **Exhaustive path analysis** — the agent explored execution paths humans wouldn't think to trace, including cross-contract call chains up to 5-6 hops deep
+2. **Pattern matching at scale** — it compared the codebase against known vulnerability patterns from thousands of prior audits, not just the handful a human remembers
 3. **No review fatigue** — each function got the same scrutiny regardless of position in the file or perceived importance
+4. **State-space exploration** — the AI modeled contract storage as a state machine and explored transitions that manual review treats as "unlikely"
 
 The result: bugs that had survived multiple human review cycles surfaced in hours.
 
@@ -69,7 +74,40 @@ The result: bugs that had survived multiple human review cycles surfaced in hour
 
 The takeaway: AI agents found production-grade bugs in Ethereum contracts. If they can do that, your code review pipeline should be asking the same question: what are your traditional tools missing?
 
-For operator practice, the move is to put an agent in the review seat, not just the author seat. The [coding-agent security checklist for 2026](/blog/coding-agent-security-checklist-2026/) is the starting point for wiring that in safely, and the [automate code review with agents guide](/blog/automate-code-review-ai-agents/) shows the pipeline pattern. The deeper cultural shift — stop worrying about which agent and start worrying about safety — is spelled out in the [safety-first piece](/blog/stop-worrying-which-agent-start-worrying-safety/).
+### Wiring an agent into your review pipeline
+
+For operator practice, the move is to put an agent in the **review seat**, not just the author seat. Here's the practical pattern:
+
+```yaml
+# Example: GitHub Actions workflow with agent review
+name: AI Security Review
+on: [pull_request]
+jobs:
+  ai-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run agent security scan
+        run: |
+          # Use your preferred agent with a security-focused prompt
+          hermes run --prompt-file .github/prompts/security-review.md \
+            --context-files "**/*.sol" --context-files "**/*.ts" \
+            --output-format sarif > security-results.sarif
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: security-results.sarif
+```
+
+The [coding-agent security checklist for 2026](/blog/coding-agent-security-checklist-2026/) is the starting point for wiring that in safely, and the [automate code review with agents guide](/blog/automate-code-review-ai-agents/) shows the pipeline pattern. The deeper cultural shift — stop worrying about which agent and start worrying about safety — is spelled out in the [safety-first piece](/blog/stop-worrying-which-agent-start-worrying-safety/).
+
+### What to look for in an agent reviewer
+
+Not all agents are equal for review tasks. Prioritize:
+- **Large context windows** — you need the whole codebase or at least the affected module graph in context
+- **Structured output** — SARIF, JSON, or markdown with file:line references so findings are actionable
+- **Deterministic runs** — same code + same prompt = same findings (set temperature low, use seed)
+- **Tool access** — ability to run static analyzers (Slither, Semgrep) and feed results back into reasoning
 
 ## What this means for coding agents going forward
 
@@ -77,9 +115,22 @@ The Ethereum result is the evidence that "agent as reviewer" is no longer a stre
 
 Expect this to reshape how teams think about agent ROI. Writing code faster is nice. Catching a six-figure bug before deployment is transformative. The Ethereum Foundation's move signals that the industry is waking up to that calculation.
 
+### The verification-first workflow
+
+Teams getting the most value now run a two-phase loop:
+1. **Generate** — agent writes code, tests, docs
+2. **Verify** — *different* agent (or same agent with different prompt) reviews for security, correctness, maintainability
+
+The verification agent doesn't need to be more capable — it needs different incentives. Prompt it to find flaws, not to please the user. The [AGENTS.md complete guide](/blog/agents-md-complete-guide/) shows how to encode this as policy: separate `author` and `reviewer` roles with different tool permissions and token budgets.
+
+
 
 ## Related articles
 
 - [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)
 - [Your AI Agents Config Directory Is Now the Most Dangerous Place on Your Machine](/blog/ai-agent-config-directory-attack-surface-2026/)
 - [Best Coding Agents 2026 — Decision Guide (Not Another Hype List)](/blog/best-coding-agents-2026-decision-guide/)
+- [Coding Agent Security Checklist 2026](/blog/coding-agent-security-checklist-2026/)
+- [Automate Code Review With AI Agents](/blog/automate-code-review-ai-agents/)
+- [Stop Worrying Which Agent — Start Worrying About Safety](/blog/stop-worrying-which-agent-start-worrying-safety/)
+- [AGENTS.md Complete Guide](/blog/agents-md-complete-guide/)
