@@ -1,0 +1,247 @@
+---
+title: "GitHub Copilot CLI v1.0.108 Just Gave Your Agent a Search Index — /index Commands + Shared tgrep Land in Pre-Release"
+description: "Pre-release v1.0.108-0 adds /index commands with managed shared tgrep indexing (on by default for eligible repos), Windows enumerate-only directory grants, and 50+ fixes. The indexing alone changes how agents find code."
+pubDate: 2026-11-07
+tags: ["github-copilot-cli", "release", "v1.0.108", "pre-release", "indexing", "tgrep", "coding-agents", "beginner"]
+tool: "copilot-cli"
+author: "Anshad"
+image: "/api/og?title=GitHub+Copilot+CLI+v1.0.108+Indexing&tool=copilot-cli"
+canonical: "https://terminalblog.com/blog/github-copilot-cli-1-0-108-pre-release-indexing/"
+---
+
+**GitHub Copilot CLI v1.0.108-0 dropped 7 hours ago** (Nov 7, 00:25 UTC). It's a pre-release, but the feature that matters — **managed shared tgrep indexing** — is enabled by default for eligible repositories. Your agent just got a search index it didn't have yesterday.
+
+---
+
+## The Headline Feature: `/index` Commands + Shared tgrep (Default-On)
+
+### What It Is
+
+**tgrep** (tree grep) is GitHub's semantic code search index. Until now, you had to set it up manually. **v1.0.108 makes it managed and shared** — the CLI builds the index, shares it across your sessions, and keeps it fresh. Enabled by default for repositories that qualify.
+
+```bash
+# New /index commands
+/index status      # Shows index health, coverage, last updated
+/index build       # Force a full rebuild
+/index watch       # Live tail of index updates
+/index pause       # Pause background indexing
+/index resume      # Resume paused indexing
+```
+
+### Why It Matters for Beginners
+
+**Before:** Agent searches with `grep`/`glob`/`rg` — scans files every time. Slow on large repos. Misses semantic context.
+
+**After:** Agent queries a **pre-built semantic index**. Finds "the auth middleware" not by filename but by *what it does*. Cross-file references work. 10-100x faster on large codebases.
+
+```markdown
+# Real difference
+You: "Where's the JWT validation?"
+# Old: rg "jwt" → 200 matches, you scroll
+# New: Agent queries index → "src/auth/validate.ts:42 — validates JWT in middleware chain"
+```
+
+### Eligibility (Default-On)
+
+- Repository has a `.git` directory
+- Not a bare repo
+- Under 500k files (soft limit)
+- Not explicitly opted out via `settings.json`
+
+```json
+// Opt out if needed
+{
+  "indexing": {
+    "managed": false
+  }
+}
+```
+
+---
+
+## Windows: Enumerate-Only Directory Grants
+
+New setting: `sandbox.userPolicy.filesystem.enumeratePaths`
+
+```json
+{
+  "sandbox": {
+    "userPolicy": {
+      "filesystem": {
+        "enumeratePaths": ["C:\\Projects\\secret-repo"]
+      }
+    }
+  }
+}
+```
+
+**What it does:** Grants the agent permission to *list* directory contents (see file names, structure) without read/write access to file contents. Useful for:
+- Letting the agent explore a repo structure before you grant full access
+- Security-sensitive directories where you want visibility but not content access
+- CI/CD scenarios where the agent maps the repo first
+
+---
+
+## 50+ Fixes You'll Actually Notice (Scannable)
+
+### Agent Behavior
+- **Autopilot + Assisted Permissions**: Since 1.0.106, agent no longer stops on permission prompts — tries another approach, reports what it couldn't do
+- **Ctrl+C stops `/compact`** — same as Esc Esc, instead of only arming exit hint
+- **Interactive Autopilot waits for MCP input/consent** — no longer auto-declines
+- **`/mcp enable` respects repo settings** that disable an MCP server
+
+### Session & Resume
+- **`copilot --resume` / `/resume` find sessions with accented names** — precomposed or decomposed Unicode, matches either
+- **Headless runs error on resume conflict** — keeps history intact instead of corrupting
+- **Auto-updates no longer skipped** when sign-in takes >1 second
+
+### Search & Navigation
+- **`/search` keeps match in view** when opening, no more jump to bottom
+- **Up/Down/Enter in `/search`** bring single match back after scroll-away
+- **Shorter terminals** no longer leave current match off-screen
+
+### MCP & Tools
+- **MCP deny rules block by advertised name** (e.g., `server(weather.lookup)`) not just sanitized name — works with `--allow-all-tools`
+- **MCP form validation errors** show beside inputs, focus first invalid field, better screen-reader labels
+- **Pasted image path re-attaches** after clearing `[image: ...]` label with Ctrl+U/K/W or Up-arrow history
+
+### Input & Editing
+- **Backspace/arrow/Ctrl+U/Shift+Enter after paste** act on pasted text, not text before it
+- **Tab chars in replies/errors/agent names** show as spaces (not dropped) — tab-separated words stay readable
+
+### Windows/Linux Fixes
+- **Language servers on Linux** no longer told files deleted when directory renamed away-and-back
+- **Language servers on Linux** now notified of directory renames (old deleted, new created) during package installs
+- **Reduce CPU during builds** in large worktrees when language servers watch files
+
+### Accessibility
+- **`/help` describes `ctrl+d`** (exits only on empty prompt), `ctrl+z` on Windows, `ctrl+j/v/y` and voice keys
+- **Screen reader labels improved** across MCP forms, `/config` help, `/model` list
+
+### SDK / Headless
+- **SDK sessions include start/resume/model-change events** in `-p --output-format json`
+- **Turn ending with unwritable event log** still ends with `session.idle` — `sendAndWait` won't timeout
+- **grep/glob tools return matches found** even when some paths unreadable — note names what was skipped
+
+---
+
+## Should You Update? (Pre-Release Reality Check)
+
+| If You... | Verdict |
+|-----------|---------|
+| **Work on large repos (>10k files)** | **Yes** — managed tgrep indexing alone is transformative |
+| **Want semantic search without setup** | **Yes** — default-on, zero config |
+| **Need Windows enumerate-only access** | **Yes** — new security granularity |
+| **Run headless/CI and hit resume conflicts** | **Yes** — conflict error preserves history |
+| **Need absolute stability** | **Wait** for stable v1.0.108 (days away) |
+
+Pre-releases install side-by-side with stable. Test without committing.
+
+---
+
+## How to Install the Pre-Release
+
+```bash
+# macOS (Homebrew) - pre-release tap
+brew install github/copilot-cli/copilot-cli@pre
+# or
+brew upgrade github/copilot-cli/copilot-cli@pre
+
+# Windows - download from GitHub releases
+# https://github.com/github/copilot-cli/releases/tag/v1.0.108-0
+
+# Linux/macOS (npm) - pre-release tag
+npm install -g @github/copilot-cli@pre
+# or specific version
+npm install -g @github/copilot-cli@1.0.108-0
+
+# Verify
+copilot --version
+# Should show: 1.0.108-0
+```
+
+---
+
+## First Things to Try After Update
+
+```bash
+# 1. Check if indexing is active (the big one)
+/index status
+# Should show: "Managed indexing: enabled", coverage %, last updated
+
+# 2. Test semantic search
+# Ask: "Find the function that validates JWT tokens"
+# Agent should use index, not grep
+
+# 3. Test /index commands
+/index watch    # Live tail — watch it index in real-time
+/index pause    # Pause it
+/index resume   # Resume
+
+# 4. Test Windows enumerate-only (if on Windows)
+# Add enumeratePaths to settings.json → agent sees structure, not content
+
+# 5. Test resume with Unicode session names
+copilot --resume "sesión-with-accents"
+# Should find it regardless of NFC/NFD form
+```
+
+---
+
+## The Bigger Picture: Indexing Is the Next Baseline
+
+```
+v1.0.104 (Oct 27) → Assisted Permissions DEFAULT
+v1.0.105 (Oct 28) → Fusion High/Max long context
+v1.0.106-1/2 (Oct 31/Nov 1) → 21 fixes: paste, resume, encoding, WSL, symlinks
+v1.0.108-0 (Nov 7) → **Managed tgrep indexing (default-on), /index commands, Windows enumerate paths, 50+ fixes**
+```
+
+**Three weeks. Four pre-releases. Zero feature regressions.**
+
+The team shipped Assisted Permissions as default (v1.0.104), fixed the Fusion tiers (v1.0.105), sanded every paper cut (v1.0.106), and now **ships the search infrastructure that makes agents actually useful on real codebases**.
+
+Managed tgrep indexing isn't a "nice to have." It's the difference between "agent greps 50k files" and "agent knows your codebase." Making it default-on for eligible repos means **every user gets it without knowing it exists**.
+
+That's the feature. Everything else in v1.0.108 is polish.
+
+---
+
+## Bottom Line
+
+**v1.0.108-0 pre-release adds the search index your agent needed.**
+
+- `/index` commands + managed shared tgrep **enabled by default** for eligible repos
+- Windows enumerate-only directory grants for security granularity
+- 50+ fixes across Autopilot, resume, search, MCP, input, Windows/Linux, accessibility, SDK
+
+If you work on repos larger than a toy project, **the indexing alone justifies the pre-release**. If you prefer stable, v1.0.108 proper lands in days.
+
+```bash
+npm install -g @github/copilot-cli@pre
+/index status
+# Watch it build. Then ask your agent anything about the codebase.
+```
+
+---
+
+## Related Articles
+
+- [GitHub Copilot CLI v1.0.106 Just Fixed the Multi-Line Paste Bug — Plus 19 Other Fixes in Two Pre-Releases](/blog/github-copilot-cli-1-0-106-pre-release-fixes/)
+- [GitHub Copilot CLI Just Killed Experimental Mode — Assisted Permissions Are Now Default](/blog/github-copilot-cli-1-0-104-105-assisted-permissions-default/)
+- [Codex vs Copilot CLI: Terminal Battle — Which Terminal Agent Actually Ships?](/blog/codex-vs-copilot-cli-terminal-battle/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Claude Code Just Made MCP Tools Background-Ready — Your Long-Running Tasks Finally Work Right](/blog/claude-code-v2-1-319-mcp-tasks-background-auto-mode/)
+- [Opencode v2.2.6 Just Made MCP Connections Shared — And Plugins Got Themes, Mobile Got a Dock, Worktrees Got Scriptable](/blog/opencode-v2-2-6-shared-mcp-plugin-themes-mobile-worktrees/)
+- [AmpCode Just Connected Your Agent to GitLab — Merge Requests, Reviews, Self-Hosted Instances](/blog/ampcode-gitlab-integration-november-2026/)
+
+---
+
+*GitHub Copilot CLI v1.0.108-0 pre-release published November 7, 2026. Full changelog: [github.com/github/copilot-cli/releases/tag/v1.0.108-0](https://github.com/github/copilot-cli/releases/tag/v1.0.108-0)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
