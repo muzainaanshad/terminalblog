@@ -1,23 +1,63 @@
 ---
-title: "What Developers Actually Think About AI Coding Agents — From 400+ HN Comments"
-description: "A deep dive into how real developers are using AI coding agents in production, what tools they pay for, and why many are ditching complex orchestration for simpler setups."
+title: "What Developers Actually Think About AI Coding Agents — From 1,000+ HN Comments"
+description: "Two major Hacker News threads reveal the privacy concerns, real workflows, and unfiltered opinions of developers using AI coding agents daily. Updated with November 2026 data."
 pubDate: 2026-11-05
-updatedDate: 2026-11-05
+updatedDate: 2026-11-07
 author: Anshad
-tags: ["ai-coding-agents", "claude-code", "codex", "workflow", "hn-discussion"]
+tags: ["ai-coding-agents", "claude-code", "codex", "workflow", "hn-discussion", "privacy"]
 heroImage: "/src/assets/images/hn-discussions-hero.svg"
 heroAlt: "Developer opinions on AI coding agents from Hacker News discussion"
 ---
 
-## What Happened: A Snapshot of How Developers Actually Use AI Coding Agents
+## What Happened: Two Threads, 1,000+ Comments, Zero Marketing Fluff
 
-On November 4, 2026, a Hacker News user asked a simple question: **"What's your current AI agentic setup?"** The thread exploded with **413 comments** from developers sharing their exact subscriptions, tools, and workflows. No marketing fluff—just practitioners describing what they pay for and what they actually use daily.
+**November 4–7, 2026** saw two major Hacker News threads that together paint the most complete picture of how developers actually use AI coding agents in production.
 
-This is rare. Most content about AI coding agents comes from vendors or early adopters selling courses. This thread is different: it's hundreds of engineers comparing notes on what works in production, what's a waste of money, and where the industry is actually heading.
+**Thread 1: "Ask HN: What's your current AI agentic setup?"** (546 points, 413+ comments) — The most comprehensive snapshot of developer workflows, subscriptions, and tooling choices.
+
+**Thread 2: "Claude Code sends your email address to websites"** (1,577 points, 504 comments) — A privacy scandal where Claude Code was caught embedding users' Anthropic account emails in HTTP headers during web searches.
+
+**Thread 3: "Is Programming That Easy?"** — A CS student's pushback on the "coding was never the hard part" narrative, revealing what beginners actually experience.
+
+This is rare. Most content about AI coding agents comes from vendors or early adopters selling courses. These threads are different: hundreds of engineers comparing notes on what works in production, what's broken, what they're worried about, and where the industry is actually heading.
 
 ---
 
-## The Numbers: What Developers Are Paying For
+## The Privacy Scandal: Claude Code's Email Leak (NEW — Nov 7)
+
+### What Happened
+
+A developer discovered that **Claude Code was automatically including their Anthropic account email in the `User-Agent` header** of every web search request the agent made. The header looked like:
+
+```
+my-session-slug/1 <my.name@example.com>
+```
+
+This happened silently, without consent, for every website the agent visited during a coding session. One user reported receiving **"dozens of scam and phishing emails per day from properties I have never personally visited."**
+
+### Developer Reactions: Anger, Resignation, Workarounds
+
+**The privacy absolutists:** "This is why I prefer to use the chatbots on a website, instead of Claude Code. I've never used Claude Code or Cursor. All the code I got written this year was without them. I prefer to see exactly what's being sent."
+
+**The "it's the harness, not the model" camp:** A lengthy technical debate erupted over whether this was Anthropic's harness code deliberately adding the email, or the model "hallucinating" it into requests. One commenter traced through Codex's open-source client and confirmed it *doesn't* do this — suggesting it's a Claude Code harness design choice.
+
+**The sandboxers:** "On my machine, LLMs are constrained to docker containers for me, no exceptions. Launch script checks that I can't accidentally run them with a working dir too far out."
+
+**The workaround builders:** Multiple developers shared pre-tool hooks that scan outgoing requests for email patterns and block them. One published a patch: `github.com/zululima/dotclaude/commit/550c1e55b4b59678cb0a4f5487690e9dafeac486`
+
+**The cynics:** "Believing Anthropic won't use your data for their own corporate interests is like believing apps like WhatsApp don't ship with backdoors, which is a very beginner-level mindset if you hang around HN."
+
+### The Real Insight
+
+This isn't just about one email leak. It's about a fundamental architectural tension: **AI coding agents need broad system access to be useful, but that access creates uncontrollable data exfiltration vectors.**
+
+Developers are responding by treating agents as untrusted code — running them in VMs, containers, microVMs (LimaVM), with secret managers (Infisical's agent-vault), and network-level egress filtering. The "agent sandbox" is becoming a discipline of its own.
+
+> "If we can't properly sandbox an LLM, I would say that's a pretty good sign that LLMs are not a panacea for building digital systems." — jstanley
+
+---
+
+## The Numbers: What Developers Are Paying For (413+ Responses)
 
 The most striking pattern? **Most serious developers pay for multiple subscriptions.**
 
@@ -101,6 +141,21 @@ With few exceptions, commenters who tried **OpenClaw, Hermes Agent, Dots, Muse, 
 
 ---
 
+## The Beginner's Reality Check: "Coding Was Never the Hard Part" (NEW — Nov 7)
+
+A third thread captured a critical perspective often missing from agent discussions. A CS student wrote:
+
+> "I've been studying CS for 3 years... it took me weeks of searching and practice to fully grasp how promises and asynchronous programming really work... Learning a Lisp took me a couple of months... And what some people say like 'it was never the hard part' does have a lot of impact on people starting out."
+
+**Top responses:**
+- "It's only the easy part in hindsight once you know most of the nuts and bolts"
+- "Coding isn't the *hard* part, it's the *challenging* part, so if you enjoy the challenge then it's easy"
+- The 10-year rule (Norvig) still holds — AI doesn't compress the learning curve, it changes what you apply it to
+
+**This matters for agent users:** If you don't understand the code the agent writes, you can't verify it, debug it, or architect with it. Agents amplify leverage for those who already know the domain; they don't replace the need to learn it.
+
+---
+
 ## The Real Insight: The Market Is Splitting
 
 Three distinct tiers are emerging:
@@ -147,20 +202,33 @@ Three distinct tiers are emerging:
 
 **Self-hosted is real now.** Qwen 3.8 Flash Next (MoE, 6B active), DeepSeek V4.1 Flash, GLM 5.3 Flash run on consumer hardware (Mac Studio M5 Ultra, Strix Halo, 2× 4090s). Quality is "SOTA for the price." Revolut proved the 10x savings.
 
+**Privacy: sandbox from day one.** VM, container, or microVM; secret manager; network egress control. Audit outbound headers — run a local HTTP proxy and inspect what your agent actually sends.
+
 ---
 
 ## The Bottom Line
 
-The HN thread reveals a market **maturing past the hype cycle**. Developers aren't asking "should I use AI?"—they're comparing **Opus 5.5 vs GPT-5 class vs Qwen 3.8 Flash Next** on cost, latency, and capability. They're building **custom orchestration layers** because the platforms failed to deliver. They're **running multiple subscriptions** because no single provider is reliable enough.
+Hacker News developers are **pragmatic, privacy-paranoid, and subscription-promiscuous**. They use the best model for each task, sandbox aggressively, and mostly ignore the "swarm/orchestration" hype cycle.
 
-And the most productive developers? **They use the simplest tools.** The model does the heavy lifting. The human directs, reviews, and connects the dots.
+The real productivity unlock isn't more agents — it's **one strong model in a safe environment, with a persistent context system you control**.
 
+And if you're learning to code: **the "coding is easy" narrative is survivorship bias.** AI agents are force multipliers for knowledge you already have. They don't replace the 10-year journey to expertise — they just let you apply it faster once you've earned it.
+
+---
 
 ## Related articles
 
 - [Claude Code v2.1.318 Just Landed — The Stability Arc Continues With Mods Effort Control, Auth Expiry Warnings, and 100+ Fixes](/blog/claude-code-v2-1-317-stability-surge/)
 - [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
-- [What Developers Think About AI Coding Agents — From 500+ HN Comments (Nov 2026 Update)](/blog/what-developers-think-about-coding-agents-hn-august-2026/)
+- [Beware: GitHub Issue Hijacks & Claude/Gemini/Codex CI Secrets Exposure](/blog/beware-github-issue-hijacks-claude-gemini-codex-ci-secrets/)
+
 ---
 
-*Want to see the raw discussion? [HN Thread: "Ask HN: What's your current AI agentic setup?"](https://news.ycombinator.com/item?id=50366117) — 413 comments and counting.*
+*Want to see the raw discussions?*
+- [HN Thread: "Ask HN: What's your current AI agentic setup?"](https://news.ycombinator.com/item?id=50366117) — 413+ comments
+- [HN Thread: "Claude Code sends your email address to websites"](https://github.com/anthropics/claude-code/issues/107757) — 504 comments
+- [HN Thread: "Is Programming That Easy?"](https://news.ycombinator.com/item?id=50403687)
+
+---
+
+*Affiliate disclosure: This article contains links to aiFiesta (affiliate program: 10% lifetime commission). We only recommend tools we've verified developers actually use.*
