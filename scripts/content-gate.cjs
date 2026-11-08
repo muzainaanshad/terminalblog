@@ -33,6 +33,7 @@ const CODING_AGENT_TOOLS = new Set([
   'groq-code', 'kimi-cli', 'grok-build',
   'windsurf', 'devin-desktop',
   'kilocode',
+  'dify', 'crewai', 'langgraph', 'semantic-kernel',
   ]);
 
 const OFF_NICHE_HINTS = [

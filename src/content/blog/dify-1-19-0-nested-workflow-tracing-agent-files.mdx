@@ -1,0 +1,195 @@
+---
+title: "Dify 1.19 Just Made Nested Workflow Tracing Real — See Inside Every Agent Call, All the Way Down"
+description: "Dify 1.19.0 (Nov 4) ships nested workflow tracing in Langfuse/LangSmith/Opik, portable App packages with bundled Workflow Tools, batch Agent file uploads with inline PDF preview, and OpenAPI Skill management. The observability upgrade agent builders have been waiting for."
+pubDate: 2026-11-08
+tags: ["dify", "release", "v1.19.0", "workflow-tracing", "agents", "observability", "beginner", "orchestration"]
+tool: "dify"
+author: "Anshad"
+image: "/api/og?title=Dify+1.19+Nested+Workflow+Tracing&tool=dify"
+canonical: "https://terminalblog.com/blog/dify-1-19-0-nested-workflow-tracing-agent-files/"
+---
+
+**Dify 1.19.0 dropped November 4, 2026** — and it's the release that finally lets you **see inside a Workflow Tool, all the way down to its LLM calls**. Nested workflow tracing lands across Langfuse, LangSmith, Opik, Weave, Arize, Phoenix, Aliyun, MLflow, Databricks, and Tencent. Plus: portable App packages that carry their Workflow Tools with them, batch Agent file uploads with inline PDF preview, and OpenAPI/CLI Skill management.
+
+If you build multi-agent workflows on Dify, this is the observability upgrade you've been waiting for.
+
+---
+
+## The One-Line Summary
+
+**Dify 1.19.0 (Nov 4) → Nested workflow tracing in all major observability backends, portable App packages (format v2) with bundled Workflow Tools, batch Agent file uploads + inline PDF/source preview, difyctl Skill CRUD, Docker Compose 2.35+ required, Python 3.13 / Node 24.22.1+ / pnpm 12.16.1 for source deploys.**
+
+---
+
+## The Headline: Nested Workflow Tracing (Finally)
+
+### What It Was
+You run a workflow. It calls a Workflow Tool. That tool calls another Workflow Tool. In your tracing backend (Langfuse, LangSmith, etc.), you saw... the outer workflow. The inner calls were a black box. You couldn't see *which* LLM calls happened inside the nested tool, what prompts were sent, or where tokens burned.
+
+### What It Is Now
+**External traces now include the persisted execution steps inside called Workflow Tools.** Child steps appear beneath the Tool span that invoked them, preserving the hierarchy across nested and repeated calls.
+
+```text
+Before:  [Outer Workflow] → [Workflow Tool: "research-agent"] → ??? (black box)
+After:   [Outer Workflow]
+           └─ [Workflow Tool: "research-agent"]
+               ├─ [LLM Call: planner] → prompt, response, tokens
+               ├─ [Workflow Tool: "web-search"]
+               │    └─ [LLM Call: summarizer] → prompt, response, tokens
+               └─ [LLM Call: synthesizer] → prompt, response, tokens
+```
+
+**Why it matters:** You can now debug *why* a nested agent hallucinated, trace token costs per sub-workflow, and see the full execution tree — not just the top level.
+
+**Key details:**
+- Works with Langfuse, LangSmith, Opik, Weave, Arize, Phoenix, Aliyun, MLflow, Databricks, Tencent
+- Independently nested workflow runs remain separate traces linked by parent identifiers
+- Historical traces are **not backfilled** — only new executions get the richer hierarchy
+- New trace queue: `OPS_TRACE_QUEUE=ops_trace_v2` (defaults to this; API, workers, and Beat must agree)
+
+---
+
+## Portable App Packages: Take Your Workflow Tools With You
+
+### The Problem
+You export a Dify app that uses Workflow Tools. You import it elsewhere. The Workflow Tools **don't come with it**. You have to recreate them manually, hope the versions match, and wire them back up.
+
+### The Fix
+**`.ifpkg` packages now include the workflows behind called Workflow Tools at their bound versions, including transitive dependencies.** Import reuses tools already in the destination workspace and recreates, publishes, and registers missing ones, remapping their references.
+
+```bash
+# Export includes Workflow Tools (up to 20 bundled by default, configurable via APP_PACKAGE_MAX_WORKFLOW_TOOLS)
+# Import: missing tools recreated + published, existing tools reused
+# All exports now use package format v2 (including apps without Workflow Tools)
+```
+
+**Why it matters:** Your app + its agent workflows become a **single deployable unit**. No more "it works on my Dify but not yours."
+
+---
+
+## Batch Agent File Uploads + Inline Preview
+
+### What's New
+- **Multi-select / multi-file drop** → parallel uploads → one atomic binding request
+- **Inline PDF preview** — read research briefs, specs, PDFs directly in the Agent file preview
+- **Syntax-highlighted source files** — Python, JS, TS, etc. with line numbers
+- **Truncation notices** — you know when text was cut off
+- **Stale save protection** — concurrent Composer saves preserve the latest files
+
+```text
+Before: Upload one file → wait → upload another → hope order doesn't matter
+After:  Select 5 files (PDF + Python + Markdown) → drop → all bound atomically → preview any inline
+```
+
+**For beginners:** This is how you give your agent a **project knowledge base** without fighting the UI. Drop your specs, API docs, and reference code — they're all there, previewable, bound in one go.
+
+---
+
+## Skill Hub Automation: OpenAPI + difyctl
+
+### Six New Commands
+| Command | What It Does |
+|---------|--------------|
+| `difyctl get skill` | List Skills, with keyword/tag filters |
+| `difyctl describe skill` | Read details, draft hash, latest published version |
+| `difyctl get skill version` | List published versions |
+| `difyctl export skill` | Export draft or published version as ZIP |
+| `difyctl import skill --files <dir>` | Create or replace a Skill's draft from local files |
+| `difyctl publish skill` | Publish the draft as a new version |
+
+**Important:** Import does **not** publish. Importing over an existing Skill is classified as destructive — the operation catalog and CLI help distinguish read, write, and destructive operations.
+
+**Why it matters:** Your team's reusable agent skills (prompt templates, tool configs, workflows) can now be **versioned, reviewed, and deployed via CI/CD** — not click-click-click in the Console.
+
+---
+
+## Upgrade Guide: Read Before You Deploy
+
+### Hard Requirements
+| Component | Minimum Version |
+|-----------|-----------------|
+| Docker Compose | **2.35.0** (root `.env` overrides precedence) |
+| Python (source) | **3.13** |
+| Node.js (source) | **24.22.1+** (24.x line) |
+| pnpm (source) | **12.16.1** |
+
+### Rolling Deployment Sequence
+1. **Back up everything** — database, vector store, uploaded files, Agent snapshot storage, secrets, env files
+2. **Use matching `1.19.0` images** — API, worker, web, Agent Backend, Local sandbox, plugin daemon `0.6.14-local`
+3. **Separate tracing queues** — new tasks default to `ops_trace_v2`; keep old tracing workers on `ops_trace` until all old work drains
+4. **Upgrade package destinations before importing new packages** — format v2 packages may be rejected by older importers
+
+### New Environment Variables
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `OPS_TRACE_QUEUE` | `ops_trace_v2` | Shared trace delivery queue |
+| `OPS_TRACE_EXPORT_MAX_ATTEMPTS` | `6` | Retryable trace export attempts |
+| `ENABLE_TRACE_PAYLOAD_SWEEP_TASK` | `true` | Daily cleanup of orphaned trace payloads |
+| `APP_PACKAGE_MAX_WORKFLOW_TOOLS` | `20` | Max bundled Workflow Tools per App package |
+| `GUNICORN_KEEP_ALIVE` | `10` | Connection keep-alive seconds |
+
+**Removed:** `OPS_TRACE_UNIFIED_ENABLED`, `OPS_TRACE_RETRYABLE_DISPATCH_MAX_RETRIES`, `OPS_TRACE_RETRYABLE_DISPATCH_DELAY_SECONDS`, `OPS_TRACE_PARENT_CONTEXT_TTL_SECONDS`
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Build multi-step agent workflows** | **Yes** — nested tracing is a debug superpower |
+| **Ship Dify apps to clients/other environments** | **Yes** — portable packages eliminate "works on my machine" |
+| **Give agents file context (PDFs, specs, code)** | **Yes** — batch upload + inline preview = faster context loading |
+| **Manage Skills across workspaces/teams** | **Yes** — difyctl + OpenAPI = GitOps for Skills |
+| **Run on Docker Compose < 2.35** | **Upgrade Compose first** — hard requirement |
+| **On 1.18.x and stable** | **Plan it** — 6 DB migrations, tracing queue transition needed |
+
+---
+
+## How to Update (Docker Compose)
+
+```bash
+cd dify/docker
+docker compose stop -t -1
+git fetch --tags
+git checkout 1.19.0
+# Merge required config changes into existing env files
+docker compose pull
+docker compose up -d
+```
+
+**Keep `MIGRATION_ENABLED=true`** (API startup migrations) or run the full migration chain (`53c10126d551`) manually before starting new workers.
+
+---
+
+## The Bottom Line
+
+**Dify 1.18 gave you Console drilldown. 1.19 gives you the full execution tree — across every observability backend you already use.**
+
+- **Nested workflow tracing** → see every LLM call inside every Workflow Tool, formatted prompts, token usage, hierarchy preserved
+- **Portable App packages** → your app + its agent workflows = one deployable `.ifpkg`
+- **Batch Agent files + PDF/source preview** → knowledge loading that doesn't suck
+- **Skill CRUD via CLI/OpenAPI** → GitOps for reusable agent capabilities
+
+For a beginner building their first multi-agent app: **you can finally see what your agents are actually doing.** For a team shipping Dify apps: **the "it works here" problem is solved.**
+
+```bash
+# After upgrade
+# 1. Run a workflow with nested Workflow Tools
+# 2. Open Langfuse/LangSmith → see the full tree
+# 3. Export app → import on another Dify → Workflow Tools come with it
+# 4. difyctl import skill --files ./my-skills → publish from CI
+```
+
+---
+
+## Related Articles
+
+- [Why ACP Is the Missing Link for Multi-Agent Coding](/blog/why-ACP-is-the-missing-link-for-multi-agent-coding/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+- [Claude Code Just Made MCP Tools Background-Ready](/blog/claude-code-v2-1-319-mcp-tasks-background-auto-mode/)
+
+---
+
+*Dify 1.19.0 released November 4, 2026. Source: [github.com/langgenius/dify/releases/tag/1.19.0](https://github.com/langgenius/dify/releases/tag/1.19.0) · Dify is open-source (Apache 2.0) at [dify.ai](https://dify.ai) and [github.com/langgenius/dify](https://github.com/langgenius/dify)*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
