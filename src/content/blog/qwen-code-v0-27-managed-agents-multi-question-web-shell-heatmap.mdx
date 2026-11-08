@@ -1,0 +1,309 @@
+---
+title: "Qwen Code v0.27 Just Made Managed Agents Handle Multiple Questions at Once — And Web Shell Got a Q&A Heatmap"
+description: "Qwen Code v0.27.0 (Nov 7) lands multi-child questions for managed agents (answer in any order, keep drafts separate), Web Shell task Q&A heatmap, GitHub channel allowlists/blocklists, safer shell edits with CRLF/Unicode, and faster deadlock-resistant runtime. 9 patches in 17 days, zero breaking changes."
+pubDate: 2026-11-08T14:00:00Z
+tags: ["qwen-code", "release", "v0.27.0", "managed-agent", "web-shell", "github-integration", "coding-agent", "beginner", "open-source"]
+tool: "qwen-code"
+author: "Anshad"
+image: "/api/og?title=Qwen+Code+v0.27+Multi+Question+Web+Shell&tool=qwen-code"
+canonical: "https://terminalblog.com/blog/qwen-code-v0-27-managed-agents-multi-question-web-shell-heatmap/"
+---
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Qwen Code v0.27 Just Made Managed Agents Handle Multiple Questions at Once — And Web Shell Got a Q&A Heatmap",
+  "description": "Qwen Code v0.27.0 (Nov 7) lands multi-child questions for managed agents (answer in any order, keep drafts separate), Web Shell task Q&A heatmap, GitHub channel allowlists/blocklists, safer shell edits with CRLF/Unicode, and faster deadlock-resistant runtime. 9 patches in 17 days, zero breaking changes.",
+  "image": "https://terminalblog.com/api/og?title=Qwen+Code+v0.27+Multi+Question+Web+Shell&tool=qwen-code",
+  "datePublished": "2026-11-08T14:00:00Z",
+  "dateModified": "2026-11-08T14:00:00Z",
+  "author": {
+    "@type": "Person",
+    "name": "Anshad"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "TerminalBlog",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://terminalblog.com/favicon.ico"
+    }
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://terminalblog.com/blog/qwen-code-v0-27-managed-agents-multi-question-web-shell-heatmap/"
+  }
+})} />
+
+**Qwen Code v0.27.0 dropped November 7, 2026** — the 9th release in 17 days for the v0.26→0.27 series. The team isn't just patching; they're compounding capabilities at a pace that makes most cloud agent platforms look stagnant.
+
+This release is about **managed agents growing up**. Multiple pending questions per session, answered in any order, with isolated drafts and errors. Web Shell gets a visual Q&A heatmap so you see *when* agents asked for input. GitHub channels get allowlists/blocklists. Shell edits finally handle CRLF and Unicode without corruption. And the managed runtime got measurably faster with fewer deadlocks.
+
+If you run Qwen Code at team scale — this is the update you've been waiting for.
+
+---
+
+## The One-Line Summary
+
+**v0.27.0 (Nov 7) → Managed agents: multi-child questions (answer any order, isolated drafts), Web Shell: Q&A heatmap + "Ask for details" side task, GitHub channel: repo allowlists/blocklists, Shell: CRLF/Unicode-safe sed, cancelled commands report as interrupted, Runtime: faster + fewer deadlocks, Security: no credentials in upgrade refusals/Advisor errors. Zero breaking changes. 9 patches in 17 days.**
+
+---
+
+## The Headline Feature: Managed Agents Finally Handle Multiple Questions Like Adults
+
+### The Problem: One Question at a Time
+
+Before v0.27, a managed agent session could only hold **one pending "Ask User" question**. If your automation needed security review → compliance check → deploy approval, you got a queue. Answer out of order? Impossible. Draft your deploy answer while security review is pending? Gone.
+
+### The Fix: `multi-child-questions` — Answer in Any Order, Keep Drafts Separate
+
+**New in v0.27:** Managed-agent sessions now support **multiple child questions simultaneously** ([#16484](https://github.com/QwenLM/qwen-code/pull/16484)).
+
+- **Any order** — answer question #3 before #1, no problem
+- **Isolated drafts** — typing an answer to "Deploy to prod?" doesn't wipe your "Security review?" draft
+- **Separate errors** — if one question fails validation, others stay clean
+- **Persists across restarts** — questions survive agent restart, daemon restart, machine reboot
+
+```bash
+# Your CI pipeline can now do this:
+qwen-code run --managed "
+  1. Security review: 'Any secrets in this diff?' [yes/no/abort]
+  2. Compliance: 'Does this meet GDPR?' [yes/no/escalate]
+  3. Deploy: 'Push to production?' [yes/no/dry-run]
+"
+# All three questions land. Team answers in whatever order they want.
+# Agent resumes each branch independently when answered.
+```
+
+**Why this changes team workflows:** You can now model **real approval chains** — security → compliance → deploy — as parallel questions that different people answer at different times. The agent doesn't block. It just waits, remembers, and resumes.
+
+---
+
+## Web Shell: You Can Finally *See* When Agents Asked for Help
+
+### Task Q&A Heatmap — Your Agent's "Ask" Calendar
+
+**New:** Web Shell's composer now shows a **task Q&A activity heatmap** ([#16037](https://github.com/QwenLM/qwen-code/pull/16037)). Click a day → scrolls transcript to that day's first Q&A → highlights it.
+
+```bash
+# In Web Shell (http://localhost:3000/web-shell):
+# 1. Open a session with managed agent runs
+# 2. See a GitHub-style contribution heatmap in the composer
+# 3. Dark green day = lots of "Ask User" questions
+# 4. Click Nov 5 → jumps to first question that day
+```
+
+**Why it matters:** Before, finding "when did the agent ask for deploy approval?" meant scrolling through thousands of lines. Now: **visual calendar → one click → context**.
+
+---
+
+### "Ask for Details" — Explain the Options Without Answering
+
+**New:** Pending "Ask User Question" panels get an **"Ask for details" action** ([#16458](https://github.com/QwenLM/qwen-code/pull/16458)). Opens a side task that explains what each option *means* without submitting an answer.
+
+```bash
+# Agent asks: "Deploy to prod? [yes/no/dry-run]"
+# You click "Ask for details" → side panel opens:
+# - yes: Full production deploy, traffic shifts immediately
+# - no: Cancels deploy, marks PR as blocked
+# - dry-run: Runs deploy plan, shows diff, no traffic shift
+# You read, understand, THEN click your actual answer
+```
+
+**For beginners:** This is the "what does this button do?" safety net. Non-technical stakeholders can understand options before committing.
+
+---
+
+## GitHub Channel: Repo Allowlists and Blocklists
+
+### Control Exactly Which Repos Trigger Your Agents
+
+**New:** GitHub channel editor adds a **Repository Filter** with **allowlist and blocklist modes**, URL-friendly entries, and skipped-notification timeline rows ([#16493](https://github.com/QwenLM/qwen-code/pull/16493)).
+
+```json
+// Channel config example:
+{
+  "type": "github",
+  "repositoryFilter": {
+    "mode": "allowlist",  // or "blocklist"
+    "entries": [
+      "myorg/backend-*",
+      "myorg/frontend-main",
+      "!myorg/backend-legacy"  // negation works
+    ]
+  }
+}
+```
+
+**Why it matters:** Stop agents from spinning up on `myorg/random-fork` or `myorg/archived-repo`. Allowlist = only these repos. Blocklist = everything except these. Skipped notifications show in timeline so you can audit.
+
+---
+
+## Shell Tool: CRLF and Unicode Finally Safe
+
+### No More Corrupted Edits on Windows Files
+
+**Fixed:** The shell tool's sed simulation now handles **CRLF files and Unicode characters correctly** in substitution patterns ([#15701](https://github.com/QwenLM/qwen-code/pull/15701), [#15836](https://github.com/QwenLM/qwen-code/pull/15836)).
+
+```bash
+# Before: Editing a Windows file (CRLF) with Unicode → corruption or failed edit
+# After:  Just works. Line endings preserved. Emoji in strings preserved.
+```
+
+**Plus:** Cancelled commands now report as **interrupted** (exit code 130) instead of completed, preserving partial output ([#15836](https://github.com/QwenLM/qwen-code/pull/15836)).
+
+---
+
+## Runtime: Faster, Fewer Deadlocks, Safer
+
+### Managed Agent Performance — Measurable Wins
+
+**Performance improvements** ([#16480](https://github.com/QwenLM/qwen-code/pull/16480), [#16478](https://github.com/QwenLM/qwen-code/pull/16478), [#16376](https://github.com/QwenLM/qwen-code/pull/16376), [#16489](https://github.com/QwenLM/qwen-code/pull/16489), [#16447](https://github.com/QwenLM/qwen-code/pull/16447)):
+
+| Improvement | What Changed | Impact |
+|-------------|--------------|--------|
+| **Tenant guard locks removed** | Native journal snapshot publication unlocked | Managed agent throughput up, contention down |
+| **Storage admission locks via alias keys** | Concurrent storage requests queue instead of deadlocking | No more "session stuck on storage" |
+| **Snapshot publication waits for claims** | Reduces failed publications from deadlocks | Fewer 503s on session rename |
+| **Local journal reads accept grown prefixes** | Even when timestamps don't change | Prevents unnecessary read failures |
+| **Session rename waits for title delivery** | No more 503 errors mid-rename | Reliable session management |
+
+**Translation:** If you run 20+ concurrent managed workspaces, this release feels snappier. Sessions don't stall on storage. Renames work. The "it works at 5 agents but falls over at 20" problem is substantially reduced.
+
+---
+
+## Security: Credentials Stop Leaking in Error Messages
+
+### Upgrade Refusals and Advisor Errors Sanitized
+
+**Fixed:** Upgrade refusals and Advisor startup errors **no longer expose embedded credentials** ([#16352](https://github.com/QwenLM/qwen-code/pull/16352), [#16083](https://github.com/QwenLM/qwen-code/pull/16083)).
+
+```bash
+# Before: "Upgrade refused for model api-key=sk-abc123@provider..."
+# After:  "Upgrade refused for model [REDACTED]@provider..."
+
+# Before: Advisor error shows full aux-model selector with secrets
+# After:  Sanitized — routing unchanged, secrets hidden
+```
+
+**Empty Harness user info rejected** during start and verify — prevents misconfigured agents from starting with no identity.
+
+---
+
+## The v0.26→0.27 Series: 9 Patches in 17 Days
+
+| Version | Date | Focus |
+|---------|------|-------|
+| **v0.27.0** | **Nov 7, 2026** | **Multi-child questions, Q&A heatmap, repo filters, CRLF/Unicode shell, runtime perf, credential sanitization** |
+| v0.26.9 | Nov 6, 2026 | Bulk skill activation, daemon APIs, TS SDK, WebShell upload, durable questions, automation default |
+| v0.26.8 | Nov 5, 2026 | Qwen subscription, Ink TUI shared loop, WebShell PR links, concurrent rewinds |
+| v0.26.7 | Nov 4, 2026 | Channel events page, local /verify-pr Docker, WebShell polish |
+| v0.26.6 | Nov 2, 2026 | WebShell approvals/split view/charts, unified ACP loop, headless hooks, RPMs |
+| v0.26.5 | Nov 1, 2026 | Bounded SQL history, Generated UI default, WebShell shortcuts, Helm, autofix |
+| v0.26.4 | Oct 29, 2026 | Theme-aware UI, unscoped npm extensions, independent worktrees |
+| v0.26.3 | Oct 28, 2026 | Persistent workflow mode, generated UI persistence, 1M context detection |
+| v0.26.2 | Oct 27, 2026 | Cloud sessions model refresh, managed agent crash fixes |
+| **v0.26.0** | **Oct 21, 2026** | **Managed agent platform launch: durable sessions, failover, desktop, SSH, --check, systemd** |
+
+**Nine releases. Seventeen days. Zero breaking changes since v0.26.0.** Every patch = production hardening + capability adds.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Run managed agents with approval chains** | **Yes** — multi-child questions = real workflow modeling |
+| **Use Web Shell for session oversight** | **Yes** — heatmap + "Ask for details" = visibility |
+| **Trigger agents via GitHub channel** | **Yes** — allowlist/blocklist = control |
+| **Edit Windows files or Unicode-heavy code** | **Yes** — CRLF/Unicode shell fixes = no corruption |
+| **Run 10+ concurrent managed workspaces** | **Yes** — runtime perf = fewer deadlocks, faster throughput |
+| **Care about credential hygiene in logs** | **Yes** — sanitized errors = safer by default |
+| **On v0.26.9 and stable** | **Yes** — zero breaking changes, pure capability adds |
+| **Pinned to v0.25.x** | **Test in staging** — but the platform gap is now a canyon |
+
+**No reason to wait.** This is the "managed agents become operable at team scale" release.
+
+---
+
+## How to Update
+
+```bash
+# CLI (npm - recommended)
+npm i -g @qwen-code/qwen-code@latest
+
+# Verify
+qwen-code --version
+# Should show 0.27.0
+
+# Desktop app
+# Check for updates in-app, or download from:
+# https://github.com/QwenLM/qwen-code/releases/tag/v0.27.0
+
+# VS Code extension
+# Auto-updates, or: Extensions → Qwen Code → Update
+```
+
+**After upgrade, try:**
+
+```bash
+# 1. Test multi-child questions
+qwen-code run --managed "
+  Security review: 'Any secrets?' [yes/no]
+  Compliance: 'GDPR ok?' [yes/no]
+  Deploy: 'Push to prod?' [yes/no/dry-run]
+"
+# Check Web Shell → all three questions visible, answer in any order
+
+# 2. Open Web Shell → see Q&A heatmap in composer
+# http://localhost:3000/web-shell
+
+# 3. Test GitHub channel repo filter
+# Channel editor → Repository Filter → add allowlist pattern
+
+# 4. Edit a Windows file with emoji in strings
+# Shell tool should preserve CRLF + Unicode
+```
+
+---
+
+## The Bigger Picture: Qwen Code Is Building the "Linux of Agent Platforms"
+
+| Release | Shift |
+|---------|-------|
+| v0.20–v0.23 | Single-agent CLI, great at coding |
+| v0.24.6 | **Managed runtime** — durable sessions, failover, advisor |
+| v0.24.7 | **Hardening** — settings isolation, permission fixes |
+| **v0.25.0** | **Platform** — workspace agents, Mem0, A2A, private MCP, cold restore, broker auth, models.dev catalog |
+| **v0.26.0** | **Operable platform** — desktop, SSH workspaces, --check preflight, systemd units, 8 MiB attachments |
+| **v0.26.1–9** | **Production hardening** — 9 patches, 500+ fixes, subscription auth, TUI shared loop, WebShell, skill infrastructure, TS SDK |
+| **v0.27.0** | **Multi-question managed agents, visual Web Shell oversight, GitHub repo governance, runtime scalability** |
+
+**Every release fills a gap. No rewrites. No "v2 coming soon." Just steady compounding.**
+
+Now with v0.27.0: **a local-first multi-agent platform with industrial-grade approval chains, visual session oversight, repository-level governance, team-scale concurrency, and unified subscription auth.**
+
+The question isn't "which agent should I use?" It's **"why would I pay for a cloud agent platform when Qwen Code runs the same patterns locally, free, with my data on my machine, with an SDK to embed it in my own products, and now with the approval infrastructure to operate it at enterprise scale?"**
+
+---
+
+## Related Articles
+
+- [Qwen Code v0.26.9 Just Made Skill Management Industrial-Grade — Daemon APIs, TypeScript SDK, and Bulk Activation](/blog/qwen-code-v0-26-9-skills-daemon-api-typescript-sdk/)
+- [Qwen Code v0.26 Just Became a Full Multi-Agent Platform — Local, Remote, and Everything In Between](/blog/qwen-code-v0-26-managed-agent-desktop-local-ssh/)
+- [Qwen Code v0.25.0 — Workspace Agents, Mem0, A2A Collaboration](/blog/qwen-code-v0-25-workspace-agents-mem0-a2a-collaboration/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Claude Code v2.1.319 Just Made MCP Tools Background-Ready](/blog/claude-code-v2-1-319-mcp-tasks-background-auto-mode/)
+- [Opencode v2.2.6 Just Made MCP Connections Shared](/blog/opencode-v2-2-6-shared-mcp-plugin-themes-mobile-worktrees/)
+- [Kilo Code v7.8.27 Just Patched Critical Supply-Chain Vulnerabilities](/blog/kilocode-v7-8-27-critical-security-patch/)
+
+---
+
+*Qwen Code is open-source (Apache-2.0) and available at [github.com/QwenLM/qwen-code](https://github.com/QwenLM/qwen-code). Full changelog: [v0.27.0 release notes](https://github.com/QwenLM/qwen-code/releases/tag/v0.27.0). Published November 8, 2026 — covers Qwen Code v0.27.0 released November 7, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
