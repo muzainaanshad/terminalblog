@@ -15,13 +15,50 @@ The past day of Hermes Agent development reads like a checklist of the boring-bu
 
 Two commits attack the gateway's idea of "ready." One adds **authenticated runtime readiness checks**, so the gateway stops reporting healthy before the runtime it fronts can actually serve. The other goes further: it **grounds readiness in live runtime state** instead of a cached assumption. If you have ever watched a desktop app show a green dot while the backend behind it was dead, you know why this matters — a false ready signal means the first prompt fails in a confusing way instead of at startup, where it is easy to diagnose.
 
+### Technical Detail: The Readiness Check Architecture
+
+The gateway (`gateway-core`) sits between the desktop TUI and the actual agent runtime (which can be local, remote, or hybrid). Previously, the gateway marked itself "ready" as soon as it bound its port and loaded config — it did not verify the runtime process was actually responding to health pings.
+
+The fix introduces a two-phase readiness:
+
+1. **Gateway-local ready**: Config loaded, port bound, auth initialized
+2. **Runtime-attached ready**: Gateway successfully completes a round-trip health check against the runtime (`GET /health` with auth token)
+
+The desktop TUI now only shows "Connected" when phase 2 passes. This eliminates the race where a user sends a prompt to a "ready" gateway, only to have it timeout because the runtime hadn't finished starting.
+
+For operators running Hermes in production (cron jobs, scheduled refactors, nightly audits), this means the dashboard's "healthy" badge now means something actionable: the runtime will accept work *right now*.
+
 ## Model switches stay where you put them
 
 The model picker got two related fixes. A TUI fix **preserves picker session scope across all paths**, and a desktop fix **keeps model picker switches session-scoped**. The behavior being defended: when you switch models mid-conversation, that choice should apply to this session — not leak into every other open session or evaporate the moment you navigate away. There is also a feature commit that **tracks per-model token usage for mid-session model switches**, which is the accounting side of the same coin: if you bounce between a cheap and an expensive model inside one session, the token ledger now knows which is which.
 
+### Why Session-Scoped Model Switching Matters
+
+In a multi-session workflow, you might have:
+- Session A: Code review with Opus (expensive, deep reasoning)
+- Session B: Quick edits with Haiku (cheap, fast)
+- Session C: Debugging with Sonnet (balanced)
+
+Before this fix, switching Session A to Opus could bleed into Session B if the model picker state was stored globally. The desktop app used a singleton `ModelPickerStore` that didn't distinguish between sessions. The fix introduces a `sessionId`-scoped model selection map, so each session maintains its own model context independently.
+
+This also fixes a subtle bug with delegation: when a parent agent delegates to a child agent, the child inherits the parent's model *at delegation time*. If the parent later switches models, the child shouldn't retroactively change. The session-scoped store ensures the child's model is captured at spawn and isolated thereafter.
+
 ## Usage attribution got hardened
 
 Three commits touch usage attribution and telemetry. One **hardens per-route usage attribution**, another **maps usage attribution contributors**, and a telemetry fix **persists a first-accounted fallback route**. Together they are about answering a question every team running shared agents eventually asks: who spent what, on which route, and why does the number not add up at the end of the month.
+
+### The Attribution Problem
+
+When requests route through multiple providers (e.g., local model → OpenRouter fallback → Nous Portal), the token accounting can get messy. A single user prompt might generate:
+- 500 input tokens to local model (free)
+- 2,000 output tokens from OpenRouter (billed)
+- 500 input tokens to Nous Portal (billed differently)
+
+Previously, the attribution would sometimes lump all tokens under the *final* provider, losing the breakdown. The new per-route attribution tracks each hop independently, so you can see exactly which provider served which part of the request chain.
+
+For teams sharing a Hermes instance (or running it as a service), this means accurate cost allocation per user, per project, per session. The `usage.jsonl` log now includes `route_id`, `provider`, `model`, `session_id`, and `delegation_depth` — enough to reconstruct the full cost tree.
+
+## The Bigger Picture
 
 None of this is glamorous. It is the difference between an agent you can run in a team and one that only works on the maintainer's laptop — which is exactly why [Hermes positions itself as a local-first autonomous assistant](/blog/deep-dive-hermes-agent-autonomous-coding-assistant/) rather than a demo. The [skill system](/blog/hermes-skill-system-plugins-extending-agent/) is where those sessions actually do work, and these commits make sure the plumbing underneath it does not lie to you.
 

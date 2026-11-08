@@ -38,9 +38,35 @@ CLI parsing bugs are frustrating because they break the most basic workflows. Yo
 
 Zero has over 40 CLI flags across subcommands (`zero run`, `zero config`, `zero session`, `zero mcp`, etc.). Each flag that accepts a value was a potential failure point. Users scripting Zero in CI/CD pipelines, git hooks, or shell aliases were hitting this silently — commands would appear to succeed but process the wrong files.
 
+The bug was particularly insidious because it only triggered when a flag value was followed by a bare-word positional argument. Flags followed by another flag (e.g., `--model gpt-4 --temp 0.7`) worked fine. But `--model gpt-4 myfile.txt` would consume `myfile.txt` as the model value. This pattern appears constantly in real workflows: specifying a model, then a file to operate on.
+
+## Root Cause and Technical Detail
+
+The regression was introduced in v0.4.0 when the CLI parser was refactored to support subcommand-specific flag sets. The original parser used a simple state machine: when it saw a flag that takes a value, it consumed the next token unconditionally. The refactor added subcommand context but kept the same greedy consumption logic.
+
+PR #619 rewrites the flag-value boundary detection. The new logic:
+
+1. When a flag expecting a value encounters the next token, it peeks at the token
+2. If the token starts with `-`, it's another flag — stop, don't consume (flag value is empty or missing)
+3. If the token is a bare word, consume it as the flag value
+4. The **critical addition**: after consuming a flag value, if the *next* token is also a bare word, preserve it as a positional — don't let the flag consume multiple positionals
+
+This lookahead strategy is the same approach used by mature parsers like `argparse` (Python) and `Commander.js` (Node), but implemented in Zero's custom Rust-based CLI layer for zero-dependency binary distribution.
+
 ## What This Means
 
 Zero's CLI is now more reliable. Flag-heavy commands (which Zero has many of) work as expected. For users scripting Zero or integrating it into workflows, this eliminates a class of silent bugs.
+
+### CI/CD Pipeline Impact
+
+The fix is especially valuable for automated workflows. A typical CI step might look like:
+
+```yaml
+- name: Run Zero agent
+  run: zero run --model gpt-4 --max-turns 10 --session ci-run ./src
+```
+
+Before the fix, `./src` could be consumed as part of `--max-turns` if the parser was in a bad state, causing the agent to run in the wrong directory with no error — just silently wrong results. Now the boundary is explicit: `--max-turns 10` consumes `10`, then `./src` is correctly identified as the positional working directory argument.
 
 ### Common Patterns That Now Work
 
