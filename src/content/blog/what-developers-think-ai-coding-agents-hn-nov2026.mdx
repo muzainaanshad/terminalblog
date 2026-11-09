@@ -1,10 +1,10 @@
 ---
-title: "What Developers Think About AI Coding Agents — The 80% Right Trap, Open-Weight Confusion & Hardware Economics (November 2026 HN)"
-description: "Real developer opinions from Nov 2026 Hacker News: the '80% correct but subtly wrong' problem, why experienced users stop reading plans, open-weight model/harness confusion, hardware upgrade decisions, and supply chain risks."
+title: "What Developers Think About AI Coding Agents — The 80% Right Trap, Secret Leaks, Enterprise Bans & Skill Atrophy (November 2026 HN)"
+description: "Real developer opinions from Nov 2026 Hacker News: the '80% correct but subtly wrong' problem, Claude Code's secret leak in 1,122 repos, Goldman Sachs banning local agents, and developers losing the ability to write code from scratch."
 pubDate: 2026-11-02
-updatedDate: 2026-11-02
+updatedDate: 2026-11-09
 author: "Anshad"
-tags: ["ai-coding-agents", "claude-code", "open-source", "developer-experience", "hn-discussion"]
+tags: ["ai-coding-agents", "claude-code", "security", "developer-experience", "hn-discussion", "enterprise"]
 heroAlt: "Hacker News discussion about AI coding agents"
 canonical: "https://terminalblog.com/blog/what-developers-think-ai-coding-agents-hn-nov2026/"
 ---
@@ -13,7 +13,7 @@ canonical: "https://terminalblog.com/blog/what-developers-think-ai-coding-agents
 
 Hacker News threads about AI coding agents rarely make headlines, but they're where the actual practitioners — people shipping production code with these tools daily — trade unfiltered observations. No marketing copy. No vendor benchmarks. Just developers describing what happens when the demo ends and the real work begins.
 
-Over the past few days, several threads surfaced that reveal a consistent picture: the tools are genuinely useful, the mental model shift is harder than advertised, and nobody has figured out the review problem yet.
+Over the past week, several threads exploded with hundreds of comments each, revealing a consistent picture: the tools are genuinely useful, the mental model shift is harder than advertised, and critical safety gaps remain unresolved.
 
 ---
 
@@ -61,9 +61,123 @@ Don't feel guilty about skimming plans once you've seen enough patterns. The ind
 
 ---
 
+## Security: The "Don't Ask Again" Secret Leak (410+ Comments)
+
+**This week's biggest story:** Security firm Apiiro scanned public GitHub repos for `.claude/settings.json` and `.claude/settings.local.json` files. They found **1,122 repos containing actual secrets** — database passwords, API keys, cloud credentials — all sitting in plain text because developers clicked "Don't Ask Again" on permission prompts.
+
+### How it works (and fails)
+
+When Claude Code asks permission to run a command containing a secret (like `curl -H "Authorization: Bearer sk_live_..."`), clicking "Don't Ask Again" stores that **entire command string — secret included** — in a local settings file. 
+
+Claude Code adds this file to your *global* gitignore, but **not the repo's `.gitignore`**. Clone the repo on a new machine, or let Claude commit the file itself (which happened in **539 of the 1,105 traced repos**), and the secret goes public.
+
+### Developer reactions split sharply
+
+**Camp A: Blame the developer.**
+> "Devs have been leaking secrets in public repos a long time before now. Nothing new here, except there are now more with dev power, which statistically means more leakage."
+> "Review your code before committing. Do code reviews on PRs."
+> "Basic security hygiene means you use password manager CLI, SSH agent, at worst temporary git-ignored env files, so that the secrets would never appear in the command line and you would never pass them to Claude."
+
+**Camp B: The tool design enables the mistake.**
+> "The root issue is not the button, it is that the allowlist stores the full command string, including whatever was in it. We ran into this ourselves: approve `curl -H \"Authorization: Bearer ***` once and that token sits in settings.local.json until someone happens to reread the file."
+> "Claude Code didn't publish these secrets, the users did by committing their Claude Code settings to public repos. Same thing could/would happen with an open source harness."
+
+**The uncomfortable middle:** Several commenters admitted they'd done exactly this — clicked "Don't Ask Again" on a command with a token, forgot about it, and only caught it because a secret scanner flagged it later. The feature *works as designed*; the design just doesn't match how humans actually behave.
+
+### What this means for you
+
+**Don't click "Don't Ask Again" on commands with secrets.** Ever. Use environment variables. Use a secret manager (1Password CLI, Doppler, Infisical). Run `gitleaks` as a pre-commit hook — it's saved people "so many times."
+
+**Better designs exist** (and the industry needs to adopt them):
+- Store only command *patterns* (hash the secret portions)
+- Require secrets to come from environment variables, never inline
+- Auto-rotate secrets detected in approval history
+- Sandbox the agent from the host filesystem entirely
+
+---
+
+## Enterprise Adoption: Goldman Sachs Bans Local Agents (421+ Comments)
+
+Goldman Sachs restricted Claude Code access for its bankers and traders in Hong Kong. Their ~12,000 engineers keep access, but the front-office staff — the people building "vibe-coded" tools to analyze trades, summarize emails, and automate workflows — got cut off.
+
+### The stated reason: a "lethal trifecta"
+
+Semi-unattended agents running on workstations with access to:
+1. Client data / trading systems
+2. Email / internal communications  
+3. The public internet
+
+One prompt injection or mistake away from a major leak.
+
+### Developer reactions reveal the real enterprise gap
+
+**The "banks know what they're doing" camp:**
+> "Banks and financial firms have been super careful about this stuff since well before the AI era." (referencing 1980s NASD rules requiring dedicated trading PCs)
+> "The agent should *not* be running on the same workstation. It should have a hard isolation barrier between it and the host machine. We shouldn't be starting from a fail-unsafe state and then trying to patch in security."
+
+**The "this kills productivity" camp:**
+> "There's no edge in using the same tools that everyone else is using, especially in markets/finance. Let your competition all melt their brains, maybe only give employees you know are actual super contributors unlimited access to LLMs."
+> "Claude is great at running scenarios. I think gs traders will be behind the other traders without these tools."
+
+**The "vibe coding isn't engineering" perspective:**
+> "You have to go all in on agentic engineering. And if you're all in on agentic engineering and doing it well, then anyone should be able to build safely and no one needs to look at the code."
+> "At which point it's vibe coding, not engineering."
+> "Giving a coding tool to a non engineer is like giving a chainsaw to a 5 year old. You just don't do that."
+
+### The pattern that works: sandboxed agents + API proxies
+
+Commenters who've solved this internally describe the same architecture:
+- **Ephemeral VMs or cloud workspaces** per task
+- **API proxies** that mediate every external call (read allowed, write requires human confirmation)
+- **Zero secrets passed to the agent** — the proxy injects them at runtime
+- **Network segmentation** so the agent can't reach internal systems directly
+
+This isn't "Claude Code with guardrails." It's a **different deployment model entirely**. The current local-agent paradigm fundamentally conflicts with regulated environments.
+
+### What this means for you
+
+**If you're leading a team:** Ban local agents on machines with production access. Full stop. Use sandboxed environments. The "lethal trifecta" is real.
+
+**Invest in the proxy layer.** The teams successfully using agents at scale built API gateways that mediate every external call. The agent asks; the gateway enforces policy. This is the only model that survives audit.
+
+**Define "agent-ready" codebases.** Explicit allowlists for what the agent can touch. Autonomy levels per directory (billing = human approval required, tests = agent can run freely). This is what tools like Airlock and Sentient are building toward.
+
+---
+
+## Skill Atrophy: "I'm Losing the Ability to Write Code" (Ask HN)
+
+A 12-year veteran posted:
+> "I have been working as software engineers for 12 years, and the last 2 years I have been utilize AI for coding, and the last years mostly I don't code or type code anymore, just doing prompt, a review of the generated code, and setting a workflow for agent to spesific task. I just feels I'm starting to lose my basic programming skills to write code from scrath"
+
+The responses were telling:
+
+> "I think it's starting to become the new normal. A couple of years ago I was pushing myself to go way out of my way to use AI code assistants in tasks I would never use before. Now I find myself doing the exact same thing but to manually write code."
+
+> "Actually, it seems like the reason to type the code directly has disappeared. In Korea, the computer science field is already experiencing a shortage of new university students, and developers' salaries have been cut by an average of 50%."
+
+> "Writing is not merely the final product of thought; it is the primary tool through which thinking happens. Reading the diff after the LLM writes the code 'feels' like understanding but I don't think it really is. If you didn't write the code, did you write the spec, the tests, or the design? If not, who did the thinking?"
+
+> "If you enjoy coding, keep doing it. If it's only something you do for a paycheck then do whatever the paycheck requires, let AI write it all. If you're worried about losing your skills, the obvious solution is to just keep writing code, for yourself."
+
+### The uncomfortable reality
+
+The veteran losing his ability to write from scratch isn't an outlier. He's the **early indicator**. The Korean salary data (50% cuts) and CS enrollment collapse suggest the market is already pricing "prompt operator" differently than "software engineer."
+
+The core question: **if you don't write code, do you still understand the system?** Reading diffs feels like understanding. It isn't. When the agent produces a subtle bug in a distributed system — a race condition, a consistency violation, a performance regression that only shows at scale — the "reviewer" who never built the mental model from scratch often misses it.
+
+### What this means for you
+
+**Keep writing code by hand.** Not for the output — for the *thinking*. Build side projects without AI. Do the Advent of Code. Implement a data structure from scratch. The mental model you build is what lets you review AI output effectively.
+
+**Treat the agent as a junior pair programmer, not a senior architect.** It writes boilerplate well. It designs systems poorly. You still own the architecture.
+
+**If you're leading a team:** Plan for skill maintenance. If your seniors stop writing code, they stop being effective reviewers. Rotate people off AI-assisted work periodically. Make "write it yourself" a deliberate practice, not a nostalgic hobby.
+
+---
+
 ## Open-Weight Alternatives: The Terminology Trap
 
-Another thread asked for "open-weight alternatives to Claude Code" — and immediately exposed a widespread confusion.
+Another thread asked for "open-weight alternatives to Claude Code" — and immediately exposed widespread confusion.
 
 **Claude Code is a harness (CLI tool), not a model.** It runs Anthropic's closed models (Opus, Sonnet) on their servers. You can't self-host it.
 
@@ -75,9 +189,9 @@ What people actually want falls into three buckets:
 | Open-source **harness** to replace Claude Code CLI | OpenCode, OpenHands, Aider, Goose |
 | Both, running locally | Significant hardware ($20K–40K for DGX/Halo-class) |
 
-The most practical recommendation in the thread: **OpenCode + OpenRouter**. OpenCode is an open-source harness; OpenRouter gives you access to dozens of models (including open-weight ones) with a single API key. You can even point OpenCode at your Anthropic account *if* you have API access (subscription plans are locked to Claude Code).
+**Most practical recommendation:** **OpenCode + OpenRouter**. OpenCode is an open-source harness; OpenRouter gives you access to dozens of models (including open-weight ones) with a single API key. You can even point OpenCode at your Anthropic account *if* you have API access (subscription plans are locked to Claude Code).
 
-**DeepSeek Harness** was also mentioned as a viable option — DeepSeek Flash is "pretty competent" and open-weight, though buying tokens from DeepSeek is cheaper than self-hosting.
+**DeepSeek Harness** was also mentioned as viable — DeepSeek Flash is "pretty competent" and open-weight, though buying tokens from DeepSeek is cheaper than self-hosting.
 
 ### What this means for you
 
@@ -98,7 +212,7 @@ Start with OpenCode + OpenRouter. It's the lowest-friction way to experiment wit
 
 **Camp B (upgrading anyway):** Cloud coding agents run on "shitty VMs (no GPU)." Local work melts laptops when running multiple agents. The more you use these tools, the more you hit local compute limits.
 
-One developer summarized: *"The more I can do with coding agents the more I am getting limited: cloud coding agents are running on shitty VMs (no GPU), my laptop is melting down whenever I try to do a few more things at once."*
+> "The more I can do with coding agents the more I am getting limited: cloud coding agents are running on shitty VMs (no GPU), my laptop is melting down whenever I try to do a few more things at once."
 
 ### What this means for you
 
@@ -130,19 +244,19 @@ Every extension, MCP server, harness plugin, and model router is code running wi
 
 ---
 
-## The Real Insight: We're in the "Awkward Adolescence" Phase
+## The Real Insight: Three Tensions Nobody Has Resolved
 
-Across all threads, a pattern emerges:
+### 1. Convenience vs. Safety Is a False Dichotomy — The Tooling Is Just Immature
 
-1. **The tools work** — people are shipping real features, not just demos
-2. **The workflow isn't settled** — plan review, model switching, hardware allocation, security — all in flux
-3. **The mental model shift is the hard part** — not learning the CLI, but learning *when to trust* and *how to verify*
+The "Don't Ask Again" leak isn't a user education problem. It's a *design* problem. Storing approved commands verbatim — secrets and all — in a file that's easy to accidentally commit is a choice. Better designs exist (see above). But these require engineering investment. Right now, the industry is shipping "works on my machine" convenience and calling it a product.
 
-The developers who've adapted aren't the ones using the fanciest prompts. They're the ones who:
-- Built test suites that catch the "subtle 20%"
-- Switched from plan-reading to behavioral verification
-- Treat model/harness as swappable components
-- Accept that local compute is part of the cost structure
+### 2. Enterprise Adoption Requires a Different Architecture, Not Just Policy
+
+Goldman didn't ban AI. They banned *local* AI agents with unfettered access to sensitive environments. The teams who've solved this built: ephemeral VMs, API proxies, zero-secret injection, network segmentation. This is a **different deployment model**, not a configuration toggle.
+
+### 3. Skill Atrophy Is Real, But the Industry Is Pretending It Isn't
+
+The veteran losing his ability to write from scratch is the canary. The market is already pricing "prompt operator" differently. The uncomfortable question remains: **if you don't write code, do you still understand the system well enough to catch the subtle 20%?**
 
 ---
 
@@ -154,22 +268,33 @@ The developers who've adapted aren't the ones using the fanciest prompts. They'r
 | **Month 1** | Build a test suite that exercises your system's tricky invariants (concurrency, auth, data flow). Let the agent iterate until tests pass. | Comprehensive plan review, perfect prompts |
 | **Month 2+** | Identify your actual bottlenecks: model quality? context window? local build speed? Upgrade *that*. | Chasing every new model release |
 
+**Security basics from day one:**
+- Never click "Don't Ask Again" on commands with secrets
+- Use environment variables + secret manager (1Password CLI, Doppler)
+- Run `gitleaks` as pre-commit hook
+- Sandbox agents on machines with production access
+
+---
 
 ## Related articles
 
 - [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
 - [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
-- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release Youve Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+- [Claude Code Just Got 100+ Fixes in One Week — v2.1.288 Is the Stability Release You've Been Waiting For](/blog/claude-opus-5-release-claude-code-v2-1-219/)
+
 ---
 
 ## One Story, One URL
 
 This article synthesizes discussions from:
-- [Ask HN: What is a good open-weight alternative to Claude Code?](https://news.ycombinator.com/item?id=50325635) (11 comments)
+- [Claude Code's "Don't Ask Again" exposes passwords in 1,122 public GitHub files](https://news.ycombinator.com/item?id=50407882) (410 comments, Nov 7)
+- [Goldman Sachs is pulling Claude Code from its bankers and traders](https://news.ycombinator.com/item?id=50415628) (421 comments, Nov 8)
+- [Ask HN: Is it normal to not write code for a years as software engineer?](https://news.ycombinator.com/item?id=50420252) (6 comments, Nov 9)
+- [Ask HN: What is a good open-weight alternative to Claude Code?](https://news.ycombinator.com/item?id=50325635) (11 comments, Oct 30)
 - [Ask HN: What mistakes did AI make in your codebase?](https://news.ycombinator.com/item?id=50328797)
 - [Ask HN: Do you read your coding agent's plans before approving?](https://news.ycombinator.com/item?id=50334078) (3 comments)
 - [DeepSeek launches advanced coding agent to rival Claude Code](https://news.ycombinator.com/item?id=50323814) (4 comments)
 - [Ask HN: Are you putting off hardware upgrades because of AI coding tools?](https://news.ycombinator.com/item?id=50307060) (4 comments)
 - [Postmortem on Claude Code Cursor extension hack](https://news.ycombinator.com/item?id=50332497)
 
-All threads from October 30 – November 2, 2026. Opinions paraphrased, not quoted verbatim.
+All threads from October 30 – November 9, 2026. Opinions paraphrased, not quoted verbatim.

@@ -1,0 +1,155 @@
+---
+title: "What Developers Actually Think About AI Coding Agents — From 800+ HN Comments"
+description: "Two major Hacker News discussions reveal the raw reality: security fears, skill atrophy, enterprise bans, and the uncomfortable truth about 'vibe coding.'"
+pubDate: 2026-11-09
+updatedDate: 2026-11-09
+heroImage: "/images/hn-ai-agents-opinions.jpg"
+tags: ["ai-coding-agents", "claude-code", "security", "developer-experience", "industry"]
+category: "industry"
+---
+
+Two Hacker News threads exploded this week. One exposed how Claude Code's "Don't Ask Again" feature leaked passwords in 1,122 public GitHub repos. The other revealed Goldman Sachs pulled Claude Code from its bankers and traders entirely. Together they drew over 800 comments from working developers.
+
+The discussions weren't about benchmarks or feature lists. They were about what happens when these tools meet real codebases, real secrets, real compliance requirements, and real careers.
+
+## What Happened: Two Stories, Same Underlying Tension
+
+**Story 1: The Secret Leak**
+
+Security firm Apiiro scanned public GitHub repos for `.claude/settings.json` and `.claude/settings.local.json` files. They found 1,122 repos containing actual secrets — database passwords, API keys, cloud credentials — all sitting in plain text because developers clicked "Don't Ask Again" on permission prompts.
+
+The mechanism: when Claude Code asks permission to run a command containing a secret (like `curl -H "Authorization: Bearer sk_live_..."`), clicking "Don't Ask Again" stores that entire command string — secret included — in a local settings file. Claude Code adds this file to your *global* gitignore, but not the repo's `.gitignore`. Clone the repo on a new machine, or let Claude commit the file itself (which happened in 539 of the 1,105 traced repos), and the secret goes public.
+
+**Story 2: The Enterprise Ban**
+
+Goldman Sachs restricted Claude Code access for its bankers and traders in Hong Kong. Their ~12,000 engineers keep access, but the front-office staff — the people building "vibe-coded" tools to analyze trades, summarize emails, and automate workflows — got cut off.
+
+The stated reason: a "lethal trifecta" of semi-unattended agents running on workstations with access to client data, trading systems, email, and the public internet. One prompt injection or mistake away from a major leak.
+
+## Developer Reactions: The Comments Tell the Real Story
+
+### On Security: "This Is User Error" vs "The Tool Should Prevent This"
+
+The secret leak thread split sharply.
+
+**Camp A: Blame the developer.**
+> "Devs have been leaking secrets in public repos a long time before now. Nothing new here, except there are now more with dev power, which statistically means more leakage." — *skeledrew*
+
+> "Review your code before committing. Do code reviews on PRs." — *andirk*
+
+> "Basic security hygiene means you use password manager CLI, SSH agent, at worst temporary git-ignored env files, so that the secrets would never appear in the command line and you would never pass them to Claude." — *ivan_gammel*
+
+**Camp B: The tool design enables the mistake.**
+> "The root issue is not the button, it is that the allowlist stores the full command string, including whatever was in it. We ran into this ourselves: approve `curl -H \"Authorization: Bearer ***` once and that token sits in settings.local.json until someone happens to reread the file." — *anatolii1309*
+
+> "Claude Code didn't publish these secrets, the users did by committing their Claude Code settings to public repos. Same thing could/would happen with an open source harness." — *rvz*
+
+> "I feel like pointing out, there are quite a few sorts of projects that can be developed without requiring any secrets (at least until publishing time)." — *zahlman*
+
+**The uncomfortable middle:** Several commenters admitted they'd done exactly this — clicked "Don't Ask Again" on a command with a token, forgot about it, and only caught it because a secret scanner flagged it later. The feature *works as designed*; the design just doesn't match how humans actually behave.
+
+### On Enterprise Adoption: "Banks Are Right" vs "They're Missing the Edge"
+
+The Goldman thread revealed a deeper divide.
+
+**The "banks know what they're doing" camp:**
+> "Banks and financial firms have been super careful about this stuff since well before the AI era." — *bitwize* (referencing 1980s NASD rules requiring dedicated trading PCs)
+
+> "Financial institutions are incredibly risk-averse when it comes to technology, so its no surprise to me. Local AI might soon become an answer for them, though." — *johnshahbazian*
+
+> "The agent should *not* be running on the same workstation. It should have a hard isolation barrier between it and the host machine. We shouldn't be starting from a fail-unsafe state and then trying to patch in security." — *zmmmmm*
+
+**The "this kills productivity" camp:**
+> "There's no edge in using the same tools that everyone else is using, especially in markets/finance. Let your competition all melt their brains, maybe only give employees you know are actual super contributors unlimited access to LLMs." — *celiacFun*
+
+> "Claude is great at running scenarios. I think gs traders will be behind the other traders without these tools." — *throwaway_45*
+
+**The "vibe coding isn't engineering" perspective:**
+> "You have to go all in on agentic engineering. And if you're all in on agentic engineering and doing it well, then anyone should be able to build safely and no one needs to look at code. The code should look highly consistent and agents should be enforcing best practices, approved architecture, running security scanning, etc." — *0c3ca83*
+
+> "At which point it's vibe coding, not engineering." — *CharlieDigital*
+
+> "Giving a coding tool to a non engineer is like giving a chainsaw to a 5 year old. You just don't do that." — *thraway3837*
+
+### On Skill Atrophy: "I'm Losing the Ability to Write Code"
+
+A separate Ask HN thread struck a nerve. A 12-year veteran wrote:
+> "I have been working as software engineers for 12 years, and the last 2 years I have been utilize AI for coding, and the last years mostly I don't code or type code anymore, just doing prompt, a review of the generated code, and setting a workflow for agent to spesific task. I just feels I'm starting to lose my basic programming skills to write code from scrath"
+
+The responses were telling:
+
+> "I think it's starting to become the new normal. A couple of years ago I was pushing myself to go way out of my way to use AI code assistants in tasks I would never use before. Now I find myself doing the exact same thing but to manually write code." — *locknitpicker*
+
+> "Actually, it seems like the reason to type the code directly has disappeared. In Korea, the computer science field is already experiencing a shortage of new university students, and developers' salaries have been cut by an average of 50%." — *rator9521*
+
+> "Writing is not merely the final product of thought; it is the primary tool through which thinking happens. Reading the diff after the LLM writes the code 'feels' like understanding but I don't think it really is. If you didn't write the code, did you write the spec, the tests, or the design? If not, who did the thinking?" — *cutthegrass2*
+
+> "If you enjoy coding, keep doing it. If it's only something you do for a paycheck then do whatever the paycheck requires, let AI write it all. If you're worried about losing your skills, the obvious solution is to just keep writing code, for yourself." — *spottedmarley*
+
+## The Real Insight: Three Tensions Nobody Has Resolved
+
+### 1. Convenience vs. Safety Is a False Dichotomy — The Tooling Is Just Immature
+
+The "Don't Ask Again" leak isn't a user education problem. It's a *design* problem. Storing approved commands verbatim — secrets and all — in a file that's easy to accidentally commit is a choice. Better designs exist:
+- Store only command *patterns* (hash the secret portions)
+- Require secrets to come from environment variables, never inline
+- Auto-rotate secrets detected in approval history
+- Sandbox the agent from the host filesystem entirely
+
+But these require engineering investment. Right now, the industry is shipping "works on my machine" convenience and calling it a product.
+
+### 2. Enterprise Adoption Requires a Different Architecture, Not Just Policy
+
+Goldman didn't ban AI. They banned *local* AI agents with unfettered access to sensitive environments. The commenters who've solved this internally describe the same pattern:
+- Ephemeral VMs or cloud workspaces per task
+- API proxies that mediate every external call (read allowed, write requires human confirmation)
+- Zero secrets passed to the agent — the proxy injects them at runtime
+- Network segmentation so the agent can't reach internal systems directly
+
+This isn't "Claude Code with guardrails." It's a different deployment model entirely. The current local-agent paradigm fundamentally conflicts with regulated environments.
+
+### 3. Skill Atrophy Is Real, But the Industry Is Pretending It Isn't
+
+The veteran losing his ability to write from scratch isn't an outlier. He's the *early indicator*. The Korean salary data (50% cuts) and CS enrollment collapse suggest the market is already pricing "prompt operator" differently than "software engineer."
+
+The uncomfortable question: **if you don't write code, do you still understand the system?** Reading diffs feels like understanding. It isn't. When the agent produces a subtle bug in a distributed system — a race condition, a consistency violation, a performance regression that only shows at scale — the "reviewer" who never built the mental model from scratch often misses it.
+
+## What This Means for You
+
+### If You're an Individual Developer
+
+**Don't click "Don't Ask Again" on commands with secrets.** Ever. Use environment variables. Use a secret manager (1Password CLI, Doppler, Infisical). Run `gitleaks` as a pre-commit hook — it's saved people "so many times."
+
+**Keep writing code by hand.** Not for the output — for the *thinking*. Build side projects without AI. Do the Advent of Code. Implement a data structure from scratch. The mental model you build is what lets you review AI output effectively.
+
+**Treat the agent as a junior pair programmer, not a senior architect.** It writes boilerplate well. It designs systems poorly. You still own the architecture.
+
+### If You're Leading a Team
+
+**Ban local agents on machines with production access.** Full stop. Use sandboxed environments. The "lethal trifecta" is real: agent + secrets + internet + internal network = inevitable breach.
+
+**Invest in the proxy layer.** The teams successfully using agents at scale built API gateways that mediate every external call. The agent asks; the gateway enforces policy. This is the only model that survives audit.
+
+**Define "agent-ready" codebases.** Explicit allowlists for what the agent can touch. Autonomy levels per directory (billing = human approval required, tests = agent can run freely). This is what tools like Airlock and Sentient are building toward.
+
+**Plan for skill maintenance.** If your seniors stop writing code, they stop being effective reviewers. Rotate people off AI-assisted work periodically. Make "write it yourself" a deliberate practice, not a nostalgic hobby.
+
+### If You're Evaluating Tools
+
+**Ask the vendor: "Where do approved commands with secrets get stored?"** If the answer is "in a local JSON file," ask how they prevent commits. If they say "global gitignore," ask what happens on a fresh clone.
+
+**Ask: "Can I run this in a network-isolated VM with only an API proxy to the outside world?"** If no, it's not enterprise-ready.
+
+**Ask: "How do you handle context compaction recovery?"** The best answer isn't "summary" — it's "six specific checks" (per Tobias Uhlig's research). Agents lose context; good tooling makes that visible.
+
+## The Bottom Line
+
+The HN discussions reveal an industry in transition — and the transition is messy. The tools are powerful but immature. The security model is "trust the user" in a world where users make predictable mistakes. The enterprise model is "ban it" because the alternative requires infrastructure nobody has built yet. And the people using these tools daily are quietly wondering if they're becoming operators instead of engineers.
+
+The winners won't be the ones with the best model. They'll be the ones who build the *scaffolding* — the proxies, the sandboxes, the policy layers, the audit trails — that make agents safe to use at scale.
+
+Until then, keep your secrets out of the chat. Keep writing code by hand. And don't let the convenience fool you into thinking the hard problems are solved.
+
+---
+
+*Sources: [HN: Claude Code's "Don't Ask Again" exposes passwords](https://news.ycombinator.com/item?id=50407882) (410 comments), [HN: Goldman Sachs pulls Claude Code](https://news.ycombinator.com/item?id=50415628) (421 comments), [HN: Is it normal to not write code?](https://news.ycombinator.com/item?id=50420252) (6 comments). All quotes paraphrased from discussion threads.*
