@@ -1,0 +1,116 @@
+---
+title: "Kilo Code v7.8.28 Just Made Hosted Workspaces Way More Flexible — Here's What Changed"
+description: "Kilo Code v7.8.28 exposes hosted workspace profile defaults through the Session Host API. Create empty workspaces without prompts, list personal/org profiles with flags, set/clear personal defaults. Plus: plugin tools with invalid JSON Schema args no longer fail every prompt."
+pubDate: 2026-11-09
+tags: ["kilocode", "release", "hosted-workspaces", "session-host-api", "plugins", "coding-agents", "beginner"]
+tools: ["kilocode"]
+author: "Anshad"
+image: "/api/og?title=Kilo+Code+v7.8.28+Hosted+Workspaces&tool=kilocode"
+canonical: "https://terminalblog.com/blog/kilocode-v7-8-28-hosted-workspace-profiles-plugin-fix/"
+---
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Kilo Code v7.8.28 Just Made Hosted Workspaces Way More Flexible — Here's What Changed",
+  "description": "Kilo Code v7.8.28 exposes hosted workspace profile defaults through the Session Host API. Create empty workspaces without prompts, list personal/org profiles with their default flags, and set or clear the personal default profile. Plus: plugin tools with invalid JSON Schema args no longer fail every prompt.",
+  "image": "https://terminalblog.com/api/og?title=Kilo+Code+v7.8.28+Hosted+Workspaces&tool=kilocode",
+  "datePublished": "2026-11-09",
+  "dateModified": "2026-11-09",
+  "author": {
+    "@type": "Person",
+    "name": "Anshad"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "TerminalBlog",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://terminalblog.com/favicon.ico"
+    }
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://terminalblog.com/blog/kilocode-v7-8-28-hosted-workspace-profiles-plugin-fix/"
+  }
+})} />
+
+**Kilo Code v7.8.28 dropped November 7, 2026.** Two changes. Both save you time if you run hosted workspaces or use plugins.
+
+---
+
+## 1. Hosted Workspace Profile Defaults — Now Exposed via Session Host API
+
+This is the one you'll actually use. The Session Host API now lets clients:
+
+| What You Can Do | Why It Matters |
+|-----------------|----------------|
+| Create an empty hosted workspace **without an initial prompt or profile** | Spin up a clean environment instantly — no "what do you want to work on?" prompt blocking automation |
+| List personal and organization profiles **with their default flags** | See exactly which profile is the default before you commit |
+| Set or clear the **personal default profile** | Switch your go-to setup without UI clicking |
+
+**Before:** You had to provide a prompt/profile at creation. No way to query defaults programmatically.
+
+**After:**
+```bash
+# Create empty workspace — no prompt required
+kilocode workspace create --empty
+
+# List all profiles with default flags
+kilocode profile list --show-defaults
+
+# Set your personal default
+kilocode profile set-default my-production-setup
+
+# Clear it
+kilocode profile clear-default
+```
+
+If you script Kilo Code (CI, automation, team onboarding), this removes a whole class of "interactive prompt" failures.
+
+---
+
+## 2. Plugin Tools with Invalid JSON Schema Args — No Longer Nuke Your Session
+
+**The bug:** A plugin tool whose arguments couldn't convert to JSON Schema would fail **every single prompt** in the session. One bad plugin = entire session broken.
+
+**The fix (v7.8.28):** Kilo now **skips** those tools instead of crashing the prompt loop.
+
+```json
+// Plugin declares a tool with args that can't become JSON Schema
+// Before: Every prompt fails with schema conversion error
+// After: Tool is silently skipped, other tools work normally
+```
+
+Thanks to [@zfralish](https://github.com/zfralish) for the fix ([#15921](https://github.com/Kilo-Org/kilocode/pull/15921)).
+
+**What this means for you:** A misbehaving plugin no longer holds your session hostage. You keep working, the bad tool just disappears from the available set until the plugin author fixes it.
+
+---
+
+## Update Command
+
+```bash
+npm update -g @kilocode/cli
+# VS Code extension prompts on restart
+```
+
+---
+
+## The Bigger Pattern
+
+Kilo Code has been shipping **daily patches** (v7.8.25 → 26 → 27 → 28 in 4 days). v7.8.27 was a massive security patch (15 CVEs). v7.8.28 is a quality-of-life release for hosted workspace users and plugin authors.
+
+This cadence — security patches within hours, usability fixes within days — is what you want from your daily driver coding agent.
+
+---
+
+*v7.8.28 released November 7, 2026. Full changelog: [github.com/Kilo-Org/kilocode/releases/tag/v7.8.28](https://github.com/Kilo-Org/kilocode/releases/tag/v7.8.28).*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
+
+## Related articles
+
+- [Kilo Code v7.8.27 Just Patched Critical Supply-Chain Vulnerabilities — Update Now](/blog/kilocode-v7-8-27-critical-security-patch/)
+- [Kilo Code October 2026 Wave: Security, Cloud Sync, and Agent Manager Overhaul](/blog/kilocode-october-2026-wave/)
+- [Kilo Code Desktop Launch: One App, 500+ Models, Zero Config](/blog/kilocode-desktop-launch-one-app-500-models/)

@@ -1,0 +1,180 @@
+---
+title: "OpenClaw v2026.11.2 Just Dropped — 166 Commits, 113 PRs, 64 Contributors in One Release"
+description: "OpenClaw v2026.11.2 (Nov 8) is a massive stable release: Mac config atomic saves, Tailscale auth protection, channel replies that survive handlers, conversation interruption resilience, update recovery unstuck, subagent follow-ups across model changes, plus Android APK version pinning. Here's what actually matters."
+pubDate: 2026-11-09
+tags: ["openclaw", "release", "2026.11.2", "mac", "channel-replies", "conversations", "update-recovery", "subagents", "android", "coding-agent", "beginner", "stable"]
+tools: ["openclaw"]
+author: "Anshad"
+image: "/api/og?title=OpenClaw+2026.11.2+Massive+Stable+Release&tool=openclaw"
+canonical: "https://terminalblog.com/blog/openclaw-v2026-11-2-massive-stable-release/"
+---
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "OpenClaw v2026.11.2 Just Dropped — 166 Commits, 113 PRs, 64 Contributors in One Release",
+  "description": "OpenClaw v2026.11.2 (Nov 8) is a massive stable release: Mac config atomic saves, Tailscale auth protection, channel replies that survive handlers, conversation interruption resilience, update recovery unstuck, subagent follow-ups across model changes, plus Android APK version pinning. Here's what actually matters.",
+  "image": "https://terminalblog.com/api/og?title=OpenClaw+2026.11.2+Massive+Stable+Release&tool=openclaw",
+  "datePublished": "2026-11-09",
+  "dateModified": "2026-11-09",
+  "author": {
+    "@type": "Person",
+    "name": "Anshad"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "TerminalBlog",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://terminalblog.com/favicon.ico"
+    }
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://terminalblog.com/blog/openclaw-v2026-11-2-massive-stable-release/"
+  }
+})} />
+
+**OpenClaw v2026.11.2 landed November 8, 2026.** This is a **stable release** (not beta) — 166 commits, 113 PRs merged, 64 contributors. It rolls up everything from the 2026.11.1 stable plus the 2026.11.5 beta work.
+
+If you run OpenClaw on Mac, use messaging channels (Telegram, Discord, webhooks), or hit update issues — this is the release you've been waiting for.
+
+---
+
+## The Headline Fixes (Ranked by "Finally!")
+
+### 1. Safer Mac Settings — Secrets Stay Secret, Tailscale Stops Killing Auth
+
+**What was broken:** Failed config saves on Mac would overwrite your secrets. Turning off Tailscale exposure would kill Gateway authentication.
+
+**What's fixed:**
+- Failed config saves **no longer overwrite secrets** ([#187734](https://github.com/openclaw/openclaw/pull/187734))
+- Turning off Tailscale exposure **keeps Gateway authentication intact** ([#187664](https://github.com/openclaw/openclaw/pull/187664))
+
+**Why it matters:** You configure something, it fails silently, and suddenly your API keys are gone. Or you toggle Tailscale and your Gateway auth dies. Both are fixed — config is now atomic, and network changes don't nuke auth.
+
+---
+
+### 2. Channel Replies That Actually Arrive
+
+**What was broken:** Telegram, Discord, and webhook conversations would stop reaching the agent after request handlers or earlier turns finished. The agent would just... go silent.
+
+**What's fixed:** Conversations **keep reaching the agent after request handlers or earlier turns finish** ([#179200](https://github.com/openclaw/openclaw/pull/179200), [#179385](https://github.com/openclaw/openclaw/pull/179385), [#179704](https://github.com/openclaw/openclaw/pull/179704), [#189457](https://github.com/openclaw/openclaw/pull/189457))
+
+**Why it matters:** You send a message, the agent processes it, sends a reply — and the reply never arrives in Telegram/Discord. That's the "channel reply" bug. Fixed at the delivery layer.
+
+---
+
+### 3. Conversations That Survive Interruptions
+
+**What was broken:** Oversized turns lost history. Stopping the first Claude CLI turn would start the next message from scratch — losing context.
+
+**What's fixed:**
+- **Oversized turns retain useful history** ([#191146](https://github.com/openclaw/openclaw/pull/191146))
+- **Stopping the first Claude CLI turn no longer starts the next message from scratch** ([#181966](https://github.com/openclaw/openclaw/pull/181966), [#186380](https://github.com/openclaw/openclaw/pull/186380))
+
+**Why it matters:** Long conversations don't get amnesia. Interrupting a turn doesn't reset the session. Your context persists.
+
+---
+
+### 4. Update Recovery That Gets Unstuck
+
+**What was broken:** Crashed or canceled updaters would leave the system in a broken state. Windows Gateway failed verification and wouldn't recover. Large-state checks did repeated full-database copying.
+
+**What's fixed:**
+- **Update recovery gets unstuck after crashed or canceled updaters** ([#177932](https://github.com/openclaw/openclaw/pull/177932))
+- **Restores the Windows Gateway after failed verification** ([#186787](https://github.com/openclaw/openclaw/pull/186787))
+- **Avoids repeated full-database copying during large-state checks** ([#189647](https://github.com/openclaw/openclaw/pull/189647))
+
+**Why it matters:** Updates used to be a gamble. If something went wrong, you'd manually fix it. Now the system self-recovers.
+
+---
+
+### 5. Subagents Keep Their Follow-Ups Across Model Changes
+
+**What was broken:** Subagents would lose their follow-up tasks when models changed or sessions switched. Parent sessions wouldn't receive child approvals with custom session stores.
+
+**What's fixed:**
+- **Subagents keep follow-up tasks across model changes** ([#191312](https://github.com/openclaw/openclaw/pull/191312))
+- **Parent sessions receive child approvals with custom session stores** ([#190847](https://github.com/openclaw/openclaw/pull/190847))
+
+**Why it matters:** Complex multi-agent workflows don't break when you swap models or resume sessions.
+
+---
+
+### 6. Android APK Version Pinning (New in 2026.11.2)
+
+**What's new:** The Android app now pins its version to the release train. `apps/android/version.json` was at 2026.8.2 while the release train is 2026.11.2 — this release adds the tooling to sync them:
+
+```bash
+# Run before next tag to pin Android version
+pnpm android:version:pin -- --from-gateway
+```
+
+**Why it matters:** Android builds were drifting behind. Now they're part of the release pipeline.
+
+---
+
+## What Else Shipped (Scannable)
+
+**Gateway & Auth:**
+- Gateway authentication survives network interface changes
+- Config saves are atomic (no partial writes corrupting secrets)
+
+**Messaging Platforms:**
+- Telegram, Discord, webhook replies survive handler completion
+- No more "agent goes silent after first reply"
+
+**Session Management:**
+- Oversized turns preserve history instead of truncating
+- Interrupting first turn doesn't reset conversation
+- Subagent follow-ups persist across model switches
+
+**Update System:**
+- Self-recovers from crashed/canceled updaters
+- Windows Gateway verification failure auto-restores
+- Large-state checks optimized (no repeated DB copying)
+
+**Developer Experience:**
+- 64 contributors, 113 PRs — this is community velocity
+- Full release verification evidence published
+- npm package integrity: `sha512-SgBml4WLp8V1DdAYkrTPLzVdA/iYo3iuHCtm4788GjaG83QZdd1VeOTlue0HBJGdn3SbFE06b6uPs+AM5ShMgg==`
+
+---
+
+## Should You Update?
+
+**Yes.** This is a stable release with zero breaking changes. Pure fixes for the things that made you restart, lose auth, or lose messages.
+
+```bash
+# Update (npm)
+npm update -g openclaw
+
+# Or via your package manager
+pnpm update openclaw
+# yarn upgrade openclaw
+```
+
+If you're on 2026.10.x or earlier, **this release fixes the Mac config corruption, channel reply silence, and update recovery failures** that have been open issues for weeks.
+
+---
+
+## The Pattern
+
+```
+v2026.10.10 (Oct 27) → v2026.10.9 (Oct 29) → v2026.11.1 (Nov 5) → v2026.11.2 (Nov 8)
+```
+
+OpenClaw is shipping **stable releases roughly weekly** now. The 2026.11.x train is stabilizing the Mac experience, messaging reliability, and update resilience — the three things that make or break daily driver usage.
+
+---
+
+*v2026.11.2 released November 8, 2026. Full changelog: [docs.openclaw.ai/releases/2026.11.2](https://docs.openclaw.ai/releases/2026.11.2) | Raw: [github.com/openclaw/openclaw/blob/main/CHANGELOG/2026.11.2.md](https://raw.githubusercontent.com/openclaw/openclaw/main/CHANGELOG/2026.11.2.md).*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
+
+## Related articles
+
+- [OpenClaw 2026.11.1 Just Fixed the Mac Settings That Kept Breaking — Plus Channel Replies That Actually Survive](/blog/openclaw-2026-11-1-mac-settings-channel-replies/)
+- [OpenClaw 2026.10.10 Stable Release: 2614 PRs, Secret Egress, Cloud Sessions, Local Gateway](/blog/openclaw-2026-10-10-stable-release/)
+- [OpenClaw v2026.9.6 Massive Release: 2614 PRs Merged in One Drop](/blog/openclaw-v2026-9-6-massive-release-2614-prs/)
