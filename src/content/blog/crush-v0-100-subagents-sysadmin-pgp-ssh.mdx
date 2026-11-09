@@ -1,0 +1,239 @@
+---
+title: "Crush v0.100 Just Gave You a Team of Subagents — And Sysadmin Mode for Real Server Work"
+description: "Crush v0.100.0 (Nov 5) ships subagents you can spawn, monitor, and steer mid-run, a sysadmin mode with flexible permissions for server ops, and PGP/SSH auth prompts inside the agent. The terminal agent just grew up."
+pubDate: 2026-11-09T10:00:00Z
+tags: ["crush", "release", "v0.100.0", "subagents", "sysadmin", "pgp", "ssh", "coding-agent", "beginner"]
+tool: "crush"
+author: "Anshad"
+image: "/api/og?title=Crush+v0.100+Subagents+Sysadmin&tool=crush"
+canonical: "https://terminalblog.com/blog/crush-v0-100-subagents-sysadmin-pgp-ssh/"
+---
+
+**Crush v0.100.0 dropped November 5, 2026** — and it's the release that stops feeling like a coding assistant and starts feeling like **a team you manage**. Subagents you can spawn, check on, redirect, and stop. Sysadmin mode with permissions that actually make sense for server work. PGP and SSH auth right in the agent chat. This is the release that makes Crush viable for ops, not just code.
+
+---
+
+## The One-Line Summary
+
+**v0.100.0 (Nov 5) → Subagents (spawn, monitor, follow-up, stop, reassign model), Sysadmin Mode (flexible permissions for server ops), PGP/SSH auth prompts in chat, Catwalk v3 hooks everywhere. Run `npm update -g crush` or download from [github.com/charmbracelet/crush/releases/tag/v0.100.0](https://github.com/charmbracelet/crush/releases/tag/v0.100.0).**
+
+---
+
+## The Headline Feature: Subagents — Your Agent Just Hired a Team
+
+### The Problem: One Agent, One Thread, One Thing at a Time
+
+Before v0.100, Crush was single-threaded. You asked it to refactor the auth module — it did that. You wanted parallel work (tests + docs + migration)? You ran multiple Crush instances. Context didn't share. You managed the coordination.
+
+### The Fix: Subagents That Work While You Watch
+
+**New in v0.100:** Crush can now spawn **background subagents** — little teammates that run independently, report back, and take follow-ups.
+
+```bash
+# In Crush:
+# 1. Start a task that needs parallel work
+"Refactor the payment service: write tests, update docs, create migration"
+
+# 2. Crush spawns subagents for each track
+# Subagent 1: Writing tests for payment service
+# Subagent 2: Updating API documentation  
+# Subagent 3: Creating database migration
+
+# 3. You see live status in the main chat
+# ████████░░ Subagent 1 (tests) - running
+# ████░░░░░░ Subagent 2 (docs) - waiting for your input
+# ██████████ Subagent 3 (migration) - done
+
+# 4. Intervene mid-run
+> @subagent-2 "Use OpenAPI 3.1 spec format, not 3.0"
+# Subagent 2 adjusts and continues
+
+# 5. Stop or reassign
+> @subagent-1 stop
+> @subagent-1 reassign-model gpt-6-astra
+```
+
+**What you can do with subagents:**
+- **Spawn** — delegate a subtask to a background agent
+- **Monitor** — see live progress bars in main chat
+- **Follow-up** — send mid-run corrections (`@subagent-2 "use TypeScript strict mode"`)
+- **Stop** — kill a subagent that went off track
+- **Reassign model** — swap the model mid-run (cheap model for grunt work, smart model for architecture)
+
+**Why this changes everything:** You're no longer the typist. You're the **tech lead**. You delegate, review, redirect. The agent handles the parallel execution.
+
+---
+
+## Feature 2: Sysadmin Mode — Permissions That Make Sense for Servers
+
+### The Problem: Coding Permissions ≠ Server Permissions
+
+Standard agent permissions: "read file," "write file," "run command." Great for code. Terrible for servers where you need: "read /etc/nginx," "restart systemd service," "tail journalctl," "edit sudoers" — each with different risk profiles.
+
+### The Fix: Sysadmin Mode with Granular Permissions
+
+**New:** `--sysadmin` flag (or toggle in settings) enables a **permission profile built for infrastructure work**.
+
+```bash
+# Enable sysadmin mode
+crush --sysadmin
+
+# Or in chat:
+/sysadmin on
+```
+
+**Permission tiers:**
+
+| Tier | What It Allows | Prompt Style |
+|------|----------------|--------------|
+| **Read-only** | `cat`, `grep`, `journalctl`, `systemctl status` | Auto-allow (configurable) |
+| **Safe write** | Config files in `/etc`, user crontabs, `.env` files | Single prompt, remember choice |
+| **Service control** | `systemctl restart`, `service nginx reload` | Per-command prompt |
+| **Privileged** | `sudo`, `/etc/sudoers`, kernel params | Always prompt, audit logged |
+
+**Real example:**
+```bash
+You: "Nginx is serving 502s. Diagnose and fix."
+Crush: 
+  1. [Read-only] journalctl -u nginx --since "10 min ago" → auto-runs
+  2. [Read-only] cat /etc/nginx/sites-enabled/default → auto-runs
+  3. [Safe write] Edit nginx config to fix upstream → prompts once
+  4. [Service control] systemctl reload nginx → prompts
+  5. [Read-only] curl localhost/health → auto-runs, confirms fix
+```
+
+**For beginners:** You don't need to know `systemctl` flags. You say "fix nginx." Crush asks for the right permissions at the right level. You learn the commands by watching.
+
+---
+
+## Feature 3: PGP/SSH Auth Prompts — Keys Stay in Your Agent
+
+### The Problem: Signing Commits or SSHing Meant Leaving the Terminal
+
+You're in Crush, agent writes code, you want to `git commit -S` (signed) or `ssh prod-server`. Before: exit agent, run command, come back. Context lost.
+
+### The Fix: PGP and SSH Prompts Inside Crush
+
+**New:** When a subagent or main agent needs to sign or SSH, **Crush prompts you in-chat**.
+
+```bash
+# Agent needs to sign a commit
+Crush: "Commit ready. Sign with your PGP key? [Allow once / Allow session / Deny]"
+You: "Allow session"
+# Agent runs: git commit -S -m "feat: payment refactor"
+# Your key stays in gpg-agent — Crush never sees the private key
+
+# Agent needs to deploy via SSH
+Crush: "Deploy to prod? SSH to deploy@prod.example.com [Allow once / Allow session / Deny]"
+You: "Allow once"
+# Agent runs: ssh deploy@prod.example.com "systemctl restart payment-api"
+```
+
+**Security model:**
+- Private keys **never leave** your `gpg-agent` / `ssh-agent`
+- Crush only requests the **operation** (sign this hash, auth to this host)
+- You control duration: once / session / never
+- Audit trail in chat: every signed commit, every SSH command visible
+
+---
+
+## The v0.99 → v0.100 Jump: What Else Changed
+
+| Area | v0.99 | v0.100 |
+|------|-------|--------|
+| **Hooks** | Tool-level only | **Session, turn, permission, subagent hooks** — full lifecycle |
+| **Catwalk** | v2 | **v3** — editors hosting Crush get new tooling |
+| **Subagents** | ❌ | **✅ Full support** |
+| **Sysadmin** | ❌ | **✅ Permission tiers** |
+| **Auth** | Basic | **PGP/SSH in-chat** |
+
+**Catwalk v3** matters if you use Crush inside an editor (VS Code, Zed, etc.) — the editor gets richer integration points.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Run parallel tasks (tests + docs + migration)** | **Yes** — subagents = parallelism without context loss |
+| **Manage servers / infra** | **Yes** — sysadmin mode = permissions that match the job |
+| **Sign commits or SSH deploy** | **Yes** — in-chat auth = stay in flow |
+| **Host Crush in an editor** | **Yes** — Catwalk v3 = better editor integration |
+| **On v0.99 and stable** | **Yes** — major feature adds, no breaking changes to core chat |
+
+**No reason to wait.** This is the "Crush becomes a platform" release.
+
+---
+
+## How to Update
+
+```bash
+# npm (recommended)
+npm update -g crush
+
+# Verify
+crush --version
+# Should show 0.100.0
+
+# Or download binary
+# https://github.com/charmbracelet/crush/releases/tag/v0.100.0
+# 196 assets across linux/arm64, linux/amd64, darwin/arm64, darwin/amd64, windows/amd64
+```
+
+**First things to try:**
+```bash
+# 1. Test subagents
+crush
+> "Create a TODO app: backend API, frontend React, tests, README"
+# Watch it spawn 4 subagents
+
+# 2. Try sysadmin mode
+crush --sysadmin
+> "Check why PostgreSQL is slow on this server"
+
+# 3. Test PGP signing
+# Make a change, commit
+> "Commit and sign this"
+# Watch the in-chat PGP prompt
+```
+
+---
+
+## The Bigger Picture: Terminal Agents Are Becoming Teams
+
+```
+v0.90–v0.98  → Single agent, great hooks, Catwalk v2
+v0.99        → Hooks everywhere, Catwalk v3, editor integration
+v0.100       → **Subagents, sysadmin permissions, in-chat auth**
+```
+
+**The pattern:** Every release removes a reason to leave the agent.
+
+- v0.99: "I need to edit a hook" → now in chat
+- v0.100: "I need to run parallel work" → subagents
+- v0.100: "I need to restart nginx" → sysadmin mode
+- v0.100: "I need to sign this commit" → in-chat PGP
+
+**Crush isn't trying to be an IDE.** It's trying to be **the terminal you never leave** — and v0.100 is the closest any agent has gotten.
+
+---
+
+## Related Articles
+
+- [Codex 0.167 Just Gave You a Command Center — And Your Images Finally Work in Chat](/blog/codex-0-167-agent-command-center-image-attachments/)
+- [OpenCode v2.2.6 Just Made MCP Connections Shared — And Plugins Got Themes, Mobile Got a Dock, Worktrees Got Scriptable](/blog/opencode-v2-2-6-shared-mcp-plugin-themes-mobile-worktrees/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Claude Code v2.1.319 Just Made MCP Tools Background-Ready — Your Long-Running Tasks Finally Work Right](/blog/claude-code-v2-1-319-mcp-tasks-background-auto-mode/)
+- [Qwen Code v0.27 Just Made Managed Agents Handle Multiple Questions at Once](/blog/qwen-code-v0-27-managed-agents-multi-question-web-shell-heatmap/)
+- [Kilo Code v7.8.27 Just Patched Critical Supply-Chain Vulnerabilities — Update Now](/blog/kilocode-v7-8-27-critical-security-patch/)
+
+---
+
+*Crush is open-source (MIT) and developed by Charm. Full changelog: [github.com/charmbracelet/crush/releases/tag/v0.100.0](https://github.com/charmbracelet/crush/releases/tag/v0.100.0). Published November 9, 2026 — covers Crush v0.100.0 released November 5, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
