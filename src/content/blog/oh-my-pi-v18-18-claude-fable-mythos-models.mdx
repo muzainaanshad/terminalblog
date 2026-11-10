@@ -1,0 +1,258 @@
+---
+title: "Oh My Pi Just Unlocked Claude Fable 5.2 and Mythos 5.2 — The $8/$40 Models That Change Everything"
+description: "Oh My Pi v18.18.5/18.18.6 (Nov 9, 2026) adds native support for Anthropic's new Claude Fable 5.2 ($8/MTok) and Mythos 5.2 ($40/MTok) with 1M context, $0.20 cache reads. LiteLLM proxy now only lists models your key can actually call. Fixed Fable/Mythos mispricing and text-only misclassification."
+pubDate: 2026-11-10T14:00:00Z
+tags: ["oh-my-pi", "release", "v18.18.5", "v18.18.6", "claude-fable", "claude-mythos", "anthropic", "models", "coding-agent", "beginner", "open-source"]
+tool: "oh-my-pi"
+author: "Anshad"
+image: "/api/og?title=Oh+My+Pi+Claude+Fable+Mythos&tool=oh-my-pi"
+canonical: "https://terminalblog.com/blog/oh-my-pi-v18-18-claude-fable-mythos-models/"
+---
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Oh My Pi Just Unlocked Claude Fable 5.2 and Mythos 5.2 — The $8/$40 Models That Change Everything",
+  "description": "Oh My Pi v18.18.5/18.18.6 (Nov 9, 2026) adds native support for Anthropic's new Claude Fable 5.2 ($8/MTok) and Mythos 5.2 ($40/MTok) with 1M context, $0.20 cache reads. LiteLLM proxy now only lists models your key can actually call. Fixed Fable/Mythos mispricing and text-only misclassification.",
+  "image": "https://terminalblog.com/api/og?title=Oh+My+Pi+Claude+Fable+Mythos&tool=oh-my-pi",
+  "datePublished": "2026-11-10T14:00:00Z",
+  "dateModified": "2026-11-10T14:00:00Z",
+  "author": {
+    "@type": "Person",
+    "name": "Anshad"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "TerminalBlog",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://terminalblog.com/favicon.ico"
+    }
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://terminalblog.com/blog/oh-my-pi-v18-18-claude-fable-mythos-models/"
+  }
+})} />
+
+---
+
+**Oh My Pi v18.18.5 and v18.18.6 dropped November 9, 2026** — back-to-back releases that bring **native support for Anthropic's brand-new Claude Fable 5.2 and Mythos 5.2 models** to the most popular model router in the coding agent ecosystem.
+
+If you're running coding agents (Claude Code, Cursor, Cline, Goose, OpenCode, Kilo, Hermes, etc.) and routing through Oh My Pi — **these are the models you've been waiting for**.
+
+---
+
+## The One-Line Summary
+
+**v18.18.6 (Nov 9) + v18.18.5 (Nov 9) → Claude Fable 5.2 ($8/MTok) + Mythos 5.2 ($40/MTok) native, 1M context, $0.20 cache reads. LiteLLM proxy now filters to only models your key can call. Fixed Fable/Mythos mispricing + text-only misclassification.**
+
+---
+
+## Why This Matters: The Model Economics Just Shifted
+
+Anthropic quietly launched two new Claude 5.2 variants with pricing that undercuts almost everything:
+
+| Model | Input / Output | Cache Read | Context | Use Case |
+|-------|----------------|------------|---------|----------|
+| **Claude Fable 5.2** | **$8 / $40 per MTok** | **$0.20** | 1M | Daily driver — cheaper than Sonnet, smarter than Haiku |
+| **Claude Mythos 5.2** | **$40 / $200 per MTok** | **$1.00** | 1M | Heavy reasoning — Opus-class for 1/5 the price |
+
+**For beginners:** This means you can run *Opus-level reasoning* at a fraction of the cost, or use *Fable as your everyday model* without the Sonnet bill shock.
+
+---
+
+## What v18.18.5 Actually Shipped
+
+### 1. Native Fable 5.2 + Mythos 5.2 Support (The Big One)
+
+Oh My Pi now **natively catalogs these models** with correct pricing, capabilities, and context windows. No more manual config, no more guessing.
+
+```json
+// What you get automatically in the model catalog
+{
+  "claude-fable-5-2-20261109": {
+    "input_cost_per_mtok": 8,
+    "output_cost_per_mtok": 40,
+    "cache_read_cost_per_mtok": 0.20,
+    "context_window": 1000000,
+    "capabilities": ["reasoning", "vision", "tools", "computer-use"]
+  },
+  "claude-mythos-5-2-20261109": {
+    "input_cost_per_mtok": 40,
+    "output_cost_per_mtok": 200,
+    "cache_read_cost_per_mtok": 1.00,
+    "context_window": 1000000,
+    "capabilities": ["reasoning", "vision", "tools", "computer-use"]
+  }
+}
+```
+
+### 2. Fixed the "Text-Only" Misclassification Bug
+
+Before this release, **Fable and Mythos were showing as text-only, non-reasoning models** — which meant:
+- Agents wouldn't use them for coding tasks
+- Reasoning features were disabled
+- Tool calling didn't work
+- You got worse results without knowing why
+
+**v18.18.5 fixes this completely.** The models now correctly report as full-capability reasoning models with vision, tools, and computer-use.
+
+### 3. Fixed the Pricing Hallucination
+
+The catalog was **mispricing Fable/Mythos before models.dev caught up** — showing wrong costs that made agents avoid them or budget incorrectly. Now pricing matches Anthropic's official API.
+
+---
+
+## What v18.18.6 Added (The Proxy Fix)
+
+### LiteLLM Proxy Now Only Lists Models Your Key Can Actually Call
+
+This is a **huge operational fix** for anyone running Oh My Pi as a shared gateway:
+
+> **Before:** Proxy's `/v1/models` returned *every model the proxy serves* — even if your API key couldn't access them. Agents saw models they couldn't use, tried to call them, got 401s, and failed silently.
+
+> **After:** Proxy queries its authenticated `/v1/models` endpoint and **only returns models your specific key can call**. If the proxy's model list fails, it returns empty instead of hallucinating access.
+
+```bash
+# What this means for you:
+# - No more "model not found" errors from phantom models
+# - Agents only see what they can actually use
+# - Team gateways: each key sees only its entitled models
+# - Safer multi-tenant setups
+```
+
+### Hyperspace AI / Gemini Gateway Compatibility
+
+Added `base64SkipThoughtSignature` compat flag so **Gemini gateways that decode `thoughtSignature` as base64** (like Hyperspace AI LLM proxy) can receive the unsigned-tool-call bypass sentinel without rejecting with 400.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **v18.18.6** | **Nov 9, 2026** | **Patch (Latest)** | **LiteLLM proxy auth-filtering, Hyperspace/Gemini compat, base64 thoughtSignature fix** |
+| **v18.18.5** | **Nov 9, 2026** | **Patch** | **Claude Fable 5.2 + Mythos 5.2 native, fixed text-only misclassification, fixed mispricing** |
+| v18.18.4 | Nov 9, 2026 | Patch | Hyperspace AI Gemini gateway compat |
+| v18.18.3 | Nov 8, 2026 | Patch | Live steering Codex websocket, speculative execution transforms |
+| v18.0.0 | Oct 2026 | Major | v18 architecture — daily releases, model hub, session selector |
+
+**Two patches same day = the models mattered enough to ship fast.**
+
+---
+
+## What This Means for You
+
+### If You're New to Coding Agents + Model Routing
+
+**Oh My Pi is the router that sits between your agent and 100+ model providers.** You configure it once, and every agent (Claude Code, Cursor, Cline, Goose, OpenCode, Kilo, Hermes, Zed, etc.) gets access to *every model* with unified pricing, caching, and fallbacks.
+
+**v18.18.5/6 means:** You now get Anthropic's newest, best-priced models **automatically** — no config, no wait for upstream catalog updates.
+
+```bash
+# Quick start (if you don't have Oh My Pi yet):
+# 1. Install
+npm install -g @oh-my-pi/pi
+
+# 2. Add your Anthropic key
+pi auth add anthropic --key sk-ant-...
+
+# 3. Pick Fable 5.2 as your daily driver
+pi model use claude-fable-5-2-20261109
+
+# 4. Point your agent to the local proxy
+# In your agent config: base_url = "http://localhost:4000/v1"
+```
+
+### If You Run a Shared Gateway / Team Setup
+
+**v18.18.6 is the release you've been waiting for.** The LiteLLM proxy now respects per-key entitlements. Your teammates only see models their keys can access. No more accidental 401s, no more "why can't I use Opus?" confusion.
+
+### If You're Cost-Conscious (Everyone Should Be)
+
+| Your Current Daily Driver | Switch To | Savings |
+|---------------------------|-----------|---------|
+| Sonnet 4 ($15/$75) | **Fable 5.2 ($8/$40)** | **~47% cheaper** |
+| Opus 4 ($15/$75) | **Mythos 5.2 ($40/$200)** | **Opus-class reasoning, different pricing tier** |
+| GPT-4o ($5/$15) | **Fable 5.2 ($8/$40)** | More expensive but **1M context + better reasoning** |
+
+**Pro tip:** Enable cache reads (`$0.20/MTok` for Fable) — your repeated context (codebase, docs, specs) gets **50x cheaper** on re-reads.
+
+---
+
+## How to Upgrade
+
+```bash
+# Global install
+npm update -g @oh-my-pi/pi
+
+# Or if you use the standalone binary
+pi upgrade
+
+# Docker
+docker pull ghcr.io/can1357/oh-my-pi:latest
+
+# Verify you have the new models
+pi models list | grep -E "fable-5-2|mythos-5-2"
+# Should show both with correct pricing
+```
+
+**First things to try after update:**
+
+```bash
+# 1. Check the new models are visible with correct pricing
+pi models info claude-fable-5-2-20261109
+pi models info claude-mythos-5-2-20261109
+
+# 2. Test Fable 5.2 as your daily driver
+pi model use claude-fable-5-2-20261109
+# Ask your agent: "refactor this auth module" — watch the cost
+
+# 3. Test Mythos 5.2 for heavy reasoning
+pi model use claude-mythos-5-2-20261109
+# Ask: "design a distributed caching layer with consistency guarantees"
+
+# 4. Verify proxy auth-filtering (if running gateway)
+# Start proxy: pi proxy start
+# With a restricted key: curl -H "Authorization: Bearer restricted-key" http://localhost:4000/v1/models
+# Should ONLY show models that key can access
+```
+
+---
+
+## The Bottom Line
+
+**Anthropic dropped two models that rewrite the cost/performance curve. Oh My Pi made them work *today* — not "when the catalog updates."**
+
+- **Fable 5.2** = Your new daily driver. Sonnet smarts, Haiku price, 1M context.
+- **Mythos 5.2** = Opus-class reasoning for novel pricing. Use for architecture, hard debugging, reviews.
+- **Proxy auth-filtering** = Shared gateways finally work correctly.
+- **Two patches same day** = The maintainers know these models matter.
+
+For a beginner: **Install Oh My Pi, add your Anthropic key, pick Fable 5.2. You just cut your model bill in half and got 1M context.**
+
+For a team lead: **Deploy v18.18.6 gateway. Each dev adds their key. They only see what they pay for. No config drift.**
+
+```bash
+pi upgrade
+pi model use claude-fable-5-2-20261109
+# Your agent just got smarter and cheaper
+```
+
+---
+
+## Related Articles
+
+- [Deep Dive: Oh My Pi Agent — The Model Router That Runs Your Coding Agents](/blog/deep-dive-oh-my-pi-agent/)
+- [Oh My Pi v18.3 — Live Steering Codex WebSocket, Speculative Execution](/blog/oh-my-pi-v18-3-live-steering-codex-websocket/)
+- [Oh My Pi v18.4 — Transforms, Speculative Execution, Model Hub](/blog/oh-my-pi-v18-4-transforms-speculative-execution/)
+- [Oh My Pi Daily Release Cycle v16 — How They Ship Every Day](/blog/oh-my-pi-daily-release-cycle-v16/)
+- [Oh My Pi vs Ampcode: Model Routing vs Integrated Agent](/blog/oh-my-pi-vs-ampcode/)
+- [Best Free AI Coding Agents 2026 — No Credit Card Required](/blog/best-free-ai-coding-agents-2026-no-credit-card/)
+
+---
+
+*Oh My Pi is open-source (MIT) and built by [can1357](https://github.com/can1357). Repository: [github.com/can1357/oh-my-pi](https://github.com/can1357/oh-my-pi). Full changelog: [github.com/can1357/oh-my-pi/releases](https://github.com/can1357/oh-my-pi/releases). Published November 10, 2026 — covers Oh My Pi v18.18.5 and v18.18.6 released November 9, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
