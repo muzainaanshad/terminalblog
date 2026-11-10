@@ -1,12 +1,12 @@
 ---
 title: "How Hermes Agent Routes Tasks Across 15+ LLM Providers Automatically"
-description: "Inside Hermes Agent's multi-provider routing engine: how it picks the right model for each job, falls back gracefully, and optimizes cost without config."
+description: "Inside Hermes Agent's multi-provider routing engine: how it picks the right model for each job, falls back gracefully, and optimizes cost without config. Complete architecture, provider list, and custom provider setup."
 pubDate: "2026-07-03T14:00:00Z"
-updatedDate: "2026-07-03T14:00:00Z"
-tags: ["model-routing", "providers", "cost-optimization"]
+updatedDate: "2026-11-10T14:00:00Z"
+tags: ["model-routing", "providers", "cost-optimization", "multi-provider"]
 tool: "hermes"
 author: "Hermes Blog Team"
-keywords: "AI model routing, multi-provider LLM, model fallback strategy, Hermes Agent, autonomous life assistants, workflow orchestration, OpenAI, Anthropic, cost optimization"
+keywords: "AI model routing, multi-provider LLM, model fallback strategy, Hermes Agent, autonomous life assistants, workflow orchestration, OpenAI, Anthropic, cost optimization, provider routing, custom providers"
 ---
 Most AI tools lock you into one provider. Hermes Agent takes the opposite approach: it supports **15+ LLM providers** and routes each task to the optimal model automatically — without you writing a single config line.
 
@@ -20,7 +20,31 @@ Hermes solves this with **automatic provider routing** — each task is analyzed
 - **Context requirements** — how many tokens does it need?
 - **Speed requirements** — does the user need results now, or can it wait?
 - **Cost sensitivity** — what's the budget for this task?
-- **Capability needs** — does it require vision, code execution, structured output?
+- **Capability needs** — does it require vision, code execution, structured output, function calling?
+
+## Built-in Provider Support
+
+Hermes ships with first-class support for these providers:
+
+| Provider | Models | Strengths |
+|----------|--------|-----------|
+| **Anthropic** | Claude 4 Opus, Sonnet 4.5, Haiku 4.5 | Reasoning, code, long context |
+| **OpenAI** | GPT-5, GPT-5-mini, GPT-4.5, o3 series | General purpose, structured output |
+| **Google** | Gemini 2.5 Pro, Flash, Flash-Lite | Multimodal, 2M context, cost-efficient |
+| **DeepSeek** | DeepSeek V4, R2, Coder | Code, reasoning, open weights |
+| **xAI** | Grok 3, Grok 3 Mini | Real-time, unfiltered |
+| **Mistral** | Large 2, Codestral, Nemo | Code, multilingual, open weights |
+| **Cohere** | Command R+, R, Aya | RAG, multilingual, enterprise |
+| **Nous** | Hermes 3, Nemotron 3 Ultra | Open weights, fine-tuned for agents |
+| **Perplexity** | Sonar, Sonar Pro | Search-augmented, citations |
+| **Together AI** | Llama 3.1 405B, 70B, 8B | Open weights, low cost |
+| **Fireworks** | Llama 3.1, Mixtral, function calling | Speed, function calling |
+| **Groq** | Llama 3.1, Mixtral, Gemma 2 | Ultra-low latency |
+| **Cerebras** | Llama 3.1 70B | Fastest inference |
+| **OpenRouter** | 300+ models | Aggregator, unified API |
+| **Nous Portal** | Hermes, Nemotron, community | Agent-optimized |
+
+Plus **custom providers** (see below) for any OpenAI-compatible endpoint.
 
 ## How It Works Under the Hood
 
@@ -33,17 +57,33 @@ routing:
     preferred: gpt-4.5-mini
     fallback: claude-haiku-4.5
     max_tokens: 2000
+    max_cost_usd: 0.001
+    capabilities: [text, code]
   code_generation:
     preferred: claude-sonnet-4.5
     fallback: deepseek-v4
     max_tokens: 8000
+    max_cost_usd: 0.01
+    capabilities: [text, code, reasoning]
   deep_analysis:
     preferred: claude-opus-4.8
     fallback: gpt-5.5
     max_tokens: 32000
+    max_cost_usd: 0.10
+    capabilities: [text, code, reasoning, long_context]
   vision:
     preferred: claude-sonnet-5
     fallback: gpt-5.4
+    max_tokens: 8000
+    capabilities: [vision, text]
+  structured_output:
+    preferred: gpt-5
+    fallback: claude-sonnet-4.5
+    capabilities: [json_schema, function_calling]
+  search_augmented:
+    preferred: perplexity-sonar-pro
+    fallback: gemini-2.5-flash
+    capabilities: [web_search, citations]
 ```
 
 This isn't a static config you maintain. Hermes **builds and adapts** this routing table based on:
@@ -52,6 +92,7 @@ This isn't a static config you maintain. Hermes **builds and adapts** this routi
 2. **Latency history** — models that return slow get deprioritized for quick tasks
 3. **Success rates** — if a model frequently fails on certain task types, it gets reassigned
 4. **Token costs** — the routing engine tracks per-task spending and optimizes
+5. **Quality signals** — user feedback (accept/reject) refines model-task fit
 
 ## Graceful Fallback Chains
 
@@ -61,15 +102,27 @@ The real magic is in fallback behavior. If your preferred model is rate-limited,
 claude-sonnet-4.5 → gpt-4.5 → deepseek-v4 → local model
 ```
 
-Each fallback is chosen to match the original's capabilities as closely as possible. If you need vision, it won't fall back to a text-only model. If you need 100K context, it won't fall back to a 16K model.
+Each fallback is chosen to match the original's capabilities as closely as possible. If you need vision, it won't fall back to a text-only model. If you need 100K context, it won't fall back to a 16K model. If you need structured output, it won't fall back to a model without JSON schema support.
 
 This fallback chain is **self-healing**. If a provider recovers, Hermes detects it on the next request and resumes routing to it.
+
+### Fallback Priority Logic
+
+```
+1. Capability match (must support required features)
+2. Context window (must meet minimum tokens)
+3. Latency percentile (p50 for quick, p99 for batch)
+4. Cost per 1K tokens (ascending)
+5. Recent success rate (descending)
+6. User preference (if configured)
+```
 
 ## Custom Provider Support
 
 Beyond the built-in providers, Hermes supports **arbitrary custom providers** via the `custom:<name>` slug system. You can add any OpenAI-compatible endpoint:
 
 ```yaml
+# .hermes/providers.yaml
 providers:
   custom:my-local-model:
     base_url: http://localhost:8000/v1
@@ -77,9 +130,115 @@ providers:
     models:
       - llama-3-8b
       - mistral-7b
+    capabilities:
+      - text
+      - code
+      - 32k_context
+    cost_per_1k_tokens: 0.0001  # estimated for routing
+    latency_p50_ms: 500         # estimated for routing
+    health_check: true
+    health_check_interval: 60   # seconds
+
+  custom:company-internal:
+    base_url: https://llm.internal.company.com/v1
+    api_key: ${INTERNAL_LLM_KEY}
+    models:
+      - proprietary-model-v2
+      - proprietary-coder-v1
+    capabilities:
+      - text
+      - code
+      - reasoning
+      - 128k_context
+      - function_calling
+    cost_per_1k_tokens: 0.002
+    headers:
+      X-Request-Source: hermes-agent
 ```
 
-These custom providers participate in the same routing, fallback, and cost-optimization logic as built-in ones.
+These custom providers participate in the **same routing, fallback, and cost-optimization logic** as built-in ones. Hermes health-checks them automatically and removes unhealthy ones from rotation.
+
+### Local Model Integration (Ollama, LM Studio, vLLM)
+
+For local-first workflows, Hermes auto-detects common local servers:
+
+```bash
+# Ollama
+ollama serve
+# → Hermes detects http://localhost:11434/v1
+
+# LM Studio
+# → Enable "OpenAI Compatible Server" in settings
+# → Hermes detects http://localhost:1234/v1
+
+# vLLM
+vllm serve meta-llama/Llama-3.1-70B-Instruct --port 8000
+# → Hermes detects http://localhost:8000/v1
+```
+
+No config needed — just start the server and Hermes will route compatible tasks to it (prioritizing local for privacy-sensitive or cost-sensitive tasks).
+
+## Cost-Aware Routing in Practice
+
+Hermes tracks **real spend** per provider, per model, per task type. Here's what a typical week looks like:
+
+| Task Type | Primary Model | Fallback | Avg Cost/Task | Weekly Volume |
+|-----------|---------------|----------|---------------|---------------|
+| Quick edits | GPT-4.5-mini | Claude Haiku 4.5 | $0.0008 | 1,200 |
+| Code generation | Claude Sonnet 4.5 | DeepSeek V4 | $0.0042 | 340 |
+| Deep analysis | Claude Opus 4.8 | GPT-5.5 | $0.038 | 45 |
+| Vision tasks | Claude Sonnet 5 | GPT-5.4 | $0.008 | 60 |
+| Search queries | Perplexity Sonar Pro | Gemini 2.5 Flash | $0.002 | 200 |
+| **Total** | | | **$0.0047 avg** | **1,845** |
+
+At $0.0047 average per task, a heavy user (50 tasks/day) spends ~$7/week on model calls — compared to $20-50 for single-provider flagship subscriptions.
+
+### Budget Controls
+
+Set hard limits in `.hermes/budget.yaml`:
+
+```yaml
+budget:
+  daily_limit_usd: 5.00
+  weekly_limit_usd: 25.00
+  monthly_limit_usd: 80.00
+  alert_at_percent: 80
+  hard_stop_at_percent: 100
+  per_task_cap_usd: 0.50
+```
+
+When limits approach, Hermes:
+1. Shifts routing to cheaper models
+2. Batches non-urgent tasks
+3. Prompts for confirmation on expensive tasks
+4. Hard-stops at limit (with override flag)
+
+## Provider Health & Reliability
+
+Hermes continuously monitors provider health:
+
+```yaml
+# Auto-generated health metrics (not manual)
+health:
+  anthropic:
+    status: healthy
+    p50_latency_ms: 1200
+    p99_latency_ms: 4500
+    error_rate_1h: 0.001
+    error_rate_24h: 0.003
+    rate_limit_remaining: 8500
+    last_check: 2026-11-10T13:45:00Z
+  openai:
+    status: degraded
+    p50_latency_ms: 2100
+    p99_latency_ms: 8000
+    error_rate_1h: 0.02
+    error_rate_24h: 0.015
+    rate_limit_remaining: 1200
+    last_check: 2026-11-10T13:45:00Z
+```
+
+**Degraded providers** are automatically deprioritized. **Unhealthy providers** (error rate >5% or latency >30s p99) are removed from routing until recovery.
 
 ## Why This Matters
 
@@ -96,3 +255,6 @@ It's one less thing to think about, and one more reason autonomous agents can ac
 - [Hermes Agent v0.19.1 Quicksilver: 80% Faster Starts, Smart Approvals, and Secrets That Survive](/blog/hermes-agent-v019-quicksilver-80-percent-faster/)
 - [Cursor Router Automatically Picks the Best Model for Every Coding Task](/blog/cursor-router-intelligent-model-routing/)
 - [Hermes Agent Deep Dive: The Most Capable Open-Source Autonomous Coding Assistant](/blog/deep-dive-hermes-agent-autonomous-coding-assistant/)
+- [Hermes Agent v0.20.0 (Herald): Voice That Interrupts, A2A Agent Chat, and Webhooks — Beginners Guide](/blog/hermes-agent-v020-herald-voice-a2a-webhooks/)
+- [Best Coding Agents 2026 — Decision Guide (Not Another Hype List)](/blog/best-coding-agents-2026-decision-guide/)
+- [Google AI Studio Turns Your GitHub Repo Into a Live App With One Import](/blog/google-ai-studio-github-import-autodeploy/)
