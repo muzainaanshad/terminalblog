@@ -1,0 +1,326 @@
+---
+title: "Claude Code Just Dropped Fable 5.2 as Default + 200 Fixes — The Stability Wave You've Been Waiting For"
+description: "Claude Code v2.1.321 makes Fable 5.2 the default model (1M context, cheaper pricing), adds --settings to remote-control, patches MCP OAuth secret leaks, fixes network path editing, and ships 200+ fixes across Windows, macOS, Desktop, VS Code, and cloud sessions. The biggest stability drop since v2.1.280."
+pubDate: 2026-11-10T10:00:00Z
+tags: ["claude-code", "release", "v2.1.321", "fable-5.2", "stability", "mcp", "remote-control", "coding-agent", "beginner"]
+tool: "claude-code"
+author: "Anshad"
+image: "/api/og?title=Claude+Code+v2.1.321+Fable+5.2&tool=claude-code"
+canonical: "https://terminalblog.com/blog/claude-code-v2-1-321-fable-5-2-stability-wave/"
+faq:
+  - q: "What's the biggest change in v2.1.321?"
+    a: "Claude Fable 5.2 is now the default Fable model — 1M context window, $8/$40 per Mtok (input/output) with $0.20/Mtok cache reads. Your agent just got way more context for less money."
+  - q: "Is this a breaking release?"
+    a: "No. v2.1.321 is a patch release (2.1.319 → 2.1.321) with 200+ fixes and zero breaking changes. Safe to upgrade immediately."
+  - q: "What was the MCP OAuth security fix?"
+    a: "MCP OAuth requests were sending refresh tokens to another host when a server redirected them. Fixed — secrets no longer leak on redirect."
+  - q: "Does this fix the network path (WSL/UNC) editing bugs?"
+    a: "Yes. NotebookEdit and Edit on network paths (UNC shares, WSL folders, /net mounts) no longer delete the first cell, overwrite on empty old_string, or edit notebooks as text."
+  - q: "How do I upgrade?"
+    a: "Run `claude upgrade` or re-run the installer. Auto-update handles it for most users. VS Code extension updates on restart."
+
+---
+
+**Claude Code v2.1.321 landed November 9, 2026** — and this might be the most impactful patch release since the massive v2.1.280 wave. **Fable 5.2 is now the default model (1M context, cheaper pricing). MCP OAuth secret leaks patched. Network path editing finally works. Remote control gets --settings. Plus 200+ fixes across every surface.**
+
+If you've been living with "it mostly works but..." moments — this is the release that kills them.
+
+---
+
+## The One-Line Summary
+
+**v2.1.321 (Nov 9) → Fable 5.2 default (1M context, $8/$40/Mtok), --settings for remote-control, MCP OAuth secret leak fixed, network path edits work, 200+ fixes. Zero breaking changes. Upgrade now.**
+
+---
+
+## The Headline Features (Ranked by Daily Impact)
+
+### 1. Fable 5.2 Is Now the Default Fable Model — 1M Context, Cheaper
+
+**What it is:** **Claude Fable 5.2 (`claude-fable-5-2`) replaces Fable 5.1 as the default Fable model.** You get:
+
+| Spec | Fable 5.1 | **Fable 5.2 (New Default)** |
+|------|-----------|-----------------------------|
+| Context Window | 200K | **1,000,000 (1M)** |
+| Input Cost | $15/Mtok | **$8/Mtok** |
+| Output Cost | $75/Mtok | **$40/Mtok** |
+| Cache Read | $1.50/Mtok | **$0.20/Mtok** |
+
+**Why it matters:** Your agent can now hold **5x more context** (entire codebases, massive logs, full conversation histories) at **~half the price**. Cache reads are **7.5x cheaper** — meaning compacted sessions cost pennies.
+
+```bash
+# Check your model
+/model
+# Should show: claude-fable-5-2 (default)
+
+# Want old Fable 5.1 back?
+/model claude-fable-5-1
+```
+
+**For beginners:** You don't need to do anything. Next session, you're on Fable 5.2. Your agent just got smarter and cheaper automatically.
+
+---
+
+### 2. `--settings <file>` for `claude remote-control` — Persistent Config Across Sessions
+
+**What it is:** You can now pass a settings file to `claude remote-control` that applies to **every session it starts**. If the file changes, the setting takes effect on the next session (no restart needed unless you're mid-session).
+
+```bash
+# Start remote control with custom settings
+claude remote-control --settings ./my-team-settings.json
+```
+
+**Why it matters:** Teams can version-control their agent configuration. One file controls permissions, model, hooks, MCP servers — every session inherits it. Change the file → new sessions pick it up.
+
+```json
+// my-team-settings.json
+{
+  "permissions": {
+    "allow": ["Bash", "Read", "Write", "Edit"],
+    "deny": ["Bash:rm -rf *", "Bash:sudo *"]
+  },
+  "model": "claude-fable-5-2",
+  "mcp": {
+    "servers": {
+      "github": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"] }
+    }
+  }
+}
+```
+
+---
+
+### 3. MCP OAuth Secret Leak Patched — Refresh Tokens No Longer Follow Redirects
+
+**What it was:** When an MCP server redirected an OAuth request, **Claude Code followed the redirect with your refresh token** — sending secrets to an unexpected host.
+
+**What it is now:** **Fixed.** Redirects during OAuth no longer carry credentials. Your tokens stay where they belong.
+
+```bash
+# This attack vector is closed
+# Before: MCP server redirects → refresh token sent to attacker.com
+# After:  MCP server redirects → redirect followed WITHOUT credentials
+```
+
+**For beginners:** If you use MCP servers with OAuth (GitHub, Slack, Notion, etc.), this was a real risk. It's now fixed. Update and you're protected.
+
+---
+
+### 4. Network Path Editing Finally Works (WSL, UNC Shares, /net Mounts)
+
+**What was broken:** Editing files on network paths — WSL folders (`/mnt/c/...`), UNC shares (`\\server\share`), `/net` mounts — caused:
+- `NotebookEdit` deleting/overwriting the first cell
+- `Edit` changing the first match, replacing whole file on empty `old_string`, editing notebooks as text
+
+**What it is now:** **Fixed.** Network paths behave like local paths. Your WSL workflows, mounted network drives, and shared folders just work.
+
+```bash
+# These now work correctly:
+claude edit /mnt/c/Users/you/project/src/auth.ts
+claude edit //server/share/project/src/auth.ts
+claude edit /net/server/share/project/src/auth.ts
+```
+
+---
+
+### 5. `/config` Now Shows Auto as Default (Not Manual) + Space Saves Don't Ask
+
+**What it was:** `/config` showed "Manual" as the default permission mode even when new sessions started in auto mode. Pressing Space on "Auto (default)" saved "Don't Ask" instead of "Plan."
+
+**What it is now:** **Fixed.** UI matches reality. Space on "Auto (default)" → saves "Plan" (the actual default).
+
+---
+
+## The 200+ Fix Layer (What You'll Actually Feel)
+
+### Windows Fixes That Matter
+
+| Fix | What It Solved |
+|-----|----------------|
+| `FileChanged` hooks stopping after first command with lowercase drive letter | `C:\` vs `c:\` mismatch broke hooks — fixed |
+| Git for Windows startup no longer checks `which git.exe` on every launch | **2-4s faster startup** on standard Git for Windows |
+| Bash commands empty for zsh users with `KSH_OPTION_PRINT` | zsh configs no longer break agent output |
+| `claude -p` on Linux exiting 0 silently on NFS export/quota issues | Now prints error, exits 1 — CI/CD catches failures |
+
+### Desktop & VS Code Fixes
+
+| Fix | What It Solved |
+|-----|----------------|
+| `/compact` showing twice in Remote Control on web/mobile | Clean UI, no duplicate buttons |
+| Plugin auto-updates downloading same plugin for each worktree | **Faster updates, less bandwidth** |
+| Fullscreen sessions with plugins ending with error when tool result shortened | No more crashes on scroll |
+| VS Code: Warning when both auth token AND API key set | Matches terminal startup warning |
+| VS Code: Plugin permission request showing name with hidden chars | Now reads "a plugin" — no spoofing |
+| Desktop: `/desktop` saying not installed when in `~/Applications` | macOS home-folder installs detected |
+| Agent view erasing another agent's saved input on update restart | Your typed text survives updates |
+
+### Cloud & Remote Session Fixes
+
+| Fix | What It Solved |
+|-----|----------------|
+| Auto mode losing background subagent report during compaction | Background work no longer vanishes |
+| Project skills/commands/agents disappearing after `git stash`/worktree entry | Your tools persist across git operations |
+| `claude -p` telling background commands get 30min when stopped at 10 | Accurate time expectations |
+| Chrome/computer use server processes staying alive after parent exits | No orphaned processes behind proxies |
+| Remote Control showing "login expired" while connection still up | No false disconnection alerts |
+| Queued "Queue for later" message reaching middle of running turn | Messages wait their turn properly |
+| Git status reading "clean" when `git status` failed | Now shows "unavailable" — honest |
+| Git status showing first file as staged when it wasn't | Accurate git state |
+| High memory in long sessions reading single lines from large files | **Lower memory footprint** |
+| Fast mode losing replies, switching models, retrying for minutes | Now tries standard speed first |
+| Messages not saved / sessions hanging on OOM during transcript read | Graceful degradation, not silence |
+| Sign-in/token refresh/logout waiting indefinitely on stalled TLS | Timeouts work, no hangs |
+| Restarted cloud session dropping large image message | Images survive restarts |
+| Restarted cloud session leaving subagent message unanswered | Conversations complete |
+| Claude not told when you stop/pause a workflow | Agent knows workflow state |
+
+### MCP & Hook Fixes
+
+| Fix | What It Solved |
+|-----|----------------|
+| `claude mcp login` printing SEP-2352 issuer warning every re-sign-in | Clean logs |
+| Deny rules & protected-file prompts not applying to `cp`/`mv` into directory | Security rules enforced on moves |
+| Read-only Bash command running outside sandbox without prompt | Sandbox respected |
+| Bash permission checks judging file write from wrong folder | Correct folder context |
+| Large hook output pointing to another hook's output file | No cross-hook confusion |
+| Embedded apps getting wrong PreToolUse hook's `ask` reason | Each app sees its own hooks |
+| PreToolUse `ask` lost when another hook's `defer` finished first | No lost permission prompts |
+| `PreToolUse` `mcp_tool` hooks skipped when answer > 16 MiB | Now refuses tool call instead of skipping |
+| MCP server showing connected with no tools after reconnect | Tools load reliably |
+| Bash commands running in wrong folder when sent in batch | Correct working directory per command |
+| File uploads failing at once on HTTP 507 from proxy | **Second retry attempt** |
+| Files with control chars in name showing differently in apps | Refused — no spoofing |
+| Sub-agent progress summaries running request to end after tool call | Proper summaries |
+| Bash reads like `grep -r foo "$PWD/src"` asking for permission | Same as typed path — no prompt |
+
+### Provider & Gateway Fixes
+
+| Fix | What It Solved |
+|-----|----------------|
+| Fallback model declining request or mentioning stopped response | Smooth fallback |
+| Gateway spend limits on busy replica skipping checks | Accurate spend tracking |
+| Sign-in limit messages naming gateway settings (internal) | User-facing messages cleaned |
+| Bedrock/Vertex/Foundry upstreams ignoring `ANTHROPIC_*_BASE_URL` | Use `base_url` on upstream instead |
+| OpenTelemetry hook events leaving built-in hooks out of counts | Accurate metrics |
+
+### Quality-of-Life Improvements
+
+| Improvement | What You Get |
+|-------------|--------------|
+| `/model` picker: "More models" unnumbered row, older models under it | Cleaner model selection |
+| `claude install` and install scripts **2-4 seconds faster** | Quicker onboarding |
+| Remote Control session recovery after crash — picks up new messages sooner | Less downtime |
+| Auto mode in headless/desktop/VS Code: background reports answered in one call | **Faster multi-agent turns** |
+| Agent view shows worktree setup error from start (not internal tag) | Debuggable errors |
+| Artifact in another org: `/login` offered only if yours, copy location shown | Clearer cross-org UX |
+| Sessions with many images: told which seen, repeat reads limited | Token budget preserved |
+| `claude remote-control` first-run question messages say what to do next | Guided setup |
+| Startup time: trusted TLS certs load faster | Snappier launch |
+| Gateway error messages show address without credentials | Secure logging |
+| Spend limit error shows reset in **your local time** (e.g., "resets 4pm America/Los_Angeles") | No timezone math |
+| Session feedback message names Ultra alongside Pro/Max | All plans visible |
+| Bundled dataviz skill suggests meter lists for ratios with limits | Better charts |
+| "Upgrade to Max" → "Upgrade to Max or Ultra" | Accurate upsell |
+| Mods turn on without asking in auto/bypass (even with managed restrictions) | Smoother mod adoption |
+| Mods' own tool calls (`$.tool.call`, `$.mcp.call`) raise no permission prompt | Mods just work |
+| Saved Fable 5.1 picks → auto-move to `fable` (Pro/Max now, Team/Enterprise when allowed) | Seamless model migration |
+| Fast mode labels name your current model (not just "Opus") | Context-aware UI |
+| Nested skill loading: `.claude/skills` in `~/.claude/plugins` no longer loads | Cleaner plugin isolation |
+| Self-hosted runner exits 0 (not 1) when refused by server | CI/CD friendly |
+| Windows: Claude finds programs (git, etc.) skipping relative/UNC PATH entries | Reliable program discovery |
+| Headless sessions reload mods in `.claude/skills` on file change (opt-out: `CLAUDE_CODE_PLUGIN_DIR_WATCH=0`) | Live mod updates |
+| Cyber Verification Program sentence matches claude.ai | Consistent messaging |
+| Cowork cloud sessions: PostToolUse can't replace AskUserQuestion/ExitPlanMode | Original answers preserved |
+| `cp`/`mv` by path (`/bin/cp`) get same path checks as bare command | Consistent security |
+| Background command notifications show start/end only for >1000 char output | Context savings |
+| Artifact design guidance: Inter & Space Grotesk as good defaults | Better typography |
+| Account email check only blocks shell commands with email + User-Agent | Other commands unaffected |
+| Remote Control sessions keep their folder (client can't move them) | Session stability |
+| Managed marketplace takeovers: data set aside for cleanup period | Safe migrations |
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Use Fable models** | **Yes** — 1M context, half the price, automatic |
+| **Run `claude remote-control` for team/shared sessions** | **Yes** — `--settings` file = version-controlled config |
+| **Use MCP servers with OAuth (GitHub, Slack, Notion, etc.)** | **Yes** — Secret leak patched |
+| **Work on WSL, network shares, or mounted drives** | **Yes** — Editing finally works |
+| **Run cloud/remote sessions** | **Yes** — 50+ fixes for stability |
+| **Embed Claude Code (SDK, VS Code, CI bots)** | **Yes** — Background tasks, git ops, memory fixes |
+| **On v2.1.319 and stable** | **Yes** — Zero breaking changes, pure fixes |
+
+**No reason to wait.** This is the "v2.1.319 stable, now actually polished" release.
+
+---
+
+## How to Upgrade
+
+```bash
+# CLI
+claude upgrade
+
+# Or re-run installer
+curl -fsSL https://claude.ai/install | bash
+
+# VS Code: Extension auto-updates on restart
+# Desktop: Auto-updater handles it (enabled by default)
+
+# Verify
+claude --version
+# Should show: 2.1.321
+```
+
+**First things to try after update:**
+
+```bash
+# 1. Check model — should be Fable 5.2
+/model
+
+# 2. Test network path edit (WSL/UNC/mount)
+# Edit a file on /mnt/c/... or //server/share/... — should work
+
+# 3. Try remote-control with settings file
+claude remote-control --settings ./team-config.json
+
+# 4. Check /config — Auto should show as default, Space saves Plan
+/config
+
+# 5. Verify MCP OAuth — sign in to a server, no SEP-2352 warning
+claude mcp login github
+```
+
+---
+
+## The Bigger Picture: The Stability Arc Continues
+
+```
+v2.1.280 (Oct 2026) → Opus 5.5 default, massive fix wave (100+ fixes)
+v2.1.283-289       → Gateway hints, plugin fixes, desktop command plugins
+v2.1.292-296       → Plugin marketplace, subagent effort, Haiku 5.5 default
+v2.1.299-312       → Idle compaction, AWS advisor, bug fixes, stability waves
+v2.1.314-319       → Cloud session MCP, safety telemetry, network drives, background tasks
+v2.1.321 (Nov 9)  → **Fable 5.2 default, --settings, MCP OAuth fix, network paths, 200+ fixes**
+```
+
+**Every release since v2.1.280 has been: zero breaking changes, massive fix volume, real usability gains.**
+
+This isn't feature churn. It's a team systematically eliminating every "it mostly works but..." paper cut. v2.1.321 might be the cleanest yet.
+
+---
+
+## Related Articles
+
+- [Claude Code v2.1.319 Just Landed — Background MCP Tasks, Expanded Auto Mode, Gateway Controls](/blog/claude-code-v2-1-319-stability-surge/)
+- [Claude Code v2.1.318 Network Drives Finally Work — WSL, UNC, Mounts Fixed](/blog/claude-code-v2-1-318-network-drives-finally-work/)
+- [Claude Code v2.1.312 — 80 Fixes You Actually Feel](/blog/claude-code-v2-1-312-80-fixes-you-actually-feel/)
+- [Claude Code v2.1.280 — Opus 5.5 Default, Massive Fix Wave](/blog/claude-code-v2-1-280-opus-5-5-default-massive-fix-wave/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Claude Code v2.1.321 released November 9, 2026. Full changelog: [github.com/anthropics/claude-code/releases/tag/v2.1.321](https://github.com/anthropics/claude-code/releases/tag/v2.1.321).*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
