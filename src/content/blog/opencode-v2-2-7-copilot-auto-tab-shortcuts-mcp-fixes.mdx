@@ -1,0 +1,213 @@
+---
+title: "OpenCode v2.2.7 Just Added GitHub Copilot Auto Support — Your Agent Can Now Pick the Right Model Automatically"
+description: "OpenCode v2.2.7 adds GitHub Copilot Auto mode (router picks model per session at discount), side panel tab shortcuts, mark sessions read/unread, and fixes MCP login rotation bugs."
+pubDate: 2026-11-10
+updatedDate: 2026-11-10
+author: "Anshad"
+tags: ["opencode", "sst", "release", "github-copilot", "mcp", "coding-agents", "beginner"]
+tool: "opencode"
+category: "releases"
+heroImage: "/blog/opencode-v2-2-7-copilot-auto.jpg"
+---
+
+**OpenCode v2.2.7 dropped today (Nov 10).** The headline: **GitHub Copilot Auto is now supported** — pick "Auto" in the model picker and Copilot's router chooses the best model for each session at the Auto discount. If routing fails, it falls back to your default chat model.
+
+---
+
+## The Headline Feature: GitHub Copilot Auto Support
+
+### What It Is
+
+OpenCode now integrates with **GitHub Copilot's Auto pool**. When you select "Auto" in the model picker, Copilot's intelligent router picks the optimal model for your task — GPT-5 for complex reasoning, Claude for code, etc. — at the discounted Auto rate.
+
+```bash
+# In OpenCode model picker → select "Auto" under GitHub Copilot
+# That's it. Router handles the rest.
+```
+
+### Why This Matters for Beginners
+
+**Before:** You had to manually pick a model. Guess wrong and you overpay or underperform.
+
+**After:** You pick **Auto**. The router learns your patterns and routes each session to the right model at the lowest cost.
+
+- **Complex refactoring?** Router sends it to a reasoning model
+- **Quick bug fix?** Router uses a fast, cheap model
+- **Auto discount applies automatically** — no config needed
+
+```markdown
+# Real difference
+You: "Fix the auth middleware"
+# Old: You pick GPT-5 → $$$
+# New: Router picks optimal model → $ (Auto discount)
+```
+
+### The Fallback Safety Net
+
+If Copilot's router has issues, OpenCode **falls back to your account's default chat model**. You never get stuck.
+
+---
+
+## UX Improvements You'll Use Daily
+
+### Side Panel Tab Shortcuts (Finally!)
+
+Right-click any side panel tab → **Close tabs to the right**. Clean up your workspace in one click.
+
+Keyboard shortcuts that actually make sense:
+- `⌘W` / `Ctrl+W` — closes side panel tabs wherever focus is
+- `⌥⌘W` / `Ctrl+Alt+W` — **always closes the session tab** (new dedicated command)
+- `⌘⇧T` / `Ctrl+Shift+T` — reopens the last closed tab (side panel or session) where it was
+
+### Mark Sessions Read or Unread
+
+Open the menu on any tab, Home row, project row, or inbox card → **Mark as unread**. Keeps the notification dot until you revisit. Perfect for "I'll deal with this later" sessions.
+
+---
+
+## MCP Login Rotation Fixed (Big Reliability Win)
+
+**The bug:** Remote MCP servers that rotate refresh tokens would sign you out when multiple clients (TUI, Desktop, background service) refreshed simultaneously or the token endpoint hiccuped.
+
+**v2.2.7 fix:** 
+- Concurrent refreshes no longer log you out ([#62827](https://github.com/anomalyco/opencode/pull/62827))
+- Temporary token failures keep your login for the next retry instead of marking `needs_auth` ([#63012](https://github.com/anomalyco/opencode/pull/63012))
+
+If you use remote MCP servers (GitHub, Linear, Notion, custom), **this alone justifies the update**.
+
+---
+
+## Other Notable Fixes (Scannable)
+
+### Core Reliability
+- **Read from end of file:** `read` accepts negative offset (`-50` = last 50 lines) ([#62147](https://github.com/anomalyco/opencode/pull/62147))
+- **Smart file suggestions:** When `read` can't find a file, it suggests close matches (typo, wrong case, wrong extension, path inside project) ([#62147](https://github.com/anomalyco/opencode/pull/62147))
+- **Shell exit codes visible:** Results end with `Exit code: N`. Killed commands show signal name. Timeouts say how long they waited. ([#62141](https://github.com/anomalyco/opencode/pull/62141))
+- **Prompt cache warming respects TTL:** Pings based on model's `cache.ttl` (`interval: "auto"`) or every 4 min. Models whose cache outlasts warming duration stop being pinged. ([#62831](https://github.com/anomalyco/opencode/pull/62831))
+
+### GitHub Copilot Specific
+- **Session costs use actual Copilot charges** (not catalog estimates) ([#62034](https://github.com/anomalyco/opencode/pull/62034))
+- **Content-filter errors name the filter** that blocked the response ([#62034](https://github.com/anomalyco/opencode/pull/62034))
+- **Plan changes picked up automatically** — no re-sign-in needed ([#62171](https://github.com/anomalyco/opencode/pull/62171))
+
+### Background Compaction
+- Background summaries no longer stop running Claude Agent sessions mid-tool-call ([#63025](https://github.com/anomalyco/opencode/pull/63025))
+
+### TUI
+- Update/confirm dialogs have keyboard-navigable buttons (`←`/`→`, `Tab`/`Shift+Tab`) ([#62906](https://github.com/anomalyco/opencode/pull/62906))
+- Model picker no longer has "Usage" action — use `/usage` instead ([#62927](https://github.com/anomalyco/opencode/pull/62927))
+
+### Desktop
+- `Ctrl+Shift+R` toggles review panel again on Windows/Linux (was reloading window) ([#62567](https://github.com/anomalyco/opencode/pull/62567))
+- Closing last side panel tab slides panel shut ([#62758](https://github.com/anomalyco/opencode/pull/62758))
+
+### SDK
+- `session.generate` returns `tokens` and `cost` with `text` ([#62835](https://github.com/anomalyco/opencode/pull/62835))
+- ACP clients can redirect running turns with `_session/steering` extension ([#54394](https://github.com/anomalyco/opencode/pull/54394))
+
+---
+
+## Breaking Changes (SDK Users Only)
+
+### `@opencode/ai`: `ImageResponse.image` Removed
+
+If you import `@opencode/ai` directly:
+```typescript
+// Before (breaks)
+const image = response.image;
+
+// After (works)
+const image = response.images[0];
+```
+([#63011](https://github.com/anomalyco/opencode/pull/63011))
+
+### Fewer Endpoints Wait for Plugins
+
+On a Location still loading plugins:
+- `agent.list` returns agents loaded so far
+- `integration.list`, `usage.limits`, `vcs.init`, `rpc.call`, `artifact.*` no longer wait up to 5s
+- Plugin-provided entries appear when plugin finishes loading (refresh on `*.updated` event)
+- Model, provider, `generate.*`, `voice.*`, `websearch.query` still wait
+
+([#62796](https://github.com/anomalyco/opencode/pull/62796), [#63040](https://github.com/anomalyco/opencode/pull/63040))
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Use GitHub Copilot** | **Yes** — Auto mode + discount is a no-brainer |
+| **Use remote MCP servers** | **Yes** — login rotation fixes are critical |
+| **Want cleaner tab management** | **Yes** — shortcuts + read/unread are daily QoL |
+| **Build on OpenCode SDK** | **Yes** — but check breaking changes above |
+| **On v2.2.6 and stable** | **Yes** — pure improvements, minimal breaking |
+
+---
+
+## How to Upgrade
+
+```bash
+# npm
+npm update -g opencode
+
+# macOS (Homebrew)
+brew upgrade opencode
+
+# Verify
+opencode --version
+# Should show: v2.2.7
+```
+
+---
+
+## First Things to Try After Update
+
+```bash
+# 1. Test GitHub Copilot Auto
+# OpenCode → Model Picker → GitHub Copilot → Select "Auto"
+# Ask agent to do something complex → watch router pick model
+
+# 2. Test tab shortcuts
+# Open multiple side panel tabs → Right-click → "Close tabs to the right"
+# ⌘W on side panel → closes side panel tab
+# ⌥⌘W → closes session tab (always)
+# ⌘⇧T → reopens last closed
+
+# 3. Test mark read/unread
+# Right-click session in inbox → "Mark as unread" → dot appears
+# Visit session → dot disappears
+
+# 4. Test negative offset read
+opencode run -p "Read the last 20 lines of package.json"
+# Agent uses read with offset: -20
+
+# 5. Verify MCP login persistence
+# If you use remote MCP: restart OpenCode → should stay logged in
+```
+
+---
+
+## The Bigger Picture
+
+v2.2.x has been iterating fast on **workflow automation** (worktrees, archived runs, MCP pooling) and **plugin extensibility** (themes, native components). 
+
+v2.2.7 adds the **GitHub Copilot integration depth** that makes OpenCode a first-class citizen in the Copilot ecosystem — not just another CLI that happens to support Copilot models.
+
+The MCP login fix shows the team cares about **production reliability**, not just features. When your agent infrastructure stays logged in across restarts and concurrent clients, you can actually ship automations.
+
+---
+
+## Related Articles
+
+- [OpenCode v2.2.6: Shared MCP Connections, Mobile Composer, Worktree Runs](/blog/opencode-v2-2-6-shared-mcp-plugin-themes-mobile-worktrees)
+- [OpenCode v2.2.5 — Worktree Shortcuts, Percentage Compaction](/blog/opencode-v2-2-5-worktree-shell-shortcuts-percentage-compaction)
+- [OpenCode vs AmpCode — Free Agent Faceoff](/blog/opencode-vs-ampcode)
+- [State of Open Source Coding Agents 2026](/blog/state-of-open-source-coding-agents-2026)
+- [GitHub Copilot CLI v1.0.108 Just Gave Your Agent a Search Index](/blog/github-copilot-cli-1-0-108-pre-release-indexing)
+
+---
+
+*OpenCode v2.2.7 released November 10, 2026. Full changelog: [github.com/sst/opencode/releases/tag/v2.2.7](https://github.com/sst/opencode/releases/tag/v2.2.7).*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*

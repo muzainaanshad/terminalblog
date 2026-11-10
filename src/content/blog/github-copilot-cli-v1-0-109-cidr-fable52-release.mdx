@@ -1,0 +1,209 @@
+---
+title: "GitHub Copilot CLI v1.0.109 Just Added CIDR Sandbox Rules + Fable 5.2 Support — Here's What's New"
+description: "GitHub Copilot CLI v1.0.109-1 adds IPv4/IPv6 CIDR support for sandbox host allow/deny rules, Claude Fable 5.2 in model picker, and 15+ fixes for shell input, resume, MCP, and accessibility."
+pubDate: 2026-11-10
+updatedDate: 2026-11-10
+author: "Anshad"
+tags: ["github-copilot-cli", "release", "v1.0.109", "sandbox", "fable-5.2", "coding-agents", "beginner"]
+tool: "copilot-cli"
+category: "releases"
+heroImage: "/blog/copilot-cli-v1-0-109-cidr-fable.jpg"
+---
+
+**GitHub Copilot CLI v1.0.109-1 landed today (Nov 10).** Two new features you'll actually use: **CIDR sandbox rules** for network-level access control and **Claude Fable 5.2 support** in the model picker. Plus 15+ fixes across shell input, session resume, MCP, and accessibility.
+
+---
+
+## New Features
+
+### 1. IPv4/IPv6 CIDR Support for Sandbox Host Rules
+
+You can now use CIDR notation in sandbox `allowHosts` and `denyHosts` settings. This gives you **network-level control** instead of listing individual hosts.
+
+```json
+// settings.json
+{
+  "sandbox": {
+    "hosts": {
+      "allowHosts": ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"],
+      "denyHosts": ["10.0.0.5/32", "::1/128"]
+    }
+  }
+}
+```
+
+**Why it matters:** 
+- Block/allow entire internal networks with one rule
+- IPv6 supported (`::1/128` for localhost, `2001:db8::/32` for docs)
+- Works alongside existing hostname rules
+
+---
+
+### 2. Claude Fable 5.2 in Model Picker (Under "New Models")
+
+Fable 5.2 (Anthropic's latest reasoning model) is now selectable in the model picker under the **New models** section.
+
+```bash
+# In Copilot CLI
+/model
+# → New models → claude-fable-5.2
+```
+
+**Context:** Fable 5.2 is Anthropic's "thinking" model variant — shows reasoning before answering. Useful for complex debugging where you want to see the agent's thought process.
+
+---
+
+## Fixes You'll Actually Notice (15+)
+
+### Shell Input & Editing
+- **Backspace at shell prompt start** now leaves shell mode *and keeps typed text* (not just on empty prompt)
+- **Up/Down in multi-line prompts** now start from cursor position after Left/Right/Backspace/Delete, instead of jumping to previous column
+- **Number keys keep working** in shell/URL approval dialogs after pressing "No, and tell Copilot" option and moving back up
+- **Tab chars in replies/errors/agent names** show as spaces (not dropped) — tab-separated words stay readable
+
+### Session Resume & History
+- **`copilot --resume` / `/resume` find sessions with accented names** — precomposed or decomposed Unicode, matches either (NFC/NFD)
+- **Headless runs error on resume conflict** — keeps history intact instead of corrupting
+- **Auto-updates no longer skipped** when sign-in takes >1 second
+
+### Search & Navigation
+- **`/search` keeps match in view** when opening, no more jump to bottom
+- **Up/Down/Enter in `/search`** bring single match back after scroll-away
+- **Shorter terminals** no longer leave current match off-screen
+
+### MCP & Tools
+- **MCP deny rules block by advertised name** (e.g., `server(weather.lookup)`) not just sanitized name — works with `--allow-all-tools`
+- **MCP form validation errors** show beside inputs, focus first invalid field, better screen-reader labels
+- **Pasted image path re-attaches** after clearing `[image: ...]` label with Ctrl+U/K/W or Up-arrow history
+- **Removing built-in MCP server** with `copilot mcp remove` or `/mcp delete` explains how to disable it instead
+
+### Windows/Linux
+- **Trusted-folder and worktree confirmations keep Windows path separators** (no more mixed `/` and `\`)
+- **Selecting directory next to home** in `/cd ~` or `/add-dir ~` uses correct full path
+- **`/terminal-setup` configures Shift+Enter correctly** for VS Code, Cursor, Windsurf on Linux when `XDG_CONFIG_HOME` is set
+
+### Accessibility
+- **`/help` describes `ctrl+d`** (exits only on empty prompt), `ctrl+z` on Windows, `ctrl+j/v/y` and voice keys
+- **Screen reader labels improved** across MCP forms, `/config` help, `/model` list
+
+### SDK / Headless
+- **Prompt mode with `--output-format json`** emits final result record with exit status even when run fails early
+- **Rate-limit errors name the same mode** as the switch dialog (Copilot Fusion mode or auto mode) instead of "auto model"
+- **SDK sessions include start/resume/model-change events** in `-p --output-format json`
+- **Turn ending with unwritable event log** still ends with `session.idle` — `sendAndWait` won't timeout
+
+### Compact & Credits
+- **Footer AI credits update immediately** after `/compact` finishes (not after next turn)
+
+---
+
+## Sandbox Path Settings: Environment Variables Now Supported
+
+Sandbox path settings now support environment variables while preserving authored expressions in settings and the editor.
+
+```json
+{
+  "sandbox": {
+    "paths": {
+      "allow": ["${HOME}/projects/*", "${WORKSPACE}/src/**"]
+    }
+  }
+}
+```
+
+Variables expand at runtime. Your `settings.json` keeps the readable `${VAR}` form.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Manage sandbox network access** | **Yes** — CIDR rules are a major security upgrade |
+| **Want Fable 5.2 reasoning model** | **Yes** — now in picker under New models |
+| **Hit resume conflicts with Unicode session names** | **Yes** — NFC/NFD matching fixed |
+| **Use MCP with `--allow-all-tools`** | **Yes** — deny rules now work by advertised name |
+| **Run headless/CI with JSON output** | **Yes** — exit status now emitted on early failure |
+| **On v1.0.108 and stable** | **Yes** — pure fixes, no breaking changes |
+
+---
+
+## How to Upgrade
+
+```bash
+# npm (stable)
+npm update -g @github/copilot-cli
+
+# macOS (Homebrew)
+brew upgrade github/copilot-cli/copilot-cli
+
+# Windows - download from GitHub releases
+# https://github.com/github/copilot-cli/releases/tag/v1.0.109-1
+
+# Verify
+copilot --version
+# Should show: 1.0.109-1
+```
+
+---
+
+## First Things to Try After Update
+
+```bash
+# 1. Test CIDR sandbox rules
+# Edit settings.json → add allowHosts/denyHosts with CIDR
+# Try accessing allowed/blocked networks
+
+# 2. Test Fable 5.2
+/model
+# → New models → claude-fable-5.2
+# Ask: "Debug this complex auth flow step by step"
+# Watch reasoning output
+
+# 3. Test resume with accents
+copilot --resume "sesión-with-accents"
+# Should find session regardless of NFC/NFD form
+
+# 4. Test MCP deny with advertised names
+# Add deny rule for "server(weather.lookup)" 
+# Verify it blocks even with --allow-all-tools
+
+# 5. Test search UX
+/search "function validate"
+# Open match → stays in view
+# Scroll away → Up/Down brings it back
+```
+
+---
+
+## The Bigger Picture: Three Weeks, Four Pre-Releases
+
+```
+v1.0.104 (Oct 27) → Assisted Permissions DEFAULT
+v1.0.105 (Oct 28) → Fusion High/Max long context
+v1.0.106-1/2 (Oct 31/Nov 1) → 21 fixes: paste, resume, encoding, WSL, symlinks
+v1.0.108-0 (Nov 7)   → Managed tgrep indexing (default-on), /index commands, Windows enumerate paths
+v1.0.109-1 (Nov 10) → CIDR sandbox, Fable 5.2, 15+ fixes
+```
+
+**Five weeks. Five releases. Zero feature regressions.**
+
+The team shipped Assisted Permissions as default (v1.0.104), fixed the Fusion tiers (v1.0.105), sanded every paper cut (v1.0.106), shipped the search infrastructure (v1.0.108), and now **hardens the security and model layer** (v1.0.109).
+
+CIDR sandbox rules aren't glamorous. But they're the kind of feature that lets you run agents in production without worrying about lateral network access. That's the feature. Everything else is polish.
+
+---
+
+## Related Articles
+
+- [GitHub Copilot CLI v1.0.108 Just Gave Your Agent a Search Index — /index Commands + Shared tgrep](/blog/github-copilot-cli-1-0-108-pre-release-indexing/)
+- [GitHub Copilot CLI Just Killed Experimental Mode — Assisted Permissions Are Now Default](/blog/github-copilot-cli-1-0-104-105-assisted-permissions-default/)
+- [Codex vs Copilot CLI: Terminal Battle — Which Terminal Agent Actually Ships?](/blog/codex-vs-copilot-cli-terminal-battle/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+- [OpenCode v2.2.7 Just Added GitHub Copilot Auto Support](/blog/opencode-v2-2-7-copilot-auto-tab-shortcuts-mcp-fixes/)
+
+---
+
+*GitHub Copilot CLI v1.0.109-1 released November 10, 2026. Full changelog: [github.com/github/copilot-cli/releases/tag/v1.0.109-1](https://github.com/github/copilot-cli/releases/tag/v1.0.109-1).*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
