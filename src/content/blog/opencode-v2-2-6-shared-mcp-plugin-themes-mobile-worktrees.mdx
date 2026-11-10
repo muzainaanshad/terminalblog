@@ -1,378 +1,115 @@
 ---
-title: "Opencode v2.2.6 Just Made MCP Connections Shared — And Plugins Got Themes, Mobile Got a Dock, Worktrees Got Scriptable"
-description: "OpenCode v2.2.6 drops Shared MCP Connection pooling (one connection across projects), GUI Plugin themes and new slots, Mobile Composer Dock for touch, Scripted Runs in Worktrees, and Automatically Archived Runs. The quality-of-life wave that makes daily agent work feel faster and cleaner."
-pubDate: 2026-11-07T15:00:00Z
-tags: ["opencode", "release", "v2.2.6", "mcp", "plugins", "mobile", "worktrees", "desktop", "beginner"]
-tool: "opencode"
+title: "OpenCode v2.2.6: Shared MCP Connections, Mobile Composer, Worktree Runs"
+description: "OpenCode v2.2.6 drops with MCP connection pooling, a mobile composer dock, scripted worktree runs, and GUI plugin themes."
+pubDate: 2026-11-07
+updatedDate: 2026-11-07
 author: "Anshad"
-image: "/api/og?title=Opencode+v2.2.6+Shared+MCP+Plugin+Themes&tool=opencode"
-canonical: "https://terminalblog.com/blog/opencode-v2-2-6-shared-mcp-plugin-themes-mobile-worktrees/"
+tags: ["opencode", "sst", "release", "mcp", "mobile"]
+tool: "opencode"
+category: "releases"
+heroImage: "/blog/opencode-v2-2-6-release.jpg"
 ---
 
-<script type="application/ld+json" set:html={JSON.stringify({
-  "@context": "https://schema.org",
-  "@type": "BlogPosting",
-  "headline": "Opencode v2.2.6 Just Made MCP Connections Shared — And Plugins Got Themes, Mobile Got a Dock, Worktrees Got Scriptable",
-  "description": "OpenCode v2.2.6 drops Shared MCP Connection pooling (one connection across projects), GUI Plugin themes and new slots, Mobile Composer Dock for touch, Scripted Runs in Worktrees, and Automatically Archived Runs. The quality-of-life wave that makes daily agent work feel faster and cleaner.",
-  "image": "https://terminalblog.com/api/og?title=Opencode+v2.2.6+Shared+MCP+Plugin+Themes&tool=opencode",
-  "datePublished": "2026-11-07T15:00:00Z",
-  "dateModified": "2026-11-07T15:00:00Z",
-  "author": {
-    "@type": "Person",
-    "name": "Anshad"
-  },
-  "publisher": {
-    "@type": "Organization",
-    "name": "TerminalBlog",
-    "logo": {
-      "@type": "ImageObject",
-      "url": "https://terminalblog.com/favicon.ico"
-    }
-  },
-  "mainEntityOfPage": {
-    "@type": "WebPage",
-    "@id": "https://terminalblog.com/blog/opencode-v2-2-6-shared-mcp-plugin-themes-mobile-worktrees/"
-  }
-})} />
+OpenCode **v2.2.6** released November 6. This is a substantial feature release — shared MCP connections, mobile-first composer, worktree automation, and a plugin theme system.
 
-**OpenCode v2.2.6 landed this week** — and it's the kind of release that doesn't shout but changes how you work every single day. Shared MCP connection pooling means you stop spinning up duplicate MCP servers. GUI plugins can now add color themes and hook into code blocks. Mobile gets a touch-friendly composer dock. Scripted runs can launch directly in worktrees. And CI sessions finally stay out of your inbox.
+## Headline Features
 
-If you've been on v2.2.5 (October 30), this is the update you actually feel.
-
----
-
-## The Headline Feature: Shared MCP Connections (Finally)
-
-### The Problem You've Been Living With
-
-You have three projects. All three use the same GitHub MCP server. All three use the same Slack MCP server. All three use the same PostgreSQL MCP server.
-
-**Before v2.2.6:** Each project spawns its own MCP connection. Three GitHub processes. Three Slack processes. Three PostgreSQL processes. Memory adds up. Startup slows down. You wonder why your machine feels heavy.
-
-### The Fix: `pool: true`
+### Shared MCP Connections (Connection Pooling)
+Turn on `pool: true` for an MCP server to share **one connection across projects** with the same setup. Fewer processes, faster startup. ([#61185](https://github.com/anomalyco/opencode/pull/61185))
 
 ```json
+// opencode.json
 {
   "mcp": {
-    "servers": {
-      "github": {
-        "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-github"],
-        "pool": true
-      },
-      "slack": {
-        "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-slack"],
-        "pool": true
-      }
+    "my-server": {
+      "pool": true
     }
   }
 }
 ```
 
-**One connection. Shared across every project with the same config.** Start faster. Use less memory. The MCP server stays alive as long as any project needs it.
+### Mobile Composer Dock
+On phones/tablets, composer actions now sit in a **touch dock above the keyboard** with 44px targets — proper mobile UX, not a squashed desktop UI. ([#61773](https://github.com/anomalyco/opencode/pull/61773))
+
+### Scripted Runs in Worktrees
+```bash
+# New worktree, auto-named
+opencode run -w
+
+# Named worktree
+opencode run --worktree=feature-auth
+```
+Runs in a fresh git worktree. Cannot combine with `--continue` or `--session`. ([#60712](https://github.com/anomalyco/opencode/pull/60712))
+
+### Automatically Archived Runs
+```bash
+opencode run --archived
+```
+Scripted/CI sessions stay out of your inbox, home, and session lists. Hidden from TUI session list and skipped by `--continue`. ([#61270](https://github.com/anomalyco/opencode/pull/61270))
+
+## Plugin System Gets Themes & Native Components
+
+GUI plugins can now:
+- Contribute **color themes** via the `Theme` registry
+- Render custom **code blocks** and add actions (`CodeBlock`, `CodeBlockAction` registries)
+- Use native **settings layout** and **menu components**
+- Set/persist sidebar width
+
+This moves plugins from "hacky UI injections" to first-class citizens. ([#61485](https://github.com/anomalyco/opencode/pull/61485), [#61533](https://github.com/anomalyco/opencode/pull/61533), [#61527](https://github.com/anomalyco/opencode/pull/61527), [#61509](https://github.com/anomalyco/opencode/pull/61509))
+
+## Other Notable Improvements
+
+**Core:**
+- Provider/model-specific session warming with `interval: "auto"` (based on cache TTL)
+- `OPENCODE_FLAGS=all` or `experimental.all_flags` to enable all feature flags
+- Experimental bytecode VM for Code Mode (`experimental.codemode_vm: true`)
+- Microsoft Store PowerShell 7 support on Windows
+- Azure Messages support for Foundry Claude models
+
+**TUI:**
+- "Scroll on send" setting — choose **Keep** to retain reading position after submit
+- Ctrl+Z suspends OpenCode even with forms/dialogs open
+
+**Desktop:**
+- Unread-session grouping in Inbox, failed-run indicators on tabs
+- MCP sign-in accepts pasted redirect URL when auto-redirect fails
+- Markdown previews show frontmatter as properties list
+- Command palette shows dates for sessions 7+ days old
+- Prompt history up to 200 (newest 100 keep attachments)
+
+**SDK:**
+- `client.experimental.job.list()` for background shell/subagent/image jobs
+- Custom `fetch` implementation for embedders
+
+## Bug Fixes Worth Noting
+
+- `opencode run` now **waits for background jobs** (shell commands, subagents, images) before exiting — prints `waiting for N background job(s)`
+- SIGTERM cancels session + background jobs, exits 143
+- File reads/media served as sandboxed downloads; cross-site browser navigations refused
+- Webfetch/Code Mode `fetch` reject URLs with credentials, ignore `#fragment` for permission matching
+- MCP servers connecting within 2s now reach first prompt and `opencode run`
+- OpenCode Console config requests timeout at 5s (no more startup hangs)
+- `opencode acp` removes sessions created by clients that close without prompting
+
+## Upgrading
 
 ```bash
-# Before: 3 projects × 3 MCP servers = 9 processes
-# After:  3 projects × 1 pooled connection each = 3 processes
+# npm
+npm update -g opencode
+
+# Or your package manager
+brew upgrade opencode  # macOS
 ```
 
-This is the kind of change you don't notice until you switch machines and realize — *oh, it used to take 15 seconds to start. Now it takes 3.*
+## Why This Release Matters
 
----
+v2.2.x has been iterating fast on **workflow automation** (worktrees, archived runs, MCP pooling) and **plugin extensibility** (themes, native components). The mobile composer dock signals serious investment in non-desktop workflows.
 
-## GUI Plugins Got Themes and Code Block Slots
+If you run OpenCode in CI, the `--archived` + `--worktree` combo is a clean pattern: isolated, reproducible runs that don't pollute your session history.
 
-### Color Themes — Your Plugin, Your Palette
+## Related
 
-GUI plugins can now ship **color themes**. Not "here's a CSS variable, good luck." Actual theme contributions that appear in Settings → Appearance → Themes alongside the built-ins.
-
-```typescript
-// In your GUI plugin
-export const theme = {
-  name: "My Plugin Theme",
-  type: "dark",
-  colors: {
-    "editor.background": "#0d1117",
-    "editor.foreground": "#e6edf3",
-    "myPlugin.accent": "#58a6ff",
-    "myPlugin.warning": "#f85149"
-  }
-};
-```
-
-Users pick it from the theme dropdown. It applies instantly. No config editing. No restart.
-
-### Code Block Render Slots — Your Plugin Owns the Output
-
-Plugins can now **render or add actions to code blocks** in the transcript. This is huge for:
-
-- **Diagram plugins** — render Mermaid/PlantUML inline with interactive controls
-- **SQL plugins** — add "Run Query" button to SQL code blocks
-- **API plugins** — add "Test Endpoint" to curl blocks
-- **Terraform plugins** — add "Plan" / "Apply" to HCL blocks
-
-```typescript
-export const codeBlockSlots = {
-  mermaid: {
-    render: (code, language) => language === "mermaid" ? <MermaidDiagram code={code} /> : null,
-    actions: [
-      { label: "Export PNG", handler: exportMermaidPNG },
-      { label: "Edit in Mermaid Live", handler: openInMermaidLive }
-    ]
-  },
-  sql: {
-    actions: [
-      { label: "Run Query", handler: runSQLQuery },
-      { label: "Explain Plan", handler: explainSQL }
-    ]
-  }
-};
-```
-
-### Native Settings and Menu Components
-
-Plugins can now use **native settings components** (toggle, select, text, secret) and **native menu components** — so your plugin's UI feels like it belongs in OpenCode, not bolted on.
-
----
-
-## Mobile Composer Dock — Touch-First, Finally
-
-### The Problem: Mobile Was an Afterthought
-
-On phones and tablets, the composer lived at the bottom of a scrolling page. Thumb reach? Terrible. Multiline input? Cramped. You typed with one finger, hunched over.
-
-### The Fix: Composer Dock Above Keyboard
-
-**v2.2.6 adds a Mobile Composer Dock** — composer actions sit in a touch dock **above the keyboard** with 44px targets (Apple's minimum touch target). Larger buttons. Predictable multiline input. Your thumbs actually reach everything.
-
-```bash
-# What changes:
-# - Send button: thumb-reachable
-# - Attach file: thumb-reachable
-# - Model picker: thumb-reachable
-# - Multiline input: expands naturally, keyboard stays put
-```
-
-This isn't "mobile support." This is **mobile-first**. If you've tried coding on an iPad or phone with OpenCode before, update and try again. The difference is night and day.
-
----
-
-## Scripted Runs in Worktrees — `opencode run -w`
-
-### The Old Way: Manual Worktree Dance
-
-```bash
-# You want to run a scripted task in a fresh worktree
-git worktree add ../feature-auth origin/main
-cd ../feature-auth
-opencode run "Implement OAuth2 refresh token flow"
-# ... wait ...
-cd ../main-project
-git worktree remove ../feature-auth
-```
-
-### The New Way: One Flag
-
-```bash
-# Run in a new auto-named worktree
-opencode run -w "Implement OAuth2 refresh token flow"
-
-# Run in a named worktree
-opencode run --worktree=auth-refactor "Implement OAuth2 refresh token flow"
-```
-
-**That's it.** OpenCode creates the worktree, runs the task, and you get the results. The worktree persists — you can inspect it, continue in it, or clean it up later.
-
-### Why This Matters for CI and Automation
-
-```yaml
-# .github/workflows/nightly-refactor.yml
-- name: Run nightly refactor
-  run: |
-    opencode run -w \
-      --format json \
-      "Review all TODO comments in src/, create GitHub issues for each"
-```
-
-Clean, isolated, reproducible. No manual git worktree management in your scripts.
-
----
-
-## Automatically Archived Runs — Keep Your Inbox Clean
-
-### The Problem: Scripted Runs Clutter Everything
-
-You run `opencode run` for CI, for nightly jobs, for automated reviews. They all show up in your session list. Your inbox becomes a graveyard of "CI run #847" sessions you never open.
-
-### The Fix: `--archived`
-
-```bash
-# Scripted run that stays out of your inbox and session list
-opencode run --archived "Nightly dependency audit"
-
-# Combined with worktree flag
-opencode run -w --archived "Refactor auth module"
-```
-
-**Archived sessions:**
-- Don't appear in the inbox
-- Don't appear in the TUI session list
-- Are skipped by `--continue`
-- Are still queryable via SDK/API if you need them
-
-```bash
-# Still accessible when you need them
-opencode session list --archived
-opencode session get <archived-session-id>
-```
-
-This is the "CI hygiene" feature you didn't know you needed until your session list became unusable.
-
----
-
-## The Rest: 14 Improvements + 33 Fixes You'll Feel
-
-### Core Improvements
-
-| Feature | What It Does |
-|---------|--------------|
-| **Provider/model session warming** | `interval: "auto"` based on cache TTL — models stay warm without config tuning |
-| **`websearch.use` policy action** | Control web search per-model, per-provider |
-| **`OPENCODE_FLAGS=all`** | Enable all experimental flags at once |
-| **Experimental Code Mode VM** | Bytecode VM for Code Mode (opt-in: `experimental.codemode_vm: true`) |
-| **PowerShell 7 from Microsoft Store** | Windows support without manual install |
-| **Azure Messages for Foundry Claude** | Enterprise Claude models work natively |
-
-### Desktop Improvements
-
-| Feature | What It Does |
-|---------|--------------|
-| **Close other tabs / close tabs after** | Tab menu actions you've been missing |
-| **Unread session grouping in Inbox** | See what's new at a glance |
-| **Failed-run indicators on tabs** | Red dot = something broke |
-| **MCP sign-in accepts pasted redirect URL** | Works when auto-redirect fails (corporate networks, containers) |
-| **Markdown frontmatter as properties list** | Clean YAML frontmatter rendering |
-| **Command palette shows real dates** | "7d ago" becomes "Nov 3, 2026" on hover |
-| **Prompt history: 200 prompts** | Last 100 full, older 100 without attachments |
-
-### SDK Improvements
-
-| Feature | What It Does |
-|---------|--------------|
-| **`client.experimental.job.list()`** | List background shell, subagent, image jobs with filters |
-| **Custom `fetch` for embedders** | Server embedders control HTTP, model, web, remote MCP traffic |
-
-### Fixes That Stop Daily Annoyances (33 Total)
-
-**The ones you'll notice:**
-
-- **`opencode run` waits for background jobs** — no more "where did my dev server go?" — it prints `waiting for N background job(s)` and stays alive until jobs finish or you Ctrl+C
-- **SIGTERM cancels session + background jobs cleanly** — exit code 143, no orphaned processes
-- **Non-interactive `opencode run` reliability** — WebSocket upgrades, service shutdown, cancellation all work now
-- **Sandboxed file/media downloads** — project files can't run scripts on server origin (security)
-- **Webfetch/Code Mode `fetch` rejects credential URLs** — no accidental secret leakage
-- **MCP servers get 2s grace period on connect** — tools from fast-connecting servers reach first prompt
-- **Console config requests timeout at 5s** — startup no longer hangs on slow Console
-- **Provider request retry on host unreachable** — sessions survive network blips
-- **Legacy custom providers with partial `limit` preserved** — no more silent provider drops
-- **ACP sessions auto-clean on client disconnect** — IDE integrations don't leave empty sessions
-- **zsh `q` flag freeze fixed** — shell permission scanning won't hang
-- **npm upgrade install scripts work again** — package updates don't break
-- **Ctrl+Z suspends OpenCode in forms/dialogs** — muscle memory works
-- **Focus stays on dialog when question arrives** — no more stolen focus
-- **Ctrl+V clipboard error shown** — instead of silent failure
-- **Session titles with newlines no longer crash TUI** — edge case, but it happened
-- **Message spacing improved, no history flashing on scroll** — smoother TUI
-- **Home/End/Ctrl+G navigate subagent transcripts** — consistent navigation
-- **kitty keyboard protocol Page Up/Down works** — terminal nerds rejoice
-- **`opencode mini` uses your agent colors** — consistent theming
-- **MCP list returns after sign-in** — UX flow fixed
-- **Ctrl+F favorites models from config/add-ons** — not just saved connections
-
----
-
-## Should You Update?
-
-| If You... | Verdict |
-|-----------|---------|
-| **Use MCP servers across multiple projects** | **Yes** — `pool: true` alone saves memory and startup time |
-| **Build or use GUI plugins** | **Yes** — themes, code block slots, native settings = plugin superpowers |
-| **Code on mobile/tablet** | **Yes** — Composer Dock is the mobile UX fix you've waited for |
-| **Run scripted/CI tasks** | **Yes** — `-w` and `--archived` clean up your automation |
-| **Use OpenCode Console / embed the SDK** | **Yes** — custom fetch, job listing, ACP cleanup |
-| **Just want latest stable** | **Yes** — zero breaking changes, pure quality-of-life |
-
-**No rush if:** You're on v2.2.5 and everything works. But the MCP pooling and mobile dock are the kind of features that, once you have them, you wonder how you lived without them.
-
----
-
-## Quick Version Context
-
-| Version | Date | Channel | Highlights |
-|---------|------|---------|------------|
-| **v2.2.6** | **Nov 2026** | **Stable (Latest)** | **Shared MCP pooling, GUI plugin themes/slots, Mobile Composer Dock, `run -w`, `run --archived`, 14 improvements, 33 fixes** |
-| v2.2.5 | Oct 30, 2026 | Stable | Worktree shortcuts (Cmd+Opt+O), quote-send from popups, % compaction buffer, MCP >10MB fixes |
-| v2.2.4 | Oct 30, 2026 | Stable | Persistent desktop terminals, artifacts (experimental), guided Claude Agent setup |
-| v2.2.3 | Oct 30, 2026 | Stable | **Claude Agent provider**, faster long sessions, desktop stability |
-| v2.2.2 | Oct 29, 2026 | Stable | Image gen by default, worktree picker on new-session, unified quotes |
-| v2.2.1 | Oct 28, 2026 | Stable | `/goal` command, image gen opt-in, scheduled prompts, redesigned model picker |
-| v2.2.0 | Oct 27, 2026 | Stable | **Breaking changes** — `@opencode/ai` exports, GitHub Action removed, TUI plugins need OpenTUI 0.7 |
-
----
-
-## How to Update
-
-```bash
-# CLI
-curl -fsSL https://opencode.ai/install | bash
-# or: npm i -g @opencode/cli@latest
-
-# Desktop
-# Download from https://opencode.ai/download
-
-# Verify
-opencode --version
-# Should show: v2.2.6
-```
-
----
-
-## The Bigger Picture: v2.2.x Is Polish, Not Churn
-
-```
-v2.2.0 (Oct 27)  →  Breaking changes, desktop plugins, new SDK exports
-v2.2.1 (Oct 28)  →  Goal command, image generation
-v2.2.2 (Oct 29)  →  Image gen by default, worktree picker, unified quotes
-v2.2.3 (Oct 30)  →  Claude Agent provider, faster sessions, desktop fixes
-v2.2.4 (Oct 30)  →  Persistent terminals, artifacts, guided Claude setup
-v2.2.5 (Oct 30)  →  Worktree shortcuts, quote-send, % compaction, MCP fixes
-v2.2.6 (Nov 2026) →  Shared MCP pooling, plugin themes, mobile dock, worktree runs, archived runs
-```
-
-**Seven releases in ~10 days. Zero new breaking changes since v2.2.0.**
-
-The team shipped the major migration (v2.2.0), then immediately followed with the fixes and features that make it *pleasant* to use. This is the release cadence you want: **break once, polish fast, add the features people actually asked for.**
-
----
-
-## Related Articles
-
-- [Opencode v2.2.5 Just Made Worktrees One Keystroke Away — And Compaction Finally Gets Percentages](/blog/opencode-v2-2-5-worktree-shortcuts-percentage-compaction/)
-- [Opencode v2.2 Just Dropped — Desktop Plugins, Refreshed App, and Breaking Changes You Can't Ignore](/blog/opencode-v2-2-desktop-plugins-breaking-changes/)
-- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
-- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
-
----
-
-## Related articles
-
-- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
-- [Claude Code v2.1.319 Just Landed — Background MCP Tasks, Expanded Auto Mode, Gateway Controls](/blog/claude-code-v2-1-319-stability-surge/)
-- [Opencode Just Became the Open-Source Coding Agent You Can Actually Trust](/blog/opencode-v1-18-18-reliability-mcp-desktop-overhaul/)
-
----
-
-*OpenCode v2.2.6 released November 2026. Full changelog: [opencode.ai/changelog/v2.2.6](https://opencode.ai/changelog/v2.2.6) · GitHub: [anomalyco/opencode](https://github.com/anomalyco/opencode)*
-
-*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
+- [OpenCode v2.2.5 — Worktree Shortcuts, Percentage Compaction](/blog/opencode-v2-2-5-worktree-shell-shortcuts-percentage-compaction)
+- [OpenCode v2.2 — Breaking Changes, Native Windows PTY](/blog/opencode-v2-1-breaking-changes-native-windows-pty-todo)
+- [OpenCode vs AmpCode — Free Agent Faceoff](/blog/opencode-vs-ampcode)
+- [State of Open Source Coding Agents 2026](/blog/state-of-open-source-coding-agents-2026)
