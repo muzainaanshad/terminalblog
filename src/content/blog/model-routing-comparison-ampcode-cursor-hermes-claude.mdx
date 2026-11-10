@@ -1,0 +1,330 @@
+---
+title: "How AmpCode, Cursor, Hermes, and Claude Code Pick the Right Model — And Why Your Wallet Cares"
+description: "Four coding agents. Four radically different approaches to model routing. We break down AmpCode's Dial, Cursor's Compass, Hermes' multi-provider engine, and Claude Code's effort caps — so you can stop guessing which model to pick and let the agent decide."
+pubDate: "2026-11-10T14:00:00Z"
+tags: ["model-routing", "comparison", "ampcode", "cursor", "hermes", "claude-code", "coding-agents", "cost-optimization"]
+tool: "ampcode"
+author: "Anshad"
+image: "/api/og?title=Model+Routing+Comparison&tool=comparison"
+canonical: "https://terminalblog.com/blog/model-routing-comparison-ampcode-cursor-hermes-claude/"
+---
+
+<figure style="max-width:800px;margin:0 auto 2rem">
+  <table style="width:100%;border-collapse:collapse;font-size:0.9rem">
+    <thead>
+      <tr style="background:#111;color:#fff">
+        <th style="padding:0.75rem;text-align:left">Agent</th>
+        <th style="padding:0.75rem;text-align:left">Routing Philosophy</th>
+        <th style="padding:0.75rem;text-align:left">User Control</th>
+        <th style="padding:0.75rem;text-align:left">Cost Savings Reported</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="border-bottom:1px solid #333">
+        <td style="padding:0.75rem"><strong>AmpCode</strong></td>
+        <td style="padding:0.75rem">Effort-based (Dial: low/medium/high/ultra) — BYO model subscriptions</td>
+        <td style="padding:0.75rem">Pick effort level; Amp routes to best model</td>
+        <td style="padding:0.75rem">Free tier = $0 token cost</td>
+      </tr>
+      <tr style="background:#1a1a1a;border-bottom:1px solid #333">
+        <td style="padding:0.75rem"><strong>Cursor</strong></td>
+        <td style="padding:0.75rem">Compass complexity predictor + task taxonomy + budget optimizer</td>
+        <td style="padding:0.75rem">Three modes: Intelligence / Balance / Cost</td>
+        <td style="padding:0.75rem">68% less than Fable, 41% less than Opus</td>
+      </tr>
+      <tr style="border-bottom:1px solid #333">
+        <td style="padding:0.75rem"><strong>Hermes</strong></td>
+        <td style="padding:0.75rem">15+ providers, capability-match + fallback chains + cost-aware routing</td>
+        <td style="padding:0.75rem">Budget caps + custom providers + local models</td>
+        <td style="padding:0.75rem">~$0.0047 avg/task vs $20-50/mo flagship subs</td>
+      </tr>
+      <tr style="background:#1a1a1a;border-bottom:1px solid #333">
+        <td style="padding:0.75rem"><strong>Claude Code</strong></td>
+        <td style="padding:0.75rem">Manual model picker + effort levels (low/medium/high/max) + maxEffortLevel cap</td>
+        <td style="padding:0.75rem">Per-session model + global effort cap</td>
+        <td style="padding:0.75rem">Cap prevents silent max-effort spend</td>
+      </tr>
+    </tbody>
+  </table>
+  <figcaption style="text-align:center;color:#888;font-size:0.85rem;margin-top:0.5rem">Quick comparison: how each agent handles model routing</figcaption>
+</figure>
+
+---
+
+## The Problem Nobody Wants to Admit
+
+You're in the middle of a refactor. The agent suggests a model. You pick one. Thirty minutes later you realize you burned $12 on a variable rename because the model was "thinking too hard."
+
+Or worse: you picked the cheap model, and it hallucinated a function that doesn't exist. Now you're debugging the agent's hallucination instead of your code.
+
+**Model routing is the hidden tax on every coding agent workflow.** Pick wrong, and you either overpay or underperform. The four major terminal agents have each taken a fundamentally different approach to solving this. Here's how they compare — and which one fits your workflow.
+
+---
+
+## AmpCode: The Dial — Effort Over Models
+
+**Philosophy:** You shouldn't care about model names. You should care about *how much thinking* a task deserves.
+
+AmpCode's **Dial** has four positions: **Low / Medium / High / Ultra**. Each maps to an effort level, not a specific model. Amp routes to whatever model delivers that effort at the best price/performance — Claude, GPT, Gemini, whatever wins this week.
+
+```bash
+# You type this:
+amp --dial high "refactor auth middleware for JWT rotation"
+
+# Amp decides: "High effort = complex reasoning = Opus 5.5 or GPT-6 Astra"
+# Routes automatically. You never see the model name unless you ask.
+```
+
+### The BYO Model Twist
+
+Here's where AmpCode diverges: **you can bring your own model subscriptions.**
+
+```bash
+amp dial --link-anthropic   # Your $20/mo Claude Pro/Max
+amp dial --link-chatgpt     # Your ChatGPT Plus/Enterprise
+amp dial --link-google      # Your Gemini API key
+```
+
+If you link Claude Pro, the "Claude Code" mode uses *your* subscription for model calls. Amp's orchestration layer (runners, skills, Pucks, portals) is free. **Your token bill is exactly what you already pay Anthropic.** No double-dip.
+
+### What This Means in Practice
+
+| Scenario | Dial Setting | What Happens |
+|----------|--------------|--------------|
+| Quick typo fix | Low | Cheapest capable model, near-instant |
+| New feature implementation | Medium | Opus 5.5 default — solid reasoning, fair cost |
+| Architecture redesign | High | GPT-6 Astra (Plaid Mode, 6x faster) or Opus 5.5 |
+| "Solve this impossible bug" | Ultra | Fable 5.1 or your linked max-tier keys |
+
+**The catch:** Windows runner parity lags behind Mac. Local-first/air-gapped still not fully there. But for teams already paying for Anthropic/OpenAI/Google, this is the closest thing to "free agent infrastructure" that exists.
+
+---
+
+## Cursor: Compass + Taxonomy + Budget Optimizer
+
+**Philosophy:** Routing should be *learned from real developer behavior*, not hardcoded rules.
+
+Cursor trained **Compass** — a complexity predictor — on hundreds of thousands of live coding turns. Each turn carries two labels: *performance* (did the dev accept or correct?) and *cost* (API pricing + tokens + cache misses from model switching).
+
+### The Two-Stage Pipeline
+
+**Stage 1 — Compass** assigns a continuous complexity score (0–1). Turns above threshold → price-efficient model. Below threshold → frontier model.
+
+**Stage 2 — Task Taxonomy** classifies the work across three dimensions:
+- **Domains** — backend, database, frontend
+- **Tasks** — bug fixes, running commands, writing tests
+- **Modifiers** — bounded edits, product questions, visual-heavy work
+
+A model only becomes eligible if its observed performance on that task label clears a **75% uplift threshold** against the price-efficient baseline. Then an optimizer picks the traffic-weighted mix to maximize performance within the mode's budget.
+
+### Three Modes, Real Data
+
+| Mode | Target | Reported Results (Aug 2026) |
+|------|--------|-----------------------------|
+| **Intelligence** | Frontier quality | Above Fable-level satisfaction at **68% lower cost** |
+| **Balance** | Strong quality, lower price | Outperforms Opus 4.8 at **41% lower cost** + 3% more satisfaction |
+| **Cost** | Lowest spend | Best available intelligence within tight budget |
+
+**Admin controls** let teams lock modes, restrict models, set defaults, and show/hide the routed model. Available across desktop, web, iOS, CLI, and SDK.
+
+### The Trade-off
+
+Cursor's router is **opaque by design** — you don't see which model handled your request unless admins enable visibility. For some teams, that's a feature (focus on outcomes). For others, it's a trust issue. The router only learns if developers explicitly accept/reject edits — so the feedback loop requires discipline.
+
+---
+
+## Hermes: 15+ Providers, Capability-Match, Self-Healing Fallbacks
+
+**Philosophy:** No single provider wins at everything. Route to the *capability match*, fallback gracefully, optimize cost continuously.
+
+Hermes supports **15+ providers** out of the box (Anthropic, OpenAI, Google, DeepSeek, xAI, Mistral, Cohere, Nous, Perplexity, Together, Fireworks, Groq, Cerebras, OpenRouter, Nous Portal) plus **arbitrary custom providers** via OpenAI-compatible endpoints.
+
+### The Routing Table (Auto-Generated, Not Manual)
+
+```yaml
+# This isn't a config you write — Hermes builds and adapts it
+routing:
+  quick_edit:
+    preferred: gpt-4.5-mini
+    fallback: claude-haiku-4.5
+    max_tokens: 2000
+    max_cost_usd: 0.001
+  code_generation:
+    preferred: claude-sonnet-4.5
+    fallback: deepseek-v4
+    max_tokens: 8000
+    max_cost_usd: 0.01
+  deep_analysis:
+    preferred: claude-opus-4.8
+    fallback: gpt-5.5
+    max_tokens: 32000
+    max_cost_usd: 0.10
+```
+
+Hermes **continuously adapts** this table based on:
+1. Provider availability (down = removed from rotation)
+2. Latency history (slow = deprioritized for quick tasks)
+3. Success rates (frequent failures = reassigned)
+4. Token costs (tracks per-task spending)
+5. Quality signals (accept/reject refines model-task fit)
+
+### Fallback Chains That Actually Work
+
+```
+claude-sonnet-4.5 → gpt-4.5 → deepseek-v4 → local model
+```
+
+Each fallback matches the original's **capabilities** (vision, context window, structured output). If a provider recovers, Hermes resumes routing to it automatically.
+
+### Custom Providers = Your Infra, Your Models
+
+```yaml
+# .hermes/providers.yaml
+providers:
+  custom:my-local-model:
+    base_url: http://localhost:8000/v1
+    models: [llama-3-8b, mistral-7b]
+    capabilities: [text, code, 32k_context]
+    cost_per_1k_tokens: 0.0001
+    latency_p50_ms: 500
+```
+
+Local models (Ollama, LM Studio, vLLM) auto-detect and participate in the same routing/fallback/cost logic. **Privacy-sensitive tasks route local automatically.**
+
+### Real Spend Data
+
+| Task Type | Primary | Fallback | Avg Cost | Weekly Volume |
+|-----------|---------|----------|----------|---------------|
+| Quick edits | GPT-4.5-mini | Claude Haiku 4.5 | $0.0008 | 1,200 |
+| Code gen | Claude Sonnet 4.5 | DeepSeek V4 | $0.0042 | 340 |
+| Deep analysis | Claude Opus 4.8 | GPT-5.5 | $0.038 | 45 |
+| **Total** | | | **$0.0047 avg** | **1,845** |
+
+At $0.0047/task, a heavy user (50 tasks/day) spends ~$7/week vs $20-50 for single-provider flagship subs. **Budget caps** (daily/weekly/monthly) shift routing to cheaper models as limits approach.
+
+---
+
+## Claude Code: Manual Picker + Effort Levels + Hard Cap
+
+**Philosophy:** Give developers explicit control, but add a safety net so silent max-effort spend can't happen.
+
+Claude Code's approach is the most **manual** of the four — you pick the model via `/model` or settings. But since v2.1.267, there's a critical guardrail: **`maxEffortLevel`**.
+
+### Effort Levels Explained
+
+| Level | What It Means | Typical Use Case |
+|-------|---------------|------------------|
+| **Low** | Minimal reasoning, fast | Renames, typo fixes, simple edits |
+| **Medium** | Balanced reasoning | Feature work, bug fixes, tests |
+| **High** | Deep reasoning | Architecture, complex refactors |
+| **Max** | Maximum chain-of-thought | "Solve this research problem" |
+
+**The problem:** Until recently, the effort knob was per-session and easy to forget. A one-line rename running at `max` effort could burn ten minutes of chain-of-thought for no reason.
+
+### The `maxEffortLevel` Cap (v2.1.267+)
+
+```json
+// settings.json
+{
+  "maxEffortLevel": "medium"
+}
+```
+
+This caps effort on **every provider** — including Bedrock, Vertex, and Foundry. You can always pick lower per session, but never above your cap.
+
+**Per-model caps** also work:
+```json
+{
+  "modelSettings": {
+    "claude-opus-5.5": { "maxEffortLevel": "high" },
+    "claude-sonnet-5.5": { "maxEffortLevel": "medium" }
+  }
+}
+```
+
+### What This Actually Prevents
+
+The most common "$40 bill" story: a model silently running at `max` effort on tasks that need none. The cap makes spend **predictable by default**. Set `medium` and see if your tasks notice — most won't.
+
+**Limitation:** No automatic routing. You still pick the model. The cap just prevents the "oops I left it on max" scenario. For teams wanting hands-off routing, this isn't it.
+
+---
+
+## Head-to-Head: Which Approach Wins Where
+
+### For "I Don't Want to Think About Models"
+**Winner: AmpCode (Dial) or Cursor (Balance mode)**
+
+Both abstract model names entirely. AmpCode lets you BYO subscriptions (zero marginal token cost). Cursor's Balance mode delivers Opus-beating quality at 41% less cost with admin controls for teams.
+
+### For "I Want Maximum Cost Control With Local Options"
+**Winner: Hermes**
+
+Only Hermes lets you add arbitrary custom providers (local models, internal company LLMs) that participate in the same routing/fallback/cost logic. Budget caps are granular (per-task, daily, weekly, monthly). Local-first/air-gapped works out of the box.
+
+### For "I Want Routing That Learns From My Team's Actual Behavior"
+**Winner: Cursor**
+
+Compass is trained on hundreds of thousands of *real* coding turns with explicit accept/reject signals. The 75% uplift threshold means upgrades only happen when there's real evidence they're worth it. Admin controls let you lock this down for teams.
+
+### For "I Want Explicit Control With a Safety Net"
+**Winner: Claude Code**
+
+You pick the model. You pick the effort level. The `maxEffortLevel` cap prevents silent budget explosions. No magic, no opacity — just a guardrail on the manual approach.
+
+---
+
+## The Hidden Cost: Switching Overhead
+
+Every time an agent switches models mid-session, there's a **cache miss penalty** — the new model starts cold. Cursor's router accounts for this in its cost model (tokens + cache misses). Hermes' fallback chains are designed to minimize capability mismatches that trigger rework. AmpCode's Dial keeps you in one "effort lane" per thread. Claude Code's manual approach means *you* own the switching decision.
+
+**If you frequently switch models manually, you're paying a hidden tax.** The automated routers (AmpCode, Cursor, Hermes) optimize for this; Claude Code makes it visible.
+
+---
+
+## What's Still Missing Across the Board
+
+| Gap | AmpCode | Cursor | Hermes | Claude Code |
+|-----|---------|--------|--------|-------------|
+| **Cross-thread routing memory** | No — each thread independent | No — per-turn only | Partial — routing table persists | No |
+| **Team-wide routing analytics** | Basic usage dashboard | Enterprise admin dashboard | Budget alerts only | Per-session only |
+| **Routing explainability** | "High effort = Opus" | Hidden by default | Capability-match logic visible | Manual = fully explained |
+| **Local-first routing parity** | Windows runner lag | Cloud-dependent | Full local support | Local via Bedrock/Vertex |
+
+---
+
+## The Verdict: Pick Your Philosophy
+
+| If your priority is... | Use this |
+|------------------------|----------|
+| **Zero token anxiety, BYO subscriptions, free orchestration** | **AmpCode** (Dial + Claude Code mode) |
+| **Learned routing from real dev behavior, team admin controls** | **Cursor** (Balance mode for most teams) |
+| **Maximum provider freedom, local models, granular budgets** | **Hermes** (custom providers + budget.yaml) |
+| **Explicit control with a hard safety cap** | **Claude Code** (`maxEffortLevel: medium`) |
+
+---
+
+## One More Thing: The Model Is Becoming a Commodity
+
+All four approaches converge on the same truth: **the model name matters less than the routing logic.**
+
+- AmpCode proved it by swapping the default model overnight — nobody noticed because the Dial abstracts it.
+- Cursor proved it by beating Opus 4.8 at 41% lower cost with a learned router.
+- Hermes proves it daily by routing 1,845 tasks/week at $0.0047 average across 15 providers.
+- Claude Code admits it by capping effort — the *level* matters more than the *model*.
+
+**The agent wars aren't about which model is default anymore. They're about what sticks after the prompt ends: routing intelligence, cost guardrails, and infrastructure that survives context switches.**
+
+---
+
+## Related Reading
+
+- [How Hermes Agent Routes Tasks Across 15+ LLM Providers Automatically](/blog/hermes-multi-provider-model-routing-across-15-llms/)
+- [Cursor Router Automatically Picks the Best Model for Every Coding Task](/blog/cursor-router-intelligent-model-routing/)
+- [Claude Code Finally Lets You Cap AI Effort — And Stop Wasting Money](/blog/claude-code-effort-cap-fable-5-1-cost-control/)
+- [AmpCode Just Let You Use Your Claude Pro/Max Plan For Free](/blog/ampcode-claude-plan-free-tier-october-2026/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
