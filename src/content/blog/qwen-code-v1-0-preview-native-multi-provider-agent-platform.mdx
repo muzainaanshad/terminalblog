@@ -1,0 +1,333 @@
+---
+title: "Qwen Code Just Hit 1.0 Preview — Native Binaries, Multi-Provider, No Node Required"
+description: "Qwen Code v1.0.0-preview drops native packages for macOS/Linux/Windows, multi-provider support (Qwen, Qoder, custom endpoints), session resumption, and non-interactive execution. The managed agent platform goes zero-dependency."
+pubDate: 2026-11-11
+author: "Anshad"
+tags: ["qwen-code", "release", "v1.0.0-preview", "native", "multi-provider", "managed-agent", "beginner", "open-source"]
+tool: "qwen-code"
+category: "releases"
+---
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Qwen Code Just Hit 1.0 Preview — Native Binaries, Multi-Provider, No Node Required",
+  "description": "Qwen Code v1.0.0-preview drops native packages for macOS/Linux/Windows, multi-provider support (Qwen, Qoder, custom endpoints), session resumption, and non-interactive execution. The managed agent platform goes zero-dependency.",
+  "image": "https://terminalblog.com/api/og?title=Qwen+Code+v1.0+Preview+Native+Multi-Provider&tool=qwen-code",
+  "datePublished": "2026-11-11T00:00:00Z",
+  "author": { "@type": "Person", "name": "Anshad" },
+  "publisher": {
+    "@type": "Organization",
+    "name": "TerminalBlog",
+    "logo": { "@type": "ImageObject", "url": "https://terminalblog.com/favicon.ico" }
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://terminalblog.com/blog/qwen-code-v1-0-preview-native-multi-provider-agent-platform/"
+  }
+})} />
+
+**Qwen Code v1.0.0-preview dropped November 11, 2026** — and it's not just a version bump. This is the release that removes the last friction point for teams: **no Node.js required**. Native binaries for macOS, Linux, and Windows. Multiple model providers (Qwen, Qoder, custom endpoints). Session resumption. Non-interactive execution for automation.
+
+If you've been waiting for Qwen Code to feel like a *product* instead of a *project* — this is it.
+
+---
+
+## The One-Line Summary
+
+**v1.0.0-preview (Nov 11) → Native packages (macOS/Linux/Windows, no Node), Qwen + Qoder accounts + custom endpoints, session resumption, non-interactive execution for scripting/automation. Zero breaking changes from v0.27.x.**
+
+---
+
+## Why This Matters: The "No Node" Milestone
+
+### Before v1.0: Install Node → npm install → hope versions align
+
+```bash
+# Old way — friction at every step
+node --version  # v18? v20? v22?
+npm i -g @qwen-code/qwen-code
+# Permission errors? EACCES? Global prefix issues?
+# Works on my machine ™
+```
+
+### After v1.0: Download → Run → Done
+
+```bash
+# New way — native binary
+# macOS (Apple Silicon)
+curl -L -o qwen-code https://github.com/QwenLM/qwen-code/releases/download/v1.0.0-preview/qwen-code-darwin-arm64
+chmod +x qwen-code
+./qwen-code --version
+# 1.0.0-preview
+
+# Linux (x64)
+curl -L -o qwen-code https://github.com/QwenLM/qwen-code/releases/download/v1.0.0-preview/qwen-code-linux-x64
+chmod +x qwen-code
+
+# Windows (x64)
+# Download qwen-code-windows-x64.exe from releases
+```
+
+**No Node. No npm. No version conflicts. No `npx` dance.**
+
+For teams onboarding juniors, for CI pipelines, for air-gapped environments — this changes the adoption curve from "configure your dev environment" to "download and run."
+
+---
+
+## Multi-Provider: Qwen, Qoder, or Bring Your Own
+
+### The Old Model: One Provider, One Account
+
+v0.27 and earlier: Qwen models via Qwen account. That's it.
+
+### v1.0 Preview: Three Paths, One Binary
+
+| Provider | Account | Models | Use Case |
+|----------|---------|--------|----------|
+| **Qwen** | Qwen account | Qwen 2.5, Qwen 3, Qwen-Plus, Qwen-Max | Default, best Chinese/English coding |
+| **Qoder** | Qoder account | Qoder-optimized models | Qoder's specialized coding models |
+| **Custom** | Any OpenAI-compatible endpoint | Anything (Llama, DeepSeek, local Ollama, etc.) | Enterprise, privacy, local-only, cost control |
+
+```bash
+# Use Qoder models
+qwen-code --provider qoder
+
+# Use custom endpoint (Ollama, LM Studio, vLLM, etc.)
+qwen-code --provider custom \
+  --endpoint http://localhost:11434/v1 \
+  --model qwen2.5-coder:32b \
+  --api-key not-needed-for-local
+
+# Use OpenRouter for model variety
+qwen-code --provider custom \
+  --endpoint https://openrouter.ai/api/v1 \
+  --model anthropic/claude-3.5-sonnet \
+  --api-key $OPENROUTER_KEY
+```
+
+**For beginners:** You're no longer locked to one vendor's models. For enterprises: run entirely on-prem with Ollama + Qwen Code binary. For cost optimizers: route to cheapest provider per task.
+
+---
+
+## Session Resumption: Your Work Survives Reboots
+
+### The Problem: Lose Context, Lose Momentum
+
+Long-running tasks (refactoring a 50-file module, debugging a flaky test suite, multi-step migrations) die when:
+- Your laptop updates overnight
+- The binary crashes (rare, but happens)
+- You accidentally close the terminal
+- CI job times out
+
+### v1.0 Fix: `--resume` Flag
+
+```bash
+# Start a long task
+qwen-code run --managed "Refactor auth module to use new JWT library, update all tests"
+
+# Session gets interrupted? Resume it:
+qwen-code --resume <session-id>
+
+# Or list recoverable sessions:
+qwen-code sessions list --resumable
+```
+
+**What persists:**
+- Full conversation history
+- Tool call results (file reads, edits, bash output)
+- Working directory state
+- Agent context (plans, subagent spawns)
+- Pending "Ask User" questions (from v0.27's multi-child questions)
+
+**For automation:** Non-interactive execution means CI/CD pipelines can run Qwen Code tasks, persist sessions, and resume on failure — no human babysitting.
+
+---
+
+## Non-Interactive Execution: Agents in Your Scripts
+
+```bash
+# One-shot task, exits with code (0 = success, 1 = failure)
+qwen-code run --non-interactive \
+  "Review PR #247 for security issues, post comments on risky patterns"
+
+# With JSON output for parsing
+qwen-code run --non-interactive --json \
+  "Generate unit tests for src/auth/*.ts" \
+  > test-generation-result.json
+
+# In CI (GitHub Actions example)
+- name: Qwen Code Security Review
+  run: |
+    qwen-code run --non-interactive \
+      "Scan changed files for: hardcoded secrets, SQL injection, XSS vectors, auth bypasses. Output SARIF."
+  env:
+    QWEN_CODE_PROVIDER: custom
+    QWEN_CODE_ENDPOINT: ${{ secrets.OLLAMA_ENDPOINT }}
+    QWEN_CODE_MODEL: qwen2.5-coder:32b
+```
+
+**This is the bridge from "chat tool" to "platform component."** Your build pipeline, your deploy hooks, your nightly security scans — they can all invoke Qwen Code as a first-class CLI citizen.
+
+---
+
+## What Carries Over from v0.27 (It's a Lot)
+
+v1.0 preview isn't a rewrite — it's a **packaging + distribution milestone**. Everything from v0.27.2 works:
+
+| v0.27 Feature | Status in v1.0 |
+|---------------|----------------|
+| Managed agents (durable sessions, failover) | ✅ Full support |
+| Multi-child questions (parallel approval chains) | ✅ Full support |
+| Web Shell (browser UI + Q&A heatmap) | ✅ Full support |
+| GitHub channel (repo allowlist/blocklist) | ✅ Full support |
+| Mods plugin system (`$.model.complete`, `ui.render`, `$.store`) | ✅ Full support |
+| WeChat/QQ/Email channels in Web Shell | ✅ Full support |
+| Private BTW follow-ups + session recap | ✅ Full support |
+| Skill import from session | ✅ Full support |
+| Daemon PR-state watch + 240-min autofix budget | ✅ Full support |
+| CRLF/Unicode-safe shell tool | ✅ Full support |
+| Credential sanitization in errors | ✅ Full support |
+| Runtime performance (fewer deadlocks, faster throughput) | ✅ Full support |
+
+**Zero breaking changes.** Your v0.27 configs, skills, sessions, and workflows work unchanged.
+
+---
+
+## Installation Quick Reference
+
+### Option 1: Native Binary (Recommended — No Node)
+
+```bash
+# macOS Apple Silicon
+curl -L -o qwen-code https://github.com/QwenLM/qwen-code/releases/download/v1.0.0-preview/qwen-code-darwin-arm64
+chmod +x qwen-code
+sudo mv qwen-code /usr/local/bin/
+
+# macOS Intel
+curl -L -o qwen-code https://github.com/QwenLM/qwen-code/releases/download/v1.0.0-preview/qwen-code-darwin-x64
+chmod +x qwen-code
+sudo mv qwen-code /usr/local/bin/
+
+# Linux x64
+curl -L -o qwen-code https://github.com/QwenLM/qwen-code/releases/download/v1.0.0-preview/qwen-code-linux-x64
+chmod +x qwen-code
+sudo mv qwen-code /usr/local/bin/
+
+# Linux ARM64
+curl -L -o qwen-code https://github.com/QwenLM/qwen-code/releases/download/v1.0.0-preview/qwen-code-linux-arm64
+chmod +x qwen-code
+sudo mv qwen-code /usr/local/bin/
+
+# Windows x64 (PowerShell)
+Invoke-WebRequest -Uri "https://github.com/QwenLM/qwen-code/releases/download/v1.0.0-preview/qwen-code-windows-x64.exe" -OutFile "qwen-code.exe"
+# Move to PATH folder
+```
+
+### Option 2: npm (Still Works — Node Required)
+
+```bash
+npm i -g @qwen-code/qwen-code@latest
+# Shows 1.0.0-preview
+```
+
+### Option 3: Desktop App (Auto-updates)
+
+Download from [GitHub Releases](https://github.com/QwenLM/qwen-code/releases/tag/v1.0.0-preview) — `.dmg` (macOS), `.AppImage` (Linux), `.exe` (Windows).
+
+### Verify
+
+```bash
+qwen-code --version
+# 1.0.0-preview
+
+qwen-code --help
+# Shows provider flags: --provider, --endpoint, --model, --api-key
+```
+
+---
+
+## Should You Update Today?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Want zero-dependency installs** | **Yes** — native binary = no Node, no npm, no config |
+| **Run on CI/CD / automation** | **Yes** -- `--resume` + `--non-interactive` = scriptable agents |
+| **Need model flexibility (local, OpenRouter, enterprise proxy)** | **Yes** — custom provider = any OpenAI-compatible endpoint |
+| **Run Qwen Code in air-gapped / offline envs** | **Yes** — Ollama + binary = fully local |
+| **Onboard new team members** | **Yes** — "download and run" beats "install Node v20, npm config, global prefix..." |
+| **Use Web Shell for team oversight** | **Yes** — all v0.27 Web Shell features intact |
+| **Build Mods/plugins** | **Yes** — Mods SDK unchanged, now distributable as standalone tools |
+| **Pinned to v0.26.x for stability** | **Test in staging** — but v0.27→1.0 is pure additive |
+| **Need Windows ARM64 binary** | **Wait** — not in preview assets yet (x64 only) |
+
+---
+
+## The Bigger Picture: From "CLI Tool" to "Platform Primitive"
+
+```
+v0.20–v0.23   Single-agent CLI, great at coding
+v0.24.6       Managed runtime — durable sessions, failover, advisor
+v0.24.7       Hardening — settings isolation, permission fixes
+v0.25.0       Platform — workspace agents, Mem0, A2A, private MCP, cold restore
+v0.26.0       Operable platform — desktop, SSH, --check, systemd, 8 MiB attachments
+v0.26.1–9     Production hardening — 9 patches, 500+ fixes, subscription, TUI, WebShell
+v0.27.0–2     Multi-question agents, visual oversight, repo governance, team-scale concurrency
+v1.0.0-preview  **Distribution milestone** — native binaries, multi-provider, resumable, scriptable
+```
+
+**Every release filled a gap. No rewrites. No "v2 coming soon." Just steady compounding.**
+
+Now with v1.0 preview: **a local-first multi-agent platform that installs like `curl | sh`, runs like a native binary, connects to any model provider, survives reboots, and slots into your automation pipeline.**
+
+The question shifts from *"which agent CLI should I use?"* to **"*why would I pay for a cloud agent platform when this runs locally, free, with my data on my machine, with an SDK to embed in my products, with the approval infrastructure to operate at enterprise scale, and now with zero-dependency distribution?*"**
+
+---
+
+## Quick Test After Install
+
+```bash
+# 1. Basic sanity
+qwen-code --version
+# 1.0.0-preview
+
+# 2. Test custom provider (Ollama example)
+# Terminal 1: ollama serve (if not running)
+# Terminal 2:
+qwen-code --provider custom --endpoint http://localhost:11434/v1 --model qwen2.5-coder:7b \
+  "Write a hello world in Rust"
+
+# 3. Test session resumption
+SESSION=$(qwen-code run --non-interactive "Create a TODO list for learning Rust" --json | jq -r .sessionId)
+qwen-code --resume $SESSION --non-interactive "Add 'Read the Rust Book' as first item"
+
+# 4. Test Web Shell (if you used it before)
+qwen-code web-shell
+# http://localhost:3000/web-shell — all your sessions, heatmap, channels intact
+
+# 5. Test Mods (if you build them)
+# Your existing Mods in ~/.qwen-code/mods/ work unchanged
+```
+
+---
+
+## Related Articles
+
+- [Qwen Code v0.27 Just Made Managed Agents Handle Multiple Questions at Once — And Web Shell Got a Q&A Heatmap](/blog/qwen-code-v0-27-managed-agents-multi-question-web-shell-heatmap/)
+- [Qwen Code v0.26 Just Became a Full Multi-Agent Platform — Local, Remote, and Everything In Between](/blog/qwen-code-v0-26-managed-agent-desktop-local-ssh/)
+- [Qwen Code v0.25.0 — Workspace Agents, Mem0, A2A Collaboration](/blog/qwen-code-v0-25-workspace-agents-mem0-a2a-collaboration/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+## Related articles
+
+- [Claude Code v2.1.322 Just Got Fast Mode on Vertex AI — Here's What That Means for You](/blog/claude-code-v2-1-322-vertex-fast-mode/)
+- [Goose v1.59 Just Added Configurable Voice Instructions — Your AI Agent Finally Speaks Your Language](/blog/goose-v1-59-voice-instructions-gpt-live/)
+- [Zed v1.28.0: Auto Git Fetch, AI Commit Messages That Match Your Style, Inline Image Rendering](/blog/zed-v1-28-0-pre-auto-git-fetch-agent-improvements/)
+
+---
+
+*Qwen Code is open-source (Apache-2.0) at [github.com/QwenLM/qwen-code](https://github.com/QwenLM/qwen-code). Release: [v1.0.0-preview](https://github.com/QwenLM/qwen-code/releases/tag/v1.0.0-preview). Published November 11, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
