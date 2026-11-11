@@ -1,0 +1,114 @@
+---
+title: "GitHub Copilot CLI v1.0.110 Just Fixed the Multi-Window Session Mess — Here's What Changed"
+description: "Copilot CLI v1.0.110 (Nov 10) fixes session conflicts when resuming across multiple windows, custom status line alignment, control character display, markdown table rendering, and 50+ other polish fixes. v1.0.109 (Nov 10) added CIDR sandbox rules, Fable 5.2 support, and 100+ UX improvements."
+pubDate: 2026-11-10
+updatedDate: 2026-11-11
+author: "Anshad"
+tags: ["github-copilot-cli", "copilot", "release", "terminal-agent", "v1.0.110", "v1.0.109"]
+tool: "copilot-cli"
+category: "releases"
+heroImage: "/blog/github-copilot-cli-v1-0-110-multiwindow-fix.jpg"
+---
+
+GitHub Copilot CLI **v1.0.110** landed November 10, hot on the heels of v1.0.109 earlier the same day. Two stable releases in 24 hours — the second one fixes a session conflict that bit anyone running multiple windows.
+
+---
+
+## The Headline Fix: Multi-Window Session Conflicts (v1.0.110)
+
+**Problem:** You `copilot --resume` a session in one window. Open a second window with `copilot -p --resume`. Both windows write into the same session while it sits idle. Messages interleave. History gets weird.
+
+**Fixed in v1.0.110:** A session reopened with `copilot --resume` is now **marked in use as soon as it opens**. The second window no longer writes into it while it sits idle.
+
+This also fixes `copilot -p --resume` (prompt mode with resume) — it waits properly instead of clobbering the session.
+
+---
+
+## What Else in v1.0.110 (50+ Fixes)
+
+**Terminal & UI:**
+- Custom status lines preserve first-row indentation — all rows align consistently
+- Control characters show visibly in `/settings` list items instead of applying terminal styling/hyperlinks
+- Markdown tables with wavy dashes and wide symbols render with correctly aligned rows
+- Wrapped text uses full row width without inserting extra blank lines inside paragraphs
+- Vim mode `j/k` motions use current cursor column after `gg`, `ge`, operators, or redo
+- `/subagents` displays custom agent names/models as plain text — columns stay aligned, no embedded formatting
+
+**Sessions & Resume:**
+- Sign-in prompt shows after `/logout` removes the last saved account with invalid credentials — no restart needed
+- Shell and Search results show accurate line and file counts; omit model-only cost guidance when AI-credit limit is set
+- Local MCP server replies with lone UTF-16 surrogate escapes (cut inside emoji) no longer fail after 60s or hang 3min — read with replacement character
+- Plugin toggles honor repository-controlled live plugin settings; consistently use same marketplace source
+
+**MCP & Plugins:**
+- `copilot mcp add` preserves existing invalid server entries and asks you to remove them before reusing names
+- Plugin preferences and settings files preserved at startup when `settings.json` has invalid values or can't parse
+
+---
+
+## v1.0.109 (Same Day, Nov 10) — The Feature Drop
+
+**New Capabilities:**
+- **IPv4/IPv6 CIDR support** for sandbox host allow/deny rules in settings — granular network control
+- **Claude Fable 5.2** in model picker under "New models"
+- `/rubber-duck` offered on default model from session start, on Auto once model picked, after switching to eligible model
+
+**UX Polish (100+ items):**
+- `/subagents` keeps Overridden/Status columns readable on narrow terminals; aligns agent names with wide characters
+- Removing built-in MCP server explains how to disable it instead of just failing
+- `/cd ~` or `/add-dir ~` selecting directory next to home uses correct full path
+- Trusted-folder and worktree confirmations keep Windows path separators
+- Hide empty assistant reply bullets when response is only whitespace
+- "Don't ask again" for parallel file ops approves all covered requests without re-prompting
+- `/terminal-setup` configures Shift+Enter correctly for VS Code, Cursor, Windsurf on Linux with `XDG_CONFIG_HOME`
+- Footer AI credits update as soon as `/compact` finishes, not after next turn
+- Prompt mode with `--output-format json` emits final result record with exit status even on early failure
+- Rate-limit errors name the same mode as switch dialog (Copilot Fusion / auto mode) instead of "auto model"
+- Multi-line prompt: Up/Down start from cursor after Left/Right/Backspace/Delete at start/end, instead of jumping columns
+- Number keys work in shell/URL approval dialogs after pressing "No, and tell Copilot" option and moving back up
+- `/cd .` and `/add-dir .` keep current directory in git repo instead of selecting `.git`; picker lists `./` first
+- ACP mode: `preToolUse` hook that answers `ask` now asks ACP client to allow/deny instead of denying as host policy
+- `/voice` immediately reports overly long socket path and fix, instead of generic error after wait
+- File move prompts show both source and destination; pure renames don't show empty diff
+- Session history keeps every turn when second window works on session another window has open
+- And **80+ more** — settings descriptions clarified, edge cases handled, Windows memory returned to system, ARM64 Linux 16/64 KiB page support, indexed search cleanup, plugin LFS install fixes, etc.
+
+---
+
+## Why Two Releases in One Day?
+
+v1.0.109 was the planned feature/stability release. v1.0.110 was a rapid patch for the multi-window session conflict — a regression that became obvious once people started using the new resume behavior heavily.
+
+This is the cadence Copilot CLI has settled into: **weekly stable drops, same-day patches when needed**.
+
+---
+
+## How to Update
+
+```bash
+# If installed via npm
+npm update -g @github/copilot-cli
+
+# Or re-run installer
+curl -fsSL https://cli.github.com/copilot/install.sh | bash
+
+# Check version
+copilot --version
+# Should show 1.0.110-1 (or 1.0.110-0)
+```
+
+---
+
+## The Bottom Line
+
+If you run Copilot CLI in multiple terminals/tmux panes/VS Code terminals — **update to v1.0.110**. The session conflict fix alone is worth it.
+
+v1.0.109 brings CIDR sandbox controls (huge for team/enterprise), Fable 5.2, and a mountain of UX paper cuts healed. v1.0.110 makes sure your sessions don't eat each other.
+
+**Two releases, one day, zero breaking changes.** That's the terminal agent maturity we've been waiting for.
+
+---
+
+*GitHub Copilot CLI is free for GitHub users. Repository: [github/github-copilot-cli](https://github.com/github/copilot-cli). Releases: [v1.0.110-1](https://github.com/github/copilot-cli/releases/tag/v1.0.110-1) · [v1.0.109](https://github.com/github/copilot-cli/releases/tag/v1.0.109).*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
