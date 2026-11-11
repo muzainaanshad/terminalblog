@@ -1,9 +1,9 @@
 ---
 title: "Qwen Code v0.27 Just Made Managed Agents Handle Multiple Questions at Once — And Web Shell Got a Q&A Heatmap"
-description: "Qwen Code v0.27.0 (Nov 7) lands multi-child questions for managed agents (answer in any order, keep drafts separate), Web Shell task Q&A heatmap, GitHub channel allowlists/blocklists, safer shell edits with CRLF/Unicode, and faster deadlock-resistant runtime. 9 patches in 17 days, zero breaking changes."
+description: "Qwen Code v0.27.0 (Nov 7) lands multi-child questions for managed agents, Web Shell Q&A heatmap, GitHub repo filters, CRLF/Unicode shell fixes. v0.27.1 (Nov 9) adds daemon PR watch, session diagnostics, Mem0 memory, web-shell bulk actions. v0.27.2 (Nov 10) adds Web Shell WeChat/QQ/Email channels, Mods one-shot completions, private BTW follow-ups, skill import from sessions. 10 patches in 20 days, zero breaking changes."
 pubDate: 2026-11-08T14:00:00Z
-updatedDate: 2026-11-10T14:00:00Z
-tags: ["qwen-code", "release", "v0.27.0", "v0.27.1", "managed-agent", "web-shell", "github-integration", "coding-agent", "beginner", "open-source"]
+updatedDate: 2026-11-10T20:00:00Z
+tags: ["qwen-code", "release", "v0.27.0", "v0.27.1", "v0.27.2", "managed-agent", "web-shell", "github-integration", "coding-agent", "beginner", "open-source"]
 tool: "qwen-code"
 author: "Anshad"
 image: "/api/og?title=Qwen+Code+v0.27+Multi+Question+Web+Shell&tool=qwen-code"
@@ -14,10 +14,10 @@ canonical: "https://terminalblog.com/blog/qwen-code-v0-27-managed-agents-multi-q
   "@context": "https://schema.org",
   "@type": "BlogPosting",
   "headline": "Qwen Code v0.27 Just Made Managed Agents Handle Multiple Questions at Once — And Web Shell Got a Q&A Heatmap",
-  "description": "Qwen Code v0.27.0 (Nov 7) lands multi-child questions for managed agents (answer in any order, keep drafts separate), Web Shell task Q&A heatmap, GitHub channel allowlists/blocklists, safer shell edits with CRLF/Unicode, and faster deadlock-resistant runtime. 9 patches in 17 days, zero breaking changes.",
+  "description": "Qwen Code v0.27.0 (Nov 7) lands multi-child questions for managed agents, Web Shell Q&A heatmap, GitHub repo filters, CRLF/Unicode shell fixes. v0.27.1 (Nov 9) adds daemon PR watch, session diagnostics, Mem0 memory, web-shell bulk actions. v0.27.2 (Nov 10) adds Web Shell WeChat/QQ/Email channels, Mods one-shot completions, private BTW follow-ups, skill import from sessions. 10 patches in 20 days, zero breaking changes.",
   "image": "https://terminalblog.com/api/og?title=Qwen+Code+v0.27+Multi+Question+Web+Shell&tool=qwen-code",
   "datePublished": "2026-11-08T14:00:00Z",
-  "dateModified": "2026-11-10T14:00:00Z",
+  "dateModified": "2026-11-10T20:00:00Z",
   "author": {
     "@type": "Person",
     "name": "Anshad"
@@ -191,10 +191,113 @@ qwen-code run --managed "
 
 ---
 
-## The v0.26→0.27 Series: 10 Patches in 17 Days
+## v0.27.2 (Nov 10) — Web Shell Gets Messaging Channels, Mods Get Extensible, Skills Get Portable
+
+### Web Shell: WeChat, QQ, and Email Channels
+
+**New:** Web Shell can now configure **WeChat, QQ, and Email channels** with QR login, scan progress, identity display, and logout ([#16736](https://github.com/QwenLM/qwen-code/pull/16736), [#16724](https://github.com/QwenLM/qwen-code/pull/16724), [#16746](https://github.com/QwenLM/qwen-code/pull/16746)).
+
+```bash
+# In Web Shell channel manager:
+# Add WeChat → scan QR → bound to your account
+# Add QQ → optional QR login flow
+# Add Email → configure SMTP/IMAP
+```
+
+**Why it matters:** Managed agents can now send notifications and ask questions through the messaging apps your team actually uses — not just webhooks.
+
+---
+
+### Mods: One-Shot Completions, UI Rewrites, Persistent Storage
+
+**New:** Mods (Qwen Code's plugin system) get three powerful primitives ([#16737](https://github.com/QwenLM/qwen-code/pull/16737), [#16794](https://github.com/QwenLM/qwen-code/pull/16794), [#16791](https://github.com/QwenLM/qwen-code/pull/16791)):
+
+1. **`$.model.complete(request, {signal})`** — Run one-off text completions without tools, history, or system prompt. Perfect for quick classification, summarization, or formatting tasks inside a Mod.
+
+2. **`ui.render` hook** — Rewrite displayed AssistantMessage text in the Ink terminal without changing stored or copied text. Your Mod can transform how model replies *look* without affecting what's saved.
+
+3. **`$.store`** — Persist plugin values between sessions. Mods now have durable key-value storage that survives restarts.
+
+```typescript
+// Example Mod using new APIs
+export default {
+  async onMessage({ $, message }) {
+    // One-shot completion for quick task
+    const summary = await $.model.complete({
+      prompt: `Summarize in 1 sentence: ${message.content}`
+    });
+    
+    // Persist user preference
+    $.store.set('user.summaryStyle', 'concise');
+    
+    // Rewrite display (not stored content)
+    $.ui.render((text) => `[Summary] ${text}`);
+  }
+}
+```
+
+---
+
+### Private BTW Follow-Ups + Optional Auto Recap
+
+**New:** Managed Agent adds **private BTW follow-ups** and **manual or optional automatic session recap** ([#16758](https://github.com/QwenLM/qwen-code/pull/16758)). Web Shell panels use persisted results; automatic recap is off by default.
+
+- **Private BTW follow-ups** — Sub-agent completions can spawn private follow-up questions that don't pollute the main chat
+- **Session recap** — Get an automatic or manual summary of what the managed agent accomplished
+
+---
+
+### Skill Import from Original Runtime Workspace
+
+**New:** Users can **import a Skill from the original Runtime workspace of a selected Session and install it explicitly without re-uploading it** ([#16638](https://github.com/QwenLM/qwen-code/pull/16638)).
+
+```bash
+# In Web Shell or CLI:
+# 1. Select a session that had a custom skill
+# 2. "Import Skill" → installs locally without re-upload
+# 3. Skill available in your current workspace
+```
+
+**Why it matters:** Skills become portable across sessions and workspaces. Build once, use everywhere.
+
+---
+
+### Daemon PR-State Watch + Self-Hosted Autofix 240-Min Budget
+
+**New:** 
+- Daemon PR-state watch adds allowed-host discovery from gh configuration and ordered shutdown ([#16732](https://github.com/QwenLM/qwen-code/pull/16732))
+- Self-hosted autofix runs now have a **240-minute agent budget**, reducing premature timeouts for long autofix rounds ([#16777](https://github.com/QwenLM/qwen-code/pull/16777))
+
+---
+
+### Web Shell UX Polish
+
+- Web shell managed sessions can reuse host shell chrome with `showManagedSessionHeader` and `alignManagedChatWithHost`, reducing duplicate headers ([#16324](https://github.com/QwenLM/qwen-code/pull/16324))
+- Web Shell slash menu now gives command and Skill names priority, truncating descriptions first ([#16790](https://github.com/QwenLM/qwen-code/pull/16790))
+- Managed Agent channel delivery ledger records each delivery segment separately, preserving receipts for multi-segment deliveries ([#16797](https://github.com/QwenLM/qwen-code/pull/16797))
+- Goal verifier verdicts show Last check reason in session output language ([#15806](https://github.com/QwenLM/qwen-code/pull/15806))
+
+---
+
+### Performance: Managed Agent Gets Faster
+
+- Drop bundled auto-memory reference, keep resident policy ([#16739](https://github.com/QwenLM/qwen-code/pull/16739))
+- GitHub channel PR state watch uses conditional requests and cache unchanged responses ([#16741](https://github.com/QwenLM/qwen-code/pull/16741))
+- Improves managed-agent performance by reducing CSI proof copying, optimizing CSI lookup, capped startup polling backoff ([#16828](https://github.com/QwenLM/qwen-code/pull/16828), [#16827](https://github.com/QwenLM/qwen-code/pull/16827))
+
+---
+
+### Breaking Changes
+
+- Dependency upgrades shipped by SDK and Web Shell ([#16452](https://github.com/QwenLM/qwen-code/pull/16452)) — check if your custom extensions need updates
+
+---
+
+## The v0.26→0.27 Series: 10 Patches in 20 Days
 
 | Version | Date | Focus |
 |---------|------|-------|
+| **v0.27.2** | **Nov 10, 2026** | **Web Shell WeChat/QQ/Email, Mods $.model.complete/ui.render/$.store, private BTW follow-ups + auto recap, skill import, daemon PR watch, 240-min autofix budget, dependency upgrades** |
 | **v0.27.1** | **Nov 9, 2026** | **Daemon PR watch store, managed-agent Session resource + diagnostics, personal memory (Mem0), web-shell sidebar multi-select + bulk pin/archive, bound-PR comment delivery, CI hardening, SDK fixes** |
 | **v0.27.0** | **Nov 7, 2026** | **Multi-child questions, Q&A heatmap, repo filters, CRLF/Unicode shell, runtime perf, credential sanitization** |
 | v0.26.9 | Nov 6, 2026 | Bulk skill activation, daemon APIs, TS SDK, WebShell upload, durable questions, automation default |
@@ -215,6 +318,10 @@ qwen-code run --managed "
 
 | If You... | Verdict |
 |-----------|---------|
+| **Use Web Shell with team messaging** | **Yes** — WeChat/QQ/Email channels = agents in your chat apps |
+| **Build Mods/extensions** | **Yes** — `$.model.complete`, `ui.render`, `$.store` = powerful primitives |
+| **Need skill portability** | **Yes** — import skills from sessions without re-upload |
+| **Run long autofix rounds** | **Yes** — 240-min budget = no premature timeouts |
 | **Run managed agents with approval chains** | **Yes** — multi-child questions = real workflow modeling |
 | **Use Web Shell for session oversight** | **Yes** — heatmap + "Ask for details" = visibility |
 | **Trigger agents via GitHub channel** | **Yes** — allowlist/blocklist = control |
@@ -265,6 +372,12 @@ qwen-code run --managed "
 
 # 4. Edit a Windows file with emoji in strings
 # Shell tool should preserve CRLF + Unicode
+
+# 5. Test v0.27.2 features
+# Web Shell → Channel Manager → Add WeChat/QQ/Email
+# Create a Mod using $.model.complete, ui.render, $.store
+# Import a skill from a previous session
+# Run long autofix → should not timeout at 40 min
 ```
 
 ---
@@ -279,12 +392,13 @@ qwen-code run --managed "
 | **v0.25.0** | **Platform** — workspace agents, Mem0, A2A, private MCP, cold restore, broker auth, models.dev catalog |
 | **v0.26.0** | **Operable platform** — desktop, SSH workspaces, --check preflight, systemd units, 8 MiB attachments |
 | **v0.26.1–9** | **Production hardening** — 9 patches, 500+ fixes, subscription auth, TUI shared loop, WebShell, skill infrastructure, TS SDK |
-| **v0.27.0** | **Multi-question managed agents, visual Web Shell oversight, GitHub repo governance, runtime scalability** |
-| **v0.27.1** | **Daemon PR watch, Session diagnostics, personal memory (Mem0), web-shell bulk actions, bound-PR delivery** |
+|| **v0.27.0** | **Multi-question managed agents, visual Web Shell oversight, GitHub repo governance, runtime scalability** |
+|| **v0.27.1** | **Daemon PR watch, Session diagnostics, personal memory (Mem0), web-shell bulk actions, bound-PR delivery** |
+|| **v0.27.2** | **Web Shell WeChat/QQ/Email channels, Mods one-shot completions + ui.render + $.store, private BTW follow-ups + auto recap, skill import from session, daemon PR-state watch, self-hosted autofix 240-min budget** |
 
 **Every release fills a gap. No rewrites. No "v2 coming soon." Just steady compounding.**
 
-Now with v0.27.0: **a local-first multi-agent platform with industrial-grade approval chains, visual session oversight, repository-level governance, team-scale concurrency, and unified subscription auth.**
+Now with v0.27.2: **a local-first multi-agent platform with industrial-grade approval chains, visual session oversight, repository-level governance, team-scale concurrency, unified subscription auth, and now Web Shell messaging channels + Mods extensibility + personal memory + skill portability.**
 
 The question isn't "which agent should I use?" It's **"why would I pay for a cloud agent platform when Qwen Code runs the same patterns locally, free, with my data on my machine, with an SDK to embed it in my own products, and now with the approval infrastructure to operate it at enterprise scale?"**
 
