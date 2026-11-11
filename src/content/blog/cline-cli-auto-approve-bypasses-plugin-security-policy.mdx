@@ -1,0 +1,217 @@
+---
+title: "Cline CLI's Auto-Approve All Silently Ignores Your Plugin's Security Policy"
+description: "When auto-approve is on (the default), a plugin's explicit `autoApprove: false` is bypassed — the tool runs without prompting. Here's why that matters and how to check if you're affected."
+publishedDate: 2026-11-11
+tags: ["cline", "security", "cli", "plugins", "hooks"]
+tool: cline
+---
+
+## The Short Version
+
+**If you use Cline CLI with auto-approve enabled (the default), any plugin that tries to force an approval prompt via `beforeTool` returning `{ policy: { autoApprove: false } }` will be ignored.** The tool executes immediately without asking.
+
+This is a security boundary bypass: a plugin author *cannot* enforce user approval for risky operations when the user has auto-approve turned on.
+
+---
+
+## What Happened
+
+Cline CLI 3.0.74 (`@cline/core` 0.2.0) has a logic bug in `apps/cli/src/runtime/interactive/approvals.ts`. The approval flow checks `autoApproveAll` **before** reading the policy returned by plugin hooks:
+
+```ts
+// approvals.ts L42–44 (main @ 500a40e)
+if (autoApproveAllRef.current) {
+    return { approved: true };  // Returns early — never reads request.policy
+}
+if (request.policy?.autoApprove === true) {
+    return { approved: true };
+}
+```
+
+When `autoApproveAll` is true (the default in interactive mode), the function returns `{ approved: true }` immediately. The plugin's `request.policy?.autoApprove === false` is never evaluated.
+
+---
+
+## Who Is Affected
+
+**You are affected if:**
+- You use Cline CLI interactively (not headless)
+- You have auto-approve enabled (default: `cline` with no flags)
+- You have plugins installed that implement `beforeTool` hooks returning `autoApprove: false`
+
+**You are NOT affected if:**
+- You run `cline --auto-approve false` (the plugin's policy is respected)
+- You run headless/non-interactive (different code path)
+- You have no plugins with `beforeTool` hooks that request approval
+
+---
+
+## How to Check If You're Affected
+
+### 1. Check Your Cline Version
+
+```bash
+cline --version
+# or
+npx @cline/cli --version
+```
+
+Affected: **Cline CLI 3.0.74** (`@cline/core` 0.2.0) and earlier on `main` @ 500a40e.
+
+### 2. Check If You Have Plugins With `beforeTool` Hooks
+
+Look in your plugin directory:
+
+```bash
+ls -la ~/.cline/plugins/
+# or project-local
+ls -la .cline/plugins/
+```
+
+Open any `.ts`/`.js` files and search for `beforeTool`:
+
+```bash
+grep -r "beforeTool" ~/.cline/plugins/
+```
+
+If any plugin returns `{ policy: { autoApprove: false } }`, it's being bypassed when auto-approve is on.
+
+### 3. Quick Repro Test
+
+Create a test plugin:
+
+```bash
+mkdir -p .cline/plugins
+cat > .cline/plugins/test-autoapprove.ts << 'EOF'
+import type { AgentPlugin } from "@cline/core";
+
+const plugin: AgentPlugin = {
+    name: "test-autoapprove",
+    manifest: { capabilities: ["hooks"] },
+    hooks: {
+        async beforeTool({ toolCall }) {
+            console.error(`[test-autoapprove] ${toolCall.toolName}: autoApprove=false`);
+            return { policy: { autoApprove: false } };
+        },
+    },
+};
+
+export default plugin;
+EOF
+```
+
+Then run:
+
+```bash
+# With auto-approve ON (default) — should show NO prompt, file reads silently
+cline
+> Read package.json
+
+# With auto-approve OFF — SHOULD show prompt
+cline --auto-approve false
+> Read package.json
+# Expected: "Cline needs permission · Approve tool call? read_files .../package.json [y] Approve [n] Deny"
+```
+
+If the first command reads the file without prompting, you're affected.
+
+---
+
+## Why This Matters
+
+### Plugin Authors Can't Enforce Security Boundaries
+
+A plugin might want to force approval for:
+- **Destructive operations** (`rm`, `write_files` to sensitive paths)
+- **External network calls** (plugins wrapping API clients)
+- **Credential access** (reading `.env`, SSH keys, cloud tokens)
+- **High-cost operations** (expensive model calls, long-running tasks)
+
+With this bug, the plugin's explicit `autoApprove: false` is a **no-op** when the user has auto-approve on. The security control is advisory only.
+
+### Users Get a False Sense of Security
+
+If you installed a plugin that claims "it will always ask before deleting files" or "it requires approval for external API calls," that promise is broken when auto-approve is enabled. The plugin's guard doesn't run.
+
+### The Fix Is Trivial But Not Yet Released
+
+The fix is to check `request.policy?.autoApprove === false` **before** the auto-approve-all shortcut:
+
+```ts
+// Suggested fix
+if (request.policy?.autoApprove === false) {
+    // Hook explicitly requires approval — show prompt or deny if headless
+    return tuiToolApprover(request) ?? { approved: false };
+}
+if (autoApproveAllRef.current) {
+    return { approved: true };
+}
+if (request.policy?.autoApprove === true) {
+    return { approved: true };
+}
+```
+
+---
+
+## Workarounds Until Fixed
+
+### 1. Run With Auto-Approve Off
+
+```bash
+cline --auto-approve false
+```
+
+This respects plugin policies. The tradeoff: you'll see more prompts for tools that are normally auto-approved (like `read_files`).
+
+### 2. Use a Wrapper Script
+
+```bash
+#!/bin/bash
+# cline-safe - always runs with auto-approve off
+exec cline --auto-approve false "$@"
+```
+
+Save as `cline-safe`, `chmod +x`, put in PATH.
+
+### 3. Audit Your Plugins
+
+Check what your installed plugins actually do in `beforeTool`. Some may have `autoApprove: false` for operations you assumed were protected.
+
+```bash
+grep -r "autoApprove.*false" ~/.cline/plugins/
+```
+
+---
+
+## Related: The "No Reason" Problem
+
+Even when the prompt *does* show (with `--auto-approve false`), the plugin can't attach a reason. The user sees:
+
+```
+Cline needs permission · Approve tool call? read_files .../hello.txt [y] Approve [n] Deny
+```
+
+Not:
+
+```
+Cline needs permission · Plugin "security-guard" requires approval: This reads a file containing API keys. [y] Approve [n] Deny
+```
+
+The plugin author has no way to explain *why* approval is needed. This is a separate UX gap worth filing.
+
+---
+
+## Summary
+
+| Scenario | Plugin's `autoApprove: false` Respected? |
+|----------|------------------------------------------|
+| `cline` (default, auto-approve on) | ❌ **No — bypassed** |
+| `cline --auto-approve false` | ✅ Yes |
+| Headless/non-interactive | ✅ Different code path |
+| No `beforeTool` hook | N/A |
+
+**Bottom line:** If you rely on plugins to enforce approval boundaries, run with `--auto-approve false` until this is patched. The fix is straightforward and tracked in [cline/cline#15645](https://github.com/cline/cline/issues/15645).
+
+---
+
+*Found something wrong? [Open an issue](https://github.com/Anshad2u/terminalblog/issues) or [edit this page](https://github.com/Anshad2u/terminalblog/edit/master/src/content/blog/cline-cli-auto-approve-bypasses-plugin-security-policy.mdx).*
