@@ -1,0 +1,107 @@
+---
+title: "Open Interpreter Just Attested Its Own Builds — Supply Chain Security Finally Arrives"
+description: "Open Interpreter v0.0.61 (Nov 11) introduces build attestation and provenance verification for Linux archives. A small release with a massive signal: your agent's binary can now prove it wasn't tampered with."
+pubDate: 2026-11-11
+updatedDate: 2026-11-11
+author: "Anshad"
+tags: ["openinterpreter", "release", "v0.0.61", "supply-chain", "attestation", "security"]
+tool: "openinterpreter"
+category: "releases"
+heroImage: "/blog/openinterpreter-v0-0-61-attestation.jpg"
+---
+
+Open Interpreter **v0.0.61** landed November 11. The changelog is short — just two bullet points — but the signal is massive: **build attestation and provenance verification** for Linux archives.
+
+---
+
+## The Feature That Matters: Your Binary Can Now Prove Its Innocence
+
+**What it is:** Every Linux release artifact now ships with a signed attestation linking it back to the exact tagged build in GitHub Actions. You can verify the checksum manifest against the original build provenance *before* you run it.
+
+**Why it matters:** Supply chain attacks on developer tools are real. Remember the `event-stream` incident? The `xz-utils` backdoor? Attackers compromise the build pipeline, not the source code. Attestation means you — or your package manager, or your CI — can cryptographically verify *this binary came from that commit on that runner at that time*.
+
+**For beginners:** It's a tamper-evident seal. If someone swaps the download on the server, the attestation breaks. You'll know before you pipe it to `bash`.
+
+---
+
+## What's Actually In The Release
+
+| Change | Impact |
+|--------|--------|
+| Attest Linux archives + checksum manifest in the original tagged build | You can verify provenance before installing |
+| Verify original build provenance before publishing existing artifacts | No more "trust me, it's the same binary" |
+
+That's it. Two bullets. But they represent a **baseline shift** for any agent that runs code on your machine.
+
+---
+
+## Why This Matters More Than New Features
+
+Open Interpreter runs *arbitrary code* on your behalf. It spawns shells, installs packages, writes files. If its binary is compromised, the attacker gets everything your user account has.
+
+Most AI coding agents skip this. They ship binaries via GitHub Releases with a "trust us" shrug. Open Interpreter just drew a line: **verifiable builds or bust**.
+
+For teams: this enables `sigstore`/`cosign` verification in your internal mirrors. For solo devs: `cosign verify-blob` against the public transparency log. For everyone: the bar just moved.
+
+---
+
+## How to Verify (If You Care)
+
+```bash
+# Download the artifact + attestation
+wget https://github.com/openinterpreter/openinterpreter/releases/download/rust-v0.0.61/openinterpreter-linux.tar.gz
+wget https://github.com/openinterpreter/openinterpreter/releases/download/rust-v0.0.61/openinterpreter-linux.tar.gz.attestation
+
+# Verify with cosign (requires sigstore setup)
+cosign verify-blob \
+  --certificate-identity-regexp "https://github.com/openinterpreter/openinterpreter/.github/workflows/.*" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  --blob openinterpreter-linux.tar.gz \
+  --signature openinterpreter-linux.tar.gz.attestation
+```
+
+Or just check the checksum against the manifest in the release notes. The point is: **you can**.
+
+---
+
+## The Bigger Picture
+
+This is v0.0.61. The version number says "early." The security posture says "grown up."
+
+Open Interpreter has been the "run code locally" pioneer since 2023. Adding attestation before 1.0 signals they treat *your machine's integrity* as a blocker, not an afterthought.
+
+Other agents should take notes. If your tool executes code on my hardware, I want a receipt.
+
+---
+
+## How to Update
+
+```bash
+# pip (Python wrapper)
+pip install --upgrade open-interpreter
+
+# Or download the attested binary directly from GitHub Releases
+# https://github.com/openinterpreter/openinterpreter/releases/tag/rust-v0.0.61
+```
+
+---
+
+## The Bottom Line
+
+A tiny release. A massive precedent.
+
+**Open Interpreter v0.0.61** doesn't add new models, new skills, or new UI. It adds *trust*. In a category where every agent wants root on your box, that's the feature that actually matters.
+
+---
+
+## Related articles
+
+- [Open Interpreter v0.0.59 Just Bound Background Terminals to Their Owners — No More Orphaned Shells](/blog/openinterpreter-v0-0-59-owner-bound-background-terminals/)
+- [Claude Code v2.1.322 Just Added Vertex Fast Mode — Your Cloud Agents Just Got a Turbo Button](/blog/claude-code-v2-1-322-vertex-fast-mode/)
+- [Why Your Coding Agent Still Forgets Everything — And The 3 Tools Fixing It](/blog/why-your-coding-agent-still-forgets-everything/)
+
+---
+
+*Open Interpreter is open-source (MIT) by [Open Interpreter](https://github.com/openinterpreter). Repository: [github.com/openinterpreter/openinterpreter](https://github.com/openinterpreter/openinterpreter). Release: [rust-v0.0.61](https://github.com/openinterpreter/openinterpreter/releases/tag/rust-v0.0.61).*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*

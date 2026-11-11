@@ -34,6 +34,7 @@ const CODING_AGENT_TOOLS = new Set([
   'windsurf', 'devin-desktop',
   'kilocode', 'crush',
   'dify', 'crewai', 'langgraph', 'semantic-kernel',
+  'openinterpreter',
   ]);
 
 const OFF_NICHE_HINTS = [
