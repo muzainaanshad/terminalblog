@@ -58,7 +58,7 @@ Three real scenarios from the past month:
 
 ## The Decision Flowchart (Start Here)
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │  DOES YOUR CODE TOUCH PRODUCTION SECRETS / PII / REGULATED  │
 │  DATA (banking, healthcare, defense, gov contracts)?        │
@@ -321,7 +321,7 @@ Now your team runs `agent-router "write tests for auth module"` and it **automat
 
 If you're in a regulated environment but *need* cloud compute for complex tasks, this is the architecture that passes audit:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                    YOUR VPC / ON-PREM                       │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
@@ -345,9 +345,10 @@ If you're in a regulated environment but *need* cloud compute for complex tasks,
 ### The Proxy Layer (What Actually Enforces Policy)
 
 ```python
-# agent-proxy/main.py — FastAPI gateway that mediates ALL agent calls
+# agent-proxy/main.py - FastAPI gateway that mediates ALL agent calls
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
+from typing import List
 import httpx
 import os
 
@@ -356,7 +357,7 @@ app = FastAPI(title="Agent Policy Proxy")
 class AgentRequest(BaseModel):
     task: str
     model: str = "auto"  # auto = route by policy
-    files: list[str] = []
+    files: List[str] = []
     max_tokens: int = 8192
 
 # Policy: what each model/endpoint can access
@@ -387,7 +388,7 @@ POLICIES = {
 
 @app.post("/agent/execute")
 async def execute_agent(request: AgentRequest, user: str = Depends(get_current_user)):
-    # 1. Classify task → select policy
+    # 1. Classify task -> select policy
     policy_name = classify_task(request.task, request.files)
     policy = POLICIES[policy_name]
     
@@ -414,32 +415,32 @@ async def execute_agent(request: AgentRequest, user: str = Depends(get_current_u
         return sanitize_response(response)
         
     finally:
-        # 7. Destroy sandbox — no state persists
+        # 7. Destroy sandbox - no state persists
         destroy_sandbox(sandbox_id)
 
 def classify_task(task: str, files: list[str]) -> str:
     """Route to the right policy based on task + files"""
-    # Regulated paths → local only
+    # Regulated paths -> local only
     regulated_paths = ["payments", "auth", "billing", "compliance", "pii"]
     if any(p in f for f in files for p in regulated_paths):
         return "local-qwen"
     
-    # Secret-related → local only
+    # Secret-related -> local only
     secret_keywords = ["secret", "credential", "api.key", "password", "token"]
     if any(k in task.lower() for k in secret_keywords):
         return "local-qwen"
     
-    # Read-only analysis → cheap cloud
+    # Read-only analysis -> cheap cloud
     read_only_keywords = ["analyze", "review", "explain", "document", "summarize"]
     if any(k in task.lower() for k in read_only_keywords):
         return "cloud-gpt4o-mini"
     
-    # Complex reasoning → premium cloud
+    # Complex reasoning -> premium cloud
     complex_keywords = ["refactor", "architecture", "migrate", "design", "debug"]
     if any(k in task.lower() for k in complex_keywords):
         return "cloud-opus"
     
-    # Default → local
+    # Default -> local
     return "local-qwen"
 ```
 
