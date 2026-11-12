@@ -1,0 +1,238 @@
+---
+title: "OpenClaw v2026.11.5-beta.2 Just Made Large Conversations Browsable — Plus Android Talk Fixes"
+description: "OpenClaw v2026.11.5-beta.2 (Nov 12) adds paged history for large conversations, preserves macOS secrets on config failures, fixes Android Talk cancellation, and ships 95 PRs of security and reliability fixes."
+pubDate: 2026-11-12
+author: "Anshad"
+tags: ["openclaw", "release", "v2026.11.5-beta.2", "security", "android", "macos", "coding-agent", "beginner"]
+tool: "openclaw"
+category: "releases"
+---
+
+**OpenClaw v2026.11.5-beta.2 dropped November 12, 2026** — the second beta in the 2026.11.5 train. This one tackles large conversation browsing, macOS secret preservation, Android Talk fixes, and ships 95 PRs of security and reliability hardening.
+
+If you run OpenClaw with long conversations, on macOS, or on Android — this update matters.
+
+---
+
+## The Headline Features
+
+### 1. Large Conversations Stay Browsable — Paged History in Both Directions
+
+**What it is:** Large conversations now remain browsable with **paged history in both directions**, visible history boundaries, and bounded archive reads.
+
+**Why it matters:** Before, scrolling through a massive conversation could freeze the UI or load everything into memory. Now:
+- History loads in pages (forward and backward)
+- You see clear boundaries of what's loaded
+- Archive reads are bounded — no more OOM on massive sessions
+
+**PRs:** [#188450](https://github.com/openclaw/openclaw/pull/188450), [#188483](https://github.com/openclaw/openclaw/pull/188483), [#188557](https://github.com/openclaw/openclaw/pull/188557), [#188372](https://github.com/openclaw/openclaw/pull/188372), [#190690](https://github.com/openclaw/openclaw/pull/190690)
+
+---
+
+### 2. macOS App Preserves Secrets When Config Saves Fail
+
+**What it is:** The macOS app now **preserves saved secrets and Gateway authentication** when configuration saves fail or Tailscale exposure is turned off.
+
+**Why it matters:** Before, a config save failure (disk full, permissions, Tailscale toggle) could wipe your saved credentials and Gateway auth. Now they survive the failure.
+
+**PRs:** [#187734](https://github.com/openclaw/openclaw/pull/187734), [#187664](https://github.com/openclaw/openclaw/pull/187664)
+
+---
+
+### 3. Android Talk No Longer Cancels Accepted Gateway Work
+
+**What it is:** Ending Talk on Android **no longer cancels work the Gateway has already accepted**.
+
+**Why it matters:** You start a voice session, the Gateway accepts the work, you end Talk — before, that canceled the in-flight work. Now the Gateway continues processing.
+
+**PR:** [#188798](https://github.com/openclaw/openclaw/pull/188798)
+
+---
+
+### 4. Google Gemini Flash Uses Interactions API
+
+**What it is:** Google provider now uses the **Interactions API for Gemini Flash models** on the official endpoint while retaining custom endpoint overrides.
+
+**Why it matters:** Better compatibility and feature support for Gemini Flash on Google's official infrastructure.
+
+**PR:** [#189395](https://github.com/openclaw/openclaw/pull/189395)
+
+---
+
+## Security Fixes (You'll Want These)
+
+| Fix | Impact |
+|-----|--------|
+| Reject malformed URI identifiers using fast-uri 4.2.3 | Prevents URI parsing exploits while preserving valid relative references |
+| Reject oversized bounded collections early in Discord SDK | Stops DoS via oversized collections without restoring retired A2UI integration |
+
+**PRs:** [#187284](https://github.com/openclaw/openclaw/pull/187284), [#187296](https://github.com/openclaw/openclaw/pull/187296), [#187303](https://github.com/openclaw/openclaw/pull/187303)
+
+---
+
+## Reliability Fixes (The Ones You'll Feel)
+
+### Message Delivery & Chat Recovery
+- Acknowledge retried committed input without starting duplicate turns
+- Retain queued messages during inline edits
+- Keep Control UI plugin-reload replies from leaking into external chat
+- Preserve completed reasoning, refill chat snapshots
+- Retain active-request provenance through compaction
+- Resume configured fallbacks after interrupted attempts
+
+**PRs:** [#188527](https://github.com/openclaw/openclaw/pull/188527), [#189869](https://github.com/openclaw/openclaw/pull/189869), [#190982](https://github.com/openclaw/openclaw/pull/190982), [#188203](https://github.com/openclaw/openclaw/pull/188203), [#180214](https://github.com/openclaw/openclaw/pull/180214), [#188672](https://github.com/openclaw/openclaw/pull/188672)
+
+### Sessions & PostgreSQL
+- Bound listing, imported-history, and accounting reads without blocking writers
+- Omit misleading continuation metadata from centered history
+- Keep session search on its text index across repeated searches
+- Use safe iMessage recovery cursor
+- Allow Boards widgets to publish
+
+**PRs:** [#189284](https://github.com/openclaw/openclaw/pull/189284), [#190182](https://github.com/openclaw/openclaw/pull/190182), [#188612](https://github.com/openclaw/openclaw/pull/188612), [#187909](https://github.com/openclaw/openclaw/pull/187909), [#188979](https://github.com/openclaw/openclaw/pull/188979), [#184919](https://github.com/openclaw/openclaw/pull/184919), [#189564](https://github.com/openclaw/openclaw/pull/189564)
+
+### Files & Unicode
+- Preserve identity of Unicode keys when reading/editing workspace paths
+- Avoid first-turn workspace-memory and skills import races when plugins load from TypeScript source
+
+**PRs:** [#189868](https://github.com/openclaw/openclaw/pull/189868), [#191838](https://github.com/openclaw/openclaw/pull/191838)
+
+### Agents & Tool Outcomes
+- Keep subagent turns and model fallback aligned with changed session capabilities
+- Surface child approval requests to parents using custom session stores
+- Retain timeout results so interrupted tools aren't mistaken for confirmed failures
+
+**PRs:** [#179312](https://github.com/openclaw/openclaw/pull/179312), [#183501](https://github.com/openclaw/openclaw/pull/183501), [#189827](https://github.com/openclaw/openclaw/pull/189827), [#180247](https://github.com/openclaw/openclaw/pull/180247)
+
+### Matrix & Google/Anthropic/Models/Codex
+- Start new thread sessions without copying room transcript
+- Report readiness only after startup
+- Let stopped CLI clients exit
+- Report late verification failures rather than crashing
+- Honor configured topP and restore tool calls with Python keyword parameter names
+- Keep setup-token credentials separate from API-key profiles, set API workspace at login, allow reasoning-only retries
+- Keep healthy providers available when another provider lacks credentials or catalog hook fails
+- Preserve conversation guidance; resolve native follow-ups by task name; wait for previous thread owners to unload; preserve one-shot cleanup
+
+**PRs:** [#177272](https://github.com/openclaw/openclaw/pull/177272), [#192385](https://github.com/openclaw/openclaw/pull/192385), [#190695](https://github.com/openclaw/openclaw/pull/190695), [#191561](https://github.com/openclaw/openclaw/pull/191561), [#187875](https://github.com/openclaw/openclaw/pull/187875), [#186976](https://github.com/openclaw/openclaw/pull/186976), [#184434](https://github.com/openclaw/openclaw/pull/184434), [#189014](https://github.com/openclaw/openclaw/pull/189014), [#189059](https://github.com/openclaw/openclaw/pull/189059), [#188541](https://github.com/openclaw/openclaw/pull/188541), [#189005](https://github.com/openclaw/openclaw/pull/189005), [#191830](https://github.com/openclaw/openclaw/pull/191830)
+
+### macOS Connections & Tools/UI
+- Resolve typed authentication references
+- Prefer configured credentials over stale app environment values
+- Replace stale Gateway services safely after in-place updates
+- Show load failures instead of blank/stale browser pages
+- Avoid duplicate voice sends and false sent feedback
+- Preserve no-timeout execution results
+- Use correct Peekaboo observation references
+
+**PRs:** [#128175](https://github.com/openclaw/openclaw/pull/128175), [#191468](https://github.com/openclaw/openclaw/pull/191468), [#187000](https://github.com/openclaw/openclaw/pull/187000), [#185432](https://github.com/openclaw/openclaw/pull/185432), [#186271](https://github.com/openclaw/openclaw/pull/186271), [#190729](https://github.com/openclaw/openclaw/pull/190729), [#172116](https://github.com/openclaw/openclaw/pull/172116)
+
+### Settings & Updates
+- Support remote Control UI base paths and open GitHub reconnection from active session
+- Recover cleanly from failed upgrades out of 2026.10.7–2026.10.9
+- Preserve recovery errors and asynchronous triage callbacks
+- Avoid first-launch Gateway failures
+- Read candidate state without copying shared database
+
+**PRs:** [#185141](https://github.com/openclaw/openclaw/pull/185141), [#180200](https://github.com/openclaw/openclaw/pull/180200), [#189713](https://github.com/openclaw/openclaw/pull/189713), [#191495](https://github.com/openclaw/openclaw/pull/191495), [#191436](https://github.com/openclaw/openclaw/pull/191436), [#187921](https://github.com/openclaw/openclaw/pull/187921), [#189023](https://github.com/openclaw/openclaw/pull/189023)
+
+### Plugins & Startup/Shutdown
+- Run continuing native commands once
+- Respect disabled mixed-case plugin IDs
+- Restore CLI message sends under agent tool policies
+- Avoid recopying managed binaries on startup
+- Honor pending-channel webhook decisions
+- Keep lease renewal independent of parent admission
+- Avoid reopening agent databases during shutdown
+
+**PRs:** [#189369](https://github.com/openclaw/openclaw/pull/189369), [#188846](https://github.com/openclaw/openclaw/pull/188846), [#188058](https://github.com/openclaw/openclaw/pull/188058), [#187865](https://github.com/openclaw/openclaw/pull/187865), [#169778](https://github.com/openclaw/openclaw/pull/169778), [#188391](https://github.com/openclaw/openclaw/pull/188391), [#188976](https://github.com/openclaw/openclaw/pull/188976)
+
+### Scheduling, Storage, Configuration, Process, Worktrees
+- Run jobs added before scheduler startup without extra deferral
+- Flush startup evidence before declaring readiness
+- Preserve cold-database admission and retry contended lease cleanup
+- Ignore empty default plugin entries rather than widening restricted allowlist
+- Preserve cleanup grace and report original startup error ahead of cleanup failures
+- Settle completed disk usage accounting even when postcheck refuses further work
+
+**PRs:** [#192379](https://github.com/openclaw/openclaw/pull/192379), [#192383](https://github.com/openclaw/openclaw/pull/192383), [#192378](https://github.com/openclaw/openclaw/pull/192378), [#192380](https://github.com/openclaw/openclaw/pull/192380), [#192386](https://github.com/openclaw/openclaw/pull/192386), [#188727](https://github.com/openclaw/openclaw/pull/188727)
+
+### macOS Service Runtime & Release Recovery
+- Prepare and retain stable executable across install, resume, migration, service restoration
+- Retain publication retry diagnostics and preserve reconciled release repairs
+- Retain original contribution provenance for work first merged on release branch
+
+**PRs:** [#189130](https://github.com/openclaw/openclaw/pull/189130), [#191633](https://github.com/openclaw/openclaw/pull/191633), [#193613](https://github.com/openclaw/openclaw/pull/193613)
+
+---
+
+## Complete Contribution Record
+
+**95 PRs merged** in this window (v2026.11.5-beta.1 → v2026.11.5-beta.2), 0 retained seed-only PRs.
+
+---
+
+## How to Update
+
+```bash
+# npm
+npm update -g openclaw
+
+# pnpm
+pnpm update openclaw
+
+# yarn
+yarn upgrade openclaw
+
+# Verify
+openclaw --version
+# Should show 2026.11.5-beta.2
+```
+
+**npm package:** https://www.npmjs.com/package/openclaw/v/2026.11.5-beta.2  
+**Integrity:** `sha512-3fkxu+uOfziAf9+SAn2EYWHdImU4UepwyT3YItJkQNk0kn9/wm+ESYKcUXP7HlLHn4kxEXOYwfQTsZcMda1zyA==`  
+**Release SHA:** `c0f42f648144b25b8945b9c56329eb13eb6d7754`
+
+---
+
+## The Bigger Pattern
+
+```
+v2026.11.1 (Nov 5) → v2026.11.2 (Nov 8) → v2026.11.3 (Nov 10) → v2026.11.5-beta.1 → v2026.11.5-beta.2 (Nov 12)
+```
+
+OpenClaw is shipping **weekly stable releases + beta iterations**. The 2026.11.x train has been:
+- **v2026.11.1** — Mac config atomic saves, Tailscale auth protection, channel replies that survive
+- **v2026.11.2** — Conversation interruption resilience, update recovery, subagent follow-ups, Android pinning
+- **v2026.11.3** — **Credential isolation, bounded auth, secret redaction, child-process sanitization**
+- **v2026.11.5-beta.2** — **Paged history for large conversations, macOS secret preservation, Android Talk fixes, 95 PRs**
+
+Five releases in two weeks. **Conversation scalability, platform reliability, and credential hygiene** — the three things that make or break production agent deployments.
+
+---
+
+## Should You Update?
+
+**Yes, if you're on the beta channel.** Zero breaking changes. Pure reliability and scalability hardening.
+
+| If You... | Verdict |
+|-----------|---------|
+| **Have large conversations** | **Yes** — paged history keeps UI responsive |
+| **Run on macOS** | **Yes** — secrets survive config failures |
+| **Use Android Talk** | **Yes** — Gateway work no longer canceled |
+| **Run OpenClaw in production** | **Yes** — 95 PRs of hardening |
+| **On v2026.11.3 stable** | **Wait for stable** unless you need the beta features |
+
+---
+
+## Related Articles
+
+- [OpenClaw v2026.11.3 Just Locked Down Your Credentials — Here's What Changed](/blog/openclaw-v2026-11-3-security-credential-isolation/)
+- [OpenClaw v2026.11.2 Just Dropped — 166 Commits, 113 PRs, 64 Contributors](/blog/openclaw-v2026-11-2-massive-stable-release/)
+- [OpenClaw 2026.11.1 Just Fixed the Mac Settings That Kept Breaking — Plus Channel Replies That Actually Survive](/blog/openclaw-2026-11-1-mac-settings-channel-replies/)
+
+---
+
+*OpenClaw v2026.11.5-beta.2 released November 12, 2026. Full changelog: [docs.openclaw.ai/releases/2026.11.5-beta.2](https://docs.openclaw.ai/releases/2026.11.5-beta.2) | Raw: [github.com/openclaw/openclaw/blob/main/CHANGELOG/2026.11.5-beta.2.md](https://raw.githubusercontent.com/openclaw/openclaw/main/CHANGELOG/2026.11.5-beta.2.md).*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
