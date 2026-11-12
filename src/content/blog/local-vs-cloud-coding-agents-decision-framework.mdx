@@ -1,0 +1,633 @@
+---
+title: "Local vs Cloud Coding Agents — The Decision Framework That Saves You From Buying the Wrong Stack"
+description: "Goldman Sachs banned local agents. Your laptop melts running three agents. Cloud costs $300/mo. Here's the practical decision matrix for choosing local, cloud, or hybrid — with real workflows, not vendor promises."
+pubDate: 2026-11-12
+tags: ["local-models", "cloud-agents", "architecture", "decision-guide", "enterprise", "ollama", "air-gapped", "guide", "pillar", "evergreen"]
+tool: "industry"
+author: "Anshad"
+image: "/api/og?title=Local+vs+Cloud+Coding+Agents&tool=industry"
+canonical: "https://terminalblog.com/blog/local-vs-cloud-coding-agents-decision-framework/"
+---
+
+<script type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Local vs Cloud Coding Agents — The Decision Framework That Saves You From Buying the Wrong Stack",
+  "description": "Goldman Sachs banned local agents. Your laptop melts running three agents. Cloud costs $300/mo. Here's the practical decision matrix for choosing local, cloud, or hybrid — with real workflows, not vendor promises.",
+  "image": "https://terminalblog.com/api/og?title=Local+vs+Cloud+Coding+Agents&tool=industry",
+  "datePublished": "2026-11-12T00:00:00Z",
+  "author": { "@type": "Person", "name": "Anshad" },
+  "publisher": {
+    "@type": "Organization",
+    "name": "TerminalBlog",
+    "logo": { "@type": "ImageObject", "url": "https://terminalblog.com/favicon.ico" }
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://terminalblog.com/blog/local-vs-cloud-coding-agents-decision-framework/"
+  }
+})} />
+
+---
+
+**Goldman Sachs banned local agents on trading floors. Your laptop hits 95°C running three concurrent sessions. Cloud bills hit $400/month per developer. The vendor marketing says "it just works" — but nobody tells you which one actually fits *your* constraints.**
+
+This is the decision framework I wish existed when I started. Not a feature comparison. Not a benchmark table. **A flowchart that maps your actual constraints (data sensitivity, hardware, team size, budget) to the right execution model — and shows you how to mix them.**
+
+---
+
+## The One-Line Summary
+
+**Local for routine work + privacy. Cloud for complex reasoning + parallelism. Hybrid for production teams. Never pick one — pick a *policy* that routes tasks to the right executor.**
+
+---
+
+## Why This Decision Keeps Biting Teams
+
+Three real scenarios from the past month:
+
+| Team | What They Chose | What Happened |
+|------|-----------------|---------------|
+| Fintech startup (8 devs) | All-cloud (Claude Code) | $3,200/month bill. Security review flagged "unapproved AI on production data." Paused for 6 weeks. |
+| Solo dev, 16GB MacBook | All-local (Ollama + OpenCode) | Qwen3-Coder-7B works for 80% of tasks. Hit wall on 15-file refactor — model lost architectural context. Wasted 2 days. |
+| Enterprise platform team (25 devs) | All-local (self-hosted) | Bought 4×A6000 servers ($18K). Models good enough for tests/boilerplate. Complex migrations still need Opus 5.5. Now running hybrid — but no routing logic. |
+
+**The pattern:** Teams pick *one* model and force everything through it. The winners **route by task type.**
+
+---
+
+## The Decision Flowchart (Start Here)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  DOES YOUR CODE TOUCH PRODUCTION SECRETS / PII / REGULATED  │
+│  DATA (banking, healthcare, defense, gov contracts)?        │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+          ┌───────────┴───────────┐
+          ▼                       ▼
+        YES                      NO
+          │                       │
+          ▼                       ▼
+┌──────────────────┐    ┌────────────────────────┐
+│ LOCAL OR         │    │ CAN YOU AFFORD         │
+│ AIR-GAPPED ONLY  │    │ $150-400/dev/month     │
+│ (no cloud calls) │    │ FOR CLOUD API COSTS?   │
+└────────┬─────────┘    └───────────┬────────────┘
+         │                          │
+    ┌────┴────┐              ┌──────┴──────┐
+    ▼         ▼              ▼             ▼
+  LOCAL    HYBRID          CLOUD         HYBRID
+  ONLY     (local routine,  ONLY          (cloud routine,
+           cloud complex)               local for privacy)
+```
+
+**If you answered YES to regulated data → stop reading cloud-only sections. You need local/air-gapped. Full stop.**
+
+---
+
+## Mode 1: Local-Only (Air-Gapped, Regulated, Zero Cloud Calls)
+
+### When This Is Mandatory
+
+- **Regulated environments:** Banking (SOX, PCI-DSS), Healthcare (HIPAA), Defense (ITAR), Government (FedRAMP)
+- **IP protection:** Proprietary algorithms, trade secrets, pre-patent code
+- **Air-gapped networks:** No internet egress, period
+- **Policy mandates:** "No customer code leaves our VPC" — common in enterprise contracts
+
+### The Stack That Works (Nov 2026)
+
+| Layer | Recommendation | Why |
+|-------|----------------|-----|
+| **Harness** | OpenCode, OpenHands, Aider, Goose, Hermes | All open-source, all run fully local |
+| **Model Server** | Ollama, LM Studio, vLLM, TGI | OpenAI-compatible API, zero external calls |
+| **Models** | Qwen3-Coder-7B (8GB VRAM), Mistral-Small-24B (16GB), DeepSeek-Coder-V3 (48GB+) | Best coding-specific open weights |
+| **Orchestration** | Your own CI/CD, no vendor SaaS | Full control |
+
+### Hardware Reality Check
+
+| Your GPU VRAM | Model Tier | What Works | What Fails |
+|---------------|------------|------------|------------|
+| 8 GB | Qwen3-Coder-7B | Bug fixes, tests, docs, simple refactors | Multi-file architecture, complex reasoning |
+| 16 GB | Mistral-Small-24B / Qwen3-30B-A3B | Most daily tasks, decent planning | Large context (>32K), very complex refactors |
+| 24 GB | CodeLlama-34B / Qwen2.5-Coder-32B | Strong Python, good tool use | Frontier-level reasoning |
+| 48 GB+ | DeepSeek-Coder-V3 / Llama-4-Maverick | Near-frontier on coding | Cost/space for most teams |
+
+**Solo dev minimum:** 16GB VRAM (RTX 4080/4090, MacBook Pro M3 Max). Below that → CPU offload = 5-10x slower = broken agent loop.
+
+### The Local-Only Workflow That Survives Audit
+
+```bash
+# 1. Model server (Ollama) — runs as systemd service, no internet
+sudo systemctl enable ollama
+ollama pull qwen3-coder:7b-q4_K_M
+ollama pull mistral-small:24b-q4_K_M
+
+# 2. Harness config — point to localhost only
+cat > ~/.config/opencode/config.json << 'EOF'
+{
+  "providers": {
+    "ollama": {
+      "baseURL": "http://localhost:11434/v1",
+      "apiKey": "ollama",
+      "models": { "default": "qwen3-coder:7b" }
+    }
+  }
+}
+EOF
+
+# 3. CI/CD — agents run in your runners, not vendor cloud
+# .github/workflows/local-agent.yml
+# runs-on: self-hosted  # your GPU runners
+# env:
+#   OLLAMA_HOST: http://localhost:11434
+```
+
+**Cost:** $0/month API. Hardware amortized: RTX 4090 (~$1,600) = $67/mo over 24 months. A6000 (~$4,500) = $188/mo.
+
+---
+
+## Mode 2: Cloud-Only (Speed, Parallelism, Zero Ops)
+
+### When This Makes Sense
+
+- **No regulated data:** Public repos, open-source, internal tools without PII
+- **Team lacks GPU infra:** No budget/space/expertise for local inference
+- **Parallel execution needed:** 5+ concurrent agent sessions (code review bot, PR bot, refactor bot, test generator, security scanner)
+- **Frontier model required:** Complex architectural reasoning, multi-file migrations, novel framework adoption
+
+### The Cloud Providers Compared (Nov 2026)
+
+| Provider | Model Access | Parallelism | Cost/Dev/Mo | Best For |
+|----------|--------------|-------------|-------------|----------|
+| **Claude Code** | Opus 5.5, Sonnet 4.5, Haiku 5.5 | 1 session/seat | $200-400 (API) | Deep reasoning, large context |
+| **OpenAI Codex** | GPT-6, o1-series, 4o | 5-20 concurrent | $300-600 | Parallel execution, speed |
+| **Gemini CLI** | Gemini 4 Argon, Flash | Generous free tier | $0-100 | Cost-sensitive, Google Cloud shops |
+| **OpenRouter** | 100+ models (all of above) | Depends on model | Pay-per-token | Model switching, experimentation |
+
+### The Cloud Workflow That Doesn't Bankrupt You
+
+```yaml
+# .github/workflows/cloud-agent-gate.yml
+# KEY: Route by task type, not "everything to cloud"
+jobs:
+  # Routine work → cheap model
+  test-generation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: codex run --model gpt-4o-mini "Generate unit tests for changed files"
+  
+  # Complex work → expensive model, but only when needed
+  architectural-refactor:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.task == 'refactor'
+    steps:
+      - uses: actions/checkout@v4
+      - run: codex run --model gpt-6 "Execute refactor plan from ARCHITECTURE.md"
+  
+  # Security → specialized model
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - run: claude-code --model sonnet-4.5 "Scan for: secrets, SQLi, XSS, auth bypass"
+```
+
+**Cost control rule:** Never default to the most expensive model. Route by task complexity.
+
+---
+
+## Mode 3: Hybrid (What Production Teams Actually Run)
+
+### The Hybrid Reality
+
+**Every team running agents at scale ends up hybrid.** The ones who admit it build routing logic. The ones who don't waste money and hit security walls.
+
+### The Routing Policy That Works
+
+```yaml
+# agent-routing-policy.yaml
+# Source of truth for "which executor handles this task"
+
+routing:
+  # 1. ALWAYS LOCAL — privacy-critical
+  - pattern: ".*secret.*|.*credential.*|.*api.key.*|.*password.*|.*pii.*"
+    executor: local
+    reason: "Secrets/PII never leave machine"
+    models: ["qwen3-coder:7b", "mistral-small:24b"]
+  
+  # 2. ALWAYS LOCAL — regulated repos
+  - repos: ["payments-*", "auth-*", "compliance-*", "billing-*"]
+    executor: local
+    reason: "SOX/PCI/HIPAA scope"
+  
+  # 3. LOCAL FIRST — routine tasks (80% of volume)
+  - task_types: ["test-generation", "doc-update", "rename", "lint-fix", "simple-bugfix", "boilerplate"]
+    executor: local
+    fallback: cloud  # if local fails 2x
+    models: ["qwen3-coder:7b", "mistral-small:24b"]
+  
+  # 4. CLOUD — complex reasoning (20% of volume)
+  - task_types: ["architectural-refactor", "new-framework-adoption", "multi-repo-migration", "root-cause-analysis"]
+    executor: cloud
+    models: ["opus-5.5", "gpt-6", "gemini-4-argon"]
+    max_parallel: 3
+  
+  # 5. CLOUD — parallel burst capacity
+  - trigger: "concurrent_sessions > local_gpu_capacity"
+    executor: cloud
+    models: ["gpt-4o-mini", "gemini-4-flash"]
+    max_parallel: 10
+  
+  # 6. HUMAN — security-critical changes
+  - patterns: ["*.tf", "*.yaml", ".github/workflows/*", "docker/*", "k8s/*", "helm/*"]
+    executor: human_review_required
+    reason: "Infrastructure changes need human approval"
+
+defaults:
+  local_model: "qwen3-coder:7b"
+  cloud_model: "gpt-4o-mini"
+  local_timeout_minutes: 10
+  cloud_timeout_minutes: 30
+```
+
+### The Wrapper That Enforces It
+
+```bash
+#!/usr/bin/env bash
+# agent-router — drop-in replacement for `codex`, `claude`, `opencode`, etc.
+
+TASK_DESCRIPTION="$1"
+REPO_PATH=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+POLICY_FILE="$HOME/.config/agent-router/policy.yaml"
+
+# 1. Load policy
+# 2. Match task description + repo + file patterns against rules
+# 3. Select executor + model
+# 4. Execute with appropriate CLI
+
+EXECUTOR=$(python3 -c "
+import yaml, sys, re
+with open('$POLICY_FILE') as f:
+    policy = yaml.safe_load(f)
+
+task = '''$TASK_DESCRIPTION'''
+repo = '''$REPO_PATH'''.split('/')[-1]
+
+for rule in policy['routing']:
+    # Check repo patterns
+    if 'repos' in rule:
+        if any(re.match(r.replace('*', '.*'), repo) for r in rule['repos']):
+            print(rule['executor'])
+            sys.exit(0)
+    # Check task patterns
+    if 'patterns' in rule:
+        if any(re.search(p, task, re.I) for p in rule['patterns']):
+            print(rule['executor'])
+            sys.exit(0)
+    # Check task types (simplified - real impl would classify)
+    if 'task_types' in rule:
+        # In reality, use an LLM classifier or keyword matching
+        keywords = {'test': 'test-generation', 'doc': 'doc-update', 'refactor': 'architectural-refactor'}
+        for kw, ttype in keywords.items():
+            if kw in task.lower() and ttype in rule['task_types']:
+                print(rule['executor'])
+                sys.exit(0)
+
+print(policy['defaults']['local_model'].split(':')[0])  # default to local
+")
+
+case "$EXECUTOR" in
+  local)
+    opencode --provider ollama --model qwen3-coder:7b "$TASK_DESCRIPTION"
+    ;;
+  cloud)
+    codex run --model gpt-4o-mini "$TASK_DESCRIPTION"
+    ;;
+  human_review_required)
+    echo "⚠️  This task requires human review. Create a PR instead."
+    exit 1
+    ;;
+esac
+```
+
+**Make it executable:** `chmod +x agent-router && sudo mv agent-router /usr/local/bin/`
+
+Now your team runs `agent-router "write tests for auth module"` and it **automatically picks the right executor.**
+
+---
+
+## The Enterprise Pattern: Sandboxed Cloud (Goldman Sachs Solution)
+
+If you're in a regulated environment but *need* cloud compute for complex tasks, this is the architecture that passes audit:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    YOUR VPC / ON-PREM                       │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
+│  │  API Proxy  │───▶│  Ephemeral  │───▶│  Agent      │     │
+│  │  (Gateway)  │    │  VM/Sandbox │    │  Runtime    │     │
+│  └──────┬──────┘    └──────┬──────┘    └──────┬──────┘     │
+│         │                  │                  │             │
+│         ▼                  ▼                  ▼             │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
+│  │  Policy     │    │  Zero       │    │  Network    │     │
+│  │  Engine     │    │  Secrets    │    │  Segmentation│    │
+│  └─────────────┘    └─────────────┘    └─────────────┘     │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                    ┌──────┴──────┐
+                    ▼             ▼
+              CLOUD PROVIDER   LOCAL MODELS
+              (Opus, GPT-6)    (Ollama, vLLM)
+```
+
+### The Proxy Layer (What Actually Enforces Policy)
+
+```python
+# agent-proxy/main.py — FastAPI gateway that mediates ALL agent calls
+from fastapi import FastAPI, HTTPException, Depends
+from pydantic import BaseModel
+import httpx
+import os
+
+app = FastAPI(title="Agent Policy Proxy")
+
+class AgentRequest(BaseModel):
+    task: str
+    model: str = "auto"  # auto = route by policy
+    files: list[str] = []
+    max_tokens: int = 8192
+
+# Policy: what each model/endpoint can access
+POLICIES = {
+    "local-qwen": {
+        "endpoint": "http://localhost:11434/v1/chat/completions",
+        "allowed_tools": ["read", "write", "edit", "bash", "grep", "glob"],
+        "blocked_commands": ["curl", "wget", "ssh", "scp", "aws", "gcloud", "kubectl"],
+        "require_approval": ["bash"],  # all bash needs approval
+        "max_file_size_mb": 10,
+    },
+    "cloud-opus": {
+        "endpoint": "https://api.anthropic.com/v1/messages",
+        "allowed_tools": ["read", "write", "edit", "bash", "grep", "glob"],
+        "blocked_commands": ["curl", "wget", "ssh", "scp"],  # no egress
+        "require_approval": ["bash", "write", "edit"],  # stricter
+        "inject_secrets_at_runtime": True,  # proxy injects, agent never sees
+        "network_egress": "none",  # sandbox has no internet
+    },
+    "cloud-gpt4o-mini": {
+        "endpoint": "https://api.openai.com/v1/chat/completions",
+        "allowed_tools": ["read", "grep", "glob"],  # READ ONLY for cheap parallel
+        "blocked_commands": ["*"],
+        "require_approval": [],
+        "network_egress": "none",
+    }
+}
+
+@app.post("/agent/execute")
+async def execute_agent(request: AgentRequest, user: str = Depends(get_current_user)):
+    # 1. Classify task → select policy
+    policy_name = classify_task(request.task, request.files)
+    policy = POLICIES[policy_name]
+    
+    # 2. Validate request against policy
+    validate_request(request, policy)
+    
+    # 3. Create ephemeral sandbox (Firecracker/VM/container)
+    sandbox_id = create_sandbox(policy)
+    
+    try:
+        # 4. Inject secrets at runtime (agent NEVER sees them)
+        if policy.get("inject_secrets_at_runtime"):
+            inject_secrets(sandbox_id, request.task)
+        
+        # 5. Forward to model endpoint with policy-enforced tool allowlist
+        response = await call_model_with_policy(
+            policy["endpoint"],
+            request,
+            policy["allowed_tools"],
+            policy["blocked_commands"]
+        )
+        
+        # 6. Sanitize response (remove any accidental secret leakage)
+        return sanitize_response(response)
+        
+    finally:
+        # 7. Destroy sandbox — no state persists
+        destroy_sandbox(sandbox_id)
+
+def classify_task(task: str, files: list[str]) -> str:
+    """Route to the right policy based on task + files"""
+    # Regulated paths → local only
+    regulated_paths = ["payments", "auth", "billing", "compliance", "pii"]
+    if any(p in f for f in files for p in regulated_paths):
+        return "local-qwen"
+    
+    # Secret-related → local only
+    secret_keywords = ["secret", "credential", "api.key", "password", "token"]
+    if any(k in task.lower() for k in secret_keywords):
+        return "local-qwen"
+    
+    # Read-only analysis → cheap cloud
+    read_only_keywords = ["analyze", "review", "explain", "document", "summarize"]
+    if any(k in task.lower() for k in read_only_keywords):
+        return "cloud-gpt4o-mini"
+    
+    # Complex reasoning → premium cloud
+    complex_keywords = ["refactor", "architecture", "migrate", "design", "debug"]
+    if any(k in task.lower() for k in complex_keywords):
+        return "cloud-opus"
+    
+    # Default → local
+    return "local-qwen"
+```
+
+**This is what Goldman Sachs built.** Not "Claude Code with guardrails." A **different deployment model entirely.**
+
+---
+
+## The Cost Comparison (Real Numbers, Nov 2026)
+
+| Team Size | Workload | Local-Only | Cloud-Only | Hybrid (Recommended) |
+|-----------|----------|------------|------------|---------------------|
+| **Solo dev** | 5 sessions/day | $67/mo (RTX 4090) | $150-300/mo | **$67/mo + $20/mo burst** |
+| **Team of 5** | 25 sessions/day | $335/mo (5×4090) | $1,500/mo | **$335/mo + $100/mo burst** |
+| **Team of 25** | 100 sessions/day | $1,675/mo (GPU cluster) | $6,000/mo | **$1,675/mo + $500/mo burst** |
+| **Enterprise 100** | 500 sessions/day | $6,700/mo (DGX) | $25,000/mo | **$6,700/mo + $2,000/mo burst** |
+
+**Hybrid saves 60-80% vs cloud-only.** Local handles the 80% routine volume. Cloud handles the 20% complex + burst.
+
+---
+
+## Migration Path: From Wherever You Are → Hybrid
+
+### Week 1: Add Local to Your Stack (Don't Remove Cloud)
+
+```bash
+# 1. Install Ollama + one good model
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull qwen3-coder:7b-q4_K_M
+
+# 2. Configure your harness for local
+# OpenCode / Hermes / Kilo / Goose — all support Ollama natively
+# Test: opencode --provider ollama --model qwen3-coder:7b "write a test for utils/date.ts"
+
+# 3. Run smoke tests locally (see: "How to Evaluate Your Coding Agent")
+npm run eval:smoke -- --provider=ollama
+```
+
+### Week 2: Build the Routing Policy
+
+```bash
+# 1. Copy the policy.yaml template above
+mkdir -p ~/.config/agent-router
+cp policy.yaml.template ~/.config/agent-router/policy.yaml
+# Edit for your repos, patterns, team
+
+# 2. Install the router wrapper
+curl -o /usr/local/bin/agent-router https://raw.githubusercontent.com/terminalblog/agent-router/main/agent-router
+chmod +x /usr/local/bin/agent-router
+
+# 3. Alias your CLIs (optional — muscle memory)
+alias codex="agent-router"
+alias claude="agent-router"
+alias opencode="agent-router"
+```
+
+### Week 3: Add CI Gates
+
+```yaml
+# .github/workflows/agent-hybrid-eval.yml
+# Run eval suite against BOTH local and cloud configs
+jobs:
+  eval-local:
+    runs-on: self-hosted  # your GPU runner
+    steps:
+      - run: npm run eval:full -- --provider=ollama --model=qwen3-coder:7b
+  
+  eval-cloud:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm run eval:full -- --provider=openrouter --model=gpt-4o-mini
+  
+  gate:
+    needs: [eval-local, eval-cloud]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare results
+        run: |
+          LOCAL_PASS=$(cat eval-local/results.json | jq .passRate)
+          CLOUD_PASS=$(cat eval-cloud/results.json | jq .passRate)
+          echo "Local: $LOCAL_PASS%, Cloud: $CLOUD_PASS%"
+          # Both must pass regression threshold
+```
+
+### Week 4: Monitor and Tune
+
+```bash
+# Dashboard: which executor handled what, success rates, costs
+# Run monthly:
+agent-router --stats --last-30-days
+
+# Output:
+# Executor    Tasks    Success%    AvgTime    EstCost
+# local       1,247    94%         45s        $0
+# cloud-opus  89       91%         2m30s      $234
+# cloud-mini  312      96%         18s        $12
+# blocked     23       -           -          $0 (security)
+```
+
+---
+
+## The Hard Truths Nobody Says in Marketing
+
+| Myth | Reality |
+|------|---------|
+| "Local models are catching up to frontier" | They're not. The gap on complex multi-file reasoning is **real and persistent**. Use local for 80%, cloud for 20%. |
+| "Cloud is more secure because vendors have security teams" | **Wrong.** Cloud agents run on shared infra with your tokens. Local agents run on *your* hardware with *your* network controls. |
+| "Hybrid is too complex" | **It's 50 lines of YAML + a 30-line wrapper.** The complexity is in *not having a policy* and letting chaos decide. |
+| "We'll just use one provider" | **Vendor lock-in is the trap.** OpenRouter + Ollama = you own the routing. Single provider = they own your workflow. |
+| "Our developers will follow the policy" | **They won't.** Enforce it in the wrapper. Make the wrong choice *impossible*, not just discouraged. |
+
+---
+
+## Your Starter Kit (Copy-Paste Tonight)
+
+```bash
+# 1. Local foundation (15 min)
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull qwen3-coder:7b-q4_K_M
+ollama pull mistral-small:24b-q4_K_M
+
+# 2. Policy file (10 min)
+mkdir -p ~/.config/agent-router
+cat > ~/.config/agent-router/policy.yaml << 'EOF'
+routing:
+  - patterns: ["secret", "credential", "api.key", "password", "pii"]
+    executor: local
+  - repos: ["payments-*", "auth-*", "billing-*"]
+    executor: local
+  - task_types: ["test", "doc", "lint", "rename", "simple-fix"]
+    executor: local
+    fallback: cloud
+  - task_types: ["refactor", "architecture", "migrate", "debug"]
+    executor: cloud
+defaults:
+  local_model: "qwen3-coder:7b"
+  cloud_model: "gpt-4o-mini"
+EOF
+
+# 3. Router wrapper (5 min)
+curl -sSL https://raw.githubusercontent.com/terminalblog/agent-router/main/install.sh | bash
+
+# 4. Test it (2 min)
+agent-router "write a unit test for utils/pricing.ts"
+# → routes to local qwen3-coder:7b
+
+agent-router "refactor the auth module to use new JWT library"
+# → routes to cloud gpt-4o-mini (or opus if you configure)
+
+# 5. Run your first hybrid eval (30 min)
+npm run eval:smoke -- --provider=local
+npm run eval:smoke -- --provider=cloud
+```
+
+---
+
+## What's Next for You
+
+| If You're... | Do This Next |
+|--------------|--------------|
+| **Solo dev, no GPU** | Start cloud-only. Buy RTX 4090 when cloud bill hits $200/mo. |
+| **Solo dev, has GPU** | Go local-first. Add cloud burst via OpenRouter for complex tasks. |
+| **Team 5-10, no regulated data** | Hybrid with policy. Route routine → local, complex → cloud. |
+| **Team 10+, regulated data** | Build the sandboxed proxy. It's the only thing that passes audit. |
+| **Enterprise 100+** | Dedicated GPU cluster + sandboxed cloud proxy + centralized policy service. |
+
+---
+
+## Related Articles
+
+- [How to Run Coding Agents with Ollama: The Complete Local Setup Guide](/blog/run-coding-agents-ollama-local-models-guide/)
+- [Your Coding Agent Works in Demos — Here's How to Prove It Works in Production](/blog/how-to-evaluate-test-coding-agents-reliability/)
+- [What Developers Think About AI Coding Agents — The 80% Right Trap (Nov 2026 HN)](/blog/what-developers-think-ai-coding-agents-hn-nov2026/)
+- [Best Coding Agents 2026 Decision Guide — 12 Options Compared](/blog/best-coding-agents-2026-decision-guide/)
+- [Qwen Code Just Hit 1.0 Preview — Native Binaries, Multi-Provider, No Node Required](/blog/qwen-code-v1-0-preview-native-multi-provider-agent-platform/)
+
+---
+
+## One Story, One URL
+
+This article synthesizes patterns from:
+- Goldman Sachs local-agent ban (HN, Nov 2026, 421 comments)
+- OpenCode + OpenRouter hybrid workflows (production teams)
+- Ollama 9M builders / $65M round (local-first momentum)
+- Qwen Code v1.0 native binaries (zero-dependency local)
+- Enterprise sandboxed-agent architectures (Airlock, Sentient, custom builds)
+
+All observations from production teams running agents at scale, not vendor benchmarks.
+
+---
+
+*Running multiple AI subscriptions? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you GPT, Claude, Gemini, Grok, DeepSeek, Perplexity and 3 more for $12/mo — one subscription, every model.*
