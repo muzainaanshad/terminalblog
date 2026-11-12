@@ -1,75 +1,162 @@
 ---
-title: "OpenHands v1.38 Just Added Conversation Budgets — Your Agent Finally Shows You the Meter"
-description: "OpenHands v1.38 (Nov 10) adds conversation budget meters, Paper theme for Agent Canvas, automation-aware installs, and agent-profile-scoped automations. Plus 30+ bug fixes including Docker sandbox persistence and focus stealing fixes."
+title: "OpenHands v1.40 Just Dropped Agent Canvas Desktop App — Plus Budgets, Paper Theme, and Automation Fixes"
+description: "OpenHands v1.40 (Nov 12) ships the Agent Canvas desktop app with macOS/Windows/Linux installers, improves Codex subscription auth, fixes Docker sandbox persistence, and adds 30+ bug fixes. v1.39 (Nov 11) added dashboard owner filter, Paper theme refinements, and automation fixes. v1.38 (Nov 10) introduced conversation budget meters and automation-aware installs."
 pubDate: 2026-11-10
-updatedDate: 2026-11-11
+updatedDate: 2026-11-12
 author: "Anshad"
-tags: ["openhands", "all-hands-ai", "release", "v1.38.0", "agent-canvas", "automation", "budget-meter"]
+tags: ["openhands", "all-hands-ai", "release", "v1.38.0", "v1.39.0", "v1.40.0", "agent-canvas", "automation", "budget-meter"]
 tool: "openhands"
 category: "releases"
 ---
 
-OpenHands **v1.38.0** dropped November 10. The headline feature is small but mighty: **conversation budgets with semantic meter fills** — you finally see how much context/tokens you've burned in real time.
+OpenHands **v1.40.0** dropped November 12 — and it's the first release with **official Agent Canvas desktop installers** for macOS, Windows, and Linux. v1.39.0 (Nov 11) polished the dashboard and Paper theme. v1.38.0 (Nov 10) introduced **conversation budget meters** — the feature that changes how you pace a session.
 
 ---
 
-## The Feature You'll Actually Notice: Budget Meters
+## The One-Line Summary
 
-**What it is:** A visual meter in the chat UI showing your conversation's token/context usage. Semantic fills (green → yellow → red) so you know when you're approaching limits *before* the agent starts hallucinating or truncating.
+**v1.40.0 (Nov 12) → Agent Canvas desktop app (DMG/EXE/AppImage/DEB), Codex subscription auth guidance, Docker sandbox persistence, 30+ bug fixes.**  
+**v1.39.0 (Nov 11) → Dashboard filter by owner, chat timestamp UX, Paper theme print-style, automation fixes.**  
+**v1.38.0 (Nov 10) → Conversation budget meters (semantic green→yellow→red), Paper theme, automation-aware installs, agent-profile-scoped automations, Docker workspace persistence, focus-stealing fixes.**
+
+---
+
+## v1.40.0 (Nov 12) — Agent Canvas Goes Desktop
+
+### Official Desktop Installers
+
+This is the headline: **Agent Canvas now has native desktop packages** — no more "how do I run this locally?" friction.
+
+| Platform | Artifact | Install |
+|----------|----------|---------|
+| **macOS (Apple Silicon)** | `OpenHands-Agent-Canvas-1.40.0-universal.dmg` | Drag to Applications, then `xattr -dr com.apple.quarantine "/Applications/OpenHands Agent Canvas.app"` |
+| **macOS (Intel)** | Same universal DMG | Same |
+| **Windows x64** | `OpenHands-Agent-Canvas-Setup-1.40.0.exe` | Run installer |
+| **Linux x64** | `OpenHands.Agent.Canvas-1.40.0.AppImage` | `chmod +x && ./OpenHands.Agent.Canvas-1.40.0.AppImage` |
+| **Linux (Debian/Ubuntu)** | `agent-canvas_1.40.0_amd64.deb` | `sudo dpkg -i agent-canvas_1.40.0_amd64.deb` |
+| **Docker (all)** | `ghcr.io/all-hands-ai/openhands:1.40.0` | `docker pull ghcr.io/all-hands-ai/openhands:1.40.0` |
+
+> **macOS Gatekeeper note:** The app isn't signed with an Apple Developer ID yet. After moving to Applications, run:
+> ```sh
+> xattr -dr com.apple.quarantine "/Applications/OpenHands Agent Canvas.app"
+> ```
+> This clears the "damaged" warning once. Signing + notarization tracked in [#16774](https://github.com/OpenHands/OpenHands/issues/16774).
+
+### Codex Subscription Authentication Guidance
+
+If you use OpenHands with a **Codex subscription** (the ChatGPT coding agent plan), v1.40 adds clearer guidance during setup — no more guessing which API keys go where.
+
+### Key Bug Fixes (v1.40)
+
+| Fix | Impact |
+|-----|--------|
+| Chat: keep messages at tied history page boundaries | No more missing messages at page edges |
+| Chat: prevent delayed echoes from deleting newer drafts | Your in-progress message survives network blips |
+| Activate home model pick when self-hosted turns Agent Profiles off | Model picker stays correct |
+| Git: use repo's real default branch instead of assuming "main" | Works with `master`, `trunk`, `develop`, etc. |
+| Indonesian translations for Codex subscription keys | i18n coverage |
+
+---
+
+## v1.39.0 (Nov 11) — Dashboard & Theme Polish
+
+### Dashboard Filter by Owner (Service Accounts)
+
+The Automations dashboard now has a **filter by owner** with a **Service accounts** option. If you run automations as service accounts (CI, scheduled jobs, bots), you can now isolate their runs from human-triggered ones.
+
+### Chat Timestamp UX
+
+Message hover timestamps now sit **closer to their message** — less eye travel, faster context.
+
+### Stop Hook Feedback Stays Out of Chat
+
+When a `Stop` hook runs (e.g., on `/compact`), its feedback no longer pollutes the chat transcript. Clean separation.
+
+### Paper Theme: Aged Newsprint Look
+
+The **Paper theme** (added in v1.38) now renders with an **aged newsprint aesthetic** — readable warnings, warm tones, easier on the eyes for marathon sessions. It's not just a color swap; it's a considered reading experience.
+
+### Automation Fixes
+
+- **Event Key dropdown** in automations now opens populated by default (no more clicking twice)
+- **Backend profile selection** respected — automations don't override your profile choice
+
+### Setup Guide Polish
+
+- Tour starts in an open dialog, ends when that dialog closes
+- Unanswered close questions dropped when guide hides — no zombie prompts
+
+---
+
+## v1.38.0 (Nov 10) — The Features That Change Daily Work
+
+### Conversation Budget Meters (The Killer Feature)
+
+**A visual meter in the chat UI showing token/context usage** — semantic fills (green → yellow → red). You finally see the "fuel gauge" *before* the agent starts hallucinating or truncating.
 
 **Why it matters:** Before, you'd hit a context limit and wonder why the agent forgot the first half of the conversation. Now you see the meter creeping up. You can `/compact` proactively, start a fresh session, or just know "okay, one more big task then I reset."
 
 **For beginners:** It's a fuel gauge. Green = plenty of room. Yellow = think about compacting. Red = the agent is running on fumes.
 
----
+### Automation-Aware Installs (`mode=automation`)
 
-## Paper Theme for Agent Canvas
-
-**What it is:** A new **Paper theme** — clean, high-contrast, easy on the eyes for long sessions. Joins the existing Light+/Solarized contrast pass (also finished in this release).
-
-**Why it matters:** Agent Canvas is where you spend hours. Themes aren't cosmetic — they're ergonomics. Paper reduces eye strain on marathon coding sessions.
-
----
-
-## Automation-Aware Installs (Big for Teams)
-
-**What it is:** `mode=automation` + `POST /plugin-spec` lets you install OpenHands configured for automation *without* the full interactive setup. Plugin specs can be pre-configured and deployed programmatically.
+`mode=automation` + `POST /plugin-spec` lets you install OpenHands configured for automation *without* the full interactive setup. Plugin specs can be pre-configured and deployed programmatically.
 
 **Why it matters:** CI/CD pipelines, fleet deployments, "give every developer the same agent config" — now scriptable. No more "run the wizard on 50 machines."
 
-**For beginners:** If you manage a team, you can now bake your standard agent setup (plugins, models, permissions) into a deployable spec. New hire runs one command → gets your exact setup.
+**For beginners:** If you manage a team, bake your standard agent setup (plugins, models, permissions) into a deployable spec. New hire runs one command → gets your exact setup.
 
----
+### Agent-Profile-Scoped Automations
 
-## Agent-Profile-Scoped Automations
+Automations (prompt presets, plugin presets) can now run **from a specific agent profile** instead of always using `default`.
 
-**What it is:** Automations (prompt presets, plugin presets) can now run **from a specific agent profile** instead of always using `default`.
+**Why it matters:** Have a "code-review" profile with strict permissions and a "feature-dev" profile with broader access. Automations pick the right one. No more permission collisions.
 
-**Why it matters:** You can have a "code-review" profile with strict permissions and a "feature-dev" profile with broader access. Automations pick the right one. No more permission collisions.
+### Docker Workspace Persistence
 
----
+**Conversation workspaces now live in a persisted volume** — your work survives container restarts. No more "where did my files go?" after `docker restart`.
 
-## Key Bug Fixes (30+)
+### Focus-Stealing Fixed
+
+Launch view no longer yanks focus when you navigated away. Type in chat, don't fight the UI.
+
+### Other Notable Fixes (v1.38)
 
 | Fix | Impact |
 |-----|--------|
-| Docker: exit non-zero when agent-server stops responding | CI pipelines actually fail instead of hanging |
-| Docker: keep conversation workspaces in persisted volume | Your work survives container restarts |
-| Composer stop interrupts agent (not pausing Cloud sandbox) | `Stop` means *stop*, not "pause the cloud VM" |
-| Focus stealing: launch view doesn't yank focus when you navigated away | Type in chat, don't fight the UI |
-| Onboarding: ACP pick saves to its own profile, not `default` | Editor integrations don't pollute your main profile |
+| Composer stop interrupts agent (not pausing Cloud sandbox) | `Stop` means *stop* |
 | Fail fast on unwritable Docker bind mounts + documented fix | Clear error instead of mysterious permission denied |
-| Reconcile active LLM profile against backend model (race fix) | Model picker stays in sync with what's actually running |
+| Reconcile active LLM profile against backend model (race fix) | Model picker stays in sync |
 | Diff viewer: release models after editor teardown | Memory doesn't leak when you close diff tabs |
 | Hide agent profile switch when self-hosted turns Agent Profiles off | UI respects your config |
 
 ---
 
-## What's Still Cooking
+## Quick Version Context
 
-- **macOS app signing/notarization** — still shows "damaged" on download; run `xattr -dr com.apple.quarantine "/Applications/OpenHands Agent Canvas.app"` once after moving to Applications
-- **Bitbucket Data Center template** — filter chip naming fixed
-- **Enterprise license banner** in Canvas — visible for licensed instances
+| Version | Date | Type | Focus |
+|---------|------|------|-------|
+| **v1.40.0** | **Nov 12, 2026** | **Stable (Latest)** | **Agent Canvas desktop app (DMG/EXE/AppImage/DEB), Codex auth guidance, Docker persistence, 30+ fixes** |
+| **v1.39.0** | **Nov 11, 2026** | **Stable** | **Dashboard owner filter, chat timestamp UX, Paper theme newsprint, automation fixes** |
+| **v1.38.0** | **Nov 10, 2026** | **Stable** | **Budget meters, Paper theme, automation-aware installs, profile-scoped automations, Docker persistence, focus fixes** |
+| v1.37.0 | Oct 2026 | Stable | Agent Canvas automations, Mermaid diagrams |
+| v1.36.0 | Oct 2026 | Stable | — |
+| v1.35.0 | Oct 2026 | Stable | Cloud remembers repo, drag sidebar, agent status |
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Want the desktop app** | **Yes** — native installers finally here |
+| **Use Codex subscription** | **Yes** — auth guidance added |
+| **Run OpenHands in Docker/CI** | **Yes** — workspace persistence, non-zero exit on agent-server stop |
+| **Manage a team / fleet** | **Yes** — `mode=automation` for scriptable config |
+| **Hit context limits unexpectedly** | **Yes** — budget meters = proactive pacing |
+| **Use automations heavily** | **Yes** — profile-scoped, owner-filtered, Event Key UX |
+| **Run on macOS** | **Yes** — but run the `xattr` command once after install |
+| **On v1.37 and happy** | **Yes** — zero breaking changes, pure polish + desktop app |
 
 ---
 
@@ -77,33 +164,57 @@ OpenHands **v1.38.0** dropped November 10. The headline feature is small but mig
 
 ```bash
 # Docker (recommended)
-docker pull ghcr.io/all-hands-ai/openhands:1.38.0
+docker pull ghcr.io/all-hands-ai/openhands:1.40.0
 
 # Or latest
 docker pull ghcr.io/all-hands-ai/openhands:latest
 
-# Desktop: auto-updater in app
+# Desktop: auto-updater in app (once on v1.38+)
 # Or download from GitHub Releases
+# https://github.com/OpenHands/OpenHands/releases/tag/v1.40.0
+```
+
+**First things to verify after update:**
+
+```bash
+# 1. Check budget meter in chat (top-right of conversation)
+# Green → yellow → red as context fills
+
+# 2. Test desktop app (if downloaded)
+# macOS: xattr -dr com.apple.quarantine "/Applications/OpenHands Agent Canvas.app"
+# Open → sign in → workspace loads
+
+# 3. Test automation-aware install (if you manage a team)
+# POST /plugin-spec with mode=automation → headless configured instance
+
+# 4. Check automations dashboard filter
+# Owner dropdown → "Service accounts" option visible
 ```
 
 ---
 
 ## The Bottom Line
 
-v1.38 is a **polish release with one killer feature** (budget meters). The rest is: themes that don't hurt your eyes, automation that deploys cleanly, profiles that don't collide, and Docker that doesn't eat your workspace.
+**Three releases in three days. Zero breaking changes. Compound polish.**
+
+- **v1.38** gave you the **budget meter** (fuel gauge for context) + **automation-aware installs** (fleet-ready)
+- **v1.39** polished the **dashboard**, **Paper theme**, and **automation UX**
+- **v1.40** ships the **desktop app** — the missing piece for "just run it locally"
 
 If you run OpenHands daily — **update for the budget meter alone**. It changes how you pace a session.
 
-If you manage a team — **update for `mode=automation`**. Scriptable agent config is the difference between "works on my machine" and "works on every machine."
+If you manage a team — **update for `mode=automation` + desktop app**. Scriptable agent config + native installers = "works on every machine" becomes real.
 
-
-## Related articles
-
-- [Claude Code v2.1.318 Just Landed — The Stability Arc Continues With Mods Effort Control, Auth Expiry Warnings, and 100+ Fixes](/blog/claude-code-v2-1-317-stability-surge/)
-- [Qwen Code v0.26 Just Became a Full Multi-Agent Platform — Local, Remote, and Everything In Between](/blog/qwen-code-v0-26-managed-agent-desktop-local-ssh/)
-- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
 ---
 
-*OpenHands is open-source (MIT) by [All Hands AI](https://github.com/all-hands-ai). Repository: [github.com/all-hands-ai/openhands](https://github.com/all-hands-ai/openhands). Release: [v1.38.0](https://github.com/all-hands-ai/openhands/releases/tag/v1.38.0).*
+## Related Articles
+
+- [Claude Code v2.1.322 Just Got Fast Mode on Vertex AI](/blog/claude-code-v2-1-322-vertex-fast-mode/)
+- [Qwen Code v1.0 Preview — Native Binaries, Multi-Provider, No Node Required](/blog/qwen-code-v1-0-preview-native-multi-provider-agent-platform/)
+- [Cline Desktop Just Got an /compact Command](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+
+---
+
+*OpenHands is open-source (MIT) by [All Hands AI](https://github.com/all-hands-ai). Repository: [github.com/all-hands-ai/openhands](https://github.com/all-hands-ai/openhands). Releases: [v1.40.0](https://github.com/all-hands-ai/openhands/releases/tag/v1.40.0) · [v1.39.0](https://github.com/all-hands-ai/openhands/releases/tag/v1.39.0) · [v1.38.0](https://github.com/all-hands-ai/openhands/releases/tag/v1.38.0). Published November 10-12, 2026.*
 
 *Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
