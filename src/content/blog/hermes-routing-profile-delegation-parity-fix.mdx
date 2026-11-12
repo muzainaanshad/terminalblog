@@ -2,12 +2,11 @@
 title: "Hermes Routing Fix Just Solved One of the Most Annoying Multi-Provider Bugs"
 description: "Profile and delegation parity now preserved when routing through portals. Your provider config won't get silently dropped anymore."
 pubDate: "2026-07-10T10:00:00Z"
-updatedDate: "2026-10-01T10:00:00Z"
-tags: ["routing", "multi-provider", "portal", "bugfix", "viral"]
+updatedDate: "2026-11-12T10:00:00Z"
+tags: ["routing", "multi-provider", "portal", "bugfix", "viral", "hermes", "provider-routing"]
 tool: "hermes"
 author: "kira"
 ---
-
 Hermes's provider routing system is complex by design. You can route through Nous Portal, custom providers, OpenRouter — sometimes all in the same session. But a bug was causing profile and delegation context to get dropped during routing.
 
 ## The Bug
@@ -53,6 +52,17 @@ When the `planner` agent delegated to `reviewer`, the request would go through N
 
 After the fix, the delegation preserves the full context. The `reviewer` agent runs with `claude-4-opus` exactly as configured.
 
+## How Hermes Routing Works Under the Hood
+
+Hermes's routing layer isn't a simple passthrough. It's a **context-aware orchestration layer** that:
+
+1. **Preserves provider identity** — The full provider config (API base, headers, auth, model capabilities) travels with every routed request
+2. **Maintains delegation chains** — Subagent context (parent, depth, assigned tools) survives portal hops
+3. **Handles capability negotiation** — Routes vision tasks to vision models, reasoning tasks to reasoning models, code tasks to code-optimized models
+4. **Enables cost-aware routing** — Optional routing table that considers price per token alongside capabilities
+
+The portal routing fix ensures all of this works even when requests traverse Nous Portal — the managed inference layer that handles auth, billing, and model availability for teams.
+
 ## What's Next
 
 Hermes's routing system is getting more capable with each fix. The combination of provider routing, profile preservation, and delegation parity makes it one of the most sophisticated multi-provider systems in the open-source AI agent space.
@@ -60,6 +70,7 @@ Hermes's routing system is getting more capable with each fix. The combination o
 ### Related Work
 
 This fix pairs well with Hermes's existing:
+
 - **Provider health checks** — automatic failover when a provider is degraded
 - **Cost-aware routing** — routing table that considers price per token
 - **Capability-based routing** — send vision tasks to vision models, reasoning tasks to reasoning models
@@ -75,3 +86,5 @@ The routing layer is becoming a true orchestrator, not just a passthrough.
 - [Hermes Agent v0.19.1 Quicksilver: 80% Faster Starts, Smart Approvals, and Secrets That Survive](/blog/hermes-agent-v019-quicksilver-80-percent-faster/)
 - [Hermes Agent Deep Dive: The Most Capable Open-Source Autonomous Coding Assistant](/blog/deep-dive-hermes-agent-autonomous-coding-assistant/)
 - [Hermes Agent v0.20.0 (Herald): Voice That Interrupts, A2A Agent Chat, and Webhooks — Beginners Guide](/blog/hermes-agent-v020-herald-voice-a2a-webhooks/)
+- [Hermes Skill System Renovate Overhaul](/blog/hermes-skill-system-renovate-overhaul/)
+- [Hermes on Windows Finally Works the Way It Should](/blog/hermes-windows-self-heal-venv-update/)
