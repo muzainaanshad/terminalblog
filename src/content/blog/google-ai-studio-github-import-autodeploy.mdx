@@ -1,9 +1,9 @@
 ---
 title: "Google AI Studio Turns Your GitHub Repo Into a Live App With One Import"
-description: "Google AI Studio's Build mode rolled out GitHub repo import with auto-deploy, collapsing the gap between a codebase and a running AI app in a single step."
+description: "Google AI Studio's Build mode rolled out GitHub repo import with auto-deploy, collapsing the gap between a codebase and a running AI app in a single step. Updated with real workflow examples and comparison to alternatives."
 pubDate: "2026-07-12T20:30:00Z"
-updatedDate: "2026-07-21T11:30:00Z"
-tags: ["news", "launches", "google", "ai-studio", "deploy"]
+updatedDate: "2026-11-13T04:30:00Z"
+tags: ["news", "launches", "google", "ai-studio", "deploy", "workflow"]
 tool: "industry"
 author: "aurora_feed"
 image: "/api/og?title=Google+AI+Studio+Turns+Your+GitHub+Repo+Into+a+Live+App&tool=launches"
@@ -26,6 +26,69 @@ The developer-tool-to-platform trajectory here mirrors what Anthropic did when i
 
 For coding agent users, the practical question is whether Build mode's auto-deploy works with agent-generated code. Early reports suggest it handles boilerplate-heavy projects well (React apps, API backends) but struggles with unconventional directory structures — exactly the kind of output a coding agent might produce if you don't constrain it. The [complete guide to AI coding agents in 2026](/blog/complete-guide-ai-coding-agents-2026/) maps which agents produce deploy-friendly codebases versus ones that need manual cleanup.
 
+## Real workflow: Agent → GitHub → AI Studio → Live
+
+Here's the concrete pattern that's working for solo developers and small teams:
+
+```bash
+# 1. Agent generates the project
+# (Claude Code / Codex / Hermes / OpenCode / etc.)
+cd my-new-app
+# Agent writes: Next.js + Prisma + NextAuth + API routes
+
+# 2. Push to GitHub
+git init && git add . && git commit -m "Initial commit from agent"
+gh repo create my-new-app --private --push
+
+# 3. Import in AI Studio Build
+# Open https://aistudio.google.com/build
+# Click "Import from GitHub" → select repo → Deploy
+# Result: https://my-new-app-xyz.run.app (live in ~3 minutes)
+```
+
+**What the agent must produce for this to work:**
+- Standard framework structure (Next.js `app/` or `pages/`, `package.json` with build script)
+- Environment variables referenced via `process.env` or `import.meta.env` (not hardcoded)
+- Database config that uses standard connection strings (DATABASE_URL, etc.)
+- No custom Dockerfile or complex build steps
+
+**What breaks the flow:**
+- Monorepo structures without clear entry points
+- Custom build scripts that Cloud Run doesn't recognize
+- Private npm registries without auth in the build environment
+- File-based databases (SQLite) — use Cloud SQL or PlanetScale instead
+
+## Comparison: AI Studio vs. the alternatives
+
+| Platform | Trigger | Config | Best For | Limitations |
+|----------|---------|--------|----------|-------------|
+| **AI Studio Build** | GitHub import | Zero (auto-detect) | Prototypes, internal tools, agent output | No staging, limited env control, Google Cloud only |
+| **Vercel** | Git push | `vercel.json` optional | Production Next.js, preview deployments | Costs at scale, vendor lock-in |
+| **Railway** | Git push | `railway.json` / Nixpacks | Full-stack with databases, background workers | Less generous free tier |
+| **Fly.io** | `fly deploy` | `fly.toml` + Dockerfile | Control, global distribution, any language | Steeper learning curve |
+| **Cloud Run (direct)** | `gcloud run deploy` | `Dockerfile` or buildpacks | Enterprise, custom runtimes, VPC | Most config, most control |
+
+AI Studio Build sits at the "zero config" end — you trade control for speed. It's the only one that ingests a GitHub repo *and* deploys without any platform-specific files in your repo.
+
+## When to use each
+
+**Use AI Studio Build when:**
+- You need a working URL in 5 minutes from a GitHub repo
+- The project is a prototype, demo, or internal tool
+- You're iterating with an agent and don't want to maintain CI
+- The team has Google Cloud credits or free tier covers it
+
+**Move to Vercel/Railway/Fly when:**
+- You need preview deployments per PR
+- You need custom domains, edge functions, or cron jobs
+- The app has paying users and needs SLA-backed hosting
+- You need PostgreSQL/Redis managed by the platform
+
+**Use Cloud Run directly when:**
+- You're already on Google Cloud with VPC/networking requirements
+- You need custom runtimes (Bun, Deno, Go, Rust, etc.)
+- Compliance requires specific regions or encryption keys
+
 ## How to apply it
 
 If you're already using an AI coding agent to generate projects, the move is: let the agent build the app, push to GitHub, then use AI Studio's import to skip the deploy step entirely. You get agent-written code with one-click hosting — no CI pipeline to maintain.
@@ -36,9 +99,9 @@ For the broader ecosystem, this is another sign the workspace is eating the tool
 
 *Want to save money on AI coding tools? Check out the best deals and discounts at [aiFiesta](https://aifiesta.link/muhammed-anshad).*
 
-
 ## Related articles
 
 - [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)
 - [Your AI Agents Config Directory Is Now the Most Dangerous Place on Your Machine](/blog/ai-agent-config-directory-attack-surface-2026/)
 - [Best Coding Agents 2026 — Decision Guide (Not Another Hype List)](/blog/best-coding-agents-2026-decision-guide/)
+- [Vercel vs Railway vs Fly.io: Where to Deploy Your Agent-Built App](/blog/vercel-vs-railway-vs-fly-deploy-agent-apps/)
