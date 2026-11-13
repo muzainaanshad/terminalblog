@@ -1,0 +1,177 @@
+---
+title: "Claude Code Just Got Code Mode — And 200+ Fixes You'll Actually Feel"
+description: "Claude Code v2.1.323 drops Code Mode (Claude writes JavaScript to call its own tools), plugin type-checking, auto-model routing for Desktop, and a massive stability wave. Here's what matters for your daily workflow."
+pubDate: 2026-11-13
+author: "Anshad"
+tags: ["claude-code", "anthropic", "release", "code-mode", "plugins", "coding-agents", "beginner"]
+tool: "claude-code"
+category: "releases"
+---
+
+**Claude Code v2.1.323 landed November 12.** This isn't a patch — it's a stability tsunami with one experimental feature that changes how Claude thinks: **Code Mode**.
+
+---
+
+## The Headline: Code Mode (Experimental)
+
+### What It Is
+
+Turn it on and **Claude writes JavaScript to call its tools** instead of using the standard tool-calling format. Think: the model generates code that executes tools, rather than the runtime calling tools for it.
+
+```bash
+# Opt in (per project or org)
+# See: https://code.claude.com/docs/en/code-mode
+```
+
+### Why This Is Wild
+
+Standard tool calling: Model → JSON → Runtime executes → Result → Model
+
+Code Mode: Model → **JavaScript** → Runtime executes JS → Result → Model
+
+The model literally writes the glue code. This unlocks:
+- **Complex multi-tool orchestration** in one turn
+- **Loops, conditionals, retries** written by the model itself
+- **Custom tool compositions** that don't exist in the standard catalog
+
+It's early. Opt-in only. But it signals where agent runtimes are heading: **the model becomes the orchestrator, not just the caller.**
+
+---
+
+## Plugin System Got Serious
+
+### Type-Checking Your Hooks
+
+`claude plugin validate` now type-checks TypeScript hooks. Every finding is a warning; `--strict` fails the build.
+
+```bash
+claude plugin validate --strict
+# Catches: wrong hook signatures, missing types, runtime errors before users hit them
+```
+
+### Plugin Version Pinning
+
+`engines["claude-code"]` in `plugin.json` means plugins outside their stated version range **won't install, update, or load**. Install picks the newest compatible version automatically.
+
+No more "works on my machine, breaks on yours" plugin chaos.
+
+### What `$` Nouns Your Mod Adds
+
+Validate now shows the `$` nouns a mod's `engine.create` hook adds, withholds, or replaces. You can see exactly what a plugin injects into the runtime before you install it.
+
+---
+
+## Desktop Users: Auto Model Routing Is Coming
+
+`CLAUDE_CODE_AUTO_MODE_MODEL` in managed settings now works for **Claude Desktop sessions on third-party providers**. Once Desktop includes this version, your auto-model preference carries over.
+
+No more manual model switching when you hop between terminal and Desktop.
+
+---
+
+## The "You'll Actually Feel These" Fixes
+
+### Permission System — Finally Reliable
+
+- **Auto mode now starts in Manual** — no more accidentally permissive starts when auto isn't available
+- **Bash allow rules with `*` in variables warn at startup** — `Bash(PORT=* npm run dev)` gets flagged
+- **`sudo`, `env` wrappers now respected** — deny/ask rules catch commands run through wrappers
+- **Wildcard allow rules (`Bash(ls*)`) fixed** — they were skipping prompts in edge cases
+- **Read deny rules now block Write/Edit** — writing to a path covered by a Read deny rule gets caught
+
+### Session Resilience
+
+- **Resumed sessions don't join your new message to an old interrupted one** — fixed the "ghost message" bug
+- **Settings hand-edited during a session stay edited** — running session no longer overwrites your `settings.json` changes
+- **Deleted settings file stays deleted** — no more zombie config resurrection
+- **`/compact` won't summarize away unanswered messages** — your pending question survives compaction
+
+### Memory & Performance
+
+- **Memory spike after large file edits fixed** — next prompt doesn't choke
+- **Subagent transcripts freed sooner** — finished subagents release memory instead of hoarding it
+- **`ps` process pileup fixed** — background process listing no longer leaks
+
+### Background Sessions & Remote Control
+
+- **Background sessions stop cleanly on sign-in changes** — no more session hijacking when profiles switch
+- **MCP tool calls ask for sign-in again instead of failing with `TOKEN_EXPIRED`** — graceful re-auth
+- **Remote Control reconnects as same computer for 30 days** — no more "new device" spam after restarts
+- **Phone notifications show permission prompts even with `DISABLE_TELEMETRY`** — you see what Claude's asking
+
+### MCP & Hooks
+
+- **MCP servers rotating refresh tokens stay signed in** — concurrent refreshes don't log you out
+- **Hook `continue: false` respected** — `CLAUDE_CODE_RESUME_INTERRUPTED_TURN` no longer re-runs stopped turns
+- **`/mcp` shows how many tools were left out and why** — schema rejection transparency
+- **Plugin installs show stderr on success** — you see notes like "no skills yet" instead of silent success
+
+### Windows-Specific
+
+- **Wildcard file reads now prompt correctly** — no more silent bypasses
+- **`.cmd`/`.bat` wrappers ignored** — runs the `.exe` directly (like `cmd.exe` does)
+- **Drive path resolution fixed** — "Working directory was deleted" on weird drives resolved
+
+---
+
+## The Settings You'll Want to Know
+
+```bash
+# Turn off subagent progress summaries (since 2.1.318)
+export CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES=1
+
+# Custom resume command hint for programmatic starters
+export CLAUDE_CODE_RESUME_HINT_COMMAND="my-resume-script"
+
+# Keep 200K context window (default now 1M)
+export CLAUDE_CODE_DISABLE_1M_CONTEXT=1
+
+# Autofs /home mount workaround (Linux)
+export CLAUDE_CODE_AUTOMOUNT_ROOTS="/home"
+
+# OpenTelemetry timeout (now 25s max)
+export OTEL_EXPORTER_OTLP_TIMEOUT=25000
+```
+
+---
+
+## What This Means for You
+
+**If you're a beginner:** The permission fixes alone make daily use smoother. Auto mode behaving correctly, settings surviving edits, sessions resuming cleanly — these are the papercuts that made Claude Code feel flaky.
+
+**If you're building plugins:** Type-checking, version pinning, and `$` noun visibility make plugin development professional-grade. You can ship with confidence.
+
+**If you run teams:** Managed settings improvements, Remote Control stability, and MCP token rotation fixes mean less "it works on my machine" debugging.
+
+**If you're curious about Code Mode:** It's the biggest architectural signal since the agent SDK. The model writing its own orchestration code is the logical endpoint of "agents as software." Watch this space.
+
+---
+
+## Quick Start: Update & Verify
+
+```bash
+# Update
+claude update
+
+# Verify version
+claude --version
+# Should show: v2.1.323
+
+# Check plugin validation
+claude plugin validate --strict
+
+# Test permission sanity
+# Try a Bash command with a wildcard variable — should warn at startup
+```
+
+---
+
+## Bottom Line
+
+v2.1.323 is the release that makes Claude Code feel **finished**. Not "done" — but *finished* in the way a tool you trust daily is finished. The papercuts are healed. The plugin system is production-ready. And Code Mode points to a future where the model doesn't just use tools — it *builds* the toolchain.
+
+**Update today.** The stability fixes compound every session.
+
+---
+
+*Want the full 400+ line changelog? [GitHub Release](https://github.com/anthropics/claude-code/releases/tag/v2.1.323) — but honestly, the fixes above are the ones you'll notice.*
