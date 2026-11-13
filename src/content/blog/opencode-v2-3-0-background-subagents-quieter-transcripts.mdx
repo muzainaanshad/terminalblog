@@ -1,0 +1,162 @@
+---
+title: "OpenCode v2.3 Just Made Subagents Background-First — You Keep Working While They Grind"
+description: "OpenCode v2.3 (released Nov 13) flips subagents to run in the background by default, adds quieter transcripts that summarize tool runs, and brings Jump-to-message search. Here's what changes for your daily flow."
+pubDate: 2026-11-13
+author: "Anshad"
+tags: ["opencode", "release", "coding-agents", "background-subagents", "beginner"]
+tool: "opencode"
+category: "releases"
+---
+
+**OpenCode v2.3 dropped today (Nov 13)** — and the headline change is simple but profound: **subagents now run in the background by default.** You fire one off, it returns immediately with a session ID, and reports back when it's done. You keep coding. It keeps grinding.
+
+---
+
+## The Big Shift: Background Subagents by Default
+
+### What Changed
+
+Before v2.3: You spawn a subagent → you wait → it finishes → you get the result.
+
+After v2.3: You spawn a subagent → **you get the session ID instantly** → you keep working in the parent session → subagent reports back when idle.
+
+```bash
+# In OpenCode TUI
+/subagent "refactor the auth module"
+# Returns immediately: "Subagent started: session_abc123"
+# You continue editing. Subagent works in background.
+# When done: notification appears with summary
+```
+
+### Why This Matters for Beginners
+
+**Parallelism without the mental overhead.** You don't need to think "should I use a subagent here?" — the answer is increasingly "yes" because it doesn't block you. Spawn three subagents for three different files. Keep writing tests in the main session. Come back to summaries.
+
+This is **multi-agent orchestration without YAML, without config, without framework ceremony**. Just `/subagent` and go.
+
+---
+
+## Quieter Transcripts by Default
+
+### The Problem
+
+OpenCode's transcript used to show every tool call, every thought, every intermediate step. For a 20-turn session, that's a wall of noise.
+
+### The Fix
+
+v2.3 defaults to **`verbosity: low`** — each run of tools + thoughts collapses into **one collapsible activity row**.
+
+```
+┌─ Activity: edited auth.ts, updated tests ────────────┐
+│  ▸ read_file auth.ts                                 │
+│  ▸ edit auth.ts (3 changes)                          │
+│  ▸ write test/auth.test.ts                           │
+│  ▸ bash "npm test"                                   │
+└──────────────────────────────────────────────────────┘
+```
+
+Click to expand. Or set `session.verbosity: "medium"` / `"high"` in your TUI config if you want the old firehose. Your existing setting is preserved.
+
+---
+
+## Jump to Message — Finally, Session Search That Works
+
+**Desktop app only (for now):** `Cmd+Alt+G` (Mac) / `Ctrl+Alt+G` (Windows/Linux) opens **Jump to message** — searches *all prompts* across the current session, including ones not yet loaded in the timeline.
+
+No more scrolling up for five minutes to find that prompt from three hours ago. Type a keyword, jump instantly.
+
+---
+
+## Other Improvements You'll Feel
+
+| Area | Change |
+|------|--------|
+| **Shell commands** | Survive server handoffs, keep output when interrupted |
+| **MCP events** | Experimental support behind `mcp_events` flag |
+| **Local models** | Discovery waits up to 15s per endpoint (Ollama, LM Studio, vLLM) — remote/tunneled endpoints now actually list models |
+| **Code Mode** | Simpler structured results from file/skill tools |
+| **Session forks** | Agents now know when they're a fork |
+| **Desktop sidebar** | Experimental "Recent" sessions (7 days, 30 rows, cross-server, pinnable) |
+| **Mermaid diagrams** | Maximize for zoom/pan |
+| **Themes** | Plugin-provided themes update live |
+
+---
+
+## Bug Fixes That Stop Papercuts
+
+- Case-only file renames on case-insensitive filesystems (macOS/Windows) — fixed
+- Stale thinking retained after Claude Agent prompts change — fixed
+- Plugin replacement stopping on cleanup failure — fixed
+- MCP OAuth refreshes when server rewrites `127.0.0.1` — fixed
+- GitHub Copilot wrong endpoint before models load — fixed
+- LM Studio null context length — fixed
+- Exhausted rate limits treated as terminal — fixed
+- Retryable provider streams losing work on interrupt — fixed
+
+---
+
+## Upgrading
+
+```bash
+# CLI
+opencode update
+
+# Desktop
+# Download from https://opencode.ai or your package manager
+# Linux: .deb, .rpm, .AppImage
+# macOS: .dmg, .app.tar.gz
+# Windows: .exe
+```
+
+Verify:
+
+```bash
+opencode --version
+# Should show v2.3.0
+```
+
+---
+
+## What This Means for You
+
+**If you're new to OpenCode:** v2.3 is the version where the agent feels *concurrent*. You're not waiting on subagents. You're not drowning in transcript noise. You can actually run multiple things at once.
+
+**If you're coming from Claude Code:** OpenCode's background subagents are the closest thing to "fire and forget" in the terminal agent space right now. No permission prompts per subagent. No blocking.
+
+**If you run a team:** The Recent sessions sidebar (experimental) + background subagents + quieter transcripts = less context-switching tax. Developers stay in flow longer.
+
+---
+
+## The Bigger Picture
+
+OpenCode has been iterating fast — v2.2.7 was Nov 10, v2.3 is Nov 13. The velocity is real. But v2.3 isn't just "more features." It's a **UX philosophy shift**:
+
+- **Concurrency by default** (background subagents)
+- **Signal over noise** (quiet transcripts)
+- **Discoverability** (jump to message)
+
+These compound. A beginner who tries OpenCode today gets an agent that respects their attention. That's rare.
+
+---
+
+## Quick Reference: New Shortcuts
+
+| Action | Mac | Windows/Linux |
+|--------|-----|---------------|
+| Jump to message | `Cmd+Alt+G` | `Ctrl+Alt+G` |
+| Place follow-up first | `Alt+Enter` | `Alt+Enter` |
+| Steer next queued prompt | `Mod+Enter` | `Mod+Enter` |
+| Show tab shortcut numbers | Hold modifier | Hold modifier |
+
+---
+
+## Related Reading
+
+- [OpenCode v2.2.7 — Worktree, Shell Shortcuts, Percentage Compaction](/blog/opencode-v2-2-5-worktree-shell-shortcuts-percentage-compaction/)
+- [OpenCode v2.2 — Desktop, Plugins, Breaking Changes](/blog/opencode-v2-2-desktop-plugins-breaking-changes/)
+- [OpenCode v2.1 — Breaking Changes, Native Windows PTY, Todo](/blog/opencode-v2-1-breaking-changes-native-windows-pty-todo/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Want to test multi-model workflows without juggling API keys? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you unified access while you evaluate agents.*
