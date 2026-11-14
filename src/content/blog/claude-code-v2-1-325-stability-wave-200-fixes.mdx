@@ -1,0 +1,104 @@
+---
+title: "Claude Code's Stability Wave Just Hit 200+ Fixes — v2.1.325 Is the Most Polished Release Yet"
+description: "Claude Code v2.1.325 (Nov 13) delivers 200+ fixes: zstd security patch, session resume finally reliable, subagents get full answers when cut off, MCP OAuth leaks plugged, Windows/sandbox hardened. The daily stability grind is paying off."
+pubDate: 2026-11-14
+author: "Anshad"
+tags: ["claude-code", "anthropic", "release", "v2.1.325", "stability", "security", "coding-agent", "beginner"]
+tool: "claude-code"
+category: "releases"
+---
+
+**Claude Code v2.1.325 dropped November 13** — the 25th release in the v2.1.3xx stability wave. 200+ fixes since v2.1.300. The daily micro-release cadence isn't marketing; it's compounding reliability. If you've been burned by session resume bugs, MCP leaks, or Windows quirks, this is the most trustworthy build yet.
+
+---
+
+## The Headline: Security + Session Reliability
+
+### Zstd Compression Security Fix
+Fixed a security issue in how zstd-compressed responses are decoded. If you're on a gateway or proxy that compresses traffic, this matters.
+
+### Session Resume Finally Works
+- Fixed recent turns going missing after unclean exits
+- Fixed sessions showing "waiting for input" when a finished PR only needed your review/merge
+- Fixed a second Enter in the exit dialog stopping background work after a move was refused
+
+The "lost work on resume" nightmare is largely fixed.
+
+### Subagents Get Full Answers When Cut Off
+Previously: subagents hit the output token limit and you got only the tail end of their answer.
+Now: they're asked for the whole answer again, more briefly. You get the complete reasoning, not fragments.
+
+---
+
+## MCP & OAuth Hardening
+
+| Fix | Impact |
+|-----|--------|
+| MCP OAuth requests leaking refresh tokens to other hosts on redirect | **Critical** — credential leak plugged |
+| MCP server staying "needs authentication" after momentary token refresh refusal | Stuck servers recover automatically |
+| Background MCP tasks stopping updates after connection loss | Reconnection resumes task progress |
+| MCP elicitation cancelled without asking in headless mode | Headless automation no longer silently fails |
+
+---
+
+## Windows & Sandbox: The Quiet Wins
+
+- **Windows startup stall** fixed when PATH has inaccessible folders (~1s saved per launch)
+- **Drive-letter case sensitivity** fixed for `/resume` and in-session resume
+- **Linux sandbox** fixed for symlinked home directories under `allowRead` inside `denyRead`
+- **Bash sandbox** now fully protects worktree settings, hooks, and linked worktree `.git` folders
+- **Sandboxed commands** follow normal permission flow by default (opt-in to auto-allow)
+
+Windows users: the "works on Linux, breaks on Windows" gap is narrowing release by release.
+
+---
+
+## The Compound Effect: 25 Releases, 200+ Fixes
+
+Since v2.1.300 (Oct 14), Anthropic has shipped **daily micro-releases** focused purely on reliability:
+
+| Version | Date | Theme |
+|---------|------|-------|
+| v2.1.300 | Oct 14 | 80+ fixes: session resume, worktree corruption, MCP reconnection |
+| v2.1.310 | Oct 26 | Cloud session monitor tool |
+| v2.1.317 | Nov 3 | Stability surge: 100+ fixes |
+| v2.1.318 | Nov 6 | Network drives finally work |
+| v2.1.321 | Nov 10 | Fable 5.2 stability wave |
+| v2.1.322 | Nov 10 | **Vertex AI Fast Mode** + 50 fixes |
+| **v2.1.325** | **Nov 13** | **200+ fixes: security, sessions, MCP, Windows, sandbox** |
+
+This isn't feature velocity. It's **trust velocity**.
+
+---
+
+## What This Means for You
+
+**If you're on v2.1.320 or earlier:** update. The session resume and MCP fixes alone justify it.
+
+**If you're on Vertex AI:** v2.1.322 gave you fast mode. v2.1.325 gives you the reliability to use it in production.
+
+**If you manage a team:** the sandbox and permission fixes mean fewer "why did it do that?" incidents. The daemon force-kill enforcement (v2.1.300+) means no more orphaned processes eating CI minutes.
+
+---
+
+## Quick Update
+
+```bash
+# npm
+npm i -g @anthropic-ai/claude-code@latest
+
+# Homebrew
+brew upgrade claude-code
+
+# Or the native installer
+curl -fsSL https://claude.ai/install.sh | bash
+```
+
+---
+
+## Related Reads
+
+- [Claude Code v2.1.322: Fast Mode on Vertex AI](/blog/claude-code-v2-1-322-vertex-fast-mode/)
+- [Claude Code v2.1.318: Network Drives Finally Work](/blog/claude-code-v2-1-318-network-drives-finally-work/)
+- [Claude Code v2.1.300: 80+ Fixes — Session Resume Finally Works](/blog/claude-code-just-fixed-everything-you-hated/)
+- [State of Open Source Coding Agents 2026](/blog/state-of-open-source-coding-agents-2026/)
