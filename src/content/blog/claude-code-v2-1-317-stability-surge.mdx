@@ -460,129 +460,701 @@ If you're on v2.1.317 and thought "it mostly works" — v2.1.318 makes "mostly" 
 
 ---
 
-### 58. Removed 2.1.288 Thinking Preservation on Resume
+### 53. Removed 2.1.288 Thinking Preservation on Resume
 
 **Removed:** The 2.1.288 fix that kept the model's earlier thinking when resuming a conversation started on 2.1.286 or earlier; that thinking can now be dropped.
 
 ---
 
-### 59. Gateway: Google Access Token Expiry Warning
+### 54. Gateway: Google Access Token Expiry Warning
 
 **Gateway:** Added a log warning when the Google access token from a federation (`external_account`) credentials file is about to expire.
 
 ---
 
-### 60. Gateway: `listen.trusted_proxies` Log Hints
+### 55. Gateway: `listen.trusted_proxies` Log Hints
 
 **Gateway:** Improved log hints about `listen.trusted_proxies`: they now say to list only a proxy that adds the connecting address to `X-Forwarded-For` itself.
 
 ---
 
-### 61. Gateway: AWS CountTokens Failure Warning
+### 56. Gateway: AWS CountTokens Failure Warning
 
 **Gateway:** Improved the warning when AWS CountTokens fails on Amazon Bedrock: it says Claude Code, not the gateway, counts after the 501, and points at IAM only when AWS denies access.
 
 ---
 
-### 62. Self-Hosted Runner: `CLAUDE_RUNNER_SPAWN_REASON`
+### 57. Self-Hosted Runner: `CLAUDE_RUNNER_SPAWN_REASON`
 
 **Self-Hosted Runner:** Added `CLAUDE_RUNNER_SPAWN_REASON` to the orchestrator's spawn-runner hook environment: why Anthropic sent the request (e.g., `runner_lost`, `resumed`); unset when none was sent.
 
 ---
 
-### 63. Self-Hosted Runner: `--release-idle-session-min` Warning
+### 58. Self-Hosted Runner: `--release-idle-session-min` Warning
 
 **Self-Hosted Runner:** Added a startup warning when `--release-idle-session-min` is the last argument with no value (still ignored) or has a value of only spaces (still read as `0`).
 
 ---
 
-### 64. Self-Hosted Runner: Orchestrator Log Lines Improved
+### 59. Self-Hosted Runner: Orchestrator Log Lines Improved
 
 **Self-Hosted Runner:** Changed orchestrator log lines: `ok session=…` now prints at every log level on stdout (was debug only, stderr) with `reason=…` after `jti=…`, and `nack session=…` ends its fields with `reason=…` after `retryable=…`; update scripts that match `retryable=true:` or `retryable=false:`.
 
 ---
 
-### 65. Remote Control: Missing Working Folder Error
+### 60. Remote Control: Missing Working Folder Error
 
 **Remote Control:** Fixed a misleading "spawn error: ENOENT" when a session's working folder is missing; the error now names the folder.
 
 ---
 
-### 66. Remote Control: Fork Title Naming
+### 61. Remote Control: Fork Title Naming
 
 **Remote Control:** Improved the title a fork of a terminal fork is created with when the app doesn't set one: "Name (fork 2)".
 
 ---
 
-### 67. VSCode: Organization Sign-In Refusal Background Process
+### 62. VSCode: Organization Sign-In Refusal Background Process
 
 **VSCode:** Fixed a window whose sign-in the organization's settings refuse starting a new Claude Code process in the background every minute.
 
 ---
 
-### 68. VSCode: Chat Panel Error Banner Close Button
+### 63. VSCode: Chat Panel Error Banner Close Button
 
 **VSCode:** Fixed a long word in the chat panel's error banner pushing its close button out of view.
 
 ---
 
-### 69. VSCode: Sign-In Screen Error Display
+### 64. VSCode: Sign-In Screen Error Display
 
 **VSCode:** Improved the sign-in screen to show what Claude Code printed when its sign-in status check fails.
 
 ---
 
-### 70. Cloud Sessions: No Repository Option
+### 65. Cloud Sessions: No Repository Option
 
 **Cloud Sessions:** Added a "No repository" option: a cloud session on an Anthropic-hosted environment can now start without picking a repository.
 
 ---
 
-### 71. Cloud Sessions: Chrome Names for Tools
+### 66. Cloud Sessions: Chrome Names for Tools
 
 **Cloud Sessions:** Added the usual Chrome names to cloud sessions, so tools other than Playwright can find the built-in Chromium through `google-chrome` and `CHROME_PATH`.
 
 ---
 
-### 72. Cloud Sessions: Deleted Environment New Session Button
+### 67. Cloud Sessions: Deleted Environment New Session Button
 
 **Cloud Sessions:** Added a "New session" button to the card shown when a cloud session's environment was deleted, where the message box is hidden.
 
 ---
 
-### 73. Cloud Sessions: GitHub Actions Log Reading
+### 68. Cloud Sessions: GitHub Actions Log Reading
 
 **Cloud Sessions:** Fixed reading GitHub Actions logs in cloud sessions: `gh run view --log` and `gh api` log requests now get the log in most environments, not an unreachable redirect.
 
 ---
 
-### 74. Cloud Sessions: Create PR Failure Messages
+### 69. Cloud Sessions: Create PR Failure Messages
 
 **Cloud Sessions:** Improved most Create PR failure messages in cloud and Remote Control sessions: they now give the reason or a link to GitHub instead of saying "Try again".
 
 ---
 
-### 75. Cloud Sessions: Connector Search Results Clarity
+### 70. Cloud Sessions: Connector Search Results Clarity
 
 **Cloud Sessions:** Changed connector search results to tell Claude that the search covers only part of the connector directory.
 
 ---
 
-### 76. Remote Control: Side-by-Side Checkout Folder Names
+### 71. Remote Control: Side-by-Side Checkout Folder Names
 
 **Remote Control:** Fixed side-by-side checkouts of one repository looking identical in the environment menu's Remote Control rows; each now shows its own folder name.
 
 ---
 
-### 77. Claude Tag: Keyboard Focus & Screen Reader
+### 72. Claude Tag: Keyboard Focus & Screen Reader
 
 **Claude Tag:** Fixed keyboard focus and screen reader announcements in Claude Tag admin setup; pressing Escape in the connect form no longer also closes the Add dialog.
 
 ---
 
-### 78. Code Review: Analytics Page Retry
+### 73. Code Review: Analytics Page Retry
 
 **Code Review:** Improved the Code Review analytics page to retry once after a server or network failure, then show a "Try again" banner instead of empty cards.
+
+---
+
+## v2.1.319 Highlights — Auto-Mode Behind Gateways (Nov 6)
+
+### 1. Auto-Mode Behavior Behind LLM Gateways
+
+**Changed:** Auto mode with telemetry or feature flags off (including behind LLM gateways) now **calls the server can't check are asked about or denied**, with no fallback to the built-in classifier. Set `CLAUDE_CODE_AUTO_MODE_SERVER=0` to keep using the built-in classifier (Bedrock, Vertex and Foundry are unchanged).
+
+### 2. LLM Gateway Server-Side Check Toggle
+
+**Changed:** Auto mode behind an LLM gateway: `CLAUDE_CODE_AUTO_MODE_SERVER=1` turns on the server-side check even with `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS` set. If managed settings set the latter, the gateway check still runs when explicitly enabled.
+
+---
+
+## v2.1.321 Highlights — Fable 5.2 Default, Remote-Control Settings, MCP OAuth Fix (Nov 9)
+
+### 1. Claude Fable 5.2 Now Default Model
+
+**Added:** **Claude Fable 5.2 (`claude-fable-5-2`)** is now the default Fable model — 1M context, $8/$40 per Mtok with $0.20/Mtok cache reads.
+
+### 2. `--settings` File for Remote Control
+
+**Added:** `--settings <file>` to `claude remote-control`, which applies a settings file to every session it starts. If the file changes, no new session starts until you restart `claude remote-control`.
+
+### 3. MCP OAuth Redirect Security Fix
+
+**Fixed:** MCP OAuth requests were **sending secrets such as refresh tokens to another host** when a server redirected them. This is now fixed — secrets stay on the intended host.
+
+### 4. Read-Only Bash Fix
+
+**Fixed:** A case where a read-only Bash command was incorrectly handled.
+
+---
+
+## v2.1.322 Highlights — Vertex Fast Mode (Nov 10)
+
+### 1. Fast Mode on Vertex AI
+
+**Added:** **Fast mode on Vertex** in the global, us, and eu regions, falling back to standard speed if Vertex refuses it. This gives Vertex users the same speed boost other providers have had.
+
+---
+
+## v2.1.323 Highlights — Code Mode, Plugin Engine Versioning, Type-Checked Hooks (Nov 12)
+
+### 1. Code Mode — Experimental Opt-In
+
+**Added:** **Code Mode**, an experimental opt-in in which Claude writes JavaScript to call its tools. See https://code.claude.com/docs/en/code-mode to turn it on, or to turn it off for an organization. This fundamentally changes how Claude executes tool calls — instead of native function calling, it generates and runs JavaScript.
+
+### 2. Plugin Engine Versioning
+
+**Added:** `engines["claude-code"]` to `plugin.json`: plugins outside their stated Claude Code version range are **not installed, updated, or loaded**, and install/update pick the newest version that fits. This prevents plugin breakage from version mismatches.
+
+### 3. Type Checking for Plugin Hooks
+
+**Added:** Type checking of a plugin's TypeScript hooks module to `claude plugin validate`. Catches type errors before deploy.
+
+---
+
+## v2.1.325 Highlights — Security Fix, Code Mode Polish, Jupyter Tips (Nov 13)
+
+### 1. zstd Security Fix
+
+**Fixed:** A **security issue in how zstd-compressed responses are decoded**. This could potentially allow malformed compressed data to cause issues.
+
+### 2. Jupyter Notebook Re-Run Tip
+
+**Added:** A spinner tip in VS Code and similar integrated terminals about re-running a notebook cell, shown once Claude has read or edited a Jupyter notebook.
+
+### 3. Organization Policy Block Guidance
+
+**Added:** A line under the error shown when your organization's policy blocks a request, saying how to continue: run `/rewind` and change the message, or run `/clear`.
+
+### 4. Sandboxed Git Protected Files Note
+
+**Added:** A note for Claude when a sandboxed `git checkout`, `git stash` or autostash pull cannot update protected files such as those in `.claude`.
+
+### 5. Bare Repo / Worktree Git Fixes
+
+**Fixed:** `/security-review` and skills' inline git commands stopping with an error in worktrees of bare repositories, `--separate-git-dir` checkouts, and Android `repo` checkouts.
+
+### 6. Subagent Model Handling Fixes
+
+**Fixed:** Subagents with their own model being moved to the plan-mode model when the model setting is `opusplan` or `haiku`. **Fixed:** Subagents on a different model sizing file reads and MCP results with the main session's model.
+
+### 7. Third-Party Gateway Context Length Fix
+
+**Fixed:** Sessions on many third-party gateways and Foundry stopping with a context length error on every turn instead of compacting.
+
+### 8. Resumed Session Missing Turns Fix
+
+**Fixed:** Recent turns sometimes going missing from a resumed session after Claude Code stopped without a clean exit.
+
+### 9. Deleted Working Directory Shell Command Fix
+
+**Fixed:** Shell commands running in the launch directory after the working directory was deleted; the command now fails with a message and can be re-issued.
+
+### 10. Approved Plan Edit Persistence
+
+**Fixed:** An approved plan edit being lost when the `plansDirectory` folder can't take it: the plan is now saved in the default plans folder, and a warning says where and why.
+
+### 11. Saved Model Setting Rewrite Fix
+
+**Fixed:** A saved `sonnet[1m]` model setting being rewritten on a new install to a model id the API rejects.
+
+### 12. Focus View Reply Visibility
+
+**Fixed:** Focus view hiding the reply to your prompt when a scheduled task replied after it.
+
+### 13. Background Subagent Prompt Visibility
+
+**Fixed:** The prompt sometimes missing from a background subagent's view when fullscreen is off.
+
+### 14. Long Options/Prompt Wrapping Fix
+
+**Fixed:** Long options in lists and permission prompts being partly overwritten when they wrap, and first-run screens losing lines on narrow terminals.
+
+### 15. Startup Warning Visibility
+
+**Fixed:** Startup warnings about permission rules and the "N MCP servers need authentication" notice being recorded as seen when they were scrolled out of view.
+
+### 16. Welcome Header Control Characters
+
+**Fixed:** The welcome header showing control characters or splitting across lines when an agent's name or the working folder contains them or a line break.
+
+### 17. Red Error for Admin-Only Commands
+
+**Fixed:** The red error shown when Claude tries a command only you can run: a dim line now says it runs only when you type it at the prompt.
+
+### 18. `/stats` Active Days Accuracy
+
+**Fixed:** `/stats` showing an Active days total that was one day too high.
+
+### 19. `/insights` Report Accuracy
+
+**Fixed:** `/insights` saying a report was ready when no session qualified for analysis, and writing two values into its HTML report without escaping them.
+
+### 20. `/voice` Mode Change Accuracy
+
+**Fixed:** `/voice` saying voice mode changed when managed settings, `--settings`, or the project's `.claude/settings.json` or `.claude/settings.local.json` kept it as it was; it now says what holds it.
+
+### 21. IDE Welcome Dialog Key Binding Fix
+
+**Fixed:** The IDE welcome dialog showing Cmd+Esc for Quick Launch on Windows and Linux.
+
+### 22. Slack App Tips on Policy Denial
+
+**Fixed:** Slack app tips showing when your organization's policy denies cloud sessions.
+
+### 23. `claude purge` Hang Fix
+
+**Fixed:** `claude purge` hanging silently when there is no terminal to read keys from, and its project picker and `-i` prompts ignoring the keyboard when stdin is piped.
+
+### 24. `claude plugin eval` Output Directory Fix
+
+**Fixed:** `claude plugin eval --output-dir ''` writing the report into the current folder; it now exits with an error.
+
+### 25. `claude -p` Control Sequence Handling
+
+**Fixed:** `claude -p` text output on a terminal passing control sequences other than text styling; pipes and files are unchanged.
+
+### 26. Leftover OAuth Lock Files
+
+**Fixed:** Leftover `.oauth_refresh.lock.owner.tmp.*` files piling up in the config directory.
+
+### 26. Fast Mode Disabled Message Accuracy
+
+**Fixed:** `/fast` saying "Fast mode has been disabled by your organization" under the keyless Console sign-in, where Claude Code had not asked the server.
+
+### 27. `/model` Organization Restriction Accuracy
+
+**Fixed:** `/model` saying that your organization restricts a model when Claude Code could not check that, for example with no network.
+
+### 28. Sign-In Success Page Accuracy
+
+**Fixed:** The browser showing the sign-in success page in some cases where sign-in failed or was canceled.
+
+### 29. Auth Status Lock Cleanup
+
+**Fixed:** `claude auth status` and other short commands leaving a lock behind on a Console profile, which made the next session hang for about a minute.
+
+### 30. Background Session Billing Fix
+
+**Fixed:** Background sessions started on your claude.ai login using (and billing) an API key or token from the shell that started the background service.
+
+### 31. Session Sign-In Migration Refusal
+
+**Fixed:** More cases of a session moving to another sign-in in the background; these moves are now refused, with a message saying what works.
+
+### 32. Exit Dialog Double-Enter Fix
+
+**Fixed:** A second Enter in the exit dialog stopping background work after the move to the background was refused.
+
+### 33. Bedrock Token Counting Provider Check
+
+**Fixed:** Token counting on Amazon Bedrock sending the conversation to Bedrock when the `allowedProviders` managed setting does not allow it.
+
+### 34. AWS/GCP Credentials Without HOME Fix
+
+**Fixed:** AWS `credential_process` helpers and Google Cloud default credentials failing when Claude Code is started without a `HOME` environment variable.
+
+### 35. Permission Mode Regression After Subagent Plan
+
+**Fixed:** A session sometimes going back to an earlier permission mode after a subagent's plan was approved.
+
+### 36. Agent SDK Settings Merge Fix
+
+**Fixed:** One invalid value in an Agent SDK `applyFlagSettings()` call silently discarding all settings from earlier calls; a call that would do this is now refused with an error.
+
+### 37. PR Review Status Accuracy
+
+**Fixed:** Sessions showing as waiting for input when a finished pull request only needed your own review or merge.
+
+### 38. Unrecognized teammateMode Warning
+
+**Fixed:** An unrecognized `teammateMode` settings value being ignored without a warning: `claude -p`, the startup warning and `claude doctor` now list it as a skipped entry (still not applied).
+
+### 39. Worktree Plugin Hook Fix
+
+**Fixed:** `--worktree` skipping a `WorktreeCreate` hook from a plugin in `CLAUDE_CODE_PLUGIN_SEED_DIR` on the first run in a new home directory.
+
+### 40. Brief-Mode Session Reply Duplication
+
+**Fixed:** Brief-mode sessions, such as Dispatch, sending a reply again after the turn had already replied.
+
+### 41. Connector Status Accuracy
+
+**Fixed:** Claude saying a working Atlassian, Asana or Sentry connector had failed in cloud sessions when a plugin listed it at a different URL.
+
+### 42. Desktop/SDK MCP Server Listing Fix
+
+**Fixed:** Claude Desktop and SDK sessions listing a folder's own MCP servers (`.mcp.json`, local) as host-added or not at all, and not connecting WebSocket ones, after a folder move or pre-warmed start.
+
+### 43. `/mcp` Plugin Reload Fix
+
+**Fixed:** `/mcp` still listing a plugin's MCP server after a plugin reload removed it while it was connecting.
+
+### 44. MCP Authentication State Fix
+
+**Fixed:** An MCP server staying "needs authentication", and its `mcp_tool` hooks being skipped, after a token refresh that was refused only for a moment.
+
+### 45. MCP Elicitation in Headless Mode
+
+**Fixed:** MCP elicitation requests being cancelled without asking in headless mode after a server's connection was replaced during a tool call.
+
+### 46. SDK MCP Reconnection Fix
+
+**Fixed:** MCP tool calls from an SDK host answering "Not connected" after a tool call had reconnected the MCP server.
+
+### 47. MCP Task Stuck After Question Close
+
+**Fixed:** An MCP task getting stuck after its question was closed with Esc or asked again: the footer now says it needs your input, and Enter in `/tasks` shows the question again.
+
+### 48. Background MCP Task Connection Recovery
+
+**Fixed:** Background MCP tasks that stopped updating after another call to the same server lost the connection, when a later call reconnects.
+
+### 49. Background MCP Task Question Timing
+
+**Fixed:** A background MCP task's question opening over a message you were still typing; it now waits until you send or clear the draft, and the spinner and turn timer keep running.
+
+### 50. Worktree Sparse Paths Root Files
+
+**Fixed:** `worktree.sparsePaths` and sparse plugin and marketplace clones leaving out the repository's root files on older git versions, such as 2.34.
+
+### 51. Self-Hosted Runner Mid-Session Repo Add
+
+**Fixed:** Self-hosted runner sessions with several repositories being unable to use a repository added mid-session.
+
+### 52. Artifact Permission Fixes
+
+**Fixed:** Claude asking for permission before reading your own artifact or its data. **Fixed:** Deny and ask permission rules and hooks for the Artifact tool not applying in some cloud sessions.
+
+### 53. Code Mode Fixes
+
+**Fixed:** Code Mode scripts ignoring a worktree entered with `EnterWorktree`, writing `~` paths into the project, and leaving `/mcp` showing an MCP server as connected after its sign-in expired. **Fixed:** Words typed with a Yes at a permission dialog or plan approval not reaching Claude in Code Mode. **Fixed:** Claude starting work by itself when you resumed a session that ended during a Code Mode script; it now waits for your next prompt.
+
+### 54. OpenTelemetry User Prompt Events
+
+**Fixed:** A missing OpenTelemetry `user_prompt` event for a message sent while tool calls run. The event has `delivery.mode: "mid_turn"` and the running turn's `prompt.id`. **Fixed:** The OpenTelemetry `user_prompt` event leaving out earlier messages' text when queued messages merged into one turn in VS Code, or when one message had an image.
+
+### 55. Slash Command Tool Grants Scope
+
+**Fixed:** A slash command's `allowed-tools` grants applying to background agents woken during or after its turn.
+
+### 56. Feedback/Bug Upload Scope
+
+**Fixed:** `/feedback` and `/bug` to upload other sessions only when they were recorded by the signed-in account or organization.
+
+### 57. Relative Deny/Ask Rules After cd
+
+**Fixed:** Relative deny and ask permission rules (e.g. `Read(./.env)`) no longer covering the project after a `cd`; they now also apply in added directories.
+
+### 58. Case-Insensitive MCP Plugin Rule Matching
+
+**Fixed:** Deny and ask permission rules starting with `mcp__plugin_*_` missing a plugin's MCP server or tool spelled in another letter case.
+
+### 59. Deny Rules After Restart in Remote Sessions
+
+**Fixed:** Deny rules not being applied to a permission approval that arrives after Claude Code restarts, in self-hosted runner and `claude remote-control` sessions.
+
+### 60. Settings File Path Resolution Fix
+
+**Fixed:** A case where a committed `.claude/settings.local.json` could be treated as the user's own when Claude Code was started in certain subfolders of a repository.
+
+### 61. Bash Permission Check Gaps
+
+**Fixed:** Some deny and ask rules not applying to certain Bash commands. **Fixed:** A gap in Bash permission checks where some compound commands could run without asking; these now ask for permission. **Fixed:** A case where a Bash allow rule could run a different program than the one it names.
+
+### 62. Connector Tool Approval Timing
+
+**Fixed:** A connector tool's approval prompt in cloud sessions being answered automatically while plugins were still loading.
+
+### 63. Artifact Cross-Org Visibility Fixes
+
+**Fixed:** Some subagents changing an artifact that people outside your organization can see, or uploading files to it, without asking first when an allow rule is set or uploads were approved earlier. **Fixed:** Some artifact publishes skipping the confirmation for pages that people outside your organization can see when "don't ask again" had been chosen for Artifact. **Fixed:** Auto mode judging only the first change to an artifact that people outside your organization can see; its yes now covers that change alone.
+
+### 64. Managed Plugin Lock Effectiveness
+
+**Fixed:** A managed `strictPluginOnlyCustomization` lock on agents and skills not taking effect in sessions that were already running.
+
+### 65. Sandbox Updater Folder Protection
+
+**Fixed:** Sandboxed commands being able to write to the native updater's download folder in some cases.
+
+### 66. Worktree Settings/Hooks Sandbox Protection
+
+**Fixed:** A case where the Bash sandbox did not fully protect a worktree's settings and hooks. **Fixed:** A case where the Bash sandbox did not fully protect a linked worktree's shared git folder.
+
+### 67. `/teleport` Stash Choice Edge Cases
+
+**Fixed:** `/teleport`'s stash choice in some unusual git states: it now stops and says what to do.
+
+### 68. Windows Startup Stall Fix
+
+**Windows:** Fixed a start-up stall that could last about a second when a PATH entry sits under a folder your account cannot open.
+
+### 69. Windows `/resume` Drive Letter Case Fix
+
+**Windows:** Fixed `/resume` on Windows refusing or hiding sessions whose folder was recorded with a different drive-letter case or slashes.
+
+### 70. Windows In-Session `/resume` Trust Fix
+
+**Windows:** Fixed an in-session `/resume` on Windows dropping a project's saved trust when the session was recorded with a different drive-letter case.
+
+### 71. Linux Sandbox Symlinked Home Fix
+
+**Linux:** Fixed sandboxed Bash commands failing with `bwrap: Can't create file` when the working directory was below an `allowRead` folder inside a `denyRead`, such as under a symlinked home directory.
+
+### 72. Claude Desktop Third-Party Deployment Stop Fix
+
+**Fixed:** Claude Desktop's third-party deployments staying on "Stopping" until a token renewal finished (once it includes this version).
+
+### 73. Subagent Token Limit Improvement
+
+**Improved:** Subagents cut off at the output token limit: they are now asked for the whole answer again, more briefly, instead of returning only its end.
+
+### 74. Keyless Console Sign-In Startup Improvement
+
+**Improved:** Startup with a keyless Console sign-in or other Anthropic profile login: a token that is still valid is read without waiting for the credentials lock.
+
+### 75. Account Email Check Improvement
+
+**Improved:** The account email check: it now also refuses your email as a client's identity in scripts a command runs, file writes, web fetches and MCP calls.
+
+### 76. HTTPS Auth Failed Message for Private Marketplaces
+
+**Improved:** The `HTTPS authentication failed` message for private plugin marketplaces: it now says git's terminal prompts and askpass programs are disabled, and it also appears with newer git versions.
+
+### 77. Plugin Installation Warnings
+
+**Improved:** The add-marketplace confirmations, plugin recommendation prompts and plugin install warning to say that plugins can run code on your computer, with access to your files and shell.
+
+### 78. Desktop Sign-In Error Detail
+
+**Improved:** The `claude --desktop` sign-in error to name the API key, provider or setting that stops a Claude account sign-in from working.
+
+### 79. Voice Mode Microphone Guidance
+
+**Improved:** The `/voice` "No audio detected" message on macOS and Windows: it now says where to pick your microphone.
+
+### 80. MCP Task Status Communication
+
+**Improved:** MCP tasks: Claude is now told when a task is waiting for your answer, and can point you to `/tasks`.
+
+### 81. Remote Control Exit Codes
+
+**Improved:** `claude remote-control`: it now exits with status 4 when it stops by itself (single-session runs still exit 0) and 69 when it can't register, so a service manager can start it again.
+
+### 82. Background Session API Key Messages
+
+**Improved:** The messages shown when a background session can't use its session's API key or token: they no longer suggest adding the key to settings.
+
+### 83. Dataviz Skill Advice
+
+**Improved:** The bundled dataviz skill's part-to-whole advice for static images and for parts with a natural order, such as age bands.
+
+### 84. Sandboxed Bash Default Permission Flow
+
+**Changed:** Sandboxed Bash commands to follow the normal permission flow by default; set `sandbox.autoAllowBashIfSandboxed: true` to keep running them without prompts.
+
+### 85. Managed Settings Sandbox Auto-Allow
+
+**Changed:** Managed settings that turn the sandbox on: to keep commands running without prompts, set `sandbox.autoAllowBashIfSandboxed: true` in your highest-ranking managed source.
+
+### 86. Read-Only Git Commands Permission
+
+**Changed:** Read-only git commands to ask first in a repository that isn't the project's or one you trusted; name it with `--add-dir`, not the `additionalDirectories` setting, to run them without prompts.
+
+### 87. Scheduled Tasks Skill Permission
+
+**Changed:** Scheduled tasks and `/loop` to ask before running a skill that declares `allowed-tools` or hooks; add `Skill(name)` to `permissions.allow` to run it unattended.
+
+### 88. "Always Allow" Dialog Standardization
+
+**Changed:** "Always allow" in Desktop, IDE and SDK hosts: a rule alone is offered only when saving it would allow that command again, so a scheduled task that relied on one can now wait for you.
+
+### 89. Sandbox `.claude` Write Refusal
+
+**Changed:** The sandbox to refuse sandboxed writes to `.claude` settings, skills, agents, commands and hooks in added directories, as it does in the launch folder.
+
+### 90. Worktree Isolation Git Command Restrictions
+
+**Changed:** Worktree isolation: an isolated worktree session or agent is now refused `git bisect run`, `git maintenance register|start` and `scalar`'s set-up commands, and is told what still works.
+
+### 91. Plugin MCP Bundle Unpack Location
+
+**Changed:** Plugin MCP bundles (`.mcpb`, `.dxt`) to unpack under the plugins directory, not `.mcpb-cache` in the plugin's folder, so read-only plugin folders load; one fetched by URL downloads again once.
+
+### 92. Remote Marketplace Plugin Ownership
+
+**Changed:** Plugins of a remote marketplace that managed settings declare, enable and list in `prependPlugins` or `appendPlugins` to count as the organization's; `pluginDigests` is deprecated and ignored.
+
+### 93. Plugin Loading Safety
+
+**Changed:** Plugin loading to skip, and `claude plugin validate` to report, some unsafe paths and links in a plugin's folder.
+
+### 94. Nested Skill Loading
+
+**Changed:** Nested skill loading: `.claude/skills` folders in `--plugin-dir` plugins no longer load from a session started above them; start Claude Code in the plugin folder instead.
+
+### 95. EnterWorktree Symlink Refusal
+
+**Changed:** EnterWorktree to refuse a `WorktreeCreate` hook path that goes through a symlink inside the project; have the hook print the real path.
+
+### 96. Teammate Session Start Folder
+
+**Changed:** tmux and iTerm2 teammates, and new sessions from the agents view opened with ←, to start in the session's folder instead of where the shell last ran `cd`.
+
+### 97. Prompt Suggestion Refresh Rate
+
+**Changed:** Prompt suggestions in the terminal to refresh less often after 8 turns in a row started by background or scheduled tasks, saving usage until you press a key or return to the terminal.
+
+### 98. Background MCP Task Esc Behavior
+
+**Changed:** Esc on a background MCP task's question to "answer later": nothing is sent to the server, and the question stays in `/tasks`.
+
+### 99. MAX_CONTEXT_TOKENS for Gateway Models
+
+**Changed:** `CLAUDE_CODE_MAX_CONTEXT_TOKENS` to also set the context window of unrecognized model IDs that start with `claude-`, such as a gateway's `claude-sonnet-latest`.
+
+### 100. Login Privacy Permission
+
+**Changed:** `/login` to ask for permission to change your privacy settings.
+
+### 101. Cost/Usage Counting for Mod Model Calls
+
+**Changed:** `/cost`, `$.session.usage()`, `--max-budget-usd` and the cost and token metrics to count a mod's `$.model.complete` and `$.model.classify` calls.
+
+### 102. Sandbox Helper Programs Environment
+
+**Changed:** The programs that Claude Code's sandbox starts for its own use, such as its network bridge, to run without Claude Code's sign-in tokens and API keys in their environment.
+
+### 103. Ripgrep/Git/Sandbox Helper mTLS Passphrase
+
+**Changed:** ripgrep, local git commands and the sandbox runtime's own helper programs to run without the mTLS client key's passphrase in their environment.
+
+### 104. Remote Control Resume/Teleport Disconnect
+
+**Remote Control:** Changed `/resume` and `/teleport` to disconnect first when the connected session has a share link, or when that can't be checked; run `/remote-control` to connect again.
+
+### 105. Cloud Session Sandbox FailIfUnavailable
+
+**Changed:** Claude Code on the web, cloud scheduled tasks and Cowork cloud sessions to start despite `sandbox.failIfUnavailable`: the hosted container has no command sandbox.
+
+### 106. Cloud/Remote Session Settings Requests
+
+**Changed:** Requests for settings, permission rules, hooks or status over a cloud or self-hosted session's connection to return less or be refused; what applies in the session is unchanged.
+
+### 107. Clean Environment Startup Wait
+
+**Changed:** `claude -p` with no cached account data to wait for that data before its first request, so a first run in a clean environment can start a few seconds later.
+
+### 108. Scratchpad Folder Guidance
+
+**Changed:** Claude's instructions to keep files you'll want out of its temporary scratchpad folder, which can be cleared.
+
+### 109. Marketplace Ref Commit Pinning
+
+**Changed:** Marketplace `ref` to accept the full ID of any commit on a branch or tag; clients before this version can't clone such a pin, so a marketplace pinned this way stops loading there.
+
+### 110. Plugin Marketplace CONNECT Tunnel
+
+**Changed:** Plugin marketplace and plugin downloads to use a CONNECT tunnel when `ALL_PROXY` is the only proxy set; a proxy that refuses CONNECT now fails them.
+
+### 111. Worktree/Submodule Container Settings
+
+**Changed:** `-p` and SDK runs in a worktree or submodule mounted into a container to apply `.claude/settings.local.json` allow rules only once the folder is trusted.
+
+### 112. Self-Hosted Runner Symlink Refusal
+
+**Changed:** Self-hosted runners to refuse a session whose session folder or repository path is a symbolic link, other than a `checkout` hook's checkout.
+
+### 113. Spend Limit Error Message
+
+**Removed:** "ask your admin to raise it" from spend limit and shared budget errors in cloud sessions and under Remote Control.
+
+### 114. VSCode Prompt Suggestions
+
+**[VSCode] Added:** Prompt suggestions wherever the terminal shows them: Tab accepts the suggested next prompt; `promptSuggestionEnabled: false` in Claude Code's settings.json turns them off.
+
+### 115. VSCode Console Sign-In No API Key
+
+**[VSCode] Added:** A Console sign-in that creates no API key.
+
+### 116. VSCode MCP Redirect URL Field
+
+**[VSCode] Added:** A field to paste the redirect URL when signing in to an MCP server from the panel in SSH, WSL and container windows.
+
+### 117. VSCode Model Picker Check Mark
+
+**[VSCode] Fixed:** The model picker's check mark staying on the old model after Claude Code restarted on another model or the model was switched over Remote Control.
+
+### 118. VSCode Effort Selector Cap
+
+**[VSCode] Fixed:** The effort selector offering levels above the effort cap set by your organization or the `maxEffortLevel` setting.
+
+### 119. VSCode Sign-In Screen Allowed Providers
+
+**[VSCode] Fixed:** The sign-in screen offering sign-ins that the managed `allowedProviders` setting refuses.
+
+### 120. VSCode MCP Permission Prompt Reason
+
+**[VSCode] Fixed:** The permission prompt for MCP tools not saying why Claude Code asks when a safety check raises the question.
+
+### 121. VSCode Organization Settings Retry Message
+
+**[VSCode] Fixed:** The message for organization settings that couldn't load saying to run a command again; it now says to try again, matching the tab's Retry link.
+
+### 122. VSCode Untrusted Folder Note
+
+**[VSCode] Improved:** The note shown for an untrusted folder: it now says why the extension is off and how to turn it on.
+
+### 123. VSCode System Refusal Error
+
+**[VSCode] Improved:** The error shown when the system refuses to run Claude Code: it now says your IT team can allow a blocked program.
+
+### 124. VSCode Sign-In Card Connection Error
+
+**[VSCode] Improved:** The sign-in card to say what to do when the browser shows a connection error for localhost.
+
+### 125. VSCode Marketplace Confirmation Button
+
+**[VSCode] Changed:** The install link's marketplace confirmation button to "Trust marketplace and continue".
+
+### 126. Web Cloud Session MCP Tool Description Limit
+
+**[Claude Code on the web] Fixed:** New cloud sessions cutting MCP tool descriptions loaded through tool search at 4,096 characters; the limit is now 16,384, as in other Claude Code sessions.
+
+### 127. Claude Tag Artifact Links in Slack
+
+**[Claude Tag] Fixed:** Artifact links pasted in Slack getting no card when the poster's Claude sign-in had expired.
 
 ---
 
@@ -763,14 +1335,19 @@ claude -p "quick task"  # Creates its own session, doesn't pollute parent
 
 | Version | Date | Type | Focus |
 |---------|------|------|-------|
-| **v2.1.318** | **Nov 4, 2026** | **Patch (Latest)** | **100+ fixes: mod effort, AWS assume_role, login expiry dates, 10-day warnings, --continue recovery, macOS bash leak, permission key races, MCP lock safety, cloud session reliability, IDE extension removal, 78 detailed fixes** |
+| **v2.1.325** | **Nov 13, 2026** | **Patch (Latest)** | **zstd security fix, Code Mode polish, Jupyter tips, 127 detailed fixes** |
+| **v2.1.323** | Nov 12, 2026 | Patch | Code Mode opt-in, plugin engine versioning, type-checked hooks |
+| **v2.1.322** | Nov 10, 2026 | Patch | Vertex fast mode (global/us/eu) |
+| **v2.1.321** | Nov 9, 2026 | Patch | Fable 5.2 default, remote-control settings file, MCP OAuth redirect fix |
+| **v2.1.319** | Nov 6, 2026 | Patch | Auto-mode behind LLM gateways, server-side check toggle |
+| **v2.1.318** | Nov 4, 2026 | Patch | 100+ fixes: mod effort, AWS assume_role, login expiry dates, 10-day warnings, --continue recovery, macOS bash leak, permission key races, MCP lock safety, cloud session reliability, IDE extension removal |
 | **v2.1.317** | Nov 3, 2026 | Patch | 80+ fixes: nested session ID, MCP disconnects, gateway 403/422, auth race, effortLevel, titles, screen reader, 5xx recovery, OTel, Windows paths, artifacts |
 | v2.1.316 | Oct 31, 2026 | Patch | 60+ fixes: shell leaks, bash/PowerShell, network, Vertex/Bedrock, auto-mode, cloud sessions |
 | v2.1.315 | Oct 29, 2026 | Patch | Safety event telemetry |
 | v2.1.314 | Oct 28, 2026 | Patch | Permissions block writes, idle compaction |
 | v2.1.312 | Oct 25, 2026 | Patch | 80 fixes you actually feel |
 
-**Four patch releases in ten days.** Each one sanding down friction. v2.1.317 fixed self-hosted runners, Desktop MCP, and gateway deployments. v2.1.318 adds mod effort control, AWS cost attribution, login expiry visibility, and 78 more fixes that make every deployment scenario more reliable.
+**Five patch releases in ten days (Nov 3–13).** Each one sanding down friction. v2.1.317 fixed self-hosted runners, Desktop MCP, and gateway deployments. v2.1.318 added mod effort control, AWS cost attribution, login expiry visibility. v2.1.319 fixed auto-mode behind gateways. v2.1.321 made Fable 5.2 default and fixed MCP OAuth redirects. v2.1.322 brought Vertex fast mode. v2.1.323 launched Code Mode and plugin engine versioning. v2.1.325 patched a zstd security issue and polished Code Mode.
 
 ---
 
@@ -789,7 +1366,10 @@ claude -p "quick task"  # Creates its own session, doesn't pollute parent
 | **Write mods that spawn quick side jobs** | **Yes** — `effort: "low"` saves tokens |
 | **Track AWS costs per developer across accounts** | **Yes** — `assume_role` enables cross-account attribution |
 | **Want 10-day warning before sign-in expires** | **Yes** — `loginExpiresAt` + stderr warning |
-| **On v2.1.317 and happy** | **Yes** — these fixes compound daily |
+| **Want to try Code Mode (experimental)** | **Yes** — opt-in at code.claude.com |
+| **Build plugins** | **Yes** — engine versioning + type-checked hooks prevent breakage |
+| **Use Vertex AI** | **Yes** — fast mode now available |
+| **On v2.1.317+ and happy** | **Yes** — these fixes compound daily |
 
 ---
 
@@ -804,7 +1384,7 @@ claude update
 
 # Verify
 claude --version
-# Should show 2.1.318
+# Should show 2.1.325
 ```
 
 **First things to verify after update:**
@@ -834,13 +1414,22 @@ claude auth status  # Should show loginExpiresAt
 
 # 8. Test --continue recovery
 # Simulate malformed tool call → --continue should recover history
+
+# 9. Test Code Mode (experimental)
+# Visit https://code.claude.com/docs/en/code-mode to enable
+
+# 10. Test Vertex fast mode
+# Use Vertex in global/us/eu region → should use fast mode automatically
+
+# 11. Test plugin engine versioning
+# Add engines.claude-code to plugin.json → validate with claude plugin validate
 ```
 
 ---
 
 ## The Bottom Line
 
-**v2.1.316 fixed the plumbing. v2.1.317 fixed the edge cases. v2.1.318 adds the capabilities that make production deployments effortless.**
+**v2.1.316 fixed the plumbing. v2.1.317 fixed the edge cases. v2.1.318 added production capabilities. v2.1.319 fixed auto-mode behind gateways. v2.1.321 made Fable 5.2 default and fixed MCP OAuth. v2.1.322 brought Vertex fast mode. v2.1.323 launched Code Mode and plugin versioning. v2.1.325 patched zstd security and polished Code Mode.**
 
 - **Self-hosted runners** → nested sessions isolated
 - **Desktop MCP** → connections persist
@@ -854,8 +1443,12 @@ claude auth status  # Should show loginExpiresAt
 - **Mods** → effort control for quick side jobs
 - **Cloud sessions** → restart reliability, GitHub Actions logs, PR failure clarity
 - **Config** → atomic MCP changes, corrupt JSON handling, network home survival
+- **Code Mode** → experimental JavaScript-based tool execution (opt-in)
+- **Plugins** → engine versioning + type-checked hooks
+- **Vertex** → fast mode in global/us/eu
+- **Security** → zstd decompression fixed
 
-This isn't a feature release. It's the **reliability layer** that makes every deployment scenario — self-hosted, Desktop, gateway, cloud, CI/CD — actually usable in production.
+This isn't a feature release. It's the **reliability layer** that makes every deployment scenario — self-hosted, Desktop, gateway, cloud, CI/CD — actually usable in production, plus the **first experimental feature** (Code Mode) that changes how Claude executes tools.
 
 ```bash
 claude update
@@ -874,6 +1467,10 @@ claude update
 # AWS: assume_role for cost attribution
 # Cloud: restart reliability, gh logs, PR failures
 # Config: atomic, survives network homes
+# Code Mode: opt-in at code.claude.com
+# Plugins: engine versioning + type checking
+# Vertex: fast mode
+# Security: zstd fixed
 ```
 
 ---
@@ -896,6 +1493,6 @@ claude update
 
 ---
 
-*Claude Code is available at [claude.ai/code](https://claude.ai/code) and [github.com/anthropics/claude-code](https://github.com/anthropics/claude-code). Published November 3, 2026 — updated November 4, 2026 — covers Claude Code v2.1.318 stable released November 4, 2026. Full changelog: [github.com/anthropics/claude-code/releases/tag/v2.1.318](https://github.com/anthropics/claude-code/releases/tag/v2.1.318)*
+*Claude Code is available at [claude.ai/code](https://claude.ai/code) and [github.com/anthropics/claude-code](https://github.com/anthropics/claude-code). Published November 3, 2026 — updated November 13, 2026 — covers Claude Code v2.1.325 stable released November 13, 2026. Full changelog: [github.com/anthropics/claude-code/releases/tag/v2.1.325](https://github.com/anthropics/claude-code/releases/tag/v2.1.325)*
 
 *Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*

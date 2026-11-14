@@ -1,21 +1,28 @@
 ---
 title: "Why I Stopped Using Copilot and Went Full Terminal Agent"
-description: "Autocomplete is comfortable. Agents that read your whole codebase, make decisions, and commit code are something else entirely."
+description: "Autocomplete is comfortable. Agents that read your whole codebase, make decisions, and commit code are something else entirely. Here's the honest breakdown after two years on Copilot and one week with a terminal agent."
 pubDate: "2026-07-10T12:00:00Z"
-updatedDate: "2026-07-10T12:00:00Z"
-tags: ['opinion', 'copilot', 'terminal-agent', 'workflow', 'personal']
+updatedDate: "2026-11-14T12:00:00Z"
+updated: true
+tags: ['opinion', 'copilot', 'terminal-agent', 'workflow', 'personal', 'claude-code', 'hermes']
 image: "/api/og?title=Why+I+Stopped+Using+Copilot+and+Went+Full+Terminal+Agent"
 ---
 
 I used Copilot for two years. Every day. It was my pair programmer, my autocomplete, my inline documentation. I defended it against everyone who said agents would replace it.
 
-Then I tried a terminal agent for one week. I haven't opened Copilot since.
+Then I tried a terminal agent (Claude Code, then Hermes) for one week. I haven't opened Copilot since.
 
 ## What Copilot Does Well
 
 Copilot is great at the micro-loop. You type a function name, it suggests the body. You write a comment, it suggests the implementation. The feedback is instant. The context is your current file. The cognitive overhead is zero.
 
 For two years, that was enough. I didn't know what I was missing because I'd never experienced anything faster.
+
+**Where Copilot genuinely shines:**
+- Boilerplate: React components, API routes, test scaffolding
+- Language syntax: "How do I destructure this in Rust again?"
+- Repetitive patterns: DTOs, migrations, config files
+- Learning new APIs: Type hints + inline docs as you type
 
 ## The Terminal Agent Difference
 
@@ -33,27 +40,102 @@ Total time: 4 minutes. Total questions I answered: zero.
 
 Copilot couldn't do this because Copilot doesn't see the full codebase. It sees one file at a time. Refactoring across multiple files requires a human to coordinate. Terminal agents don't have that limitation.
 
+### Real-World Example: Adding a Feature Across the Stack
+
+**With Copilot (my old workflow):**
+1. Create the database migration (Copilot helps with syntax)
+2. Update the model/entity (Copilot suggests fields)
+3. Create the repository interface + implementation (Copilot helps per file)
+4. Create the service layer (Copilot helps per method)
+5. Create the API controller (Copilot helps per endpoint)
+6. Wire up dependency injection (manual)
+7. Write tests for each layer (Copilot helps per test file)
+8. Run tests, fix integration issues (manual)
+
+**With terminal agent (Claude Code / Hermes):**
+```
+> "Add a 'team invites' feature: users can invite teammates via email. 
+>  Needs: DB migration, model, repository, service, API endpoints, 
+>  email notification, and tests. Follow existing patterns in the codebase."
+```
+
+Agent does all 8 steps. Runs tests. Fixes the 3 integration failures. Commits.
+
+Time: ~12 minutes vs ~45 minutes. The difference isn't speed — it's that I stayed in "architect mode" the entire time instead of context-switching between "implementer" and "architect."
+
 ## What You Lose
 
 Terminal agents require a different workflow:
 - You type commands instead of tab-completing
 - You review diffs instead of accepting inline suggestions
 - You describe intent in natural language instead of coding it yourself
+- You need to trust the agent's file operations (read, write, edit, bash)
 
-The first few days feel slower. You're fighting the interface instead of flowing with it. But by day 3, something clicks. You realize the agent isn't an autocomplete — it's a teammate.
+The first few days feel slower. You're fighting the interface instead of flowing with it. By day 3, something clicks: the agent isn't an autocomplete — it's a teammate.
 
 ## What You Gain
 
-The productivity jump isn't incremental. It's categorical. Tasks that took 30 minutes now take 5. Refactors you'd postpone for weeks happen in an afternoon. You stop thinking about how to implement things and start thinking about what to build.
+The productivity jump isn't incremental. It's categorical:
+
+| Task Type | Copilot Time | Terminal Agent Time | Notes |
+|-----------|-------------|---------------------|-------|
+| Single-file feature | 15 min | 8 min | Copilot wins on pure typing speed |
+| Multi-file refactor | 45 min | 5 min | Agent reads entire context |
+| New feature (full stack) | 60-90 min | 10-20 min | Agent coordinates layers |
+| Bug hunt + fix | 30-60 min | 5-15 min | Agent searches codebase |
+| Test generation | 20 min/file | 3 min/feature | Agent writes integration tests |
+
+Tasks that took 30 minutes now take 5. Refactors you'd postpone for weeks happen in an afternoon. You stop thinking about *how* to implement things and start thinking about *what* to build.
 
 Copilot made me faster at typing. Terminal agents made me faster at shipping. The difference is bigger than I expected.
 
----
-*Stop paying for AI subscriptions you barely use. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** is $12/mo for access to GPT, Claude, Gemini, Grok, DeepSeek, Perplexity, and more. One sub, every top model.*
+## The Mental Model Shift
 
+**Copilot mindset:** "I'm writing code, and the AI helps me type faster."
+
+**Terminal agent mindset:** "I'm directing an engineer who writes code, and I review the result."
+
+This shifts you from *implementation* to *specification and review*. You spend more time thinking about:
+- Architecture decisions (which the agent then implements)
+- Edge cases (which the agent then handles)
+- Test strategy (which the agent then executes)
+- Integration points (which the agent then wires up)
+
+## Practical Transition Tips
+
+If you're considering the switch:
+
+1. **Start with a throwaway project** — Don't migrate your main repo. Clone something, break it, let the agent fix it.
+
+2. **Use `/init` or AGENTS.md** — Both Claude Code and Hermes support project instructions. Write a 50-line AGENTS.md with your conventions, test commands, and "don't touch these files" rules. It pays off immediately.
+
+3. **Learn the review loop** — `git diff` becomes your primary interface. Get comfortable reading unified diffs fast.
+
+4. **Expect the first week to feel slower** — You're learning a new abstraction layer. Push through.
+
+5. **Don't go back to Copilot for "just this one thing"** — The context-switching cost is higher than you think.
+
+## When Copilot Still Makes Sense
+
+- Learning a new language/framework (inline syntax help is unbeatable)
+- Quick throwaway scripts where agent setup overhead isn't worth it
+- Teams not ready for agent workflows (see: [Most Teams Aren't Ready for What Coding Agents Do Next](/blog/teams-not-ready-for-coding-agents/))
+- Mobile/IDE-only environments where terminal access is limited
+
+## The Bottom Line
+
+Two years of Copilot taught me that autocomplete is a local maximum. Terminal agents are a different hill entirely — steeper to climb, but the view from the top is shipping entire features while you'd still be writing the first service class.
+
+If you're curious, give a terminal agent one real week on a real project. Not a toy. A real feature in your real codebase. That's all it took for me.
+
+---
+
+*Stop paying for AI subscriptions you barely use. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** is $12/mo for access to GPT, Claude, Gemini, Grok, DeepSeek, Perplexity, and more. One sub, every top model.*
 
 ## Related articles
 
 - [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
 - [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)
 - [Your AI Agents Config Directory Is Now the Most Dangerous Place on Your Machine](/blog/ai-agent-config-directory-attack-surface-2026/)
+- [Most Teams Aren't Ready for What Coding Agents Do Next](/blog/teams-not-ready-for-coding-agents/)
+- [Why I'm Betting on Multi-Agent Orchestration Over Bigger Models](/blog/multi-agent-orchestration-over-bigger-models/)
