@@ -1,26 +1,15 @@
 #!/usr/bin/env node
 /**
- * GEO Optimizer — Optimize terminalblog content for AI search engines (ChatGPT, Perplexity, Claude, etc.)
+ * GEO Optimizer — Analyze terminalblog content for AI search engines (ChatGPT, Perplexity, Claude, etc.)
  * 
- * What this does:
- * 1. Analyzes top-ranking/pillar posts for GEO readiness
- * 2. Ensures FAQ sections have FAQPage JSON-LD schema
- * 3. Adds clear definitions at article starts
- * 4. Verifies canonical URLs and structured data
- * 5. Optimizes meta descriptions for AI citations
- * 6. Reports findings and applies improvements
- * 
- * Usage:
- *   node scripts/geo-optimizer.cjs --dry          # Dry run only
- *   node scripts/geo-optimizer.cjs                # Apply changes
- *   node scripts/geo-optimizer.cjs --analyze-only # Just analyze, no changes
+ * This version only ANALYZES - does NOT modify files.
+ * The site already serves structured data via @jdevalk/astro-seo-graph schema endpoint.
  */
 
 const fs = require('fs');
 const path = require('path');
 
 const BLOG = path.join(__dirname, '..', 'src', 'content', 'blog');
-const DRY = process.argv.includes('--dry');
 const ANALYZE_ONLY = process.argv.includes('--analyze-only');
 
 const PILLAR_TAGS = ['pillar', 'guide', 'checklist', 'comparison', 'pricing', 'security', 'beware', 'decision', 'complete-guide', 'features-comparison', 'evergreen'];
@@ -50,14 +39,14 @@ function parse(file) {
   // Check for FAQ section
   const hasFaqSection = /^## FAQ\s*$/m.test(body) || /^## FAQ\s*$/im.test(body);
   
-  // Check for FAQPage JSON-LD
+  // Check for FAQPage JSON-LD (the schema endpoint handles this)
   const hasFaqSchema = /FAQPage|application\/ld\+json/i.test(body) || /buildFaqSchema/i.test(body);
   
-  // Check for clear definition at start (first 2000 chars of body after any script tags)
-    const bodyAfterScripts = body.replace(/<script[^>]*>[\s\S]*?<\/script>\s*/g, '').replace(/<script[^>]*set:html=\{JSON\.stringify\([\s\S]*?\)\}\s*\/\>\s*/g, '');
-    const firstSection = bodyAfterScripts.slice(0, 2000);
-    const hasDefinition = /^(\*{0,2})(What is|What are|A (coding agent|agent) is|An (agent|agent) is|is a|refers to|means)/im.test(firstSection.trim());
-  
+  // Check for clear definition at start
+  const bodyAfterScripts = body.replace(/<script[^>]*>[\s\S]*?<\/script>\s*/g, '').replace(/<script[^>]*set:html=\{JSON\.stringify\([\s\S]*?\)\}\s*\/\>\s*/g, '');
+  const firstSection = bodyAfterScripts.slice(0, 2000);
+  const hasDefinition = /^(\*{0,2})(What is|What are|A (coding agent|agent) is|An (agent|agent) is|is a|refers to|means)/im.test(firstSection.trim());
+
   // Check for canonical URL in frontmatter
   const hasCanonical = !!fm.canonical;
   
@@ -67,7 +56,7 @@ function parse(file) {
   // Check for meta description
   const hasDescription = !!fm.description && fm.description.length >= 120 && fm.description.length <= 160;
   
-  // Check for structured data (Article, BlogPosting)
+  // Check for structured data (Article, BlogPosting) - the schema endpoint handles this
   const hasArticleSchema = /@type.*BlogPosting|@type.*Article|buildPostGraph/i.test(raw);
 
   return {
@@ -95,14 +84,10 @@ function parse(file) {
 }
 
 function extractFaq(body) {
-  // Normalize line endings to \n for consistent regex matching
   const normalizedBody = body.replace(/\r\n/g, '\n');
-
-  // Find FAQ section - look for ## FAQ (H2) or ### FAQ (H3) and capture until next heading, 
-  // or \n---, or end of string
+  
   let faqMatch = normalizedBody.match(/(?:^|\n)## FAQ\s*\n([\s\S]*?)(?:\n## |\n---|$)/);
   if (!faqMatch) {
-    // Try H3 FAQ format (### FAQ)
     faqMatch = normalizedBody.match(/(?:^|\n)### FAQ\s*\n([\s\S]*?)(?:\n### |\n## |\n---|$)/);
   }
   if (!faqMatch) return [];
@@ -110,8 +95,7 @@ function extractFaq(body) {
   const faqContent = faqMatch[1];
   const faqs = [];
 
-  // Pattern 1: **Q1: Question?** ... (numbered Q format with bold)
-  // Matches: **Q1: Question?**\n\nAnswer or **Q1: Question?**\nAnswer
+  // Pattern 1: **Q1: Question?** ...
   const pattern1 = /\*\*Q\d*:\s*([^*]+?)\*\*\s*\n\s*\n?([\s\S]*?)(?=\n\s*\*\*Q\d*:|$)/gi;
   let match;
   while ((match = pattern1.exec(faqContent)) !== null) {
@@ -120,7 +104,7 @@ function extractFaq(body) {
     if (q && a && q.length > 3) faqs.push({ q, a });
   }
 
-  // Pattern 2: **Question?** ... (bolded question ending with ? or :)
+  // Pattern 2: **Question?** ...
   if (faqs.length === 0) {
     const pattern2 = /\*\*([^*?]+(?:\?|:))\*\*\s*\n\s*\n?([\s\S]*?)(?=\n\*\*[^*?]+(?:\?|:)\*\*|$)/gi;
     while ((match = pattern2.exec(faqContent)) !== null) {
@@ -130,135 +114,7 @@ function extractFaq(body) {
     }
   }
 
-  // Pattern 3: **Q:** ... (answer on following lines until next Q or end)
-  if (faqs.length === 0) {
-    const pattern3 = /\*\*Q:\*\*\s*(.*?)\n([\s\S]*?)(?=\n\s*\*\*Q:|$)/gi;
-    while ((match = pattern3.exec(faqContent)) !== null) {
-      const q = match[1].trim();
-      const a = match[2].trim();
-      if (q && a) faqs.push({ q, a });
-    }
-  }
-
-  // Pattern 4: Q: ... A: ... (plain text, with or without numbers, with or without bold)
-  if (faqs.length === 0) {
-    const pattern4 = /(?:^|\n)(?:\*\*)?(?:Q|Question)\s*\d*[:：]\s*(.*?)(?:\n|\r)(?:\*\*)?(?:A|Answer)\s*\d*[:：]\s*(.*?)(?=\n(?:Q|Question)\s*\d*[:：]|\n\*\*(?:Q|Question)|$)/gi;
-    while ((match = pattern4.exec(faqContent)) !== null) {
-      const q = match[1].trim().replace(/^["']|["']$/g, '');
-      const a = match[2].trim().replace(/^["']|["']$/g, '');
-      if (q && a) faqs.push({ q, a });
-    }
-  }
-
-  // Pattern 5: H3 question format (### Question?) followed by answer
-  if (faqs.length === 0) {
-    const pattern5 = /^###\s+([^\n?]+?\?)\s*\n([\s\S]*?)(?=\n###\s+[^\n?]+?\?|\n## |\n---|$)/gmi;
-    while ((match = pattern5.exec(faqContent)) !== null) {
-      const q = match[1].trim().replace(/^["']|["']$/g, '');
-      const a = match[2].trim().replace(/^["']|["']$/g, '');
-      if (q && a && q.length > 3) faqs.push({ q, a });
-    }
-  }
-
   return faqs;
-}
-
-function buildFaqSchema(faqs) {
-  if (!faqs.length) return '';
-  const entities = faqs.map(({ q, a }) => ({
-    '@type': 'Question',
-    name: q,
-    acceptedAnswer: { '@type': 'Answer', text: a }
-  }));
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'FAQPage',
-    mainEntity: entities
-  };
-}
-
-function injectFaqSchema(raw, faqSchema) {
-  // Find the frontmatter end and inject script tag after it
-  const fmEnd = raw.indexOf('\n---', 4);
-  if (fmEnd === -1) return raw;
-  
-  const scriptTag = `\n<script type="application/ld+json" set:html={JSON.stringify(${JSON.stringify(faqSchema, null, 2)})} />\n`;
-  
-  // Insert after frontmatter
-  return raw.slice(0, fmEnd + 4) + scriptTag + raw.slice(fmEnd + 4);
-}
-
-function buildArticleSchema(post) {
-  const articleSchema = {
-    '@context': 'https://schema.org',
-    '@type': 'BlogPosting',
-    headline: post.title,
-    description: post.fm.description || '',
-    image: post.fm.image && !post.fm.image.includes('api/og?title=Article') ? `https://terminalblog.com${post.fm.image}` : undefined,
-    datePublished: post.fm.pubDate,
-    dateModified: post.fm.updatedDate || post.fm.pubDate,
-    author: {
-      '@type': 'Person',
-      name: post.fm.author || 'TerminalBlog'
-    },
-    publisher: {
-      '@type': 'Organization',
-      name: 'TerminalBlog',
-      logo: {
-        '@type': 'ImageObject',
-        url: 'https://terminalblog.com/favicon.ico'
-      }
-    },
-    mainEntityOfPage: {
-      '@type': 'WebPage',
-      '@id': `https://terminalblog.com/blog/${post.slug}/`
-    }
-  };
-  
-  // Remove undefined values
-  Object.keys(articleSchema).forEach(key => articleSchema[key] === undefined && delete articleSchema[key]);
-  if (articleSchema.image === undefined) delete articleSchema.image;
-  
-  return articleSchema;
-}
-
-function injectArticleSchema(raw, articleSchema) {
-  // Find the frontmatter end and inject script tag after it
-  const fmEnd = raw.indexOf('\n---', 4);
-  if (fmEnd === -1) return raw;
-  
-  const scriptTag = `\n<script type="application/ld+json" set:html={JSON.stringify(${JSON.stringify(articleSchema, null, 2)})} />\n`;
-  
-  // Insert after frontmatter (after any existing FAQ schema)
-  return raw.slice(0, fmEnd + 4) + scriptTag + raw.slice(fmEnd + 4);
-}
-
-function addDefinition(body) {
-  // Find the first paragraph after the first heading or start of body
-  const lines = body.split('\n');
-  let insertIndex = 0;
-  
-  // Skip frontmatter-like content at start
-  while (insertIndex < lines.length && (lines[insertIndex].startsWith('#') || lines[insertIndex].trim() === '')) {
-    insertIndex++;
-  }
-  
-  // Find first substantial paragraph
-  while (insertIndex < lines.length && lines[insertIndex].trim().length < 50) {
-    insertIndex++;
-  }
-  
-  if (insertIndex >= lines.length) return body;
-  
-  // Check if first paragraph already looks like a definition
-  const firstPara = lines.slice(insertIndex, insertIndex + 3).join(' ');
-  if (/^(What is|What are|A |An |is a |refers to|means )/i.test(firstPara.trim())) {
-    return body; // Already has definition
-  }
-  
-  // We can't easily generate a definition without knowing the topic
-  // Return body unchanged - this needs manual intervention
-  return body;
 }
 
 function analyze() {
@@ -286,12 +142,12 @@ function analyze() {
     
     if (!p.hasFaqSection) issues.push('Missing FAQ section');
     else if (faqs.length === 0) issues.push('FAQ section exists but no parseable Q&A pairs');
-    else if (!p.hasFaqSchema) issues.push('Has FAQ but missing FAQPage JSON-LD schema');
+    else if (!p.hasFaqSchema) issues.push('Has FAQ but missing FAQPage JSON-LD schema (handled by schema endpoint)');
     
     if (!p.hasDefinition) issues.push('No clear definition in first section');
     if (!p.hasDescription) issues.push('Meta description missing or wrong length (need 120-160 chars)');
     if (!p.hasImage) issues.push('Missing custom hero image (using generic OG)');
-    if (!p.hasArticleSchema) issues.push('Missing Article/BlogPosting schema');
+    if (!p.hasArticleSchema) issues.push('Missing Article/BlogPosting schema (handled by schema endpoint)');
     if (p.words < MIN_WORDS_PILLAR) issues.push(`Thin pillar (${p.words}w < ${MIN_WORDS_PILLAR}w)`);
     
     const status = issues.length === 0 ? '✅ READY' : `⚠️ ${issues.length} issue(s)`;
@@ -299,7 +155,7 @@ function analyze() {
     console.log(`  Title: ${p.title}`);
     console.log(`  Words: ${p.words} | Age: ${p.ageDays}d | Tags: ${p.tags.join(', ')}`);
     console.log(`  FAQ: ${p.hasFaqSection ? 'Yes' : 'No'} | FAQ Schema: ${p.hasFaqSchema ? 'Yes' : 'No'} | FAQs found: ${faqs.length}`);
-    console.log(`  Definition: ${p.hasDefinition ? 'Yes' : 'No'} | Description: ${p.hasDescription ? 'OK' : 'Fix'} | Image: ${p.hasImage ? 'Custom' : 'Generic'} | Schema: ${p.hasArticleSchema ? 'Yes' : 'No'}`);
+    console.log(`  Definition: ${p.hasDefinition ? 'Yes' : 'No'} | Description: ${p.hasDescription ? 'OK' : 'Fix'} | Image: ${p.hasImage ? 'Custom' : 'Generic'} | Schema: ${p.hasArticleSchema ? 'Yes' : 'No'} | Canonical: ${p.hasCanonical ? 'Yes' : 'No'}`);
     if (issues.length) {
       issues.forEach(i => console.log(`  - ${i}`));
     }
@@ -313,16 +169,18 @@ function analyze() {
   const withImage = pillarPosts.filter(p => p.hasImage).length;
   const withSchema = pillarPosts.filter(p => p.hasArticleSchema).length;
   const thinPillars = pillarPosts.filter(p => p.words < MIN_WORDS_PILLAR).length;
+  const withCanonical = pillarPosts.filter(p => p.hasCanonical).length;
   
   console.log('\n' + '='.repeat(80));
   console.log('SUMMARY');
   console.log('='.repeat(80));
   console.log(`Pillar posts with FAQ section: ${withFaq}/${pillarPosts.length}`);
-  console.log(`Pillar posts with FAQ schema: ${withFaqSchema}/${pillarPosts.length}`);
+  console.log(`Pillar posts with FAQ schema: ${withFaqSchema}/${pillarPosts.length} (schema endpoint handles this)`);
   console.log(`Pillar posts with clear definition: ${withDefinition}/${pillarPosts.length}`);
   console.log(`Pillar posts with good meta description: ${withDescription}/${pillarPosts.length}`);
   console.log(`Pillar posts with custom image: ${withImage}/${pillarPosts.length}`);
-  console.log(`Pillar posts with Article schema: ${withSchema}/${pillarPosts.length}`);
+  console.log(`Pillar posts with Article schema: ${withSchema}/${pillarPosts.length} (schema endpoint handles this)`);
+  console.log(`Pillar posts with canonical URL: ${withCanonical}/${pillarPosts.length}`);
   console.log(`Thin pillars (<${MIN_WORDS_PILLAR}w): ${thinPillars}/${pillarPosts.length}`);
   
   // AI Search visibility check (simulated based on content quality)
@@ -347,72 +205,10 @@ function analyze() {
   return { posts: allPosts, pillarPosts, topPillars };
 }
 
-function applyFixes(posts) {
-  if (DRY || ANALYZE_ONLY) {
-    console.log('\n[DRY RUN] No changes applied.');
-    return;
-  }
-  
-  let changed = 0;
-  
-  for (const p of posts) {
-    if (!p.evergreen) continue; // Only fix pillar posts
-    
-    let newRaw = p.raw;
-    let fileChanged = false;
-    
-    // Add FAQ schema if FAQ exists but no schema
-    if (p.hasFaqSection && !p.hasFaqSchema) {
-      const faqs = extractFaq(p.body);
-      if (faqs.length > 0) {
-        const faqSchema = buildFaqSchema(faqs);
-        newRaw = injectFaqSchema(newRaw, faqSchema);
-        fileChanged = true;
-        console.log(`  ✓ Added FAQPage schema to ${p.slug} (${faqs.length} Q&As)`);
-      }
-    }
-    
-    // Add canonical URL if missing
-    if (!p.hasCanonical) {
-      const canonicalUrl = `https://terminalblog.com/blog/${p.slug}/`;
-      const fmEnd = newRaw.indexOf('\n---', 4);
-      if (fmEnd !== -1) {
-        const canonicalLine = `canonical: "${canonicalUrl}"\n`;
-        newRaw = newRaw.slice(0, fmEnd) + '\n' + canonicalLine + newRaw.slice(fmEnd);
-        fileChanged = true;
-        console.log(`  ✓ Added canonical URL to ${p.slug}`);
-      }
-    }
-    
-    // Add Article/BlogPosting schema if missing
-    if (!p.hasArticleSchema) {
-      const articleSchema = buildArticleSchema(p);
-      newRaw = injectArticleSchema(newRaw, articleSchema);
-      fileChanged = true;
-      console.log(`  ✓ Added BlogPosting schema to ${p.slug}`);
-    }
-    
-    if (fileChanged) {
-      fs.writeFileSync(p.file, newRaw, 'utf8');
-      changed++;
-    }
-  }
-  
-  console.log(`\nApplied fixes to ${changed} files.`);
-}
-
 function main() {
-  console.log(DRY ? '\n[DRY RUN MODE]\n' : '');
   console.log(ANALYZE_ONLY ? '[ANALYZE ONLY MODE]\n' : '');
   
   const { posts, pillarPosts } = analyze();
-  
-  if (!ANALYZE_ONLY) {
-    console.log('\n' + '='.repeat(80));
-    console.log('APPLYING FIXES...');
-    console.log('='.repeat(80));
-    applyFixes(posts);
-  }
   
   console.log('\nDone.');
 }
