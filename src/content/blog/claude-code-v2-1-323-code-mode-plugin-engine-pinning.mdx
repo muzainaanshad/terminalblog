@@ -1,0 +1,267 @@
+---
+title: "Claude Code Just Got Code Mode — The Experimental Feature That Lets Claude Write JavaScript to Call Its Own Tools"
+description: "Claude Code v2.1.323 (Nov 12) introduces Code Mode — an experimental opt-in where Claude writes JavaScript to call tools instead of native tool calls. Plus engine version pinning for plugins, TypeScript hook validation, .docx artifact uploads, and 100+ fixes."
+pubDate: 2026-11-12
+updatedDate: 2026-11-15
+author: "Anshad"
+tags: ["claude-code", "anthropic", "release", "v2.1.323", "code-mode", "plugins", "coding-agent"]
+tool: "claude-code"
+category: "releases"
+---
+
+**Claude Code v2.1.323 landed November 12** — and the headline is **Code Mode**, an experimental opt-in that fundamentally changes how Claude interacts with tools. Instead of native tool calls, Claude writes JavaScript to call its tools. This is the biggest architectural shift since the agent launched.
+
+---
+
+## The Headline: Code Mode — Claude Writes JavaScript Now
+
+### What Is Code Mode?
+
+**Code Mode** is an experimental opt-in where **Claude writes JavaScript to call its tools** instead of using the native tool-calling protocol. Think of it as: the model generates code that runs in a sandbox, and that code makes the actual tool calls.
+
+```bash
+# Enable Code Mode (experimental)
+# See https://code.claude.com/docs/en/code-mode for full docs
+claude --code-mode
+```
+
+### Why This Changes Everything
+
+| Before (Native Tools) | After (Code Mode) |
+|----------------------|-------------------|
+| Model outputs structured tool calls | Model writes JavaScript that calls tools |
+| Fixed tool schema | Flexible — model can compose, loop, conditionally call |
+| One tool call per turn | Model can batch, retry, transform results in JS |
+| Hard to debug | Full JS stack traces, console.log, breakpoints |
+
+**For beginners:** This is like giving the agent a REPL instead of a button panel. It can write a loop to edit 50 files, catch errors and retry, transform data between calls — all in JavaScript you can read and debug.
+
+### The Tradeoffs
+
+- **Experimental** — opt-in only, not default
+- **Organizations can disable** — `codeMode: false` in managed settings
+- **Learning curve** — model needs to write correct JS, not just pick tools
+- **Performance** — slight overhead vs native calls
+
+But the ceiling is higher: **the agent becomes programmable**.
+
+---
+
+## Plugin System: Engine Version Pinning + TypeScript Validation
+
+### Plugins Now Pin Their Claude Code Version Range
+
+`plugin.json` gets a new field: `engines["claude-code"]`. Plugins outside their stated range **won't install, update, or load**. Install/update picks the newest version that fits.
+
+```json
+// plugin.json
+{
+  "name": "my-plugin",
+  "engines": {
+    "claude-code": ">=2.1.300 <3.0.0"
+  }
+}
+```
+
+**Why it matters:** No more mystery breaks when a plugin assumes APIs that don't exist yet. The version contract is explicit.
+
+### `claude plugin validate` Now Type-Checks TypeScript Hooks
+
+Run `claude plugin validate` (or `--strict` to fail on warnings) and it will type-check your plugin's TypeScript hooks module. Each finding is a warning; `--strict` fails the build.
+
+### Mods: `$` Nouns from `engine.create` Now Visible in Validation
+
+The validate command now shows what `$` nouns a mod's `engine.create` hook adds, withholds, or replaces — so you know exactly what the mod exposes before installing.
+
+---
+
+## Quality-of-Life Improvements You'll Feel
+
+| Feature | What It Does |
+|---------|--------------|
+| **`.docx` artifact uploads** | Drag Word docs into artifacts — they're parsed and usable |
+| **`/diff to close` hint** | Diff panel tells you how to close it (keys in `?` guide) |
+| **Bash allow-rule startup warning** | Warns if you have `Bash(PORT=* npm run dev)` — wildcard in var value |
+| **Plugin LSP startup warning** | Names the language server and what to check when it fails to start |
+| **Perforce mode notice** | One-time notice naming `CLAUDE_CODE_PERFORCE_MODE` when P4 settings found |
+| **Subagent progress summaries toggle** | `CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES=1` turns them off |
+| **Custom resume hint command** | `CLAUDE_CODE_RESUME_HINT_COMMAND` lets wrappers name their own resume cmd |
+| **Mod pane `isPromptCovered` prop** | Mods know when a dialog/field covers the prompt |
+
+---
+
+## The Fixes That Stop Papercuts (100+)
+
+### Session & Resume Reliability
+- **Fixed:** Running `/compact` again (or after `/context`) summarizing away a message Claude hadn't answered yet
+- **Fixed:** Resumed session joining your next message to an old interrupted message
+- **Fixed:** Memory spike at next prompt after Claude changed a very large file
+- **Fixed:** Settings file hand-edited during session being undone by running session — deleted files stay deleted
+- **Fixed:** `claude plugin` / `claude mcp list` signing you out of Console when token renewed mid-command
+
+### Memory & Performance
+- **Fixed:** Edit/Bash OOM on certain `/proc` files, devices, named pipes
+- **Fixed:** Claude Code failing to start/clear credentials on "Out of memory" writing config
+- **Fixed:** Non-streaming requests failing on errors that streaming recovers from
+- **Fixed:** Subagent transcripts + large tool results saved apart from session after worktree entry
+
+### Sign-In & Background Sessions (Major Hardening)
+- **Fixed:** Session on named profile moving to another sign-in on `/fork`, Left arrow, `--bg`
+- **Fixed:** Background session sending conversation under another sign-in when profile missing/changed
+- **Fixed:** Session on API key/auth token moving to another sign-in in background — now stops and says so
+- **Fixed:** MCP tool calls ending in sign-in server error (`TOKEN_EXPIRED`) instead of asking you to sign in
+- **Fixed:** Expired claude.ai login showing "Credit balance too low" when Console key used instead
+- **Fixed:** Background session sign-in leaving previous account's credentials — now clears for ALL sessions
+- **Fixed:** Sessions moving between profile and stored login when update restarted them
+- **Fixed:** Sessions opened before sign-in keeping signed-out feature flags after sign-in
+- **Fixed:** Sessions failing after gateway sign-in expired — now carry on after `/login` in another terminal
+
+### Permission System
+- **Fixed:** Bash allow rules with `*` in variable value skipping prompts in some cases
+- **Fixed:** `sudo`/`env` wrappers missing from deny/ask rules
+- **Fixed:** `sandbox.excludedCommands` letting unnamed commands run outside sandbox
+- **Fixed:** Write/Edit writing to path covered by `Read` deny rule
+- **Fixed:** Bash running without prompt for zsh with certain non-default shell options
+- **Fixed:** Sandbox switching off during session
+- **Fixed:** Rewind sometimes changing your permission mode
+- **Fixed:** `--permission-mode auto` starting in Manual when auto unavailable (safer default)
+
+### MCP & Plugins
+- **Fixed:** Earlier MCP tool calls missing from resumed conversation
+- **Fixed:** Plugins with `defaultEnabled: false` staying off in claude.ai cloud sessions after turning on
+- **Fixed:** `/fast on/off` on Vertex not asking plugin's `config.set` hook
+- **Fixed:** Marketplace names `npm`, `pip`, `uv`, `cargo`, `github`, `gh` refused as reserved
+- **Fixed:** Stopped MCP call/shell command reading as "Called"/"Ran" in collapsed group — now says "Not run"
+- **Fixed:** Load errors of managed-settings plugins only going to debug log — now in `init.plugin_errors`
+- **Fixed:** Plugin installs hiding stderr from install command (e.g., "no skills yet" note)
+- **Fixed:** One malformed `renames` entry making Claude ignore ALL renames from that marketplace
+- **Fixed:** `--bg --safe-mode` asking about project MCP servers that safe mode never starts
+- **Fixed:** MCP link prompts offering Accept for non-http links without saying they won't open
+- **Fixed:** `/mcp` and `/plugins` opening on "Disable" when server needs auth but holds sign-in — now "Reconnect"
+- **Fixed:** Plugins with version list in `enabledPlugins` staying off silently — now explains why
+
+### Windows-Specific
+- **Fixed:** File-reading Bash commands running without prompt with wildcard/list
+- **Fixed:** `.cmd`/`.bat` wrapper running beside `.exe` (e.g., `git.cmd` next to `git.exe`) — now runs `.exe`
+- **Fixed:** "Working directory was deleted" on drives where real path can't be resolved
+
+### Cloud & Remote Sessions
+- **Fixed:** Cloud session history unreadable if machine stopped mid-rewrite
+- **Fixed:** Scheduled tasks from ended session not running after `/clear`/`/resume`/`/branch` in same folder
+- **Fixed:** Approved plan answered "You are not in plan mode" after process restart (cloud/self-hosted/SDK)
+- **Fixed:** Answer to Claude's question lost after restart in long conversation
+- **Fixed:** Message dropping out of cloud conversation when session restarted before Claude replied
+- **Fixed:** Resumed cloud session making model call nobody asked for when files arrived after first reply
+- **Fixed:** Streamed replies missing text from middle when container shut down mid-reply
+- **Fixed:** Skill files from Cowork cloud sessions failing upload on first try
+
+### Self-Hosted Runner
+- **Reverted:** Exit code of superseded work order back to `1` (v2.1.321/322 had changed to `0`)
+
+---
+
+## VS Code Extension Fixes
+
+- **Added:** Trust prompt before first session in untrusted folder — declining leaves folder settings/MCP unused
+- **Added:** Live output of running Bash/PowerShell command in chat under command card
+- **Fixed:** Discarded response (unparseable tool call) still showing after retry
+- **Fixed:** Queued message missing after compaction summary
+- **Fixed:** "Buy usage credits" button counting as agreement to pay for Fable while credits off
+- **Fixed:** "Extensions want to relaunch terminal" warning returning on every reload
+- **Fixed:** "Couldn't load conversation history" in new chat after process restart
+- **Fixed:** Sign-in screen showing choices again after pasted code — now shows "Signing in…"
+- **Fixed:** "Hit Fable limit" line staying in panel after model switch
+- **Fixed:** Fable warning naming usage credits when they're off/used up
+- **Fixed:** Diff tab not opening for multi-line edits on CRLF files
+- **Fixed:** Dictation continuing after session switch
+- **Improved:** Sign-in errors behind TLS proxies — cert failure now says what to do
+
+---
+
+## The Bigger Picture: v2.1.3xx Stability Wave Continues
+
+```
+v2.1.300 (Oct 14) → 80+ fixes: session resume, worktree corruption, MCP reconnection
+v2.1.310 (Oct 26) → Cloud session monitor tool
+v2.1.317 (Nov 3)  → Stability surge: 100+ fixes
+v2.1.318 (Nov 6)  → Network drives finally work
+v2.1.319 (Nov 6)  → Background MCP tasks, expanded auto mode
+v2.1.321 (Nov 9)  → Fable 5.2 default, --settings, MCP OAuth fix
+v2.1.322 (Nov 10) → Vertex AI Fast Mode + 50 fixes
+v2.1.323 (Nov 12) → **Code Mode (experimental), plugin engine pinning, TS validation**
+v2.1.325 (Nov 13) → 200+ fixes: security, sessions, MCP, Windows, sandbox
+```
+
+**Code Mode is the first feature release in this stability wave.** Everything before was fixes. This suggests the foundation is solid enough to build on.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Want to experiment with Code Mode** | **Yes** — opt-in at `code.claude.com/docs/en/code-mode` |
+| **Maintain plugins** | **Yes** — add `engines["claude-code"]` to your `plugin.json` |
+| **Write TypeScript hooks** | **Yes** — `claude plugin validate` now type-checks them |
+| **Run on Vertex AI** | **Yes** — v2.1.322 gave fast mode, v2.1.323 adds reliability |
+| **Use background sessions / cloud** | **Yes** — major sign-in/background hardening |
+| **On v2.1.320+ and stable** | **Yes** — zero breaking changes, pure capability + fixes |
+
+---
+
+## Quick Update
+
+```bash
+# npm
+npm i -g @anthropic-ai/claude-code@latest
+
+# Homebrew
+brew upgrade claude-code
+
+# Native installer
+curl -fsSL https://claude.ai/install.sh | bash
+
+# Verify
+claude --version
+# Should show: 2.1.323
+```
+
+**First things to try:**
+```bash
+# 1. Read Code Mode docs (experimental!)
+# https://code.claude.com/docs/en/code-mode
+
+# 2. If you maintain a plugin, add engine pinning:
+# plugin.json → "engines": { "claude-code": ">=2.1.300 <3.0.0" }
+
+# 3. Validate your plugin (type-checks TS hooks)
+claude plugin validate --strict
+
+# 4. Test .docx artifact upload
+# Drag a Word doc into an artifact
+
+# 5. Check background session reliability
+# Start a background task, sign in elsewhere, verify it continues
+```
+
+---
+
+## Related Articles
+
+- [Claude Code v2.1.325 — Stability Wave Hits 200+ Fixes](/blog/claude-code-v2-1-325-stability-wave-200-fixes)
+- [Claude Code v2.1.322 — Fast Mode on Vertex AI](/blog/claude-code-v2-1-322-vertex-fast-mode)
+- [Claude Code v2.1.321 — Fable 5.2 Default, MCP OAuth Fixes](/blog/claude-code-v2-1-321-fable-5-2-stability-wave)
+- [Claude Code v2.1.317 — Stability Surge (36k Words of Fixes)](/blog/claude-code-v2-1-317-stability-surge)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide)
+
+
+## Related articles
+
+- [Claude Codes November Stability Arc Just Compounded Again — v2.1.325 Adds Security Fixes, Code Mode, and 100+ More Fixes](/blog/claude-code-v2-1-317-stability-surge/)
+- [Qwen Code v0.26 Just Became a Full Multi-Agent Platform — Local, Remote, and Everything In Between](/blog/qwen-code-v0-26-managed-agent-desktop-local-ssh/)
+- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+---
+
+*Claude Code v2.1.323 released November 12, 2026. Full changelog: [github.com/anthropics/claude-code/releases/tag/v2.1.323](https://github.com/anthropics/claude-code/releases/tag/v2.1.323).*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
