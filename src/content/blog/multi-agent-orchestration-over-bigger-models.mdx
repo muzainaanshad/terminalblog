@@ -2,7 +2,7 @@
 title: "Why I'm Betting on Multi-Agent Orchestration Over Bigger Models"
 description: "A single smarter model is the obvious path. Coordinating multiple smaller models is the path that actually ships more code."
 pubDate: "2026-07-10T23:30:00Z"
-updatedDate: "2026-07-10T23:30:00Z"
+updatedDate: "2026-11-15T03:30:00Z"
 tags: ["opinion", "orchestration", "multi-agent", "architecture", "prediction"]
 image: "/api/og?title=Multi+Agent+Orchestration+Over+Bigger+Models&tool=Opinion"
 ---
@@ -17,9 +17,12 @@ Each new model generation is more expensive to train and operate. GPT-5 required
 
 Yet the performance gains per dollar are shrinking. GPT-5 is roughly 15% better than GPT-4 on complex reasoning. Opus 4.8 is around 10% better than 4.6. The raw intelligence gains are real but the cost-to-gain ratio is worsening.
 
+Meanwhile, the cost of running these models at scale is staggering. A team of 20 developers using a frontier model for every task can easily burn $50K–100K/month in API costs. Most of those tasks — formatting, simple refactors, boilerplate, test generation — don't need a $2B model. They need the right tool for the job.
+
 ## The Orchestration Alternative
 
 Instead of one $2B model that does everything, what if you had:
+
 - One small, fast model for code generation ($0.15/M tokens)
 - One medium model for planning and architecture ($2/M tokens)
 - One specialized model for security review ($1/M tokens)
@@ -27,29 +30,50 @@ Instead of one $2B model that does everything, what if you had:
 
 Orchestrated together, this system outperforms a single large model on most tasks and costs a fraction as much.
 
-## Proof It Works
+## Proof It Works: Hermes's MOA System
 
 Hermes's MOA (Mixture of Agents) system already does this. Multiple smaller models collaborate: one proposes, another critiques, a third synthesizes. The combined output is more accurate than any single model in the mix.
 
 The cost savings are dramatic. A MOA round with 5 small models costs as much as 1-2 calls to a frontier model — but produces better results on complex reasoning tasks.
 
+This isn't theoretical. In my own workflow, I route:
+- **Planning/architecture** → Opus-class model (expensive, rare)
+- **Code generation** → Sonnet-class or strong open models (frequent)
+- **Review/linting** → Specialized small models or deterministic tools (every commit)
+- **Test generation** → Tiny models or templates (high volume)
+
+The result: I get frontier-quality output on the 10% of tasks that need it, and 90% cost savings on the rest.
+
 ## Why This Wins Long-Term
 
 The orchestration approach has better economics:
+
 - **Smaller models improve faster** — edge models catch up to frontier models every 6-8 months. The gap is closing.
 - **Orchestration is software** — it improves with code, not compute. Better routing, better prompts, better task decomposition.
 - **Cost per task decreases** — orchestration optimizes for total task cost, not per-token price.
 
-## What This Means
+There's a second-order effect too: orchestration forces you to understand your tasks. You can't just "throw the biggest model at it" — you have to decompose work, define success criteria, and build evaluation loops. That discipline compounds.
+
+## Real-World Patterns That Work
+
+### Pattern 1: Critique-and-Refine
+Small model generates → different small model critiques → synthesis model merges. Cost: ~3x small model. Quality: matches or beats 1x large model on coding tasks.
+
+### Pattern 2: Specialist Routing
+Route by task type. Security review → model trained on vulns. SQL generation → model fine-tuned on schemas. Documentation → model with RAG over your codebase. Each specialist is cheaper than a generalist.
+
+### Pattern 3: Verification Loops
+Agent writes code → deterministic tool (type checker, linter, test runner) validates → agent fixes. The "model" here is often a 1B-parameter specialist. The verification is free.
+
+## What This Means for Tool Selection
 
 If you're a team picking tools today, optimize for agents with good orchestration, not just access to the best model. Agents that route tasks intelligently across models will give you better results than agents that dump everything into one frontier model.
 
-Hermes's MOA and subagent systems are ahead here. Codex's worktree isolation enables a form of orchestration. Claude Code's subagents are a start.
+Hermes's MOA and subagent systems are ahead here. Codex's worktree isolation enables a form of orchestration. Claude Code's subagents are a start. OpenCode's plugin architecture allows custom routing.
 
 The most productive coding setup in 2027 won't be the one with the smartest model. It'll be the one that uses models intelligently — matching task complexity to model capability, not using a sledgehammer for every nail.
 
 ---
-
 
 ## Related articles
 
