@@ -1,0 +1,145 @@
+---
+title: 'Beware: Codex Windows Sandbox Shares Deny-Read ACLs Across Sessions — One Session Can Silently Drop Another''s File Protections'
+description: 'A critical sandbox vulnerability in OpenAI Codex CLI on Windows (v0.162.0-alpha.2 and later) allows one session to revoke another session''s deny-read ACLs, potentially exposing secrets. Includes commands to check if you''re affected.'
+pubDate: 2026-11-15
+updatedDate: 2026-11-15
+category: security
+tags: [beware, codex, security, sandbox, windows, vulnerability]
+author: Anshad
+---
+
+**TL;DR:** If you use Codex CLI on Windows with `[windows] sandbox = "elevated"` and custom `deny_read_paths` in your permissions profile, **any other Codex session running simultaneously can silently remove those protections**. Your secrets (API keys, SSH keys, `.env` files) could become readable by the agent without warning.
+
+---
+
+## What Happened
+
+OpenAI Codex CLI uses Windows ACLs (Access Control Lists) to enforce "deny-read" rules on sensitive paths you configure. The idea: you list paths like `C:\Users\you\.ssh\id_rsa` or `C:\Users\you\.env` in your permissions profile, and Codex applies a **deny ACE** (Access Control Entry) for the `CodexSandboxUsers` group — blocking the agent from reading those files.
+
+**The bug:** All Codex sessions share the **same group SID** (`CodexSandboxUsers`). When any session refreshes its ACLs (which happens periodically), it **revokes all previously applied deny ACEs for that group** that aren't in *its own* current deny list.
+
+So if Session A has a strict profile with 16 deny-read paths, and Session B starts with a permissive profile (`workspace-write`, zero deny entries), Session B's refresh **wipes out Session A's protections**. The `deny_read_acl_state.json` alternates between populated and empty — observed ~2,600 "applied 16 deny-read ACLs" refreshes interleaved with ~1,900 refreshes applying **none** on the same day.
+
+**Making it worse:** Missing deny paths are created as **directories** in your real filesystem. A stale entry for `C:\Users\you\.secrets\ai_factory\key.pem` recreates `key.pem\` as an empty directory. On the next refresh from another session, the parent `.secrets` folder gets an explicit **allow** grant (`RX`) that overrides the inherited deny.
+
+This was independently rediscovered via **Lean state-machine formalization** on 2026-11-09 — the formal proof shows a counterexample where Command A starts with `denyInstalled(secret)=true`, Command B starts with an allowed profile, the shared last-profile reconciliation runs, Command B removes the group deny, and Command A reads the secret.
+
+---
+
+## Who Is Affected
+
+You are affected if **all** of these are true:
+
+| Condition | Check |
+|-----------|-------|
+| You use **Codex CLI on Windows** | `codex --version` shows 0.162.0-alpha.2 or later |
+| You use **elevated sandbox** | `[windows] sandbox = "elevated"` in `~/.codex/config.toml` |
+| You have **custom `deny_read_paths`** in your permissions profile | Check `~/.codex/config.toml` for `deny_read_paths = [...]` |
+| You run **multiple Codex sessions concurrently** | Multiple terminals, VS Code + terminal, background `codex exec`, etc. |
+
+**Not affected:** macOS/Linux users (different sandbox implementation), Windows users on `workspace-write` or `read-only` sandbox modes without custom deny paths, single-session users.
+
+---
+
+## How to Check If You're Vulnerable
+
+Run these commands in PowerShell:
+
+```powershell
+# 1. Check your Codex version
+codex --version
+# Vulnerable if >= 0.162.0-alpha.2
+
+# 2. Check your sandbox mode
+cat $env:USERPROFILE\.codex\config.toml | Select-String "sandbox"
+# Look for: sandbox = "elevated"
+
+# 3. Check for custom deny_read_paths
+cat $env:USERPROFILE\.codex\config.toml | Select-String "deny_read_paths"
+# If this returns paths, you have custom denies
+
+# 4. Inspect the live ACL state (run while Codex is active)
+cat $env:USERPROFILE\.codex\.sandbox\deny_read_acl_state.json
+# Watch for: "principals": {} alternating with populated entries
+
+# 5. Check sandbox logs for the telltale pattern
+Get-Content $env:USERPROFILE\.codex\.sandbox\sandbox.*.log -Tail 50 | Select-String "applied.*deny-read ACLs"
+# Look for interleaved "applied 16 deny-read ACLs" and "applied 0 deny-read ACLs"
+```
+
+If steps 2–3 return positive and step 4 shows the alternating state, **you are actively losing protections**.
+
+---
+
+## How to Protect Yourself (Workarounds)
+
+### Immediate: Run only one Codex session at a time
+Close all Codex terminals, VS Code extensions, background `codex exec` processes. Keep exactly **one** session alive.
+
+### Immediate: Move secrets out of denied paths
+The deny-read mechanism is fundamentally broken. Move API keys, SSH keys, `.env` files to:
+- Windows Credential Manager (`cmdkey`)
+- 1Password / Bitwarden CLI (`op read`, `bw get`)
+- Environment variables injected at process start (not stored on disk)
+- A separate non-denied path that you **never** add to `deny_read_paths`
+
+### Immediate: Disable elevated sandbox until fixed
+In `~/.codex/config.toml`:
+```toml
+[windows]
+sandbox = "workspace-write"  # or "read-only"
+```
+This loses the deny-read feature but avoids the shared-SID bug. Note: `sandbox_mode` CLI override (`codex exec -s workspace-write`) **silently disables** your `[permissions]` profile entirely (Issue #3 in the bug report).
+
+### Check for phantom directories created by the bug
+```powershell
+# Look for directories that should be files (ends in .pem, .key, .env, etc.)
+Get-ChildItem $env:USERPROFILE\.secrets -Recurse -Directory | Where-Object { $_.Name -match '\.(pem|key|env|pem|json)$' }
+# If found, these were created by the bug — delete them and restore real files from backup
+```
+
+---
+
+## Is There a Fix?
+
+**No official fix yet.** The issue is open at [openai/codex#52022](https://github.com/openai/codex/issues/52022) (created 2026-10-08, still open as of 2026-11-15).
+
+The reporter suggests three architectural fixes:
+1. **Per-session/profile deny state** — key deny-read ACLs by session ID or profile hash, not shared group SID
+2. **Union semantics** — compute the union of all active sessions' deny lists, never subtract
+3. **Reference-counted leases** — each running execution holds a "lease" on its denies; only release when that execution ends
+
+The Lean formalization proved the invariant needed: *"every running execution requiring deny-read(p) holds a lease that keeps denyInstalled(p) true."* A last-writer-wins persisted set cannot represent this.
+
+**Do not trust the deny-read feature on Windows until a fix ships and you verify it.**
+
+---
+
+## What This Means for Codex Users
+
+| Scenario | Risk Level | Action |
+|----------|------------|--------|
+| Single session, custom denies | Medium | Bug won't trigger, but phantom directory bug still applies. Move secrets. |
+| Multiple sessions, custom denies | **Critical** | Stop immediately. Use workarounds above. |
+| VS Code + terminal both running Codex | **Critical** | Two sessions = bug triggers. Close one. |
+| CI/CD running Codex in parallel | **Critical** | Serialise jobs. Move secrets to env vars. |
+| Using `codex exec -s workspace-write` | High | Silently disables your permissions profile (Issue #3). Avoid overrides. |
+
+---
+
+## Related Issues
+
+- [#51822](https://github.com/openai/codex/issues/51822) — Sharing violation on running runtime executables (separate setup failure, fixed)
+- The Lean formalization addendum in the issue body provides a machine-checked proof of the vulnerability
+
+---
+
+## Summary
+
+**This is a sandbox escape / credential leak vulnerability.** The deny-read mechanism — the primary way Windows users protect secrets from Codex — is broken when multiple sessions run. One permissive session silently disables another session's protections. Phantom directories created by the bug can even *grant* access to previously denied parent folders.
+
+**If you use Codex on Windows with elevated sandbox and custom deny paths: assume your deny-read rules are not working.** Move secrets to credential managers or environment variables. Run only one session. Wait for a proper fix with per-session lease semantics.
+
+---
+
+*Found this useful? [Share it](https://terminalblog.com/beware-codex-windows-sandbox-deny-read-shared-acl/) so other Windows Codex users know to check their setup.*
