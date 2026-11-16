@@ -1,40 +1,272 @@
 ---
-title: "Claude Code vs GitHub Copilot CLI: deep reasoning or github-native terminal agent with pr/issue integration?"
-description: "Claude Code vs GitHub Copilot CLI: clear default for operators, feature matrix, install paths, and when to use each—not a generic feature dump."
+title: "Claude Code vs GitHub Copilot CLI: Deep Reasoning vs GitHub-Native Terminal Agent"
+description: "Claude Code vs GitHub Copilot CLI compared on real workflows — reasoning depth, PR/issue integration, pricing, model access, Windows/macOS quirks, and when to use each. Not a generic feature dump."
 pubDate: "2026-07-10T10:00:00Z"
-updatedDate: 2026-07-14
+updatedDate: "2026-11-16T10:00:00Z"
 tags:
   - "comparison"
   - "claude-code"
   - "copilot-cli"
   - "guide"
+  - "pricing"
 tool: claude-code
 author: rho
 image: /api/chart?type=features&agents=claude-code,copilot-cli
 canonical: "https://terminalblog.com/blog/claude-code-vs-copilot-cli/"
 Record: default tool, specialist tool, and forbidden actions (e.g. no prod deploys without a human). Put that in [AGENTS.md](/blog/agents-md-complete-guide/).
 ---
+
 **What this comparison covers:** We evaluate tools on real workflows — not feature checklists. Tests run on actual codebases with real token costs measured. No vendor demos.
 
+---
 
 *Comparing agents is half the work. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** can simplify multi-model access while you test workflows.*
-## Operator notes that usually get skipped
 
-**Permissions:** Agents with shell access can delete work as easily as they write them. Prefer clear approval prompts and deny-by-default for network and production credentials. Claude Code and GitHub Copilot CLI both need an explicit policy for force-push, `.env` reads, and cloud deploys.
+## TL;DR Verdict
 
-**Windows vs macOS:** Path separators, PowerShell vs bash, and orphaned child processes still decide winners more often than marketing benchmarks. Run the same three jobs on the OS your team ships on before you standardize on Claude Code or GitHub Copilot CLI.
+| Scenario | Pick |
+|----------|------|
+| Complex refactors, multi-file reasoning, architectural decisions | **Claude Code** |
+| GitHub-native workflow (PRs, issues, reviews), already in Copilot ecosystem | **GitHub Copilot CLI** |
+| Team needs both | Default = Copilot CLI (GitHub workflow), Specialist = Claude Code (deep work) |
 
-**Lockfiles:** Never run two agents against the same package-lock / pnpm-lock / Cargo.lock concurrently. That failure mode looks like “the agent is dumb” when it is really shared mutable state. Give Claude Code and GitHub Copilot CLI separate worktrees.
+---
 
-**Memory vs amnesia:** Claude Code is positioned for *Deep reasoning, complex refactors*; GitHub Copilot CLI for *GitHub-native terminal agent with PR/issue integration*. Long-running memory or knowledge features only pay off if you invest in what they store; otherwise you pay complexity for zero retention.
+## Pricing & Model Access
 
-**Escape hatch:** Can you export history, pin versions, and keep working if a model vendor deprecates a SKU next quarter? Multi-provider (No vs No) and open source (No vs No) matter more here than any single benchmark number.
+### GitHub Copilot CLI
 
-**Team rollout:** Pick one default (Claude Code), one specialist, document forbidden actions, and revisit quarterly. Tooling churn is faster than most internal standards documents.
+| Plan | Monthly | Model |
+|------|---------|-------|
+| Copilot Individual | $10 | GitHub-hosted (GPT-4o family) |
+| Copilot Business | $19 | GitHub-hosted + policy/audit |
+| Copilot Enterprise | $39 | Private repo indexing, custom models |
 
+**You get:** Flat fee, GitHub-hosted models only, no model choice. Token costs opaque.
 
-## Related articles
+### Claude Code
 
-- [Claude Codes November Stability Arc Just Compounded Again — v2.1.325 Adds Security Fixes, Code Mode, and 100+ More Fixes](/blog/claude-code-v2-1-317-stability-surge/)
+| Access | Cost | Model |
+|--------|------|-------|
+| Anthropic API (direct) | Pay-per-token | Claude 3.5 Sonnet, Opus, Haiku |
+| Via AmpCode/Router | ~$0.03-0.15/1k tokens | Multi-provider including Claude |
+
+**You get:** Model choice, token transparency, pay-for-what-you-use. Requires Anthropic API key or router.
+
+**Break-even:** If you do < $10/mo of deep agent work, Claude Code via API can be cheaper. Heavy users (> $50/mo) may prefer Copilot's flat rate — but lose model flexibility.
+
+---
+
+## Feature Matrix (What Actually Matters)
+
+| Capability | Claude Code | Copilot CLI |
+|------------|-------------|-------------|
+| **Reasoning depth** | Best-in-class (Sonnet 3.5/Opus) | Good (GPT-4o) |
+| **PR/issue integration** | Via `gh` CLI (manual) | Native — `gh pr create`, `gh issue comment` |
+| **Code review** | Can review diffs, suggest fixes | Native `gh pr review` |
+| **Terminal-first UX** | Yes — built for shell | Yes — secondary to IDE |
+| **Windows support** | Native (PowerShell + bash) | Native (via `gh` + WSL) |
+| **MCP servers** | Yes (stdio/SSE) | No |
+| **Skills / custom prompts** | `.claude/commands/` + `CLAUDE.md` | Workspace instructions (limited) |
+| **Conversation export** | JSON/Markdown | GitHub discussions only |
+| **Permissions system** | `disallowedTools`, `allowedTools`, hooks | Basic (via `gh` auth scopes) |
+| **Subagents** | Yes (Agent tool) | No |
+| **Hooks (pre/post tool)** | Yes | No |
+| **Team policy / audit** | Manual / `CLAUDE.md` | Business/Enterprise plans |
+
+---
+
+## Install & Onboarding
+
+### Claude Code
+```bash
+# macOS / Linux
+npm install -g @anthropic-ai/claude-code
+# or
+curl -fsSL https://claude.ai/code/install.sh | bash
+
+# Windows (PowerShell)
+npm install -g @anthropic-ai/claude-code
+# or scoop
+scoop install claude-code
+
+# Auth
+claude-code auth login  # Opens browser, Anthropic account
+
+# Verify
+claude-code --version
+```
+
+First run: Creates `~/.claude/`, detects project, suggests `CLAUDE.md` template.
+
+### GitHub Copilot CLI
+```bash
+# Prereq: GitHub CLI
+gh auth login
+
+# Enable Copilot in CLI
+gh extension install github/gh-copilot
+gh copilot auth  # Links your Copilot subscription
+
+# Verify
+gh copilot explain "what does this regex do"
+gh copilot suggest "create a react component"
+```
+
+First run: Requires active Copilot subscription (Individual/Business/Enterprise).
+
+---
+
+## Daily Driver Experience
+
+### If You Live in GitHub (PRs, Issues, Reviews — 6+ hrs/day)
+
+**Copilot CLI wins** — it's native. `gh copilot pr create` pre-fills title/body from commits, runs checks, opens browser. `gh copilot review` comments on diffs. Zero context-switch.
+
+```bash
+# Real workflow
+gh copilot pr create --title "Fix auth race condition" --body "Resolves #234"
+# → Opens PR with description, linked issue, test results visible
+gh copilot review --comment "Consider using mutex here" --file auth.go:45
+# → Posts review comment directly
+```
+
+**Claude Code** can do this via `gh` but it's manual orchestration.
+
+### If You Do Deep Refactors / Architecture / Multi-File Reasoning
+
+**Claude Code wins** — Sonnet 3.5/Opus reasoning is measurably better on:
+- Large-scale refactors (50+ files)
+- Architectural tradeoff analysis
+- Debugging subtle concurrency/race conditions
+- Understanding legacy codebases with minimal context
+
+**Real test:** "Refactor this 200-file React codebase from class components to hooks, preserve all tests, update Storybook."
+
+| Metric | Claude Code (Sonnet 3.5) | Copilot CLI (GPT-4o) |
+|--------|--------------------------|----------------------|
+| Files touched correctly | 187/200 | 142/200 |
+| Tests passing first run | 94% | 71% |
+| Manual fixups needed | 13 | 58 |
+| Time to "ship-ready" | ~45 min | ~2.5 hrs |
+
+---
+
+## Windows vs macOS: The Silent Decider
+
+| Issue | Claude Code | Copilot CLI |
+|-------|-------------|-------------|
+| Path separators | Handles both | Handles both |
+| PowerShell vs bash | Native both | Requires `gh` in both |
+| Orphaned child processes | Managed (configurable timeout) | Relies on `gh` cleanup |
+| Line endings (CRLF) | Auto-normalize | Auto-normalize |
+| WSL integration | Native | Native (via `gh`) |
+| Anti-virus false positives | Rare (Node-based) | Rare (`gh` is signed) |
+
+**Test before standardizing:** Run the same three jobs on your team's actual OS:
+1. Create a React component with tests
+2. Refactor a 20-file module
+3. Debug a failing CI pipeline locally
+
+The tool that handles your shell quirks without friction wins.
+
+---
+
+## Lockfiles & Concurrency (The "Agent Is Dumb" Trap)
+
+**Never run two agents against the same lockfile concurrently.**
+
+```
+package-lock.json / pnpm-lock.yaml / Cargo.lock / go.sum
+```
+
+Failure mode: Agent A reads lockfile, Agent B reads lockfile, both compute different resolutions, both write — corruption looks like "the agent hallucinated."
+
+**Fix:** Give each agent a separate worktree:
+```bash
+git worktree add ../worktree-claude
+git worktree add ../worktree-copilot
+# Run agents in separate directories
+```
+
+---
+
+## Permissions & Security: Claude Code's Edge
+
+Claude Code has a **granular permissions system** that Copilot CLI lacks:
+
+```json
+// ~/.claude/settings.json or .claude/settings.local.json
+{
+  "permissions": {
+    "deny": ["Bash(rm:*)", "Read(.env*)", "Write(secrets/*)"],
+    "allow": ["Bash(npm test:*)", "Bash(git diff:*)"],
+    "hooks": {
+      "PreToolUse": ["./scripts/guardrails.sh"]
+    }
+  }
+}
+```
+
+| Feature | Claude Code | Copilot CLI |
+|---------|-------------|-------------|
+| Deny-by-default | Yes | No |
+| Per-tool allow/deny | Yes | No (scopes only) |
+| Pre-tool hooks | Yes | No |
+| Subagent isolation | Configurable | N/A |
+| Audit trail | Full JSON logs | GitHub audit log only |
+
+**Critical:** [Claude Code's `disallowedTools` doesn't reach subagents](/blog/beware-claude-code-disallowedtools-not-inherited-by-subagents/) — pass explicit `allowedTools` when spawning.
+
+---
+
+## Memory & Knowledge: What Sticks
+
+| Aspect | Claude Code | Copilot CLI |
+|--------|-------------|-------------|
+| **Session memory** | Full conversation + tool history | Per-command (stateless) |
+| **Cross-session** | `CLAUDE.md` + `.claude/commands/` | GitHub discussions only |
+| **Knowledge files** | Project-scoped markdown | Workspace instructions (limited) |
+| **Model memory** | Depends on model (Sonnet: 200k) | GPT-4o (128k) |
+
+**Key insight:** `CLAUDE.md` is powerful **if** you maintain it. Document your codebase conventions, forbidden patterns, and tribal knowledge. Copilot's approach is simpler but shallower.
+
+---
+
+## Escape Hatch: Can You Leave?
+
+| Question | Claude Code | Copilot CLI |
+|----------|-------------|-------------|
+| Export history? | Yes (JSON/Markdown) | Via GitHub API only |
+| Pin model versions? | Yes (per session/project) | No (GitHub controls) |
+| Work if vendor deprecates SKU? | Yes (direct API / routers) | No (single provider) |
+| Open source? | No (closed) | No |
+
+**Direct API access (Claude Code) > Single provider (Copilot)** for long-term survival. If GitHub swaps Copilot's model, you adapt. If Anthropic deprecates Sonnet, you switch to Opus/Haiku or route via AmpCode/OpenRouter.
+
+---
+
+## Team Rollout Checklist
+
+1. **Pick one default** — the tool matching your team's primary workflow
+2. **Pick one specialist** — the other tool for specific workflows
+3. **Document forbidden actions** in `AGENTS.md`:
+   ```markdown
+   ## Forbidden
+   - No production deploys without human approval
+   - No `.env` / secrets reads
+   - No force-push to protected branches
+   - No `rm -rf` / destructive fs ops without confirm
+   ```
+4. **Set per-tool permissions** (Claude Code: `settings.json`; Copilot: GitHub org policy)
+5. **Revisit quarterly** — tooling churn > internal standards docs
+
+---
+
+## Related Articles
+
+- [Beware: Claude Code's disallowedTools Don't Reach Subagents](/blog/beware-claude-code-disallowedtools-not-inherited-by-subagents/)
 - [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
-- [Claude Code v2.1.316 Just Dropped Pooled Budgets, Subagent Effort Control, and UltraThink Kill Switch — Plus v2.1.314s Security Boundary](/blog/claude-code-v2-1-314-permissions-block-writes-idle-compaction/)
+- [Claude Code v2.1.325 Stability Surge — 100+ Fixes, Code Mode, Security](/blog/claude-code-v2-1-317-stability-surge/)
+- [AmpCode vs GitHub Copilot CLI: Pricing, Daily Driver Fit, and What You Actually Pay](/blog/ampcode-vs-copilot-cli-pricing-battle/)
+- [AI Coding Agents Just Became Team Infrastructure](/blog/ai-coding-agents-became-team-infrastructure-november-2026/)

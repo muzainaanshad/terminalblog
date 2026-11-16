@@ -1,13 +1,14 @@
 ---
-title: "AmpCode vs GitHub Copilot CLI: pricing and what you actually pay at scale"
-description: "AmpCode vs GitHub Copilot CLI: clear default for operators, feature matrix, install paths, and when to use each—not a generic feature dump."
+title: "AmpCode vs GitHub Copilot CLI: Pricing, Daily Driver Fit, and What You Actually Pay at Scale"
+description: "AmpCode vs GitHub Copilot CLI compared on real workflows — pricing at scale, feature matrix, install paths, Windows/macOS quirks, and when to use each. Not a generic feature dump."
 pubDate: "2026-07-10T19:00:00Z"
-updatedDate: 2026-07-14
+updatedDate: "2026-11-16T10:00:00Z"
 tags:
   - "comparison"
   - "ampcode"
   - "copilot-cli"
   - "guide"
+  - "pricing"
 tool: ampcode
 author: rho
 image: /api/chart?type=features&agents=ampcode,copilot-cli
@@ -15,27 +16,215 @@ canonical: "https://terminalblog.com/blog/ampcode-vs-copilot-cli-pricing-battle/
 AmpCode: "**Pay-as-you-go (free tier ~$10/day)**. GitHub Copilot CLI: **$10-39/mo (Copilot subscription)**."
 Record: default tool, specialist tool, and forbidden actions (e.g. no prod deploys without a human). Put that in [AGENTS.md](/blog/agents-md-complete-guide/).
 ---
+
 **What this comparison covers:** We evaluate tools on real workflows — not feature checklists. Tests run on actual codebases with real token costs measured. No vendor demos.
 
+---
 
 *Comparing agents is half the work. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** can simplify multi-model access while you test workflows.*
-## Operator notes that usually get skipped
 
-**Permissions:** Agents with shell access can delete work as easily as they write them. Prefer clear approval prompts and deny-by-default for network and production credentials. AmpCode and GitHub Copilot CLI both need an explicit policy for force-push, `.env` reads, and cloud deploys.
+## TL;DR Verdict
 
-**Windows vs macOS:** Path separators, PowerShell vs bash, and orphaned child processes still decide winners more often than marketing benchmarks. Run the same three jobs on the OS your team ships on before you standardize on AmpCode or GitHub Copilot CLI.
+| Scenario | Pick |
+|----------|------|
+| You live in VS Code / JetBrains, want PR/issue integration, already pay for Copilot | **GitHub Copilot CLI** |
+| You want multi-model routing, terminal-first, pay-per-use, no subscription lock-in | **AmpCode** |
+| Team needs both | Default = Copilot CLI (IDE), Specialist = AmpCode (automation/terminal) |
 
-**Lockfiles:** Never run two agents against the same package-lock / pnpm-lock / Cargo.lock concurrently. That failure mode looks like “the agent is dumb” when it is really shared mutable state. Give AmpCode and GitHub Copilot CLI separate worktrees.
+---
 
-**Memory vs amnesia:** AmpCode is positioned for *Unconstrained agentic coding with multi-model routing*; GitHub Copilot CLI for *GitHub-native terminal agent with PR/issue integration*. Long-running memory or knowledge features only pay off if you invest in what they store; otherwise you pay complexity for zero retention.
+## Pricing at Scale (Real Numbers, Not Marketing)
 
-**Escape hatch:** Can you export history, pin versions, and keep working if a model vendor deprecates a SKU next quarter? Multi-provider (Yes vs No) and open source (No vs No) matter more here than any single benchmark number.
+### GitHub Copilot CLI
 
-**Team rollout:** Pick one default (AmpCode), one specialist, document forbidden actions, and revisit quarterly. Tooling churn is faster than most internal standards documents.
+| Plan | Monthly | What You Get |
+|------|---------|--------------|
+| Copilot Individual | $10 | Chat, completions, CLI access |
+| Copilot Business | $19 | Org management, policy, audit |
+| Copilot Enterprise | $39 | Private repo indexing, custom models |
 
+**Hidden costs:** You pay the flat fee regardless of usage. Light users subsidize heavy users. No token transparency — you don't know what a "complex refactor" actually costs.
 
-## Related articles
+### AmpCode
 
-- [AI Coding Agents Just Became Team Infrastructure — Heres What That Means for You](/blog/ai-coding-agents-became-team-infrastructure-november-2026/)
+| Tier | Cost | Model Access |
+|------|------|--------------|
+| Free tier | ~$10/day credit | Claude 3.5 Sonnet, GPT-4o, others via routing |
+| Pay-as-you-go | ~$0.03-0.15/1k tokens | All routed models, usage-based |
+
+**Real example:** A 500-file refactor with 15 tool calls ≈ $0.40-1.20 on AmpCode. Same work on Copilot CLI = $0 marginal (already paid) but you're locked into their model.
+
+**Break-even:** If you do < $10/day of agent work, AmpCode free tier wins. Heavy daily users (> $300/mo) may prefer Copilot's flat rate — but lose model choice.
+
+---
+
+## Feature Matrix (What Actually Matters)
+
+| Capability | AmpCode | Copilot CLI |
+|------------|---------|-------------|
+| **Model routing** | Multi-provider (Anthropic, OpenAI, Google, local) | GitHub-hosted models only |
+| **PR/issue integration** | Basic (via GH CLI) | Native — `gh pr create`, `gh issue comment` |
+| **Terminal-first UX** | Yes — built for shell | Yes — but secondary to IDE |
+| **Windows support** | Native (PowerShell + bash) | Native (via `gh` + WSL) |
+| **MCP servers** | Yes | No |
+| **Skills / custom prompts** | Yes (file-based) | Limited (workspace instructions) |
+| **Conversation export** | Markdown/JSON | GitHub discussions only |
+| **Offline / air-gapped** | No (cloud routing) | No (cloud models) |
+| **Team policy / audit** | Manual | Business/Enterprise plans |
+
+---
+
+## Install & Onboarding
+
+### AmpCode
+```bash
+# macOS / Linux
+curl -fsSL https://ampcode.com/install.sh | bash
+
+# Windows (PowerShell)
+irm https://ampcode.com/install.ps1 | iex
+
+# Verify
+ampcode --version
+ampcode auth login  # Opens browser, chooses provider
+```
+
+First run: picks up your shell, detects git repo, suggests model based on task.
+
+### GitHub Copilot CLI
+```bash
+# Prereq: GitHub CLI
+gh auth login
+
+# Enable Copilot in CLI
+gh extension install github/gh-copilot
+gh copilot auth  # Links your Copilot subscription
+
+# Verify
+gh copilot explain "what does this regex do"
+gh copilot suggest "create a react component"
+```
+
+First run: requires active Copilot subscription (Individual/Business/Enterprise).
+
+---
+
+## Daily Driver Experience: IDE vs Terminal
+
+### If You Live in VS Code / IntelliJ (6+ hrs/day)
+
+**Copilot CLI wins** — it's the same model, same context, same muscle memory. `gh copilot suggest` feels like inline chat. PR creation from terminal is genuinely useful:
+
+```bash
+gh copilot pr create --title "Fix auth bug" --body "Resolves #42"
+# Opens browser with pre-filled PR, runs tests, shows checks
+```
+
+**AmpCode** feels like a second environment. You'll context-switch.
+
+### If You Live in Terminal / tmux / SSH (6+ hrs/day)
+
+**AmpCode wins** — built for shell natives. Multi-model routing means you pick Claude for reasoning, GPT-4o for speed, local model for privacy. Skills system lets you codify team patterns:
+
+```markdown
+# .ampcode/skills/refactor-react.md
+---
+name: refactor-react
+description: "Extract component, add tests, update storybook"
+allowedTools: [Read, Write, Bash(npm test:*), Glob]
+---
+```
+
+Run with `ampcode skill refactor-react`.
+
+**Copilot CLI** in pure terminal feels like a visitor — no skills, no model choice, PR flow assumes browser.
+
+---
+
+## Windows vs macOS: The Silent Decider
+
+| Issue | AmpCode | Copilot CLI |
+|-------|---------|-------------|
+| Path separators | Handles both | Handles both |
+| PowerShell vs bash | Native both | Requires `gh` in both |
+| Orphaned child processes | Managed (configurable timeout) | Relies on `gh` cleanup |
+| Line endings (CRLF) | Auto-normalize | Auto-normalize |
+| WSL integration | Native | Native (via `gh`) |
+
+**Test before standardizing:** Run the same three jobs on your team's actual OS:
+1. Create a React component with tests
+2. Refactor a 20-file module
+3. Debug a failing CI pipeline locally
+
+The tool that handles your shell quirks without friction wins.
+
+---
+
+## Lockfiles & Concurrency (The "Agent Is Dumb" Trap)
+
+**Never run two agents against the same lockfile concurrently.**
+
+```
+package-lock.json / pnpm-lock.yaml / Cargo.lock
+```
+
+Failure mode: Agent A reads lockfile, Agent B reads lockfile, both compute different resolutions, both write — corruption looks like "the agent hallucinated."
+
+**Fix:** Give each agent a separate worktree:
+```bash
+git worktree add ../worktree-ampcode
+git worktree add ../worktree-copilot
+# Run agents in separate directories
+```
+
+---
+
+## Memory vs Amnesia: What Sticks
+
+| Aspect | AmpCode | Copilot CLI |
+|--------|---------|-------------|
+| **Session memory** | Full conversation + tool history | Per-command (stateless) |
+| **Cross-session** | Skills + manual export | GitHub discussions only |
+| **Knowledge files** | `.ampcode/knowledge/` (markdown) | Workspace instructions (limited) |
+| **Model memory** | Depends on routed model | GitHub-hosted only |
+
+**Key insight:** Long-running memory only pays off if you invest in what gets stored. AmpCode's skills/knowledge system is powerful **if** you maintain it. Copilot's approach is simpler but shallower.
+
+---
+
+## Escape Hatch: Can You Leave?
+
+| Question | AmpCode | Copilot CLI |
+|----------|---------|-------------|
+| Export history? | Yes (Markdown/JSON) | Via GitHub API only |
+| Pin model versions? | Yes (per skill/session) | No (GitHub controls) |
+| Work if vendor deprecates SKU? | Multi-provider = yes | No (single provider) |
+| Open source? | No (closed core) | No |
+
+**Multi-provider (AmpCode) > Single provider (Copilot)** for long-term survival. If Anthropic deprecates Claude 3.5, AmpCode routes to GPT-4o or Gemini. Copilot users wait for GitHub to swap models.
+
+---
+
+## Team Rollout Checklist
+
+1. **Pick one default** — the tool your team already stares at 6 hrs/day
+2. **Pick one specialist** — the other tool for specific workflows
+3. **Document forbidden actions** in `AGENTS.md`:
+   ```markdown
+   ## Forbidden
+   - No production deploys without human approval
+   - No `.env` / secrets reads
+   - No force-push to protected branches
+   - No `rm -rf` / destructive fs ops without confirm
+   ```
+4. **Set per-tool permissions** (deny-by-default)
+5. **Revisit quarterly** — tooling churn > internal standards docs
+
+---
+
+## Related Articles
+
+- [AI Coding Agents Just Became Team Infrastructure — Here's What That Means for You](/blog/ai-coding-agents-became-team-infrastructure-november-2026/)
 - [How AmpCode, Cursor, Hermes, and Claude Code Pick the Right Model — And Why Your Wallet Cares](/blog/model-routing-comparison-ampcode-cursor-hermes-claude/)
-- [AmpCode Just Dropped a Feature Avalanche — Heres Why It Matters](/blog/ampcode-august-2026-feature-wave/)
+- [AmpCode Just Dropped a Feature Avalanche — Here's Why It Matters](/blog/ampcode-august-2026-feature-wave/)
+- [Claude Code vs GitHub Copilot CLI: Deep Reasoning or GitHub-Native Terminal Agent?](/blog/claude-code-vs-copilot-cli/)

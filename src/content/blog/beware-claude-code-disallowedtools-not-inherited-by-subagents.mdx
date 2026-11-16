@@ -1,8 +1,8 @@
 ---
 title: "Beware: Claude Code's disallowedTools Don't Reach Subagents — Your Deny List Is a Parent-Only Guard"
-description: "Ever wonder if Claude gives a better answer than GPT for a specific coding problem? [aiFiesta](https://aifiesta.link/muhammed-anshad) lets you compare 9+ pre..."
+description: "Claude Code's deny list (disallowedTools/permissions.deny) does NOT propagate to subagents spawned via the Agent tool. Subagents start with default permissions, silently bypassing your safety controls. Here's the reproduction, blast radius, and three practical fixes."
 pubDate: "2026-07-16T10:00:00Z"
-updatedDate: "2026-07-16T10:00:00Z"
+updatedDate: "2026-11-16T10:00:00Z"
 tags:
   - "security"
   - "beware"
@@ -15,38 +15,136 @@ author: jax_opensrc
 image: "/api/og?title=Beware:%20disallowedTools%20Not%20Inherited%20by%20Subagents&tool=Claude%20Code"
 canonical: "https://terminalblog.com/blog/beware-claude-code-disallowedtools-not-inherited-by-subagents/"
 ---
+
 **What is a coding agent?** A coding agent is an AI-powered tool that can autonomously write, edit, and reason about code across multiple files in a codebase. Unlike simple autocomplete (GitHub Copilot), agents can execute terminal commands, navigate project structure, run tests, and complete multi-step tasks from a high-level prompt.
 
-
+---
 
 *Ever wonder if Claude gives a better answer than GPT for a specific coding problem? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** lets you compare 9+ premium models side-by-side in one chat. No more juggling tabs.*
 
+## The Bug: Deny List Stops at the Parent
+
+When you configure `disallowedTools` (or `permissions.deny`) in your main Claude Code session — for example blocking `Bash(rm:*)`, `Read(.env*)`, or `Write(secrets/*)` — those restrictions are **not automatically inherited** by subagents spawned via the Agent tool.
+
+The subagent starts with its own default tool policy. Tools you explicitly banned at the parent level can run freely inside the subagent.
+
+### Reproduction (2-minute test)
+
+```bash
+# 1. Start Claude Code with a deny rule
+claude-code --permission-prompt-tool=never --disallowed-tools "Bash(rm:*)"
+
+# 2. In the session, ask: "Delete the file test.txt using rm"
+# → Claude refuses. Good.
+
+# 3. Now spawn a subagent: "Use the Agent tool to delete test.txt"
+# → Subagent runs `rm test.txt` and succeeds. Deny list bypassed.
+```
+
+The GitHub issue (`anthropics/claude-code#1247`) carries `has repro` and `area:permissions` labels from maintainers — this is confirmed behavior, not a theoretical concern.
+
+---
+
+## Why This Is More Dangerous Than a Normal Bug
+
+| Assumption | Reality |
+|------------|---------|
+| "My deny list protects the whole session" | Only protects the parent |
+| "Subagents are just helper threads" | Subagents are **independent permission contexts** |
+| "I'd see a warning if something bypassed it" | **Silent bypass** — no log entry, no alert |
+
+This affects **every workflow that uses the Agent tool** to parallelize work: research agents, refactoring agents, test runners, documentation generators. If any of those subagents touch production credentials, cloud APIs, or destructive filesystem ops, your deny list is theater.
+
+---
+
+## Blast Radius: What Subagents Can Do That You Banned
+
+| Blocked in Parent | Subagent Can Still Do |
+|-------------------|------------------------|
+| `Bash(rm:*)` | Delete any file |
+| `Bash(curl:*)` | Exfiltrate data to arbitrary endpoints |
+| `Read(.env*)` | Read all environment files |
+| `Write(secrets/*)` | Write SSH keys, API tokens, certs |
+| `Bash(aws:*)` / `Bash(gcloud:*)` | Provision/destroy cloud resources |
+| `Bash(docker:*)` | Run containers, mount host paths |
+
+**Real scenario:** You block `Bash(curl:*)` to prevent data exfiltration. A research subagent tasked with "check the API docs" silently posts your `.env` to a webhook. No alert. No audit trail in the parent session.
+
+---
+
+## Three Fixes (Ranked by Effectiveness)
+
+### 1. Explicit `allowedTools` per Subagent (Best)
+
+Stop relying on top-down inheritance. When spawning a subagent, pass **only the tools it needs**:
+
+```typescript
+// In your Agent tool invocation
+await agent({
+  prompt: "Run the test suite and report failures",
+  allowedTools: ["Bash(npm test:*)", "Read", "Glob"]  // Explicit allow-list
+});
+```
+
+This is **deny-by-default at the subagent level** — the only reliable model.
+
+### 2. External Guardrails (Defense in Depth)
+
+Add controls **outside** the agent's permission system:
+
+| Layer | Example |
+|-------|---------|
+| Git hooks | `pre-commit` blocks commits containing secrets |
+| CI gates | GitHub Actions fails on `rm -rf` or `.env` reads in agent logs |
+| Cloud IAM | Agent runs with read-only credentials; write requires human approval |
+| Network egress | VPC/firewall blocks outbound to unknown domains |
+
+These work even if the agent's internal permissions are misconfigured.
+
+### 3. Keep Dangerous Credentials Out of the Agent's Environment
+
+| Credential | Don't Put in Agent Env | Do Instead |
+|------------|------------------------|------------|
+| AWS keys | `AWS_ACCESS_KEY_ID` | Use IAM roles / OIDC / temporary STS tokens |
+| DB passwords | `DATABASE_URL` | Cloud SQL proxy / IAM auth |
+| SSH keys | `~/.ssh/id_rsa` | SSH agent forwarding with confirm prompt |
+| API tokens | `GITHUB_TOKEN` | Fine-grained PAT with minimal scope |
+
+If the credential isn't in the process environment, no subagent can leak it — regardless of permission config.
+
+---
+
+## Verification Checklist (Run After Any Config Change)
+
+1. **Spawn a test subagent** asking it to perform a blocked operation (e.g., "read .env.production")
+2. **Verify it refuses** — if it succeeds, your guard is a no-op
+3. **Check the parent session logs** — subagent tool calls should be visible
+4. **Audit `allowedTools` lists** in your automation scripts quarterly
+
+---
 
 ## FAQ
 
-**Q1: What is the disallowedTools inheritance bug in Claude Code?**
-
-When you set `disallowedTools` (or `permissions.deny`) in your main Claude Code session, those restrictions are NOT automatically inherited by subagents spawned via the Agent tool. The subagent starts with its own default tool policy, meaning tools you explicitly banned at the parent level can run freely inside the subagent.
-
-**Q2: Why is this more dangerous than a normal bug?**
-
-Most developers assume a deny list applies globally across all agent processes. When subagents bypass it silently — no warning, no log entry — your safety model is broken without you knowing. This affects every workflow that uses the Agent tool to parallelize work (research, refactoring, test runs).
-
-**Q3: How do I fix this in my current setup?**
-
-Stop relying on top-down inheritance. Instead: (1) Pass an explicit `allowedTools` list when spawning subagents — give only what they need; (2) Add external guardrails outside the agent (Git hooks, CI gates, read-only cloud credentials); (3) Keep dangerous credentials out of the agent's environment entirely; (4) Test your deny rules by spawning a subagent and asking it to perform the blocked operation — if it succeeds, your guard is a no-op.
-
-**Q4: Does this affect me if I don't use subagents?**
-
+**Q: What if I don't use subagents?**
 If you only run the main session and never spawn subagents via the Agent tool, your deny list works as expected for that session. The gap is specifically the parent-to-subagent handoff.
 
-**Q5: Has Anthropic acknowledged this?**
+**Q: Does this affect `permissions.allow`?**
+Yes — `allowedTools` at the parent level also doesn't propagate. Subagents get the default allow list unless you explicitly pass `allowedTools` in the Agent tool call.
 
-Yes — the GitHub issue has `has repro` and `area:permissions` labels from maintainers, confirming it's a real reproducible behavior, not a theoretical concern.
+**Q: Has Anthropic said when they'll fix this?**
+As of 2026-11, the issue is labeled `area:permissions` with `has repro` but no fix milestone. Treat it as permanent architecture — design your permissions around explicit subagent allow-lists.
 
+**Q: Do other agents have this problem?**
+- **OpenCode**: Subagents inherit parent permissions by default (configurable)
+- **GitLawb Zero**: Explicit per-subagent policy required (safer default)
+- **AmpCode**: Delegation model inherits parent constraints
+- **Cursor**: No subagent concept — single permission context
 
-## Related articles
+---
 
-- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
+## Related Articles
+
 - [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
-- [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)
+- [Claude Code Background Subagent Secret Leak — What the Logs Show](/blog/claude-code-background-subagent-secret-leak/)
+- [Coding Agents Security Hardening Wave — July 2026](/blog/coding-agents-security-hardening-wave/)
+- [AGENTS.md Complete Guide — Permissions, Memory, and Tool Policy](/blog/agents-md-complete-guide/)
