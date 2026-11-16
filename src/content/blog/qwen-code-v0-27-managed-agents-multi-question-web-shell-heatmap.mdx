@@ -15,7 +15,7 @@ tags:
   - "beginner"
   - "open-source"
 pubDate: 2026-11-08T14:00:00Z
-updatedDate: 2026-11-15T14:00:00Z
+updatedDate: 2026-11-16T14:00:00Z
 tool: "qwen-code"
 author: "Anshad"
 image: "/api/og?title=Qwen+Code+v0.27+Multi+Question+Web+Shell&tool=qwen-code"
@@ -58,7 +58,7 @@ If you run Qwen Code at team scale — this is the update you've been waiting fo
 
 ## The One-Line Summary
 
-**v0.27.0 (Nov 7) → Managed agents: multi-child questions (answer any order, isolated drafts), Web Shell: Q&A heatmap + "Ask for details" side task, GitHub channel: repo allowlists/blocklists, Shell: CRLF/Unicode-safe sed, cancelled commands report as interrupted, Runtime: faster + fewer deadlocks, Security: no credentials in upgrade refusals/Advisor errors. Zero breaking changes. 9 patches in 17 days.**
+**v0.27.4 (Nov 15) → Local dir grants for managed agents, Feishu/WeCom webhooks, Auto Mode guardrails, restored /memory CLI, multi-workspace Goals, HTTP fallback. v0.27.3 (Nov 13) → Background workflow chips, Chinese GitHub localization, CI fixes. v0.27.2 (Nov 10) → Web Shell WeChat/QQ/Email, Mods $.model.complete/ui.render/$.store, private BTW follow-ups + auto recap, skill import, daemon PR watch, 240-min autofix budget. v0.27.1 (Nov 9) → Daemon PR watch, Session diagnostics, Mem0 memory, web-shell bulk actions. v0.27.0 (Nov 7) → Multi-child questions, Q&A heatmap, repo filters, CRLF/Unicode shell, runtime perf, credential sanitization. 11 patches in 23 days, zero breaking changes.**
 
 ---
 
@@ -321,14 +321,91 @@ export default {
 
 ---
 
-## The v0.26→0.27 Series: 10 Patches in 20 Days
+## v0.27.4 Highlights — Local Directory Grants, Feishu/WeCom Webhooks, Auto Mode Guardrails, Memory Controls (Nov 15)
 
-| Version | Date | Focus |
-|---------|------|-------|
-| **v0.27.3** | **Nov 13, 2026** | **Background workflow chips in Web Shell, Chinese localization for GitHub events, CI fixes** |
-| **v0.27.2** | **Nov 10, 2026** | **Web Shell WeChat/QQ/Email, Mods $.model.complete/ui.render/$.store, private BTW follow-ups + auto recap, skill import, daemon PR watch, 240-min autofix budget, dependency upgrades** |
-| **v0.27.1** | **Nov 9, 2026** | **Daemon PR watch store, managed-agent Session resource + diagnostics, personal memory (Mem0), web-shell sidebar multi-select + bulk pin/archive, bound-PR comment delivery, CI hardening, SDK fixes** |
-| **v0.27.0** | **Nov 7, 2026** | **Multi-child questions, Q&A heatmap, repo filters, CRLF/Unicode shell, runtime perf, credential sanitization** |
+### 1. Managed Agent Local Directory Access Without Persisting Credentials
+
+**New:** Managed Agent sessions can now access the browser user's local filesystem through **temporary directory grants** ([#16844](https://github.com/QwenLM/qwen-code/pull/16844), [#16866](https://github.com/QwenLM/qwen-code/pull/16866)). The agent gets short-lived, scoped access — no credentials or paths persisted.
+
+```bash
+# In Web Shell → Managed Session:
+# 1. User grants a local directory (browser file picker)
+# 2. Agent gets a short-lived ticket for WebSocket auth
+# 3. Runtime stays active while terminal attached
+# 4. Access revoked on detach — nothing stored
+```
+
+**Why it matters:** You can now run managed agents against local codebases without copying code to the cloud, without SSH tunnels, without exposing your filesystem permanently.
+
+---
+
+### 2. Feishu & WeCom Webhooks for Managed Channels
+
+**New:** Send managed-channel outputs to **Feishu custom bot webhooks** and **WeCom group webhooks** ([#17012](https://github.com/QwenLM/qwen-code/pull/17012), [#17013](https://github.com/QwenLM/qwen-code/pull/17013), [#17223](https://github.com/QwenLM/qwen-code/pull/17223), [#17224](https://github.com/QwenLM/qwen-code/pull/17224)).
+
+Long replies are split into **ordered delivery segments** instead of being truncated — with a visible truncation notice if limits are exceeded.
+
+```json
+// Channel config example:
+{
+  "type": "feishu",
+  "webhookUrl": "https://open.feishu.cn/open-apis/bot/v2/hook/...",
+  "signingSecret": "optional",
+  "deliverySegments": true
+}
+```
+
+**Why it matters:** Teams in Chinese enterprise ecosystems (Feishu/WeCom) get first-class agent notifications — no more "agent finished, check the web UI."
+
+---
+
+### 3. Auto Mode Now Requires Explicit Authorization for Risky Actions
+
+**Fixed:** AUTO permission mode now judges **explicit user authorization** for destructive, discarding, shared-history, or bulk actions — not mere relevance ([#16858](https://github.com/QwenLM/qwen-code/pull/16858), [#17146](https://github.com/QwenLM/qwen-code/pull/17146), [#17127](https://github.com/QwenLM/qwen-code/pull/17127), [#17100](https://github.com/QwenLM/qwen-code/pull/17100)).
+
+- Fast-classifier timeout gets one model review when identifiers differ
+- AUTO mode no longer tries filesystem resolution for HTTP(S) URLs (prevents Windows network lookup delays)
+- **Full Access (YOLO) mode now visibly marked** in Web Shell composer with destructive color
+
+**Why it matters:** "Auto mode" no longer means "trust me blindly." Risky actions require explicit green light. The UI keeps you honest.
+
+---
+
+### 4. Restored `/memory` CLI Controls + Persistent Workspace Settings
+
+**New:** Native `/memory` controls back in CLI, with workspace settings persisting across restarts ([#17162](https://github.com/QwenLM/qwen-code/pull/17162), [#17213](https://github.com/QwenLM/qwen-code/pull/17213)).
+
+Typed SDK APIs to preview, submit, inspect, cancel, and retry **Codex memory imports**.
+
+**Why it matters:** Memory management isn't a black box anymore. You control what's imported, what's kept, what's discarded — from CLI or code.
+
+---
+
+### 5. Web Shell Goals: Multi-Workspace Merge + Workspace Badges
+
+**New:** Goals page merges goals from trusted workspaces, shows workspace badges, lets new goals target a selected workspace ([#17230](https://github.com/QwenLM/qwen-code/pull/17230)).
+
+**Why it matters:** If you run multiple workspaces (client A, client B, internal), you now see a unified goal view with context — not siloed lists.
+
+---
+
+### 6. Plain HTTP Fallback for Tabs, Previews, Commands
+
+**Fixed:** Terminal tabs, web previews, local commands, and slash commands keep working over plain HTTP when native UUID support is unavailable ([#17196](https://github.com/QwenLM/qwen-code/pull/17196)).
+
+**Why it matters:** Corporate proxies, restricted networks, or weird environments no longer break the Web Shell UX. It degrades gracefully.
+
+---
+
+## The v0.26→0.27 Series: 11 Patches in 23 Days
+
+|| Version | Date | Focus ||
+||---------|------|-------||
+|| **v0.27.4** | **Nov 15, 2026** | **Local directory grants, Feishu/WeCom webhooks, Auto Mode guardrails, /memory CLI, multi-workspace Goals, HTTP fallback** ||
+|| **v0.27.3** | **Nov 13, 2026** | **Background workflow chips in Web Shell, Chinese localization for GitHub events, CI fixes** ||
+|| **v0.27.2** | **Nov 10, 2026** | **Web Shell WeChat/QQ/Email, Mods $.model.complete/ui.render/$.store, private BTW follow-ups + auto recap, skill import, daemon PR watch, 240-min autofix budget, dependency upgrades** ||
+|| **v0.27.1** | **Nov 9, 2026** | **Daemon PR watch store, managed-agent Session resource + diagnostics, personal memory (Mem0), web-shell sidebar multi-select + bulk pin/archive, bound-PR comment delivery, CI hardening, SDK fixes** ||
+|| **v0.27.0** | **Nov 7, 2026** | **Multi-child questions, Q&A heatmap, repo filters, CRLF/Unicode shell, runtime perf, credential sanitization** ||
 | v0.26.9 | Nov 6, 2026 | Bulk skill activation, daemon APIs, TS SDK, WebShell upload, durable questions, automation default |
 | v0.26.8 | Nov 5, 2026 | Qwen subscription, Ink TUI shared loop, WebShell PR links, concurrent rewinds |
 | v0.26.7 | Nov 4, 2026 | Channel events page, local /verify-pr Docker, WebShell polish |
@@ -347,6 +424,12 @@ export default {
 
 | If You... | Verdict |
 |-----------|---------|
+| **Run managed agents against local codebases** | **Yes** — local directory grants = no SSH, no cloud copy, no persistent exposure |
+| **Use Feishu or WeCom for team chat** | **Yes** — first-class webhooks with ordered delivery segments |
+| **Run Auto Mode in production** | **Yes** — explicit authorization for risky actions = safer by default |
+| **Manage memory/Codex imports from CLI** | **Yes** — native `/memory` controls back, persistent settings, typed SDK |
+| **Run multiple workspaces (clients, projects)** | **Yes** — unified Goals view with workspace badges |
+| **Behind corporate proxy / restricted network** | **Yes** — plain HTTP fallback keeps Web Shell working |
 | **Use Web Shell with team messaging** | **Yes** — WeChat/QQ/Email channels = agents in your chat apps |
 | **Build Mods/extensions** | **Yes** — `$.model.complete`, `ui.render`, `$.store` = powerful primitives |
 | **Need skill portability** | **Yes** — import skills from sessions without re-upload |
@@ -360,7 +443,7 @@ export default {
 | **On v0.26.9 and stable** | **Yes** — zero breaking changes, pure capability adds |
 | **Pinned to v0.25.x** | **Test in staging** — but the platform gap is now a canyon |
 
-**No reason to wait.** This is the "managed agents become operable at team scale" release.
+**No reason to wait.** This is the "managed agents become operable at enterprise scale" release.
 
 ---
 
@@ -372,11 +455,11 @@ npm i -g @qwen-code/qwen-code@latest
 
 # Verify
 qwen-code --version
-# Should show 0.27.0
+# Should show 0.27.4
 
 # Desktop app
 # Check for updates in-app, or download from:
-# https://github.com/QwenLM/qwen-code/releases/tag/v0.27.0
+# https://github.com/QwenLM/qwen-code/releases/tag/v0.27.4
 
 # VS Code extension
 # Auto-updates, or: Extensions → Qwen Code → Update
@@ -407,6 +490,13 @@ qwen-code run --managed "
 # Create a Mod using $.model.complete, ui.render, $.store
 # Import a skill from a previous session
 # Run long autofix → should not timeout at 40 min
+
+# 6. Test v0.27.4 features
+# Web Shell → Managed Session → grant local directory → open Web Terminal
+# Channel Manager → Add Feishu/WeCom webhook
+# CLI → /memory → see restored controls
+# Web Shell → Goals page → see multi-workspace merge
+# Auto Mode → try a risky action → see explicit authorization prompt
 ```
 
 ---
