@@ -1,8 +1,8 @@
 ---
 title: Hermes Agent Ships 5 Notable Fixes This Week — Symlink Containment, Git Hardening, Cron Visibility, and More
 description: "The problem: Hermes reads project context files (AGENTS.md, CLAUDE.md, .cursorrules, .hermes.md) to prime the agent. Until now, those reads followed symlinks..."
-pubDate: "2026-09-28T12:00:00Z"
-updatedDate: "2026-09-28T12:00:00Z"
+pubDate: 2026-09-28T12:00:00Z
+updatedDate: 2026-09-28T12:00:00Z
 tags:
   - "hermes-agent"
   - "weekly-roundup"
@@ -91,7 +91,7 @@ category: just-shipped
 
 **PR:** [#114451](https://github.com/NousResearch/hermes-agent/pull/114451) · Labels: `type/bug`, `duplicate`, `P1`, `sweeper:risk-session-state`, `sweeper:risk-message-delivery`
 
-**The problem:** `json.loads()` accepts any JSON value (scalars, arrays, strings). Scans treated parse success as "this is an object," then crashed on `.get()` / `["sequence"]` access. A single `json.dumps(42)` in a receipt file wedged the entire Bot Chat deferred queue on every scheduler tick until manually removed.
+**The problem:** `json.loads()` accepts any JSON value (scalars, arrays, strings). Scans treated parse success as "this is an object," then crashed on `.get()` / `["sequence"` access. A single `json.dumps(42)` in a receipt file wedged the entire Bot Chat deferred queue on every scheduler tick until manually removed.
 
 **The fix:** New `parse_json_object()` / `read_json_object_file()` helpers in `utils.py` that require `isinstance(data, dict)` and raise `ValueError` otherwise. All audited scan/read sites wired through them. Existing `except (OSError, ValueError)` skip paths apply — healthy siblings continue, exact-id reads fail closed instead of overwriting.
 

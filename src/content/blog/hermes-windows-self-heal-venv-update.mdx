@@ -8,8 +8,8 @@ tags:
   - "venv"
   - "viral"
   - "reliability"
-pubDate: "2026-07-03T16:00:00Z"
-updatedDate: "2026-11-15T03:30:00Z"
+pubDate: 2026-07-03T16:00:00Z
+updatedDate: 2026-11-15T03:30:00Z
 tool: "hermes"
 author: "dev"
 ---
@@ -62,14 +62,19 @@ def check_venv_health(venv_path: Path) -> HealthReport:
     report = HealthReport()
 
     # 1. Critical binaries exist
-    for exe in ["python.exe", "pip.exe", "hermes.exe"]:
+    for exe in ["python.exe"
+  - "pip.exe"
+  - "hermes.exe":
         if not (venv_path / "Scripts" / exe).exists():
             report.missing.append(exe)
 
     # 2. Core packages importable
-    for pkg in ["httpx", "pydantic", "rich", "typer"]:
+    for pkg in ["httpx"
+  - "pydantic"
+  - "rich"
+  - "typer":
         try:
-            subprocess.run([python, "-c", f"import {pkg}"], check=True, capture_output=True)
+            subprocess.run([python, "-c", f"import {pkg}", check=True, capture_output=True)
         except subprocess.CalledProcessError:
             report.broken.append(pkg)
 
@@ -97,7 +102,9 @@ def self_heal(venv_path: Path, report: HealthReport) -> RepairResult:
         for attempt in range(3):
             try:
                 subprocess.run([
-                    pip, "install", "--force-reinstall", "--no-deps", pkg
+                    pip, "install"
+  - "--force-reinstall"
+  - "--no-deps", pkg
                 ], check=True, timeout=120)
                 result.repaired.append(pkg)
                 break

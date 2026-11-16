@@ -3,7 +3,7 @@ title: "Your Hermes Agent Just Went Silent — Here's How to Bring It Back"
 description: | Failure Mode | Symptom | Where to Look First |
 |--------------|---------|---------------------|
 | Subagent hang | Parent agent waits forever on delegatet...
-pubDate: "2026-09-27T14:00:00Z"
+pubDate: 2026-09-27T14:00:00Z
 tags:
   - "hermes"
   - "debugging"
@@ -50,7 +50,9 @@ You delegated a task. The parent agent shows "executing: waiting for subagent." 
 ```bash
 # List all active sessions
 > agents.list()
-=> ["main-refactor-7f2a", "sub-refactor-auth-3b1c", "sub-refactor-tests-9d4e"]
+=> ["main-refactor-7f2a"
+  - "sub-refactor-auth-3b1c"
+  - "sub-refactor-tests-9d4e"
 
 # Check the stuck child
 > agents.get("sub-refactor-auth-3b1c").status
@@ -228,8 +230,10 @@ Session started, ran for 3 minutes, then went silent. Status never updated.
 ```
 Webhook URL changed. Update it:
 ```bash
-> cron.jobs.get("weekly-dep-check").config.set("deliver", "slack:#engineering")
-> cron.jobs.get("weekly-dep-check").config.set("webhookUrl", "https://hooks.slack.com/services/NEW/WEBHOOK")
+> cron.jobs.get("weekly-dep-check").config.set("deliver"
+  - "slack:#engineering")
+> cron.jobs.get("weekly-dep-check").config.set("webhookUrl"
+  - "https://hooks.slack.com/services/NEW/WEBHOOK")
 ```
 
 **C. Disable continuity if memory is suspect**
@@ -257,7 +261,8 @@ Agent starts repeating itself. References files that don't exist. Claims it "alr
 > agent.memory.dump("main-refactor-7f2a")
 => {
   preferences: { indent: "tabs", testFramework: "jest" },
-  projectConventions: { "api routes": "src/routes/api/", "db models": "src/models/" },
+  projectConventions: { "api routes": "src/routes/api/"
+  - "db models": "src/models/" },
   corruptedEntries: [
     { key: "auth middleware location", value: "src/middleware/auth.ts", reality: "src/auth/middleware.ts" },
     { key: "test command", value: "npm run test:unit", reality: "npm test" }
@@ -291,8 +296,11 @@ Four identical turns. The agent is looping on a false belief.
 
 **A. Surgical memory correction**
 ```bash
-> agent.memory.delete("main-refactor-7f2a", "auth middleware location")
-> agent.memory.set("main-refactor-7f2a", "auth middleware location", "src/auth/middleware.ts")
+> agent.memory.delete("main-refactor-7f2a"
+  - "auth middleware location")
+> agent.memory.set("main-refactor-7f2a"
+  - "auth middleware location"
+  - "src/auth/middleware.ts")
 ```
 Removes the false belief, writes the truth.
 
@@ -312,11 +320,14 @@ Run the task memory-free. Re-enable after.
 **D. Audit skills for conflicting instructions**
 ```bash
 > skills.list()
-=> ["security-audit", "code-review", "release-manager", "db-migration"]
+=> ["security-audit"
+  - "code-review"
+  - "release-manager"
+  - "db-migration"
 > skills.inspect("security-audit").memoryWrites
-=> ["test command: npm run test:unit"]
+=> ["test command: npm run test:unit"
 > skills.inspect("code-review").memoryWrites
-=> ["test command: npm test"]
+=> ["test command: npm test"
 ```
 Two skills wrote different "test command" facts. Fix the skill, or disable one:
 ```bash
@@ -371,8 +382,11 @@ Agent runs fine for 20 minutes. Then tool calls queue up. Model status shows "ac
 # hermes config
 routing:
   fallbacks:
-    claude-opus-5.5: ["claude-sonnet-5", "gpt-6-astra", "nemotron-3-ultra"]
-    gpt-6-astra: ["claude-sonnet-5", "gpt-6-luna"]
+    claude-opus-5.5: ["claude-sonnet-5"
+  - "gpt-6-astra"
+  - "nemotron-3-ultra"
+    gpt-6-astra: ["claude-sonnet-5"
+  - "gpt-6-luna"
 ```
 When primary hits rate limit, Hermes silently routes to next available. No stall.
 
@@ -402,7 +416,8 @@ Current session continues on cheaper/faster model. Opus quota recovers in backgr
 **D. Cap MOA usage**
 ```bash
 > config.set("moa.maxAdvisors", 3)  # default is 5
-> config.set("moa.useForTasksUnder", "complex")  # only for genuinely ambiguous tasks
+> config.set("moa.useForTasksUnder"
+  - "complex")  # only for genuinely ambiguous tasks
 ```
 Cuts MOA token burn by 40-60%.
 

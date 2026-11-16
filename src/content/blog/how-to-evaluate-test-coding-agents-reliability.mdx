@@ -5,7 +5,7 @@ description: "<div class=\"metrics\">
         <h3>Smoke Test Pass Rate</h3>
         <div class=\"metric\">${latest.smoke.passRate}%</div>
         ..."
-pubDate: "2026-11-11T14:00:00Z"
+pubDate: 2026-11-11T14:00:00Z
 tags:
   - "evaluation"
   - "testing"
@@ -164,7 +164,9 @@ Start with **real tasks your team does weekly**. Not synthetic benchmarks. Real 
     "category": "security",
     "difficulty": "hard",
     "prompt": "Rotate JWT signing keys: add new key, update token issuer, add grace period for old tokens, remove expired key after 30 days",
-    "files": ["src/auth/jwt.ts", "src/auth/middleware.ts", "src/config/keys.json"],
+    "files": ["src/auth/jwt.ts"
+  - "src/auth/middleware.ts"
+  - "src/config/keys.json",
     "verification": [
       "tests pass",
       "no hardcoded secrets in diff",
@@ -178,7 +180,8 @@ Start with **real tasks your team does weekly**. Not synthetic benchmarks. Real 
     "category": "bugfix",
     "difficulty": "medium",
     "prompt": "Fix pagination in GET /api/users: cursor-based pagination returns duplicate results on page 2",
-    "files": ["src/api/users.ts", "src/db/queries.ts"],
+    "files": ["src/api/users.ts"
+  - "src/db/queries.ts",
     "verification": [
       "tests pass",
       "no duplicate IDs across pages",
@@ -192,7 +195,7 @@ Start with **real tasks your team does weekly**. Not synthetic benchmarks. Real 
     "category": "maintenance",
     "difficulty": "easy",
     "prompt": "Add composite index on (tenant_id, created_at) for queries table",
-    "files": ["migrations/20261111_add_tenant_created_index.sql"],
+    "files": ["migrations/20261111_add_tenant_created_index.sql",
     "verification": [
       "migration runs clean",
       "EXPLAIN shows index usage",
@@ -430,8 +433,9 @@ git log --oneline --since="1 year ago" --grep="fix\|feat\|refactor" \
     "type": "bugfix",
     "input": "Users report 500 error on /api/export when date range > 30 days. Root cause: query timeout on large date ranges.",
     "context": {
-      "files": ["src/api/export.ts", "src/db/export-queries.ts"],
-      "relatedTests": ["tests/api/export.test.ts"]
+      "files": ["src/api/export.ts"
+  - "src/db/export-queries.ts",
+      "relatedTests": ["tests/api/export.test.ts"
     },
     "goldenOutput": "diff --git a/src/api/export.ts b/src/api/export.ts\n+  const CHUNK_SIZE_DAYS = 7;\n+  for (let start = range.start; start < range.end; start += CHUNK_SIZE_DAYS) {\n+    const chunkEnd = Math.min(start + CHUNK_SIZE_DAYS, range.end);\n+    await processChunk(start, chunkEnd);\n+  }\n-  await processChunk(range.start, range.end);",
     "verification": [
@@ -683,7 +687,7 @@ name: Agent Deploy Gate
 
 on:
   workflow_run:
-    workflows: ["Agent Regression Suite"]
+    workflows: ["Agent Regression Suite"
     types: [completed]
 
 jobs:

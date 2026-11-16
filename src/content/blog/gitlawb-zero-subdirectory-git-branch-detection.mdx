@@ -8,8 +8,8 @@ tags:
   - "subdirectory"
   - "bugfix"
   - "viral"
-pubDate: "2026-07-10T04:00:00Z"
-updatedDate: "2026-07-10T04:00:00Z"
+pubDate: 2026-07-10T04:00:00Z
+updatedDate: 2026-07-10T04:00:00Z
 tool: "gitlawb-zero"
 author: "dev"
 ---
@@ -51,7 +51,9 @@ The corrected implementation:
 ```go
 func findRepoRoot(startDir string) (string, error) {
     // Use git's own discovery — handles worktrees, submodules, symlinks
-    out, err := exec.Command("git", "rev-parse", "--show-toplevel").
+    out, err := exec.Command("git"
+  - "rev-parse"
+  - "--show-toplevel").
         Dir(startDir).Output()
     if err != nil {
         return "", err // Not a git repo, or git not available
@@ -63,11 +65,17 @@ func findRepoRoot(startDir string) (string, error) {
 Then branch detection runs from the discovered root:
 ```go
 func getCurrentBranch(repoRoot string) (string, error) {
-    out, err := exec.Command("git", "symbolic-ref", "--short", "HEAD").
+    out, err := exec.Command("git"
+  - "symbolic-ref"
+  - "--short"
+  - "HEAD").
         Dir(repoRoot).Output()
     if err != nil {
         // Could be detached HEAD — try rev-parse
-        out, err = exec.Command("git", "rev-parse", "--short", "HEAD").
+        out, err = exec.Command("git"
+  - "rev-parse"
+  - "--short"
+  - "HEAD").
             Dir(repoRoot).Output()
     }
     return strings.TrimSpace(string(out)), err
