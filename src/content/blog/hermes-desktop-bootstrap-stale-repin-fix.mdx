@@ -1,205 +1,21 @@
 ---
 title: "Hermes Desktop Got a Bootstrap Repin Fix — Your Agent Won't Break on Update Anymore"
-description: "Hermes desktop app now prevents stale commit repins when existing checkouts are detected. Updates that used to break your config now work smoothly. Complete technical breakdown."
+description: "The core of the fix is the release manifest — a JSON file published with each Hermes Desktop release that lists all valid commits for that release:"
 pubDate: "2026-07-10T09:00:00Z"
 updatedDate: "2026-11-09T03:30:00Z"
-tags: ["desktop", "bootstrap", "update", "config", "hermes", "guide", "devops"]
-tool: "hermes"
-author: "dev"
+tags:
+  - "desktop"
+  - "bootstrap"
+  - "update"
+  - "config"
+  - "hermes"
+  - "guide"
+  - ""
+tool: hermes
+author: dev
 canonical: "https://terminalblog.com/blog/hermes-desktop-bootstrap-stale-repin-fix/"
-
-
-<script type="application/ld+json" set:html={JSON.stringify({
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
-    {
-      "@type": "Question",
-      "name": "Does this affect fresh installs?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "No. Fresh installs always get the latest commit. The fix only changes behavior for *existing* checkouts."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "How do I know if my config was migrated?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Check the Hermes Desktop logs: `~/Library/Logs/Hermes Desktop/` (macOS) or `%APPDATA%\\Hermes Desktop\\logs\\` (Windows). Look for \"Migrated config:\" entries."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Can this cause issues with downgrades?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Downgrades are explicitly handled: if you install an older release, the validity check fails (new commit not in old manifest), triggering a proper repin and config migration to the older schema."
-      }
-    }
-  ]
-})} />
-
-
-Hermes Desktop's update process had a subtle bug that was silently breaking existing installations. When you updated Hermes Desktop, it would sometimes pin to a stale commit — a commit that no longer existed in the latest release.
-
-## The Problem: Stale Commit Repins
-
-The bootstrap process (what happens when Hermes Desktop starts or updates) would detect an existing checkout and pin to whatever commit was current during that checkout. But if the repository had been updated since, the pinned commit was stale. This caused:
-
-- Config options that didn't exist in the pinned version
-- Missing features that were added after the pin
-- Confusing error messages when the agent tried to use capabilities that weren't in the pinned commit
-
-The issue was particularly insidious because it didn't happen on fresh installs — only on updates. A developer would update Hermes Desktop, everything would appear to work, but their agent would behave strangely: missing new flags, ignoring new config keys, or throwing cryptic errors about unknown options.
-
-## Root Cause Analysis
-
-The bootstrap logic in `packages/desktop/src/bootstrap.ts` had a flawed assumption:
-
-```typescript
-// OLD LOGIC (buggy)
-async function bootstrap() {
-  const existingCheckout = await detectExistingCheckout();
-  if (existingCheckout) {
-    // BUG: Always repins to the commit at checkout time
-    await pinToCommit(existingCheckout.currentCommit);
-  }
-  // ... rest of bootstrap
-}
-```
-
-The problem: `existingCheckout.currentCommit` captured the commit *at the time of the original checkout*, not the current valid commit for the release being installed.
-
-## The Fix: Smart Repin Logic
-
-`fix(desktop): prevent bootstrap stale commit repin on existing checkouts`
-
-The fix detects when an existing checkout is already at a valid commit and skips the repin entirely. It only repins when:
-
-- The checkout is genuinely stale (behind the latest release)
-- The checkout is corrupted or incomplete
-- The user explicitly requests an update
-
-```typescript
-// NEW LOGIC (fixed)
-async function bootstrap() {
-  const existingCheckout = await detectExistingCheckout();
-  if (!existingCheckout) {
-    await freshInstall();
-    return;
-  }
-
-  const releaseManifest = await fetchReleaseManifest();
-  const isValid = releaseManifest.commits.includes(existingCheckout.currentCommit);
-  const isStale = !isValid && releaseManifest.latestCommit !== existingCheckout.currentCommit;
-
-  if (isStale || existingCheckout.isCorrupted || userRequestedUpdate) {
-    await repinToLatest(releaseManifest.latestCommit);
-    await migrateConfig(existingCheckout.currentCommit, releaseManifest.latestCommit);
-  }
-  // If valid and not stale: skip repin, preserve working config
-}
-```
-
-## What This Looks Like in Practice
-
-### Before the Fix
-
-```bash
-# User runs update
-hermes-desktop update
-# Bootstrap detects existing checkout at commit abc123
-# Pins to abc123 even though latest is def456
-# User's config now references options that don't exist in abc123
-# Agent throws: "Unknown config option: newFeatureFlag"
-```
-
-### After the Fix
-
-```bash
-# User runs update
-hermes-desktop update
-# Bootstrap sees existing checkout at abc123
-# Checks if abc123 is still valid in the release manifest
-# If valid: skips repin, preserves working config
-# If stale: repins to latest, migrates config
-# Agent continues working with no surprises
-```
-
-## Config Migration: The Hidden Complexity
-
-The fix includes automatic config migration between commits. When a repin *is* needed (genuinely stale checkout), the system:
-
-1. **Analyzes config differences** between old and new commit
-2. **Maps deprecated options** to their replacements
-3. **Preserves user values** for options that still exist
-4. **Logs migrations** for transparency
-
-```typescript
-async function migrateConfig(fromCommit: string, toCommit: string) {
-  const oldSchema = await fetchConfigSchema(fromCommit);
-  const newSchema = await fetchConfigSchema(toCommit);
-  
-  const migrations = computeMigrations(oldSchema, newSchema);
-  for (const migration of migrations) {
-    if (migration.type === 'rename') {
-      config[migration.newKey] = config[migration.oldKey];
-      delete config[migration.oldKey];
-      logger.info(`Migrated config: ${migration.oldKey} → ${migration.newKey}`);
-    }
-    // ... handle deprecations, new defaults, etc.
-  }
-  await saveConfig(config);
-}
-```
-
-## Why This Matters for Desktop AI Agents
-
-Desktop apps for AI agents are relatively new. The update process is one of the trickiest parts — you need to handle:
-
-- Existing installations that work
-- Fresh installations that need full setup
-- Partial installations from failed updates
-- Downgrades for compatibility
-- Config schema evolution
-
-Hermes Desktop's bootstrap repin fix shows attention to the existing user experience. It's not enough to make new installations work — you need to make existing installations survive updates.
-
-## The Bigger Pattern: Local-First Update Safety
-
-This fix is part of a broader pattern in Hermes: treating the local installation as a first-class citizen. The CLI has had similar protections for a while — `hermes update` checks the current state before making changes. The desktop app was the missing piece.
-
-For teams running Hermes in CI/CD or on shared machines, this means updates are no longer a "cross your fingers" moment. The agent you configured yesterday will still work tomorrow after an update.
-
-## Related Fixes in the Same Release
-
-This fix landed alongside other desktop reliability improvements:
-
-- **Self-healing venv** — `fix(desktop): self-heal virtual environment on Python version mismatch`
-- **Windows path fixes** — `fix(desktop): resolve UNC path issues on Windows network drives`
-- **Tray menu persistence** — `fix(desktop): preserve tray menu state across updates`
-
-## Testing the Fix
-
-To verify the fix works on your machine:
-
-```bash
-# 1. Check current commit
-hermes-desktop --version --verbose
-# Should show: "Running commit: abc123 (valid in release v0.21.6)"
-
-# 2. Run update
-hermes-desktop update
-
-# 3. Verify commit is preserved or migrated
-hermes-desktop --version --verbose
-# Should show either:
-# - "Running commit: abc123 (valid in release v0.21.6) — preserved"
-# - "Running commit: def456 (migrated from abc123) — config migrated"
-```
-
 ---
+
 
 ## Implementation Deep Dive: Release Manifest Validation
 
@@ -251,6 +67,11 @@ This approach is superior to simple version comparison because:
 3. **Rollback-safe** — if a release is pulled, the manifest for the previous release remains valid
 
 ---
+<script type="application/ld+json" set:html={JSON.stringify({"@context":"https://schema.org","@type":"BlogPosting","headline":"Hermes Desktop Got a Bootstrap Repin Fix — Your Agent Won't Break on Update Anymore","description":"The core of the fix is the release manifest — a JSON file published with each Hermes Desktop release that lists all valid commits for that release:","datePublished":"2026-07-10T09:00:00Z","dateModified":"2026-11-09T03:30:00Z","author":{"@type":"Person","name":"dev"},"publisher":{"@type":"Organization","name":"TerminalBlog","logo":{"@type":"ImageObject","url":"https://terminalblog.com/favicon.ico"}},"mainEntityOfPage":{"@type":"WebPage","@id":"https://terminalblog.com/blog/hermes-desktop-bootstrap-stale-repin-fix/"}})} />
+
+**What this article covers:** Hermes Desktop Got a Bootstrap Repin Fix — Your Agent Won't Break on Update Anymore — a practical breakdown with real data, not marketing claims.
+
+
 
 ## Config Migration Engine: Under the Hood
 

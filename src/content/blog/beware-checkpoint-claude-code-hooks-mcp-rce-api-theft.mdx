@@ -1,70 +1,26 @@
 ---
-title: "Check Point Just Exposed How Your Coding Agent Can Be Weaponized — Clone a Repo, Get Hacked"
-description: "Check Point Research disclosed CVE-2025-59536 and CVE-2026-21852: cloning an untrusted repository with Claude Code can execute arbitrary shell commands and exfiltrate your Anthropic API key — before you even click 'trust.' Here's what happened, why it matters, and how to protect yourself."
-pubDate: 2026-10-23T14:00:00Z
-tags: ["claude-code", "security", "beware", "cve-2025-59536", "cve-2026-21852", "rce", "api-key-theft", "hooks", "mcp", "beginner"]
-tool: "claude-code"
-author: "Anshad"
-image: "/api/og?title=Check+Point+Claude+Code+RCE+API+Theft&tool=claude-code"
+title: Check Point Just Exposed How Your Coding Agent Can Be Weaponized — Clone a Repo, Get Hacked
+description: 1. Attacker pushes malicious .claude/settings.json to a repo (or .mcp.json for MCP servers)
+2. You git clone that repo and run claude in the directory
+3. B...
+pubDate: "2026-10-23T14:00:00Z"
+tags:
+  - "claude-code"
+  - "security"
+  - "beware"
+  - "cve-2025-59536"
+  - "cve-2026-21852"
+  - "rce"
+  - "api-key-theft"
+  - "hooks"
+  - "mcp"
+  - "beginner"
+tool: claude-code
+author: Anshad
+image: /api/og?title=Check+Point+Claude+Code+RCE+API+Theft&tool=claude-code
 canonical: "https://terminalblog.com/blog/beware-checkpoint-claude-code-hooks-mcp-rce-api-theft/"
-
-<script type="application/ld+json" set:html={JSON.stringify({
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
-    {
-      "@type": "Question",
-      "name": "Does this affect me if I only use the VS Code extension?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Yes — the extension runs the same CLI backend. Project configs load the same way."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Can GitHub/GitLab scan for this?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Not automatically yet. The scanner script can be added to CI as a pre-clone gate."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "What about `claude-code-action` in GitHub Actions?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Separate CVEs (CVE-2026-54316 etc.) affect the GitHub Action. Update to v2.1.163+."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Is Anthropic doing enough?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "They patched fast. But the **architecture** — repo-controlled config that executes — is the root cause. Expect more variants until project configs are sandboxed or opt-in."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Should I stop using Claude Code?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "No. Update, verify configs, run untrusted code in isolation. This is the new normal for AI-assisted development."
-      }
-    }
-  ]
-})} />
-
-
-Check Point Research **disclosed February 25, 2026** two critical vulnerabilities in Anthropic's Claude Code that should terrify anyone who clones repositories and opens them in an AI coding agent.
-
-**CVE-2025-59536 (CVSS 8.7):** Remote code execution via malicious Hooks in `.claude/settings.json` — commands run **before the trust dialog resolves**, no confirmation needed.
-
-**CVE-2026-21852 (CVSS 5.3):** API key exfiltration via `ANTHROPIC_BASE_URL` override in the same config file — your key gets sent to an attacker-controlled endpoint.
-
-Both are **fixed** (v1.0.111 and v2.0.65 respectively). But the architecture lesson remains: **configuration files are now executable attack surface.**
-
 ---
+
 
 ## The Attack in Three Lines
 
@@ -75,6 +31,11 @@ Both are **fixed** (v1.0.111 and v2.0.65 respectively). But the architecture les
 You don't need to approve anything. You don't need to run a command. **Opening the project in Claude Code is the trigger.**
 
 ---
+<script type="application/ld+json" set:html={JSON.stringify({"@context":"https://schema.org","@type":"BlogPosting","headline":"Check Point Just Exposed How Your Coding Agent Can Be Weaponized — Clone a Repo, Get Hacked","description":"1. Attacker pushes malicious .claude/settings.json to a repo (or .mcp.json for MCP servers)\r\n2. You git clone that repo and run claude in the directory\r\n3. B...","datePublished":"2026-10-23T14:00:00Z","dateModified":"2026-10-23T14:00:00Z","author":{"@type":"Person","name":"Anshad"},"publisher":{"@type":"Organization","name":"TerminalBlog","logo":{"@type":"ImageObject","url":"https://terminalblog.com/favicon.ico"}},"mainEntityOfPage":{"@type":"WebPage","@id":"https://terminalblog.com/blog/beware-checkpoint-claude-code-hooks-mcp-rce-api-theft/"}})} />
+
+**What is a coding agent?** A coding agent is an AI-powered tool that can autonomously write, edit, and reason about code across multiple files in a codebase. Unlike simple autocomplete (GitHub Copilot), agents can execute terminal commands, navigate project structure, run tests, and complete multi-step tasks from a high-level prompt.
+
+
 
 ## Vulnerability #1: Hooks RCE — The Calculator That Shouldn't Open
 

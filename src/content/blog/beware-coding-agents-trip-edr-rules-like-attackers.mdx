@@ -1,25 +1,25 @@
 ---
 title: "Beware: Your Coding Agent Trips the Same EDR Rules Built to Catch Attackers"
-description: "Sophos telemetry from June 2026 shows Claude Code, Cursor, and Codex setting off credential-access, LOLBin, and persistence rules on Windows endpoints — because to a behavioral engine, benign agent work is indistinguishable from an intrusion. Here's what fired, why allowlisting is the wrong fix, and how to scope it safely."
+description: You rolled out a coding agent to your developer fleet. It writes code, installs dependencies, automates a browser now and then, and troubleshoots its own fai...
 pubDate: "2026-07-17T14:00:00Z"
 updatedDate: "2026-07-17T14:00:00Z"
-tags: ["security", "beware", "edr", "claude-code", "cursor", "codex", "endpoint", "credentials"]
-tool: "claude-code"
-author: "kira_bug_hunter"
+tags:
+  - "security"
+  - "beware"
+  - "edr"
+  - "claude-code"
+  - "cursor"
+  - "codex"
+  - "endpoint"
+  - "credentials"
+tool: claude-code
+author: kira_bug_hunter
 image: "/api/og?title=Beware:%20Coding%20Agents%20Trip%20EDR%20Rules&tool=Endpoint%20Security"
 canonical: "https://terminalblog.com/blog/beware-coding-agents-trip-edr-rules-like-attackers/"
-
-
-
-## Related articles
-
-- [Coding Agent Security Checklist 2026: the isolation model every operator needs](/blog/coding-agent-security-checklist-2026/)
-- [Beware: Your Coding Agent's Sandbox Was Leaking Its Own Credentials to Spawned Commands](/blog/beware-coding-agent-sandbox-leaks-own-credentials/)
-- [Beware: Claude Code's permissions.deny Silently Fails on Absolute Paths](/blog/beware-claude-code-permissions-deny-absolute-path/)
-- [Beware: Claude Code Subagents Can Spontaneously Trigger Prompt Injection](/blog/claude-code-subagent-spontaneous-prompt-injection/)
-- [Beware: Claude Code on Windows — Click-Through Permissions](/blog/claude-code-windows-click-through-permissions/)
-
 ---
+**What is a coding agent?** A coding agent is an AI-powered tool that can autonomously write, edit, and reason about code across multiple files in a codebase. Unlike simple autocomplete (GitHub Copilot), agents can execute terminal commands, navigate project structure, run tests, and complete multi-step tasks from a high-level prompt.
+
+
 
 You rolled out a coding agent to your developer fleet. It writes code, installs dependencies, automates a browser now and then, and troubleshoots its own failures. Then your SOC lights up: credential-access alerts, LOLBin download blocks, a persistence-rule hit on a startup folder. Nothing was stolen. No attacker was on the box. The agent was just doing its job — and your endpoint detection and response (EDR) engine could not tell the difference.
 
@@ -30,7 +30,9 @@ That is the uncomfortable finding in Sophos's July 2026 telemetry report ([sopho
 Sophos counted blocking-rule hits by unique machine, mapped to MITRE ATT&CK tactics. Two categories dominated:
 
 | MITRE ATT&CK tactic | Share of blocks | Top rule | What triggered it |
-|---|---|---|---|
+|---
+<script type="application/ld+json" set:html={JSON.stringify({"@context":"https://schema.org","@type":"BlogPosting","headline":"Beware: Your Coding Agent Trips the Same EDR Rules Built to Catch Attackers","description":"You rolled out a coding agent to your developer fleet. It writes code, installs dependencies, automates a browser now and then, and troubleshoots its own fai...","datePublished":"2026-07-17T14:00:00Z","dateModified":"2026-07-17T14:00:00Z","author":{"@type":"Person","name":"kira_bug_hunter"},"publisher":{"@type":"Organization","name":"TerminalBlog","logo":{"@type":"ImageObject","url":"https://terminalblog.com/favicon.ico"}},"mainEntityOfPage":{"@type":"WebPage","@id":"https://terminalblog.com/blog/beware-coding-agents-trip-edr-rules-like-attackers/"}})} />
+|---|---|---|
 | Credential Access (TA0006) | 56.2% | Creds_3b (DPAPI browser-credential decryption) | Claude Code's GStack `/browse` running PowerShell to unlock saved browser data |
 | Execution (TA0002) | 28.8% | Exec_5a (bitsadmin download) | OpenAI Codex pivoting from certutil to bitsadmin to fetch the python.org installer |
 | Defense Evasion (TA0005) | Prominent in silent rules | Exec_16a (PowerShell string-formatting) | Agents emitting PowerShell that matched an old obfuscation signature |
@@ -88,3 +90,10 @@ The endpoint community has been here before. When attackers stopped dropping fil
 Coding agents are the next category to hit that wall. The shift Sophos measured is still small in absolute numbers, and the report is explicit that it's a first-pass read, not a verdict. But the direction is unmistakable: as agent adoption climbs, more legitimate endpoints will generate credential-access, LOLBin, and persistence signatures as a matter of routine. The teams that plan for it — scope execution noise, hold the credential line, block the dangerous flags, and isolate sensitive work — will get the productivity without blinding their defenses. The ones that reflexively allowlist their way out of the alerts will hand an attacker a pre-approved process the day an agent gets hijacked.
 
 The fact that an AI agent decrypted your browser credentials does not make it safe. It just makes it harder to tell who asked.
+
+
+## Related articles
+
+- [Claude Codes November Stability Arc Just Compounded Again — v2.1.325 Adds Security Fixes, Code Mode, and 100+ More Fixes](/blog/claude-code-v2-1-317-stability-surge/)
+- [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
+- [Claude Code v2.1.316 Just Dropped Pooled Budgets, Subagent Effort Control, and UltraThink Kill Switch — Plus v2.1.314s Security Boundary](/blog/claude-code-v2-1-314-permissions-block-writes-idle-compaction/)

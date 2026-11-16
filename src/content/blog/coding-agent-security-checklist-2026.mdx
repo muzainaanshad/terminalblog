@@ -1,181 +1,20 @@
 ---
 title: "Coding Agent Security Checklist 2026 — The Operator's Hardening Guide"
-description: "A practical, runnable security checklist for Claude Code, Codex, Cursor, Hermes, OpenCode, and other coding agents. Sandbox isolation, permissions, secrets, MCP, network egress, supply chain, and incident response — with the command you can run today to find your own holes."
+description: A coding agent is not a chatbot with extra steps. It is a process with a shell, a filesystem, a git client, network egress, and — usually — your environment ...
 pubDate: 2026-07-13
-updatedDate: "2026-10-12"
-tags: ["security", "beware", "guide", "checklist", "pillar"]
-tool: "industry"
-author: "kira"
-image: "/api/og?title=Article"
+updatedDate: 2026-10-12
+tags:
+  - "security"
+  - "beware"
+  - "guide"
+  - "checklist"
+  - ""
+tool: industry
+author: kira
+image: /api/og?title=Article
 canonical: "https://terminalblog.com/blog/coding-agent-security-checklist-2026/"
-
-
-<script type="application/ld+json" set:html={JSON.stringify({
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
-    {
-      "@type": "Question",
-      "name": "Do I need to run the full checklist for every coding agent session?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "No. The checklist is a setup-time and periodic audit tool. Run the `env | grep` command from Section 1 and the git checkpoint command from Section 4 before every session. The rest (MCP audit, sandbox verification, network egress) should be reviewed after major agent upgrades or monthly."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Is a \"sandbox enabled\" toggle in the agent config enough?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "No. A config flag proves nothing. You must verify the sandbox actually scrubs environment variables, restricts filesystem access, and blocks network egress. Run the `env | grep` test from Section 1 — if it prints secrets you wouldn't paste publicly, the sandbox is leaking."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Can I trust auto-approve if I'm careful about what I ask?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "No. Prompt injection via images, READMEs, and tool output can coerce the agent into running destructive commands you never asked for. The [GhostCommit PNG injection](/blog/ghostcommit-png-prompt-injection-env-theft/) and [PreToolUse raw command leak](/blog/codex-pretooluse-hook-raw-command-leak/) are real examples. Keep approval gates on for destructive actions."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "What's the single most common way secrets leak from coding agents?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Environment variable inheritance. The agent's child process inherits your shell's `GITHUB_TOKEN`, `AWS_*`, `ANTHROPIC_API_KEY`, etc. by default. The [zero-sandbox-credential-leak](/blog/zero-sandbox-credential-leak/) is the canonical case: the sandbox protected filesystem and network but inherited every credential verbatim."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "How do I protect against MCP server supply chain attacks?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Audit every MCP server before adding it: who built it, what network it reaches, what it writes. Prefer read-only MCP for untrusted contexts. Pin plugin versions. Treat a major-version bump like a code review. Enumerate your MCP configs with the command in Section 5."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "What should I do if I suspect a secret was leaked during an agent session?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Immediate response: (1) Revoke the token at the provider (GitHub, AWS, Anthropic, etc.), (2) Rotate it locally, (3) Purge it from shell profiles and `.env` files, (4) Re-run `env | grep` from Section 1 to confirm it's gone from child processes."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Is Windows safe for coding agents?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Windows has documented gaps: click-through UAC dialogs can silently grant denied permissions ([windows-click-through-permissions](/blog/claude-code-windows-click-through-permissions/)), and Smart App Control can leave sandboxes effectively off ([smart-app-control-sandbox-fail](/blog/codex-smart-app-control-sandbox-fail/)). If you must use Windows, verify isolation manually and consider WSL2 with a verified sandbox instead."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "How often should I review this checklist?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "After every major agent upgrade (e.g., Claude Code v2.1.x → v2.2.x), monthly for active operators, and whenever a new [Beware post](/blog/tag/beware/) lands that maps to your stack."
-      }
-    }
-  ]
-})} />
-
-
-**What is a coding agent security checklist?** A coding agent security checklist is a practical audit tool that verifies sandbox isolation, permission boundaries, secret handling, MCP server trust, network egress controls, supply chain integrity, and incident response readiness for AI coding agents like Claude Code, Codex, Cursor, Hermes, and OpenCode. It provides runnable commands to find real security holes before they're exploited.
-
-## Related articles
-
-- [Open source vs commercial coding agents: operator fit, not ideology](/blog/open-source-vs-commercial-coding-agents-guide/)
-- [Beware: Oh-My-Pi Subagents Can Write Into Your Protected Parent Checkout (Write-Root Not Enforced)](/blog/beware-oh-my-pi-subagent-write-root-escape/)
-- [Your coding agent's sandbox just handed out your AWS keys](/blog/zero-sandbox-credential-leak/)
-- [AGENTS.md makes a coding agent 10× smarter](/blog/agents-dot-md-make-coding-agent-10x-smarter/)
-- [Agent Skills 670K: the security reckoning](/blog/agent-skills-670k-security-reckoning/)
-- [The AI agent config attack surface, 2026](/blog/ai-agent-config-directory-attack-surface-2026/)
-- [Beware: Cline Kanban WebSocket hijack — any website can steal code and run commands (CVE-2026-44211)](/blog/beware-cline-kanban-websocket-rce/)
-- [Beware: Claude Code security-guidance plugin leaks OAuth tokens into transcripts](/blog/beware-claude-code-security-guidance-leaks-oauth-tokens/)
-- [Beware: OpenCode context-integrity pruning injection](/blog/beware-opencode-context-integrity-pruning-injection/)
-- [Claude Code patched its credential leak — and made sessions talk across machines](/blog/claude-code-just-patched-credential-leak-cross-session-messaging/)
-- [Beware: AgentJacking — Sentry MCP hijacks Claude Code, Cursor, and Codex](/blog/beware-agentjacking-sentry-mcp-hijacks-claude-code-cursor-codex/)
-- [Beware: Claude Code trust-dialog bypass (CVE-2026-33068)](/blog/beware-claude-code-trust-dialog-bypass-cve-2026-33068/)
-- [Beware: Cursor CLI worktree pre-trust RCE](/blog/beware-cursor-cli-worktree-pre-trust-rce/)
-- [AI agents keep deleting production databases — the pattern and the fix](/blog/ai-agents-keep-deleting-production-databases-pattern/)
-- [Claude Code + Gemini CLI prompt injection steals CI secrets](/blog/claude-code-gemini-cli-prompt-injection-steals-ci-secrets/)
-- [Beware: Hermes agent security audit — 5 high-severity findings](/blog/beware-hermes-agent-security-audit-5-high-severity-findings/)
-- [Beware: Hermes agent security audit — 6 high-severity findings (October 2026)](/blog/beware-hermes-agent-oct2026-security-audit-6-high-findings/)
-- [Beware: Claude Opus 4.1 retired API is dead](/blog/beware-claude-opus-4-1-retired-api-dead/)
-- [Beware: Claude Code nested-project sandbox drop](/blog/beware-claude-code-nested-project-sandbox-drop/)
-- [CVE-2026-69192: the '012.0.0.1' SSRF filter bypass](/blog/cve-2026-69192-leading-zero-ssrf-ip-address/)
-- [Claude Code v2.1.233 fixes Windows NTLM leak](/blog/claude-code-v2-1-233-security-fix-windows-ntlm-leak/) and [v2.1.234: NTLM leak fixed + 50 fixes](/blog/claude-code-v2-1-234-ntlm-leak-fixed-50-fixes/)
-- [OpenClaw secret egress host binding](/blog/openclaw-2026-8-1-beta2-secret-egress-gpt56-macos-profiles/) and the [earlier safer-browser/network release](/blog/openclaw-v2026-6-34-safer-browser-network/)
-- [Hermes Agent's allowlist bug — when security boundaries disagree](/blog/hermes-agent-allowlist-bug-security-boundaries/)
-- [Hermes Agent's ZIP update fallback silently destroys local patches](/blog/hermes-agent-zip-update-silent-data-loss/)
-- [What devs think about the AI coding expertise collapse](/blog/what-developers-think-ai-coding-expertise-collapse-hn/) — 500+ HN comments on agent-driven skill atrophy
-- [Beware: Claude Code v2.1.214 permission fail-closed](/blog/beware-claude-code-v2-1-214-permission-fail-closed/)
-- [Beware: Claude Code plan-mode permission bypass v2.1.212](/blog/beware-claude-code-plan-mode-permission-bypass-v2-1-212/)
-- [Beware: Clinejection — supply-chain attack via GitHub Actions](/blog/beware-clinejection-supply-chain-attack-github-actions/)
-- [Beware: CVE-2026-55607 Claude Code worktree sandbox escape](/blog/beware-cve-2026-55607-claude-code-worktree-sandbox-escape/)
-- [Beware: Codex MultiAgentV2 — subagent instructions get encrypted](/blog/beware-codex-multiagentv2-encrypts-subagent-instructions/)
-- [Beware: Kiro IDE MCP config RCE (CVE-2026-10591)](/blog/beware-kiro-ide-mcp-config-rce-cve-2026-10591/)
-- [Beware: Goose code review arbitrary command execution](/blog/beware-goose-review-arbitrary-command-execution-fsmonitor/)
-- [Beware: Gitlawb Zero MCP trust boundary v0.4.0](/blog/beware-gitlawb-zero-mcp-trust-boundary-v0-4-0/)
-- [Beware: friendly fire — auto-mode auto-review RCE](/blog/beware-friendly-fire-auto-mode-auto-review-rce/)
-- [Beware: sandbox leaks its own credentials](/blog/beware-coding-agent-sandbox-leaks-own-credentials/)
-- [Beware: agents trip EDR rules like attackers](/blog/beware-coding-agents-trip-edr-rules-like-attackers/)
-- [Beware: Claude Code approval-preview unicode spoof](/blog/beware-claude-code-approval-preview-unicode-spoof/)
-- [Claude Code: subagent spontaneous prompt injection](/blog/claude-code-subagent-spontaneous-prompt-injection/)
-- [Beware: Codex desktop subagent MCP resource crisis](/blog/beware-codex-desktop-subagent-mcp-resource-crisis/)
-- [Beware: Cursor DuneSlide RCE (CVE-2026-50548, CVE-2026-50549)](/blog/beware-cursor-duneslide-rce-cve-2026-50548-50549/)
-- [Beware: OpenClaw git backup RCE path traversal SQL injection](/blog/beware-openclaw-git-backup-rce-path-traversal-sql-injection/)
-- [Beware: One browser tab kills session tree](/blog/beware-one-browser-tab-kills-session-tree/)
-- [Beware: OpenClaw WhatsApp security patches 2026-07-13](/blog/openclaw-whatsapp-security-patches-2026-07-13/)
-- [Beware: Claude Chrome OAuth persists after logout](/blog/beware-claude-chrome-oauth-persists-after-logout/)
-- [Beware: Claude Code auto-mode overrides hook ask](/blog/beware-claude-code-auto-mode-overrides-hook-ask/)
-- [Beware: Claude Code background task SIGKILL git corruption](/blog/beware-claude-code-background-task-sigkill-git-corruption/)
-- [Beware: Claude Code cross-session content bleed](/blog/beware-claude-code-cross-session-content-bleed/)
-- [Beware: Claude Code disallowedtools not inherited by subagents](/blog/beware-claude-code-disallowedtools-not-inherited-by-subagents/)
-- [Beware: Claude Code edit tool false string not found desync](/blog/beware-claude-code-edit-tool-false-string-not-found-desync/)
-- [Beware: Claude Code interrupt drops work](/blog/beware-claude-code-interrupt-drops-work/)
-- [Beware: Claude Code permissions deny absolute path](/blog/beware-claude-code-permissions-deny-absolute-path/)
-- [Beware: Claude Code rmdir bypass mass deletion](/blog/beware-claude-code-rmdir-bypass-mass-deletion/)
-- [Beware: Claude Code safeguard blocks security review](/blog/beware-claude-code-safeguard-blocks-security-review/)
-- [Beware: Cline web fetch SSRF IAM credentials](/blog/beware-cline-web-fetch-ssrf-iam-credentials/)
-- [Beware: Codex desktop Windows silent exit node leak](/blog/beware-codex-desktop-windows-silent-exit-node-leak/)
-- [Beware: Silent quota model burn](/blog/beware-silent-quota-model-burn/)
-- [GhostCommit PNG prompt injection env theft](/blog/ghostcommit-png-prompt-injection-env-theft/)
-- [Coding agents security hardening wave](/blog/coding-agents-security-hardening-wave/)
-- [Credential guards + provider isolation](/blog/hermes-security-credential-guards-provider-isolation/)
-- [Case-insensitive .env file guard](/blog/hermes-env-file-guard-case-insensitive-security/)
-- [Cron job secret scope isolation](/blog/hermes-cron-job-secret-scope-security-fix/)
-- [Browser private-page guard](/blog/hermes-browser-private-page-guard-security/)
-- [Secret leakage in the Windows sandbox](/blog/hermes-secret-leakage-sandbox-windows-failures/)
-- [Claude Code background subagent secret leak](/blog/claude-code-background-subagent-secret-leak/)
-- [Claude Code MCP response cross-contamination](/blog/claude-code-mcp-response-cross-contamination/)
-- [AWS Agent Toolkit / MCP](/blog/aws-agent-toolkit-claude-code-mcp/)
-- [Claude Code Windows click-through permissions](/blog/claude-code-windows-click-through-permissions/)
-- [Claude Code permission prompt flood](/blog/claude-code-permission-prompt-flood/)
-- [Codex Smart App Control sandbox fail](/blog/codex-smart-app-control-sandbox-fail/)
-- [Codex preToolUse hook raw command leak](/blog/codex-pretooluse-hook-raw-command-leak/)
-- [Claude Code indefinite auto-retry token limit](/blog/claude-code-indefinite-auto-retry-token-limit/)
-- [Claude Code subagent spontaneous prompt injection](/blog/claude-code-subagent-spontaneous-prompt-injection/)
-- [Claude Code model routing trust crisis](/blog/claude-code-model-routing-trust-crisis/)
-- [Beware: Codex crash leaks system instructions](/blog/codex-crash-leaks-system-instructions/)
-- [Beware: GPT-5.6 tool call bugs](/blog/codex-gpt-5-6-tool-call-bugs/)
-- [What developers think about AI code review validity HN](/blog/what-developers-think-ai-code-review-validity-hn/)
-- [What developers think about AI coding without vibes HN](/blog/what-developers-think-ai-coding-without-vibes-hn/)
-- [Show HN: coding agent memory sandbox tools](/blog/show-hn-coding-agent-memory-sandbox-tools/)
-- [Rust guardrail tool AI agent code](/blog/rust-guardrail-tool-ai-agent-code/)
-- [Confessor audit: what AI coding agent touched](/blog/confessor-audit-what-ai-coding-agent-touched/)
-
-### New security articles this cycle (October 2026)
-
-- [Beware: Hermes Agent approval gate bypass — commands execute while blocked](/blog/beware-hermes-agent-approval-gate-bypass-commands-execute-while-blocked/) — critical bypass vulnerability
-- [Beware: Malicious git configs run attacker code in Claude, Codex, Cursor](/blog/beware-malicious-git-configs-run-attacker-code-claude-codex-cursor/) — supply chain attack
-- [Beware: Hermes Agent v0.22 approval gate bypass](/blog/beware-hermes-agent-approval-gate-bypass-commands-execute-while-blocked/) — v0.22 regression
-- [OpenClaw macOS launchd crash loop — denial of service](/blog/openclaw-macos-launchd-crash-loop/) — stability issue
-- [OpenCode GitHub Copilot provider archive](/blog/opencode-github-copilot-provider-archive/) — provider security
-- [OpenCode v1.19 upgrade path — security implications](/blog/opencode-v1-19-opencode-2-upgrade-path-lands/) — migration security
 ---
+
 
 A coding agent is not a chatbot with extra steps. It is a process with a shell, a filesystem, a git client, network egress, and — usually — your environment variables already loaded. When a chatbot makes a mistake, you get a wrong sentence. When a coding agent makes a mistake, it commits to `main`, exfiltrates a token through a plugin, or SIGKILLs itself mid-rebase and corrupts the worktree.
 
@@ -248,7 +87,9 @@ Yes, this site's own agent keeps fixing real leaks. These are the missing-harden
 Before the checklist, name what you are defending against. An agent's blast radius is the union of everything it can reach.
 
 | Capability the agent has | What a bug or injection turns it into | Where we've seen it |
-|---|---|---|
+|---
+<script type="application/ld+json" set:html={JSON.stringify({"@context":"https://schema.org","@type":"BlogPosting","headline":"Coding Agent Security Checklist 2026 — The Operator's Hardening Guide","description":"A coding agent is not a chatbot with extra steps. It is a process with a shell, a filesystem, a git client, network egress, and — usually — your environment ...","datePublished":"2026-07-13","dateModified":"2026-10-12","author":{"@type":"Person","name":"kira"},"publisher":{"@type":"Organization","name":"TerminalBlog","logo":{"@type":"ImageObject","url":"https://terminalblog.com/favicon.ico"}},"mainEntityOfPage":{"@type":"WebPage","@id":"https://terminalblog.com/blog/coding-agent-security-checklist-2026/"}})} />
+|---|---|
 | Shell access to your worktree | Arbitrary command execution, `rm -rf`, credential theft | [GhostCommit PNG injection](/blog/ghostcommit-png-prompt-injection-env-theft/) |
 | Inherited environment (`AWS_*`, `GITHUB_TOKEN`) | Silent secret exfiltration from "inside" the sandbox | [Zero sandbox credential leak](/blog/zero-sandbox-credential-leak/) |
 | Write to parent checkout / protected dirs | Subagent escapes its scoping boundary | [Oh-My-Pi write-root escape](/blog/beware-oh-my-pi-subagent-write-root-escape/) |

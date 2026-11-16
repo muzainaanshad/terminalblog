@@ -1,38 +1,23 @@
 ---
 title: "Claude Code v2.1.316 Just Dropped Pooled Budgets, Subagent Effort Control, and UltraThink Kill Switch — Plus v2.1.314's Security Boundary"
-description: "Claude Code v2.1.316 (Oct 31) adds pooled group budgets for Claude Apps Gateway, CLAUDE_CODE_SUBAGENT_EFFORT for independent subagent effort, CLAUDE_CODE_DISABLE_ULTRATHINK to disable the keyword, layered policy mode, Bedrock guardrail input tagging, and 40+ fixes. Combined with v2.1.314's (Oct 30) permissions.blockWritesOutsideWorkingDirectories security boundary, idle compaction, and effort cap handling — this is the stability sprint you've been waiting for."
-pubDate: 2026-10-30T10:00:00Z
-updatedDate: 2026-10-31T04:30:00Z
-tags: ["claude-code", "release", "v2.1.316", "v2.1.314", "security", "stability", "coding-agent", "beginner"]
-tool: "claude-code"
-author: "sage"
-image: "/api/og?title=Claude+Code+v2.1.316+Pooled+Budgets+Subagent+Effort&tool=claude-code"
+description: "Result: Write, Edit, and NotebookEdit tools refuse any path outside your working directories — in every permission mode. Even auto mode. Even if you explicit..."
+pubDate: "2026-10-30T10:00:00Z"
+updatedDate: "2026-10-31T04:30:00Z"
+tags:
+  - "claude-code"
+  - "release"
+  - "v2.1.316"
+  - "v2.1.314"
+  - "security"
+  - "stability"
+  - "coding-agent"
+  - "beginner"
+tool: claude-code
+author: sage
+image: /api/og?title=Claude+Code+v2.1.316+Pooled+Budgets+Subagent+Effort&tool=claude-code
 canonical: "https://terminalblog.com/blog/claude-code-v2.1.314-permissions-block-writes-idle-compaction/"
-faq:
-  - q: "What is the new permissions.blockWritesOutsideWorkingDirectories setting?"
-    a: "A new security boundary (v2.1.314) that makes Write, Edit, and NotebookEdit tools refuse any path outside your configured working directories — regardless of permission mode (even in auto/allow mode). This prevents accidental or malicious writes to system directories, home folder, or other projects."
-  - q: "Does idle compaction work automatically now?"
-    a: "Yes (v2.1.314) — VS Code and Claude Desktop's Code tab now automatically summarize conversations over 200K tokens that sit idle. The summary is used on your next message if the prompt cache expired. No manual /compact needed."
-  - q: "What's the effort cap fix about?"
-    a: "When an org admin caps a model's effort level, Claude Code now automatically lowers the effort, retries, and tells you which level it's using — instead of failing turn after turn with 'Invalid effort level'."
-  - q: "What's new in v2.1.316?"
-    a: "Pooled group budgets for Claude Apps Gateway, CLAUDE_CODE_SUBAGENT_EFFORT for independent subagent effort levels, CLAUDE_CODE_DISABLE_ULTRATHINK to turn off the ultrathink keyword, managed.policy_mode: layered for stacked policies, guardrail.input_tagging for Bedrock guardrails, plus 40+ fixes including shell command cleanup, bash alias fixes, and TLS certificate handling."
-  - q: "Are there breaking changes in v2.1.314 or v2.1.316?"
-    a: "No breaking changes in either. These are patch releases — only bug fixes, security improvements, and quality-of-life updates. Run `claude update` safely."
-  - q: "What about the MCP authentication fixes?"
-    a: "Fixed MCP servers showing 'needs authentication' after stored sign-in stopped working — they now work signed out. Fixed `claude mcp logout` falsely reporting success when macOS keychain is locked over SSH."
-
-
-
-Claude Code **v2.1.316 dropped October 31** — just 1 day after v2.1.314's security boundary release. Combined, these two patch releases deliver **200+ fixes total** across 3 days (v2.1.314 Oct 30, v2.1.316 Oct 31).
-
-v2.1.314 shipped the **single most-requested security feature** since auto-mode launched: a hard boundary that stops writes outside your working directories, period. Plus idle compaction that actually works in VS Code, effort cap handling that doesn't brick your session, and 40+ other fixes.
-
-v2.1.316 adds **pooled group budgets**, **independent subagent effort control**, **UltraThink kill switch**, **layered policy mode**, **Bedrock guardrail tagging**, and another 40+ fixes.
-
-Anthropic is in full stability sprint mode.
-
 ---
+
 
 ## The Headline: `permissions.blockWritesOutsideWorkingDirectories` — The Boundary You've Been Waiting For
 
@@ -55,7 +40,12 @@ Add this to your settings:
 Before v2.1.314, the permission system had a gap:
 
 | Scenario | Old Behavior | New Behavior |
-|----------|--------------|--------------|
+|---
+<script type="application/ld+json" set:html={JSON.stringify({"@context":"https://schema.org","@type":"BlogPosting","headline":"Claude Code v2.1.316 Just Dropped Pooled Budgets, Subagent Effort Control, and UltraThink Kill Switch — Plus v2.1.314's Security Boundary","description":"Result: Write, Edit, and NotebookEdit tools refuse any path outside your working directories — in every permission mode. Even auto mode. Even if you explicit...","datePublished":"2026-10-30T10:00:00Z","dateModified":"2026-10-31T04:30:00Z","author":{"@type":"Person","name":"sage"},"publisher":{"@type":"Organization","name":"TerminalBlog","logo":{"@type":"ImageObject","url":"https://terminalblog.com/favicon.ico"}},"mainEntityOfPage":{"@type":"WebPage","@id":"https://terminalblog.com/blog/claude-code-v2.1.314-permissions-block-writes-idle-compaction/"}})} />
+
+**What is a coding agent?** A coding agent is an AI-powered tool that can autonomously write, edit, and reason about code across multiple files in a codebase. Unlike simple autocomplete (GitHub Copilot), agents can execute terminal commands, navigate project structure, run tests, and complete multi-step tasks from a high-level prompt.
+
+-------|--------------|--------------|
 | `auto` mode + `Write(/etc/passwd)` | ❌ Allowed (you said auto) | ✅ **Blocked** |
 | Malicious prompt injection writes to `~/.ssh/id_rsa` | ❌ Possible | ✅ **Blocked** |
 | Accidental `Edit(../../../package.json)` | ❌ Allowed | ✅ **Blocked** |

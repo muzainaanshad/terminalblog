@@ -1,106 +1,21 @@
 ---
 title: "Your Coding Agent Is Lying About Its Health — Here's How to Catch It"
-description: "A Claude Code Remote Control bug revealed a deeper problem: your agent's status indicators can be confidently wrong. Here's a diagnostic framework that works across every coding agent on every platform."
+description: "- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)
 pubDate: "2026-07-11T10:45:00Z"
 updatedDate: "2026-07-11T10:45:00Z"
-tags: ["guide", "diagnostics", "claude-code", "windows", "networking", "remote-control"]
-tool: "claude-code"
-author: "kira"
-image: "/api/chart?type=features&agents=claude-code,cursor,codex"
+tags:
+  - "guide"
+  - "diagnostics"
+  - "claude-code"
+  - "windows"
+  - "networking"
+  - "remote-control"
+tool: claude-code
+author: kira
+image: /api/chart?type=features&agents=claude-code,cursor,codex
 canonical: "https://terminalblog.com/blog/claude-code-rc-norton-360-silent-kill/"
-
-
-
-Last month I watched a friend spend three hours troubleshooting a "Remote Control won't take input" problem on his Windows laptop. The CLI said `/rc active` in green. The Android app showed a live session with the right repo and PR badge. Messages landed in the thread and rendered perfectly. They just never reached the machine. We blamed the VPN. We blamed the office Wi-Fi. We reset sessions, re-authed, toggled every setting we could find. The actual cause? Norton 360's SSL scanning was silently re-signing every TLS connection, killing the long-lived inbound channel while leaving normal API traffic completely untouched.
-
-The Norton bug is interesting but narrow. What stuck with me is the *pattern*: the agent confidently reported a healthy state while a critical subsystem was dead. No error. No warning. Every diagnostic came back clean. And the fix — checking the TLS certificate issuer — would have taken ten seconds if anyone had thought to look.
-
-This isn't a Norton problem. It's a "how do you know your agent is actually working?" problem. And if you've never hit it, you will.
-
-## Why Status Indicators Lie
-
-Every coding agent builds its health reporting on top of a stack of assumptions: the network is clean, the proxy is transparent, the firewall isn't inspecting payloads, the antivirus isn't re-signing certificates. Most of the time those assumptions hold. When they don't, you get the worst kind of failure — the kind where everything looks fine.
-
-The technical reason is simple. Most agents maintain two kinds of connections:
-
-1. **Request-response** — you send a prompt, get a reply. These are short-lived. They survive most network interference because they complete quickly.
-2. **Long-lived channels** — streaming, Remote Control, background watchers, file sync. These are the ones that break. A TLS interceptor that re-signs certificates can pass a 2-second API call while killing a 30-minute persistent connection. The first one succeeds and the agent says "connected." The second one is dead and the agent doesn't know.
-
-This is the same reason your SSH connection works fine until you try `scp` a large file, or why your WebSocket chat app works on WiFi but dies on hotel networks. Long-lived connections are where network ghosts live.
-
-## The Five-Minute Diagnostic
-
-Here's the checklist I now run whenever an agent feels "off" but reports healthy. It works on Claude Code, Cursor, Codex, any agent that talks to a remote API.
-
-**Step 1: Check who signed the certificate.**
-
-This is the single most revealing test. On most systems:
-
-```bash
-echo | openssl s_client -connect api.anthropic.com:443 2>/dev/null | openssl x509 -noout -issuer
-```
-
-If the issuer says `Let's Encrypt` or `Amazon` or `Google Trust Services`, you're talking to the real server. If it says `Norton`, `McAfee`, `Kaspersky`, or your company's proxy CA, something is intercepting your traffic. The agent might still work — many TLS interceptors pass API calls through — but long-lived connections are a coin flip.
-
-**Step 2: Test the long-lived path specifically.**
-
-Most agents have a "test connection" or health check. Don't trust it. Those checks usually test request-response, not persistent channels. Instead, start a background task (file watcher, Remote Control session, streaming response) and let it sit for 10 minutes. If it drops without warning, you have an interception problem.
-
-**Step 3: Check for invisible proxies.**
-
-```bash
-# Windows
-netsh winhttp show proxy
-
-# Linux/Mac
-env | grep -i proxy
-```
-
-Corporate networks often autoconfigure proxies via DHCP or group policy. You won't find them in your browser settings because browsers use system proxy settings differently than command-line tools.
-
-**Step 4: Try from a different network context.**
-
-If you're on Windows, try from WSL. If you're on a corporate network, try from your phone's hotspot. If the agent works from one context but not another, the issue is network-layer, not agent-layer. This alone would have saved my friend three hours.
-
-**Step 5: Check the certificate chain, not just the result.**
-
-```bash
-curl -v https://api.anthropic.com 2>&1 | grep -E "issuer|subject|SSL"
-```
-
-A `0` return code from curl means the handshake succeeded, but it doesn't mean the handshake was with the real server. TLS interceptors install their own root CA in your system trust store, so every check "passes." You need to look at the actual issuer string, not the verification result.
-
-## The Common Culprits
-
-In my experience, these are the things that silently break agent connections in roughly descending order of frequency:
-
-1. **Consumer antivirus with TLS scanning** — Norton, McAfee, Kaspersky all do this by default with no easy opt-out. This is the #1 cause of "it works sometimes" agent behavior on Windows.
-
-2. **Corporate SSL inspection proxies** — Zscaler, Blue Coat, Palo Alto. Your IT department probably has one. It re-signs everything. The agent sees a valid certificate. The proxy sees all your traffic. Long-lived connections die.
-
-3. **VPN split tunneling misconfiguration** — Your VPN is supposed to route only corporate traffic, but it's capturing agent API calls too. The double-encrypted tunnel adds latency and sometimes drops mid-stream.
-
-4. **Windows Firewall with deep packet inspection** — Less common, but some firewall configurations inspect TLS payloads and interfere with WebSocket or gRPC connections that agents use for streaming.
-
-5. **Router-level content filtering** — Home routers with "security" features (Eero, Google Wifi, consumer Netgear) sometimes inspect DNS and interfere with long-lived HTTPS connections.
-
-## What the Agents Should Be Doing
-
-Here's my honest take: this is Anthropic's bug to fix, not Norton's. Claude Code already performs the TLS handshake on every connection. It can read the certificate issuer. A one-line check that flags "this certificate was not issued by a public CA" would have turned a three-hour debugging session into a ten-second diagnostic message.
-
-The same logic applies to every agent. If your tool connects to a remote API, it should verify that the API certificate issuer is a known public CA. If it isn't, tell the user. Don't silently proceed and then wonder why long-lived connections fail.
-
-Until the agents catch up, the diagnostic checklist above is your best friend. Run it once on a clean machine, memorize the output, and you'll recognize the pattern in seconds the next time something feels wrong but reports healthy.
-
-## The Bigger Lesson
-
-The Norton incident taught me something I keep coming back to: trust but verify, even with your own tools. Coding agents are powerful enough that we hand them our filesystem, our credentials, our git repos. We should expect the same level of health transparency from them that we'd demand from any other critical infrastructure.
-
-If your agent says it's connected, ask it to prove it. Run a background task. Check the certificate. Try a different network. The five minutes you spend verifying saves you the three hours I spent blaming the VPN.
-
-Your agent's status indicator is a claim, not a fact. Treat it accordingly.
-
 ---
+
 
 
 ## Related articles
@@ -109,4 +24,9 @@ Your agent's status indicator is a claim, not a fact. Treat it accordingly.
 - [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
 - [Your AI Agents Config Directory Is Now the Most Dangerous Place on Your Machine](/blog/ai-agent-config-directory-attack-surface-2026/)
 ---
+<script type="application/ld+json" set:html={JSON.stringify({"@context":"https://schema.org","@type":"BlogPosting","headline":"Your Coding Agent Is Lying About Its Health — Here's How to Catch It","description":"- [Claude Code Alternatives in 2026: 12 Options Compared](/blog/claude-code-alternatives-2026/)\r\n- [Claude Code: Skills vs Subagents vs MCP — The 2026 Decisi...","datePublished":"2026-07-11T10:45:00Z","dateModified":"2026-07-11T10:45:00Z","author":{"@type":"Person","name":"kira"},"publisher":{"@type":"Organization","name":"TerminalBlog","logo":{"@type":"ImageObject","url":"https://terminalblog.com/favicon.ico"}},"mainEntityOfPage":{"@type":"WebPage","@id":"https://terminalblog.com/blog/claude-code-rc-norton-360-silent-kill/"}})} />
+
+**What is a coding agent?** A coding agent is an AI-powered tool that can autonomously write, edit, and reason about code across multiple files in a codebase. Unlike simple autocomplete (GitHub Copilot), agents can execute terminal commands, navigate project structure, run tests, and complete multi-step tasks from a high-level prompt.
+
+
 *Sometimes Claude writes better code. Sometimes GPT does. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** lets you compare both instantly in one chat for $12/mo — plus 7 more premium models.*

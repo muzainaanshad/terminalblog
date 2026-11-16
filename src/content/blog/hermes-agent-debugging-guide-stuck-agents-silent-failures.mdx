@@ -1,29 +1,36 @@
 ---
 title: "Your Hermes Agent Just Went Silent — Here's How to Bring It Back"
-description: "Hermes agents don't crash loudly — they stall, hang, or drift into silent failures. This guide walks through the real failure modes: stuck subagents, cron jobs that stop reporting, memory corruption, and MCP server disconnects. Debug with the Console REPL, not guesswork."
-pubDate: 2026-09-27T14:00:00Z
-tags: ["hermes", "debugging", "troubleshooting", "workflow", "cron", "subagents", "mcp", "guide"]
-tool: "hermes"
-author: "sage"
-image: "/api/og?title=Hermes+Agent+Debugging+Guide&tool=hermes"
+description: | Failure Mode | Symptom | Where to Look First |
+|--------------|---------|---------------------|
+| Subagent hang | Parent agent waits forever on delegatet...
+pubDate: "2026-09-27T14:00:00Z"
+tags:
+  - "hermes"
+  - "debugging"
+  - "troubleshooting"
+  - "workflow"
+  - "cron"
+  - "subagents"
+  - "mcp"
+  - "guide"
+tool: hermes
+author: sage
+image: /api/og?title=Hermes+Agent+Debugging+Guide&tool=hermes
 canonical: "https://terminalblog.com/blog/hermes-agent-debugging-guide-stuck-agents-silent-failures/"
-
-
-
-You gave Hermes a task. It started. Then... nothing. No error. No completion. Just a blinking cursor or a dashboard that says "executing" for 45 minutes.
-
-This isn't a crash. It's a **stall** — the most common failure mode in autonomous agents. And unlike a crash, a stall doesn't leave a stack trace. It leaves you guessing.
-
-This guide covers the five real failure modes we see in production Hermes deployments, and how to diagnose each one using the Console REPL instead of hope.
-
 ---
+
 
 ## The Core Insight: Stalls ≠ Crashes
 
 A crash is loud. A stall is silent. Hermes agents stall for five reasons, in order of frequency:
 
 | Failure Mode | Symptom | Where to Look First |
-|--------------|---------|---------------------|
+|---
+<script type="application/ld+json" set:html={JSON.stringify({"@context":"https://schema.org","@type":"BlogPosting","headline":"Your Hermes Agent Just Went Silent — Here's How to Bring It Back","description":"| Failure Mode | Symptom | Where to Look First |\r\n|--------------|---------|---------------------|\r\n| Subagent hang | Parent agent waits forever on delegatet...","datePublished":"2026-09-27T14:00:00Z","dateModified":"2026-09-27T14:00:00Z","author":{"@type":"Person","name":"sage"},"publisher":{"@type":"Organization","name":"TerminalBlog","logo":{"@type":"ImageObject","url":"https://terminalblog.com/favicon.ico"}},"mainEntityOfPage":{"@type":"WebPage","@id":"https://terminalblog.com/blog/hermes-agent-debugging-guide-stuck-agents-silent-failures/"}})} />
+
+**What is a coding agent?** A coding agent is an AI-powered tool that can autonomously write, edit, and reason about code across multiple files in a codebase. Unlike simple autocomplete (GitHub Copilot), agents can execute terminal commands, navigate project structure, run tests, and complete multi-step tasks from a high-level prompt.
+
+-----------|---------|---------------------|
 | **Subagent hang** | Parent agent waits forever on `delegate_task` | Console → Active Sessions → child status |
 | **MCP server disconnect** | Tool calls time out silently | Console → Tool Calls → `mcp.*` latency |
 | **Cron job drift** | Scheduled job stops reporting, no error logged | `hermes cron list` + job's Bot Chat |

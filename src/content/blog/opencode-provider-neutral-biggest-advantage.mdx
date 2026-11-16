@@ -1,130 +1,24 @@
 ---
 title: "OpenCode Provider-Neutral Design: Why Model Freedom Matters for Coding Agents"
-description: "Deep dive into OpenCode's provider-agnostic architecture — how it works, why it matters for cost and flexibility, provider setup guide, and real-world routing strategies."
+description: "name: \"code-review\"
+description: \"Review code for bugs and style\"
+allowedTools: [\"read\", \"grep\", \"edit\"]
+provider: \"anthropic\"
+model: \"claude-3-5-sonnet-..."
 pubDate: "2026-07-08T09:00:00Z"
 updatedDate: "2026-08-16T09:00:00Z"
-tags: ["guide", "opencode", "multi-provider", "open-source", "model-routing"]
-tool: "opencode"
-author: "sage"
-image: "/api/og?title=OpenCode+Provider+Neutral+Guide&tool=opencode"
+tags:
+  - "guide"
+  - "opencode"
+  - "multi-provider"
+  - "open-source"
+  - ""
+tool: opencode
+author: sage
+image: /api/og?title=OpenCode+Provider+Neutral+Guide&tool=opencode
 canonical: "https://terminalblog.com/blog/opencode-provider-neutral-biggest-advantage/"
-
-
-
-OpenCode's defining feature isn't a specific capability — it's the freedom to choose your model on every task. While commercial agents lock you into one provider's roadmap and pricing, OpenCode treats models as interchangeable backends. Switch from Claude to GPT-4o to a local Llama with a single flag. No vendor negotiation, no platform migration, no feature loss.
-
-This guide explains how the provider-neutral architecture works, how to configure every major provider, and practical routing strategies that cut costs without sacrificing quality.
-
-## The Problem: Vendor Lock-in Is Expensive
-
-Most coding agents couple their product to one model provider:
-
-| Agent | Locked Provider | Monthly Cost (heavy use) |
-|-------|-----------------|--------------------------|
-| Cursor | Anthropic (Claude) | $20-50+ |
-| Claude Code | Anthropic (Claude) | $20-100+ |
-| GitHub Copilot | OpenAI (GPT) | $10-40+ |
-| Windsurf | Anthropic/OpenAI | $15-60+ |
-
-When that provider raises prices, degrades quality, or hits rate limits — you're stuck. OpenCode breaks this coupling entirely.
-
-## How OpenCode's Provider Abstraction Works
-
-OpenCode uses a unified provider interface. Every supported provider implements the same contract:
-
-```text
-interface Provider {
-  complete(request: CompletionRequest): Promise<CompletionResponse>
-  stream(request: CompletionRequest): AsyncIterable<StreamChunk>
-  models(): Promise<Model[]>
-  validateConfig(config: ProviderConfig): ValidationResult
-}
-```
-
-This means:
-- **Same API surface** — tools, context, output parsing work identically
-- **Per-request provider selection** — `--provider anthropic --model claude-3-5-sonnet`
-- **Per-skill provider config** — different skills can use different models
-- **Local models on equal footing** — Ollama, llama.cpp, vLLM are first-class providers
-
-## Supported Providers (2026)
-
-### Cloud Providers
-
-| Provider | Models | Best For | Cost/1M tokens |
-|----------|--------|----------|----------------|
-| **Anthropic** | Claude 3.5 Sonnet, Opus, Haiku | Complex reasoning, code gen | $3-15 input / $15-75 output |
-| **OpenAI** | GPT-4o, GPT-4o-mini, o1-preview | General purpose, speed | $2.50-15 input / $10-60 output |
-| **Google** | Gemini 1.5 Pro, Flash | Large context, multimodal | $1.25-3.50 input / $5-10 output |
-| **Groq** | Llama 3.1 70B/8B, Mixtral | Ultra-fast inference | ~$0.60 input / ~$0.80 output |
-| **Together AI** | Llama 3.1, Qwen 2.5, DeepSeek | Open models, cheap | ~$0.30-0.90 input/output |
-| **Fireworks** | Llama 3.1, DeepSeek Coder | Code-specialized | ~$0.20-0.50 input/output |
-
-### Local Providers (Zero Marginal Cost)
-
-| Runtime | Setup | Models | Hardware |
-|---------|-------|--------|----------|
-| **Ollama** | `ollama serve` + pull | Codellama, DeepSeek, Qwen, Phi | 8GB+ RAM (quantized) |
-| **llama.cpp** | Binary + model file | Any GGUF | CPU/GPU, very flexible |
-| **vLLM** | Docker/PIP | High-throughput serving | GPU (A100/H100 ideal) |
-| **LM Studio** | GUI + local server | Any GGUF | Easy local experimentation |
-
-## Configuration
-
-### Environment Variables (Simplest)
-
-```bash
-# ~/.bashrc or ~/.zshrc
-export ANTHROPIC_API_KEY="sk-ant-..."
-export OPENAI_API_KEY="sk-..."
-export GOOGLE_API_KEY="..."
-export GROQ_API_KEY="..."
-export TOGETHER_API_KEY="..."
-export FIREWORKS_API_KEY="..."
-
-# Local: no key needed, just run the server
-# ollama serve
-# llama-cpp-server -m model.gguf
-```
-
-### Project Config (`.opencode/config.json`)
-
-```json
-{
-  "providers": {
-    "anthropic": {
-      "apiKey": "${ANTHROPIC_API_KEY}",
-      "defaultModel": "claude-3-5-sonnet-20241022"
-    },
-    "openai": {
-      "apiKey": "${OPENAI_API_KEY}",
-      "defaultModel": "gpt-4o"
-    },
-    "ollama": {
-      "baseUrl": "http://localhost:11434",
-      "defaultModel": "codellama:13b"
-    },
-    "groq": {
-      "apiKey": "${GROQ_API_KEY}",
-      "defaultModel": "llama-3.1-70b-versatile"
-    }
-  },
-  "defaultProvider": "anthropic",
-  "modelRouting": {
-    "simple": "groq:llama-3.1-8b-instant",
-    "coding": "anthropic:claude-3-5-sonnet",
-    "reasoning": "openai:o1-preview",
-    "local": "ollama:codellama:13b"
-  }
-}
-```
-
-### Per-Skill Provider Override
-
-In any `SKILL.md`:
-
-```markdown
 ---
+
 name: "code-review"
 description: "Review code for bugs and style"
 allowedTools: ["read", "grep", "edit"]
@@ -133,6 +27,11 @@ model: "claude-3-5-sonnet-20241022"
 temperature: 0.1
 maxTokens: 8192
 ---
+<script type="application/ld+json" set:html={JSON.stringify({"@context":"https://schema.org","@type":"BlogPosting","headline":"OpenCode Provider-Neutral Design: Why Model Freedom Matters for Coding Agents","description":"name: \"code-review\"\r\ndescription: \"Review code for bugs and style\"\r\nallowedTools: [\"read\", \"grep\", \"edit\"]\r\nprovider: \"anthropic\"\r\nmodel: \"claude-3-5-sonnet-...","datePublished":"2026-07-08T09:00:00Z","dateModified":"2026-08-16T09:00:00Z","author":{"@type":"Person","name":"sage"},"publisher":{"@type":"Organization","name":"TerminalBlog","logo":{"@type":"ImageObject","url":"https://terminalblog.com/favicon.ico"}},"mainEntityOfPage":{"@type":"WebPage","@id":"https://terminalblog.com/blog/opencode-provider-neutral-biggest-advantage/"}})} />
+
+**What is a coding agent?** A coding agent is an AI-powered tool that can autonomously write, edit, and reason about code across multiple files in a codebase. Unlike simple autocomplete (GitHub Copilot), agents can execute terminal commands, navigate project structure, run tests, and complete multi-step tasks from a high-level prompt.
+
+
 
 # Code Review Skill
 ...

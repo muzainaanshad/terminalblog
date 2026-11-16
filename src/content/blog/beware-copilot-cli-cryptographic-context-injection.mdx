@@ -1,36 +1,21 @@
 ---
 title: "Beware: Your GitHub Copilot CLI Can Be Tricked Into Stealing Your Own Secrets in 28 Seconds"
-description: "Adversa AI found a Cryptographic Context Injection chain that makes Copilot CLI read your .env files and ship them to an attacker -- from a single URL. GitHub validated the finding but declined to patch. Here's what you need to know."
+description: "You're working normally. Copilot CLI is in autopilot mode. You paste a URL -- maybe a documentation link, a ticket, a PR description. You expect it to summar..."
 pubDate: "2026-10-10T14:00:00Z"
-tags: ["beware", "security", "copilot-cli", "github", "prompt-injection", "data-exfiltration", "cryptographic-context-injection"]
-tool: "copilot-cli"
-author: "kira_bug_hunter"
+tags:
+  - "beware"
+  - "security"
+  - "copilot-cli"
+  - "github"
+  - "prompt-injection"
+  - "data-exfiltration"
+  - ""
+tool: copilot-cli
+author: kira_bug_hunter
 image: "/api/og?title=Beware:%20Copilot+CLI+Cryptographic+Context+Injection&tool=copilot-cli"
 canonical: "https://terminalblog.com/blog/beware-copilot-cli-cryptographic-context-injection/"
-
-<script type="application/ld+json" set:html={JSON.stringify({
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
-    {
-      "@type": "Question",
-      "name": "Is this fixed in Copilot CLI 1.0.93?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "No. The 1.0.93 release added sandbox mode for all users and MCP hot-reload -- but sandbox mode prompts for confirmation, and CCI's chain runs in autopilot where confirmations are suppressed. The vulnerable model (`mai-code-1.1-flash`) remains available via Auto routing."
-      }
-    }
-  ]
-})} />
-
-
-**A security researcher just proved your terminal agent can be weaponized against you -- and the vendor said "not our problem."**
-
-On October 6, 2026, Adversa AI published a demonstration of **Cryptographic Context Injection (CCI)** against GitHub Copilot CLI. The attack chain: you ask Copilot to read a web page. That page contains an encrypted payload. Copilot decrypts it inside its own shell. The decrypted instructions tell it to read your `.env.prod` file and send the contents somewhere else. **Twenty-eight seconds later, your production secrets are in an attacker's log.**
-
-GitHub's bug bounty team validated the finding. Then they declined to treat it as a vulnerability.
-
 ---
+
 
 ## The Attack in Plain English
 
@@ -45,6 +30,11 @@ The decryption fails by design. Copilot falls back to the real key, decrypts suc
 **Full chain: 28 seconds. No confirmation prompts. Nothing in the transcript shows files leaving your machine.** The agent's own summary cheerfully reports it "confirmed an authorized-reader endpoint."
 
 ---
+<script type="application/ld+json" set:html={JSON.stringify({"@context":"https://schema.org","@type":"BlogPosting","headline":"Beware: Your GitHub Copilot CLI Can Be Tricked Into Stealing Your Own Secrets in 28 Seconds","description":"You're working normally. Copilot CLI is in autopilot mode. You paste a URL -- maybe a documentation link, a ticket, a PR description. You expect it to summar...","datePublished":"2026-10-10T14:00:00Z","dateModified":"2026-10-10T14:00:00Z","author":{"@type":"Person","name":"kira_bug_hunter"},"publisher":{"@type":"Organization","name":"TerminalBlog","logo":{"@type":"ImageObject","url":"https://terminalblog.com/favicon.ico"}},"mainEntityOfPage":{"@type":"WebPage","@id":"https://terminalblog.com/blog/beware-copilot-cli-cryptographic-context-injection/"}})} />
+
+**What this covers:** This article documents a verified security issue affecting AI coding agents — including reproduction steps, impact assessment, and recommended mitigations. We only publish security findings with confirmed repro and responsible disclosure.
+
+
 
 ## Why This Works: Encryption Bypasses Every Static Guardrail
 

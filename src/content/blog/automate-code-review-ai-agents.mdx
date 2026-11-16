@@ -1,145 +1,18 @@
 ---
-title: "How I Automate My Entire Code Review Process With AI Agents"
+title: How I Automate My Entire Code Review Process With AI Agents
 description: "Code review is the bottleneck that agents are perfectly suited to solve. Here's a concrete workflow that runs every day without human intervention."
 pubDate: "2026-07-10T21:00:00Z"
 updatedDate: "2026-07-22T04:00:00Z"
-tags: ["guide", "code-review", "automation", "workflow", "cron-jobs"]
-image: "/api/og?title=AI+Code+Review+Automation+Workflow&tool=Guide"
+tags:
+  - "guide"
+  - "code-review"
+  - "automation"
+  - "workflow"
+  - ""
+image: /api/og?title=AI+Code+Review+Automation+Workflow&tool=Guide
 canonical: "https://terminalblog.com/blog/automate-code-review-ai-agents/"
-
-
-<script type="application/ld+json" set:html={JSON.stringify({
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
-    {
-      "@type": "Question",
-      "name": "Which",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Hermes Agent has native cron support and is the most capable for scheduled automation. Alternatives include CodeRabbit (hosted GitHub App, free tier available), PR-Agent by Codium (open source, runs via GitHub Actions or CLI), and Claude Code's `/review` command (manual invocation only). The key difference: Hermes runs on your infrastructure with full control; CodeRabbit is hosted; PR-Agent requires more setup but is self-hosted."
-      }
-    }
-  ]
-})} />
-
-
-Code review is the bottleneck in every engineering team. PRs sit for days waiting for reviews. Reviewers rush through them. Bugs slip through. The median PR review time in a 2026 Stripe Developer Productivity report was 19 hours — and that includes the 2 hours of actual review in a 19-hour window.
-
-I automated mine. Here's the exact setup, the tooling, the prompt template, and what I learned after running it for three months.
-
-## The Problem With Manual Reviews
-
-Manual code review has inherent limits:
-- Reviewers can't context-switch efficiently between unrelated PRs
-- Review quality drops measurably after 30 minutes of focused diff reading
-- Subtle bugs (race conditions, off-by-one errors, uncaught null paths) are easy to miss in large diffs
-- Architectural debt gets buried under nitpicks about variable naming
-
-The real cost isn't the reviewer's time — it's the delay. Every hour a PR sits unread is an hour where a developer context-switches to something else, or worse, starts stacking more changes on top of unreviewed code. Automated review doesn't replace human judgment. It removes the idle time between "PR opened" and "first pair of eyes on it."
-
-## The Setup: Three Daily Crons
-
-I use Hermes Agent for this because it has cron support built in. Three scheduled tasks run against my repo every day:
-
-**Morning review (9 AM):** Hermes checks for PRs opened in the last 24 hours. For each PR, it:
-1. Reads the full diff plus surrounding file context
-2. Analyzes the change against the existing codebase patterns
-3. Runs a structured checklist (more on this below)
-4. Posts a summary as a PR comment
-
-**Midday check (1 PM):** Same process for PRs opened since 9 AM. Catches the lunch-hour PRs and cross-timezone contributors.
-
-**Evening summary (6 PM):** Reviews the day's merged PRs. Generates a changelog-style summary — useful for standup prep and team visibility.
-
-The key insight: the agent doesn't need to approve or merge anything. It surfaces issues and lets humans decide. This avoids the "AI approved my broken code" problem entirely.
-
-## The Review Checklist
-
-Each review runs through six dimensions. This isn't arbitrary — it's the order that correlates with production incidents in my experience:
-
-1. **Functionality** — Does the code do what the PR description claims? Are edge cases handled? Does it handle empty inputs, null values, and error states?
-2. **Security** — Credential exposure, SQL injection vectors, auth bypass risks, hardcoded secrets, unsafe deserialization
-3. **Test coverage** — Are the new code paths tested? Are the tests actually exercising the logic, or just hitting happy paths?
-4. **Style consistency** — Does it match project conventions? Not "my preferences" — the conventions already established in the codebase
-5. **Architecture fit** — Does this change respect existing module boundaries? Does it introduce coupling that wasn't there before?
-6. **Performance** — N+1 queries, unnecessary allocations, blocking I/O in async contexts, unbounded loops
-
-The order matters. Teams often review style first because it's easiest. But a security vulnerability buried at the bottom of a review comment gets missed more often than one flagged at the top.
-
-## Prompt Template
-
-The quality of automated review depends heavily on the prompt. Here's the template I've refined over three months:
-
-```
-You are a senior code reviewer. Review this PR diff against the codebase context provided.
-
-Focus on:
-1. Functional correctness — does the diff do what the PR description says?
-2. Security — any credential exposure, injection risks, or auth bypasses?
-3. Test coverage — are new paths tested with meaningful assertions?
-4. Architecture — does this fit existing module boundaries?
-5. Performance — any obvious inefficiencies or blocking operations?
-
-For each finding:
-- Severity: [critical / warning / nit]
-- File and line
-- What's wrong and why
-- Suggested fix (code snippet if possible)
-
-If the code looks clean, say so. Don't invent issues.
-```
-
-That last line is critical. Without it, agents tend to find "issues" everywhere — false positives that erode team trust in the automation. Telling the agent "if it looks clean, say so" reduced my false positive rate from roughly 40% to under 10%.
-
-## Handling False Positives
-
-False positives are the number-one killer of code review automation adoption. If the team sees 5 automated comments and 3 are wrong, they'll ignore all 5 next time.
-
-Three things that helped:
-
-**Severity labels matter.** "Nit" comments are easily ignored. "Critical" comments get attention. Make sure the agent reserves critical for actual issues — not style preferences.
-
-**Let humans dismiss easily.** A single command or reaction to mark "this is a false positive" helps. More importantly, track dismissed findings. If the same pattern gets dismissed repeatedly, remove it from the checklist.
-
-**Start conservative.** Run the automation on your own PRs for a week before rolling it out to the team. Tune the prompt until the signal-to-noise ratio is acceptable. Most teams need 1-2 weeks of tuning before the automation feels useful rather than annoying.
-
-## Alternatives Worth Knowing
-
-Hermes isn't the only option for automated code review:
-
-**CodeRabbit** offers hosted AI code review as a GitHub App. It integrates in minutes and provides inline comments. The free tier handles most small-team needs. It's the fastest way to get started, though you lose control over the review checklist and prompt.
-
-**PR-Agent** (by Codium) is open source and runs via GitHub Actions or as a local CLI. More configurable than CodeRabbit, but requires more setup. Good choice if you want to self-host the review logic.
-
-**Claude Code's /review command** does ad-hoc PR review when invoked manually. It won't run on a schedule, but it's useful for critical PRs where you want a deeper analysis than the automated pass provides.
-
-The tradeoff is always the same: hosted = fast setup, less control. Self-hosted = more work, full control over what gets checked and how results are delivered.
-
-## The Results After Three Months
-
-Running this setup against a mid-size TypeScript monorepo (roughly 80K lines, 15 contributors):
-
-- **Automated reviews caught ~30% of issues** that would otherwise require a human re-review cycle
-- **Median time from PR open to first review dropped from 19 hours to 4 hours** — most of that is just the gap until the next cron run
-- **Zero false-positive-driven rollbacks** — the conservative prompt tuning paid off
-- **False positive rate: ~8%** — down from 40% in the first week
-
-The remaining 70% of issues are architectural decisions, design tradeoffs, and "should we do it this way" questions that genuinely benefit from human discussion. The automation doesn't try to answer those — it just clears the obvious stuff out of the way.
-
-## Getting Started
-
-If you want to try this:
-
-1. Pick a tool (Hermes, CodeRabbit, PR-Agent)
-2. Start with the checklist above — don't customize it yet
-3. Run it on your own PRs for a week, tune the prompt
-4. Roll it out to the team with a clear message: "this catches obvious issues, humans handle the rest"
-5. Track dismissed findings weekly — tune out patterns that generate false positives
-
-The setup takes an afternoon. The time saved compounds every day. And the real win isn't the hours saved — it's the faster feedback loops that keep developers in flow instead of context-switching.
-
 ---
+
 
 **Related:** [Setting Up Autonomous Cron Jobs with Hermes Agent](/blog/hermes-cron-jobs-scheduled-automation-tasks) · [Automating Code Review and PR Creation with Hermes Agent's Git Workflow](/blog/hermes-git-pr-automation-code-review-workflow)
 
@@ -167,5 +40,10 @@ An afternoon for the initial setup with Hermes or PR-Agent. CodeRabbit integrate
 - [Claude Code: Skills vs Subagents vs MCP — The 2026 Decision Guide](/blog/claude-code-skills-vs-subagents-vs-mcp/)
 - [Best Coding Agents 2026 — Decision Guide (Not Another Hype List)](/blog/best-coding-agents-2026-decision-guide/)
 ---
+<script type="application/ld+json" set:html={JSON.stringify({"@context":"https://schema.org","@type":"BlogPosting","headline":"How I Automate My Entire Code Review Process With AI Agents","description":"Code review is the bottleneck that agents are perfectly suited to solve. Here's a concrete workflow that runs every day without human intervention.","datePublished":"2026-07-10T21:00:00Z","dateModified":"2026-07-22T04:00:00Z","author":{"@type":"Person","name":"Anshad"},"publisher":{"@type":"Organization","name":"TerminalBlog","logo":{"@type":"ImageObject","url":"https://terminalblog.com/favicon.ico"}},"mainEntityOfPage":{"@type":"WebPage","@id":"https://terminalblog.com/blog/automate-code-review-ai-agents/"}})} />
+
+**What is a coding agent?** A coding agent is an AI-powered tool that can autonomously write, edit, and reason about code across multiple files in a codebase. Unlike simple autocomplete (GitHub Copilot), agents can execute terminal commands, navigate project structure, run tests, and complete multi-step tasks from a high-level prompt.
+
+
 
 *Tired of deciding which AI subscription to keep? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** bundles GPT, Claude, Gemini, Grok, DeepSeek, Perplexity and more for $12/mo — less than half of a single premium chat sub.*

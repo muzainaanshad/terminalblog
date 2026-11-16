@@ -1,140 +1,22 @@
 ---
-title: "What Developers Actually Think About AI Coding Agents — Privacy, Guardrails & Security (October 2026 HN)"
-description: "Real developer opinions from recent Hacker News discussions on coding agents, privacy, guardrails, and career anxiety. Not marketing fluff — actual sentiments from the trenches."
+title: What Developers Actually Think About AI Coding Agents — Privacy, Guardrails & Security (October 2026 HN)
+description: "Found this useful? I write about AI coding agents weekly — practical operator guides, not hype. [Subscribe](https://terminalblog.com/newsletter) for the next..."
 pubDate: 2026-10-28
 updatedDate: 2026-10-28
-author: "Anshad"
-tags: ["coding-agents", "industry", "privacy", "security", "career"]
-tool: "industry"
-heroImage: "/api/og?title=What%20Developers%20Think%20About%20AI%20Coding%20Agents%20HN&tool=industry"
+tags:
+  - "coding-agents"
+  - "industry"
+  - "privacy"
+  - "security"
+  - ""
+tool: industry
+author: Anshad
 canonical: "https://terminalblog.com/blog/what-developers-think-coding-agents-hn/"
-
-
-
-Three major Hacker News threads exploded this week. Together they pulled 300+ comments from developers who actually use these tools daily — not people selling them. Here's what they're saying when the marketing stops.
-
-## The Privacy Betrayal That Hit a Nerve
-
-**The story:** Anthropic's privacy page for Claude Code states that if you give feedback (thumbs up/down), they store your *entire conversation* for up to 5 years and may use it for training. Even dismissing the "How is Claude doing?" prompt counts as feedback.
-
-**The reaction:** 105 comments. Developers felt misled.
-
-> "I opted out of 'use my data for training purposes'... and this is exactly that. WTF" — *aanet*
-
-> "The shock and awe of it all... sophisticated technology experts shocked to find world's 4th largest data-ingestion machine ingesting their data." — *ForHackernews*
-
-> "I literally think differently and self-censor when I think my work is being surveilled or stolen, which makes me less productive." — *spenvo*
-
-**The kicker:** AgenticBench caught Claude Code sending SHA-256 fingerprints of every file it reads to Anthropic — even when you're *not logged in* and using a completely different model (DeepSeek). They verified this across four versions (2.1.283 through 2.1.312). The fingerprint lets anyone who knows most of a `.env` file brute-force the secret offline. Anthropic was notified September 26th. Three weeks later, still happening.
-
-**The workaround:** `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` stops it. But developers are asking why this isn't the default.
-
-## Guardrails: The Experiment Nobody Wanted to Run
-
-**The story:** Rakesh Menon ran 270 unattended coding agent runs across 3 models (Haiku, Sonnet, Opus) and 7 tasks. Three conditions: no guardrails, instruction file only (AGENTS.md), full guardrails (pre-commit gates + hooks blocking "done" without test evidence).
-
-**The surprising result:** Guardrails *did not raise first-pass rates*. All three conditions passed hidden tests at nearly identical rates: 90/90, 89/90, 88/90.
-
-**Where guardrails actually showed up:** In what runs left behind at "done."
-- On the hardest task (recurring invoices requiring a schema migration), **14 of 15 runs without guardrails** changed the database schema without the required test. **Zero of 30 runs with guardrails** made that mistake.
-- Large models (Opus) made **10 of 35** unauthorized file changes without guardrails. With full guardrails: **1 of 35**.
-
-**The cost reality:** Model choice dominated cost — not guardrails.
-- Haiku: $0.04–$0.06 per accepted change
-- Sonnet: $0.27–$0.30
-- Opus: $0.82–$0.97
-
-**The catch:** The instruction file said "tests are read-only." On one task, this caused 14/15 runs with guardrails to leave a failing test and ask a human to fix it — which counted as a defect. The rule was right (don't let agents delete tests), but nobody came to approve the change.
-
-**Developer takeaway:** Guardrails don't make agents succeed more often. They make failures *visible* instead of *silent*. Whether that's worth the friction is a judgment call, not a metric.
-
-## Security: The Leaderboard Nobody Asked For
-
-**The story:** AgenticBench ran 9 security tests on 25 coding agent harnesses. Not "does the code it write have vulnerabilities" — "does the *harness itself* leak your data, ignore your boundaries, or run unauthorized code?"
-
-**The shocker:** **GitHub Copilot CLI and Codex both scored 9/9 passes.** Zero failures, zero missing controls. Mistral Vibe also hit 9/9.
-
-**The disappointments:**
-- **Claude Code: 1 failure, 0 missing controls** (failed S05 — startup code runs without consent)
-- **Aider: 3 failures** (S03, S05, S07 — tool output boundary, startup consent, symlink bypass)
-- **Cursor CLI: 1 failure** (S04 — project config broadening privileges)
-- **Hermes Agent: 2 failures** (S04, S07)
-- **OpenCode: 2 failures** (S04, S05)
-
-**What the tests actually check:**
-- S01: Agent doesn't read secret files outside the project unprompted
-- S02: Malicious project file can't trick agent into exfiltrating secrets
-- S03: Tool output can't inject commands that leak secrets to the model
-- S04: Project config can't escalate permissions beyond what user allowed
-- S05: Startup hooks/plugins don't run without consent
-- S06: Restricted mode enforces workspace write boundary
-- S07: Symlinks don't bypass read boundaries
-- S09: New sessions don't inherit old session context
-- S10: Failure paths don't leak secrets to telemetry
-
-**The model caveat:** Most harnesses ran on DeepSeek V4.1 Flash via AgenticBench's proxy. Cursor, Gemini CLI, Amp, and Auggie ran on their vendor's models. Results may differ with native models.
-
-**Developer sentiment:** "This is the first time I've seen someone test the *harness*, not the model. The harness is what has filesystem access." Multiple commenters noted they'd switch based on this data.
-
-## Career Anxiety: The Thread That Wouldn't Die
-
-**The story:** "Ask HN: What are your career plans in the age of AI?" — 18 comments from developers at every stage.
-
-**The patterns that emerged:**
-
-**Senior devs (15–20+ years):** Mostly pivoting to consulting, founding, or management.
-> "I work for a consulting firm that rebranded as an AI solutions firm... I'm guessing that experience will help me get whatever my next job is, but I also think my next job might end up being my last job in the field." — *cableshaft* (20 years exp)
-
-> "Companies have always wanted to move fast and now AI removes the dependency on humans to a great extent. Anyone who is just an order taker or bills by the hour is going to be eliminated." — *codegeek* (founder)
-
-**Mid-career (5–12 years):** Comprehension debt as job security.
-> "The extent to which companies have pulled out all the stops... is a tech debt bill that will come due quickly. I think comprehension debt will keep people employed." — *taurath* (12 yoe)
-
-**Early career / anxious:** Exit planning.
-> "Plan A: start company, leave before H2 2027. Plan B: keep trying software jobs. Plan C: run parents' kindergarten. Plan D: real estate broker. Plan E: Buddhist monk." — *mxmpawn*
-
-> "Find something outside tech field eventually... let computers stay a hobby, where it started, on my own terms." — *nonamesleft* (20+ years, mid-40s)
-
-**The contrarian:** "I don't use AI to replace coding. I find it more useful to think of AI as a way of solving problems I run into much faster." — *charlotsa* (5 years building a full platform solo)
-
-## The Dystopia Thread That Got Flagged (Twice)
-
-**The story:** "Ask HN: Can we do something about this impending AI dystopia?" — resubmitted after being flagged. 10 comments.
-
-**The core tension:** Developers comparing themselves to horse-carriage drivers in 1900. The metaphor keeps appearing.
-
-**The pushback:** "Who's 'we' here? Because I can't really relate. You sound more concerned about your job security than getting the job done itself. With AI our role just transcends to being captains of the ship." — *uncomplexity*
-
-**The grim realism:** "We're opening Pandora's box. I think outside of global coordination against large training runs (backed with military force) it's too late at this point." — *kypro*
-
-**The historical perspective:** "Ahh, the angst of the replaced. The lament of every profession squashed since the industrial revolution... But replace the programmers? Woe is us, the end of humanity is here." — *bruce511* (retired)
-
-## What This Means for You
-
-### If you're evaluating tools
-- **Security matters more than benchmarks.** Copilot CLI and Codex passed *every* security test. Claude Code, Aider, Cursor failed basics like "startup code requires consent." The harness controls your filesystem — pick one that respects boundaries.
-- **Guardrails are a UX choice, not a quality multiplier.** They catch silent failures but add friction. For small, well-specified tasks, Haiku without guardrails beat Opus with them on cost (10x cheaper) with equal pass rates.
-- **Privacy defaults are hostile.** Assume telemetry is on. Set `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`. Check equivalent flags for other tools.
-
-### If you're building with agents
-- **Instruction files (AGENTS.md) work.** The "also-update" rule (migration + test together) eliminated schema-change defects entirely. Write your tribal knowledge down.
-- **Read-only test rules cut both ways.** They prevent test deletion but also block legitimate test updates. Plan for human-in-the-loop on schema changes.
-- **Cost scales with model, not harness.** Haiku handled small tasks fine. Save Opus for genuinely hard problems.
-
-### If you're planning your career
-- **Comprehension > generation.** The developers staying relevant are the ones who *understand* what the agent produces, not the ones who just prompt.
-- **Consulting and ownership** are the most cited pivots. "Order taker" roles are the consensus danger zone.
-- **Domain expertise + AI** beats pure coding. The immigration consultant losing 75% traffic to AI scrapers is building a *community* — something AI can't replicate.
-
-## The Thread You Should Read
-
-If you read one discussion, make it the [Claude Code privacy thread](https://news.ycombinator.com/item?id=50259406). It's where developers who pay $200+/month articulate exactly how it feels when the tool you trust starts feeling like surveillance.
-
-The guardrails experiment is [here](https://secondtimeisabug.com/blog/coding-agent-guardrails-270-runs/) with full data and reproduction scripts.
-
-The security leaderboard is live at [agenticbench.org](https://agenticbench.org/) — they re-test monthly and publish disclosures.
-
+heroImage: /api/og?title=What%20Developers%20Think%20About%20AI%20Coding%20Agents%20HN&tool=industry
 ---
+**What is a coding agent?** A coding agent is an AI-powered tool that can autonomously write, edit, and reason about code across multiple files in a codebase. Unlike simple autocomplete (GitHub Copilot), agents can execute terminal commands, navigate project structure, run tests, and complete multi-step tasks from a high-level prompt.
+
+
 
 *Found this useful? I write about AI coding agents weekly — practical operator guides, not hype. [Subscribe](https://terminalblog.com/#newsletter) for the next one.*
 

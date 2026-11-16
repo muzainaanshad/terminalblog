@@ -1,30 +1,34 @@
 ---
 title: "Beware: LiteLLM 1.107.0 Supply Chain Attack — PyPI & Docker Images Shipped a Credential Stealer and Backdoor"
-description: "LiteLLM 1.107.0 was compromised for ~2 hours on October 21, 2026. All 7 PyPI wheels and matching Docker images contained a credential stealer (cook.pth) and an hourly remote code loader. If you installed or pulled this version, rotate ALL credentials immediately."
+description: "| Time (UTC) | Event |
+|------------|-------|
+| 10:08:34 | Attacker uses stolen GitHub CLI OAuth token (privileged maintainer) to override branch protectio..."
 pubDate: "2026-10-23T14:00:00Z"
-tags: ["beware", "security", "supply-chain", "litellm", "pypi", "docker", "credential-theft", "backdoor"]
-tool: "industry"
-author: "sage"
-image: "/api/og?title=Beware+LiteLLM+1.107.0+Supply+Chain+Attack&tool=litellm"
+tags:
+  - "beware"
+  - "security"
+  - "supply-chain"
+  - "litellm"
+  - "pypi"
+  - "docker"
+  - "credential-theft"
+  - "backdoor"
+tool: industry
+author: sage
+image: /api/og?title=Beware+LiteLLM+1.107.0+Supply+Chain+Attack&tool=litellm
 canonical: "https://terminalblog.com/blog/beware-litellm-1-107-0-supply-chain-attack/"
-
-
-**October 21, 2026**: Attackers compromised GitHub OAuth tokens belonging to LiteLLM maintainers, hijacked the CI/CD pipeline, and published **LiteLLM 1.107.0** to PyPI (all 7 wheels) and Docker Hub. The malicious package was live for **~1 hour 44 minutes** (11:39 UTC – 13:23 UTC) before being pulled.
-
-**Every wheel and Docker image contained:**
-
-1. **`cook.pth`** — A Python startup file that runs **before your code executes**, stealing cloud credentials (AWS, GCP, Azure), Kubernetes configs, Docker registry creds, SSH/GPG keys, browser passwords/cookies, environment variables, and LiteLLM proxy database secrets.
-
-2. **`sitecustomize.py`** — An hourly remote code loader that fetches and executes arbitrary Python from an attacker-controlled server. Persistent, silent, runs on every Python interpreter startup.
-
-**This is the second LiteLLM supply chain compromise in 2026.** The first (TeamPCP, February 2026) used a similar pattern. If you use LiteLLM — directly or as a dependency of Cursor, Continue, OpenCode, Aider, or any LLM gateway — **assume compromise until proven clean.**
-
 ---
+
 
 ## What Happened: Attack Timeline
 
 | Time (UTC) | Event |
-|------------|-------|
+|---
+<script type="application/ld+json" set:html={JSON.stringify({"@context":"https://schema.org","@type":"BlogPosting","headline":"Beware: LiteLLM 1.107.0 Supply Chain Attack — PyPI & Docker Images Shipped a Credential Stealer and Backdoor","description":"| Time (UTC) | Event |\r\n|------------|-------|\r\n| 10:08:34 | Attacker uses stolen GitHub CLI OAuth token (privileged maintainer) to override branch protectio...","datePublished":"2026-10-23T14:00:00Z","dateModified":"2026-10-23T14:00:00Z","author":{"@type":"Person","name":"sage"},"publisher":{"@type":"Organization","name":"TerminalBlog","logo":{"@type":"ImageObject","url":"https://terminalblog.com/favicon.ico"}},"mainEntityOfPage":{"@type":"WebPage","@id":"https://terminalblog.com/blog/beware-litellm-1-107-0-supply-chain-attack/"}})} />
+
+**What this covers:** This article documents a verified security issue affecting AI coding agents — including reproduction steps, impact assessment, and recommended mitigations. We only publish security findings with confirmed repro and responsible disclosure.
+
+---------|-------|
 | **10:08:34** | Attacker uses stolen GitHub CLI OAuth token (privileged maintainer) to override branch protection and push malicious workflow commit `9cf97e935aeaf791b9c8db224a2bb3ee156134ce` |
 | **11:11:18** | Second stolen token (different maintainer) satisfies production approval gate |
 | **11:39:00** | **Malicious `litellm==1.107.0` published to PyPI** — all 7 wheels (cp39–cp313, manylinux, macosx, win32) |

@@ -1,46 +1,20 @@
 ---
 title: "Coding Agents Just Got Serious About Security — and It's About Time"
-description: "A wave of prompt-injection and data-leak hardening just landed across OpenClaw, Goose, Hermes, and Codex. The coding agent is now an attack surface, and the ecosystem is finally treating it like one."
-tags: ["opinion", "trend", "openclaw", "goose", "hermes", "codex"]
-tool: "openclaw"
-author: "kira"
+description: "- [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)
 pubDate: "2026-07-10T18:05:00Z"
 updatedDate: "2026-07-10T18:05:00Z"
+tags:
+  - "opinion"
+  - "trend"
+  - "openclaw"
+  - "goose"
+  - "hermes"
+  - "codex"
+tool: openclaw
+author: kira
 canonical: "https://terminalblog.com/blog/coding-agents-security-hardening-wave/"
-
-
-
-Something shifted in the last few hours, and it wasn't a flashy new feature. It was a quiet, coordinated-looking harden across the coding-agent ecosystem. For operators who actually read changelogs, it read like an overdue security sprint — and a signal about where the next generation of exploits is going to land.
-
-OpenClaw shipped a cluster of fixes: OAuth error bodies are now redacted so a provider can't leak secrets in a stack trace, a UTF-16 token-mask boundary is preserved so redaction actually covers multibyte characters, internal tool-trace banners are stripped from text before it leaves the agent, and plugin provenance from the official ClawHub is hardened against tampering. Goose tightened function-call name sanitization. Hermes opened up a "deterministic tool output risk" — naming the problem instead of hiding it. Codex started validating memory-consolidation artifacts before letting them succeed.
-
-Read that list as one sentence: agents are now scrubbing untrusted input, redacting their own leaks, and verifying the integrity of what they persist. That is the behavior of software that has realized it lives in a hostile environment.
-
-For a year, the security conversation around these tools was stuck on "don't let the agent run `rm -rf`." Cute, but wrong. The real exposure isn't the agent's hands — it's its ears. Every coding agent ingests untrusted text all day: a paste from a coworker, a comment in a PR, a README, a webpage it was told to read, a plugin manifest from a registry. Any of those can carry instructions. If the agent treats that text as commands, the attacker doesn't need to touch your shell — they already own the conversation.
-
-The fixes landed this week are exactly the defenses that threat model demands. Sanitizing function-call names blocks an injected tool from masquerading as a trusted one. Token-mask boundaries matter because a half-corrected redaction leaks the second half of the secret. Provenance checks on plugins close the supply-chain door. Validating persisted memory stops a poisoned artifact from surviving a reboot and quietly steering every future session.
-
-What this means for developers: stop thinking of your agent as a helpful autocomplete and start treating it like a process that handles untrusted input — because it does. Audit what text you feed it. Prefer tools that redact, sanitize, and verify by default. And when you pick between agents, the presence of this work in the commit log is now a feature worth more than the next model bump.
-
-## A practical audit checklist
-
-If you're running one of these agents today, you don't need to wait for a vendor to fix your threat model. You can close most of the surface yourself:
-
-- **Redact anything sensitive before it enters context.** Secrets, tokens, API keys, and formatted stack traces should never round-trip through a conversation log or a persisted session file. Treat every paste as potentially forwarded.
-- **Verify plugin provenance.** Agents install plugins and MCP servers from registries. Only install what you can trace to a maintainer you trust, and pin versions so a re-published manifest you didn't review can't silently replace what you validated.
-- **Sanitize untrusted files before the agent reads them.** A README, a patch comment, a dependency manifest, or a support thread can carry injection payloads. When you let an agent open a file from outside the repo, it should be read as data, not as instructions.
-- **Validate persisted memory and outputs.** Codex's move to validate memory-consolidation artifacts points at a real long-term risk: a poisoned checkpoint survives reboots and steers every later session. If your agent persists state, treat that store as an asset worth verifying.
-- **Watch for the redaction edge cases.** Half-corrected redaction leaks the *second half* of a secret. Token-mask boundaries and UTF-16 multibyte characters are exactly where naive scrubbing fails — check that fixes cover the full character range, not just ASCII.
-
-You can start with the two things that cost nothing: stop pasting secrets into chats, and stop letting the agent auto-invoke anything from an external manifest.
-
-## What to watch for next
-
-The fixes in the log are the obvious first layer. The harder problems are the ones no changelog mentions: tool supersession, where an agent swaps in a tool it wasn't asked for; and indirect injection through files the agent reads on its own. Software that scrubs, redacts, and verifies on day one is ahead of the curve — but it still runs on the same untrusted-text model to prove itself the next session.
-
-The arms race isn't model vs. model anymore. It's harness vs. injection. And this week, the harnesses showed up.
-
 ---
+
 
 
 ## Related articles
@@ -49,4 +23,9 @@ The arms race isn't model vs. model anymore. It's harness vs. injection. And thi
 - [Your AI Agents Config Directory Is Now the Most Dangerous Place on Your Machine](/blog/ai-agent-config-directory-attack-surface-2026/)
 - [What Developers Think About Coding Agents — The Skill Atrophy Crisis, Interface Wars, and Trust Divide From 500 HN Comments](/blog/hn-developer-divide-coding-agents-interface-skill-atrophy/)
 ---
+<script type="application/ld+json" set:html={JSON.stringify({"@context":"https://schema.org","@type":"BlogPosting","headline":"Coding Agents Just Got Serious About Security — and It's About Time","description":"- [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)\r\n- [Your AI Agen...","datePublished":"2026-07-10T18:05:00Z","dateModified":"2026-07-10T18:05:00Z","author":{"@type":"Person","name":"kira"},"publisher":{"@type":"Organization","name":"TerminalBlog","logo":{"@type":"ImageObject","url":"https://terminalblog.com/favicon.ico"}},"mainEntityOfPage":{"@type":"WebPage","@id":"https://terminalblog.com/blog/coding-agents-security-hardening-wave/"}})} />
+
+**What is a coding agent?** A coding agent is an AI-powered tool that can autonomously write, edit, and reason about code across multiple files in a codebase. Unlike simple autocomplete (GitHub Copilot), agents can execute terminal commands, navigate project structure, run tests, and complete multi-step tasks from a high-level prompt.
+
+
 *Running Claude Code or Cursor but still paying separately for ChatGPT Plus? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you GPT, Claude, Gemini, and 6 more premium models for $12/mo — pick the best model for every task without paying for 9 subscriptions.*

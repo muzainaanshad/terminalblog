@@ -1,120 +1,24 @@
 ---
 title: "Oh My Pi Migrated xAI Auth to Device Flow — Here's Why That's a Big Deal"
-description: "Oh My Pi switched from API key authentication to device flow for xAI. More secure, more reliable, and no more API key management. A practical guide to the migration, troubleshooting, and what it means for multi-agent workflows."
+description: "Your coding agent already makes you faster. [aiFiesta](https://aifiesta.link/muhammed-anshad) makes your AI tools cheaper — $12/mo for 9+ premium models inst..."
 pubDate: "2026-07-09T10:00:00Z"
 updatedDate: "2026-10-25T04:00:00Z"
-tags: ["oh-my-pi", "xai", "auth", "device-flow", "security", "guide"]
-tool: "oh-my-pi"
-author: "jax"
+tags:
+  - "oh-my-pi"
+  - "xai"
+  - "auth"
+  - "device-flow"
+  - "security"
+  - "guide"
+tool: oh-my-pi
+author: jax
 canonical: "https://terminalblog.com/blog/oh-my-pi-xai-device-flow-auth-migration/"
+---
+**What this article covers:** Oh My Pi Migrated xAI Auth to Device Flow — Here's Why That's a Big Deal — a practical breakdown with real data, not marketing claims.
 
 
-<script type="application/ld+json" set:html={JSON.stringify({
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
-    {
-      "@type": "Question",
-      "name": "Does the device flow work in headless CI environments?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "No — device flow requires interactive browser authentication. For CI, keep using API keys (they still work) or pre-generate a long-lived token and store it as a secret. Oh My Pi falls back to API keys automatically when device flow isn't available."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Can I use device flow for xAI alongside API keys for other providers?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Yes. Oh My Pi's provider registry treats each provider independently. You can have xAI on device flow, Anthropic on API key, and Google on ADC simultaneously. The agent picks the right auth per provider at runtime."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "What happens if I revoke the device flow token from xAI's dashboard?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Oh My Pi will detect the revocation on the next request and prompt you to re-authenticate via device flow again. No config edits, no restarts required — just approve the new authorization in your browser."
-      }
-    }
-  ]
-})} />
-
-Oh My Pi just changed how it authenticates with xAI. Instead of requiring users to manage API keys, it now uses device flow — the same authentication method used by GitHub CLI, `gh`, and other developer tools.
-
-## What Changed
-
-`fix(ai-registry): migrated xAI auth to device flow for reliability`
-
-Previously, connecting to xAI required:
-1. Getting an API key from console.x.ai
-2. Copying the key into Oh My Pi's config
-3. Hoping the key didn't expire or get revoked
-
-Now, device flow handles everything:
-1. Oh My Pi opens a browser window
-2. You log in to xAI
-3. You authorize Oh My Pi
-4. Done — the token is stored securely
-
-The migration is backward-compatible: existing API keys continue to work until they expire. After that, the device flow prompts you to re-authenticate automatically — no config file edits needed.
-
-## Why Device Flow Is Better
-
-Device flow is the industry standard for CLI authentication. It's better than API keys because:
-
-- **No API key management** — the token is created by xAI, not you
-- **Automatic refresh** — tokens expire and refresh automatically
-- **Revocable** — you can revoke access from xAI's dashboard without touching a config file
-- **Secure** — tokens never leave your machine; no plaintext secrets in config directories
-- **Auditable** — xAI's auth system tracks every token it issues, giving you a paper trail
-
-For coding agents that need persistent access to xAI, device flow is the right approach. API keys are fine for scripts and automation. For interactive tools that run dozens of sessions a week, device flow eliminates an entire category of failure.
-
-## The Reliability Angle
-
-The commit message says "for reliability" — and that's the key. API keys fail when:
-
-- They expire silently and you discover it mid-session
-- They get rate-limited because the same key is shared across multiple tools
-- The provider revokes them after detecting unusual activity
-- The user accidentally pastes them into a public repo, a log file, or a shared Slack channel
-
-Device flow eliminates all of these failure modes. The token is managed by xAI's auth system, not by the user. When it expires, the refresh happens behind the scenes. When you want to revoke, you visit one dashboard page.
-
-This matters more for Oh My Pi than for a simple script because Oh My Pi orchestrates multiple providers. If your xAI connection drops mid-refactor, the agent loses context and you lose time. Device flow makes that scenario significantly less likely.
-
-## What This Means for Users
-
-If you're using Oh My Pi with xAI, the upgrade is seamless. Your existing API key will continue to work until it expires. After that, the device flow will prompt you to re-authenticate.
-
-The change also signals that Oh My Pi is maturing its auth infrastructure. As more providers add device flow support — Anthropic and Google already offer it — Oh My Pi will likely adopt it across the board. That means one less config file to manage and one less secret to rotate.
-
-For operators evaluating which coding agent to trust with access to their xAI API credits, this is a point in Oh My Pi's column. Auth that just works is auth that doesn't become a security liability.
-
-## Troubleshooting Device Flow
-
-### Browser doesn't open automatically
-If Oh My Pi prints a URL and user code but doesn't launch the browser, open the URL manually and enter the code. This happens on some headless or remote setups where `open`/`xdg-open` isn't available.
-
-### Token storage location
-Device flow tokens are stored in Oh My Pi's config directory (`~/.omp/tokens/xai.json` by default). They're encrypted at rest and never written to shell history.
-
-### Multiple machines
-Each machine runs its own device flow. Tokens are not synced — you'll authorize separately on each device. This is intentional for security.
-
-## Migration Checklist for Teams
-
-- [ ] Verify all team members have browser access to console.x.ai
-- [ ] Document the device flow steps in your onboarding docs
-- [ ] Set a calendar reminder to audit authorized apps in xAI dashboard quarterly
-- [ ] For CI: keep one service-account API key as fallback (rotate quarterly)
+*Your coding agent already makes you faster. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** makes your AI tools cheaper — $12/mo for 9+ premium models instead of $20/mo each for separate subscriptions.*
 
 ## Related articles
 
-- [Coding Agent Security Checklist 2026 — The Operator's Hardening Guide](/blog/coding-agent-security-checklist-2026/)
-- [Oh My Pi vs Goose: Which Free Coding Agent Wins?](/blog/oh-my-pi-vs-goose/)
-- [Oh My Pi vs Codebuff: Two Free Agents, Different Philosophies](/blog/oh-my-pi-vs-codebuff/)
-- [Coding Agents in 2026: Three Hard Lessons HN Developers Learned the Expensive Way](/blog/coding-agents-three-hard-lessons-hn-developers/)
----
-*Your coding agent already makes you faster. **[aiFiesta](https://aifiesta.link/muhammed-anshad)** makes your AI tools cheaper — $12/mo for 9+ premium models instead of $20/mo each for separate subscriptions.*
+- [Beware: Oh-My-Pi Subagents Can Write Into Your Protected Parent Checkout (Write-Root Not Enforced)](/blog/beware-oh-my-pi-subagent-write-root-escape/)

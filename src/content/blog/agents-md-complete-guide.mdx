@@ -1,78 +1,19 @@
 ---
 title: "AGENTS.md Complete Guide — Repo Rules for Every Agent"
 description: "How to write AGENTS.md (and related instruction files) so Claude Code, OpenCode, Cursor, Codex, and others respect your architecture, tests, and safety rules. Includes OS-specific pitfalls, permission boundaries, and a loop to prove the agent is actually reading it."
+tags:
+  - "agents-dot-md"
+  - "guide"
+  - "pillar"
+  - "best-practices"
+  - "workflow"
 pubDate: 2026-07-13
 updatedDate: 2026-07-15
-tags: ["agents-dot-md", "guide", "pillar", "best-practices", "workflow"]
 tool: "opencode"
 author: "ada"
 image: "/api/og?title=AGENTS.md+Complete+Guide"
 canonical: "https://terminalblog.com/blog/agents-md-complete-guide/"
-
-
-<script type="application/ld+json" set:html={JSON.stringify({
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
-    {
-      "@type": "Question",
-      "name": "What is AGENTS.md?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "AGENTS.md is a project instruction file placed at the repository root that tells coding agents (Claude Code, OpenCode, Cursor, Codex, etc.) how to work with your codebase. It contains build commands, architecture rules, safety constraints, and style preferences so the agent follows your repo's conventions without tribal knowledge."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Do all coding agents read AGENTS.md?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Most do, but the exact filename varies: Claude Code reads `CLAUDE.md` (and `AGENTS.md`), Cursor reads project rules, OpenCode and Hermes read `AGENTS.md`, Codex reads repository instructions. The safest approach is to maintain both `AGENTS.md` and the agent-specific variant (e.g., `CLAUDE.md`) or have one import the other."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Where should AGENTS.md live in a monorepo?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Put a root `AGENTS.md` for universal rules (no force-push, run tests, match style). Add per-package `AGENTS.md` files in subdirectories like `packages/api/` for invariants that only matter there. Nested files layer on top of the root file — they add constraints, they don't replace it."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "How long should AGENTS.md be?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Aim for 200–400 lines. Beyond ~400 lines, agents start skipping sections the same way humans skim long docs. If you have more rules, promote sections into `docs/` or `skills/` files and keep the root as an index with only the truly universal rules."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Can AGENTS.md replace a permission system?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "No. AGENTS.md is **advice the model is asked to follow**; a permission system is an **enforced gate the model cannot bypass**. Put intent in AGENTS.md (\"never force-push main\") and enforcement in the harness (deny `git push --force`, require approval for destructive actions). See the [coding agent security checklist](/blog/coding-agent-security-checklist-2026/) for the boundary that actually holds."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "How do I verify the agent is actually reading my AGENTS.md?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Add a harmless canary rule: \"Always echo `AGENTS_OK` as the first line of any shell output in this repo.\" Ask the agent a trivial task and watch for compliance. If it doesn't comply, the file isn't being loaded at the path/working directory you assumed — fix discovery first."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "What's the difference between AGENTS.md and a skill file (SKILL.md)?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "AGENTS.md is the always-loaded root instruction file for universal repo rules. SKILL.md files (used by OpenCode, Hermes, and other skill-driven agents) are modular workflows loaded on demand when the task matches — e.g., a \"database-migration\" skill loads only when you ask for migrations. Use AGENTS.md for invariants, skills for workflows."
-      }
-    }
-  ]
-})} />
-
+---
 
 ## Related articles
 
@@ -89,9 +30,9 @@ This is the practical guide. For the original thesis see [AGENTS.md makes every 
 
 Agents thrash when:
 
-- Build/test commands are tribal knowledge  
-- Architecture rules live only in Slack  
-- Safety (“never force push”, “no prod secrets”) is implied  
+- Build/test commands are tribal knowledge
+- Architecture rules live only in Slack
+- Safety ("never force push", "no prod secrets") is implied
 
 `AGENTS.md` is the **always-on brief**. Put it at the repo root. Keep it short enough to load, strict enough to prevent disasters.
 
@@ -99,9 +40,9 @@ Agents thrash when:
 
 A surprising number of "my AGENTS.md is ignored" bugs come from misunderstanding discovery order, not bad content. The rules below reflect how mainstream harnesses behave in practice:
 
-- **Repo root is the default.** Most agents read `./AGENTS.md` relative to the working directory they were launched in. If you start the agent in a subdirectory (or it `cd`s into one), the root file still applies, but a `docs/AGENTS.md` in the subfolder layers on top.  
-- **Agent-specific names take precedence where supported.** Claude Code reads `CLAUDE.md`; Cursor reads project rules; OpenCode and many open agents read `AGENTS.md`. When a harness supports both, the agent-native name (e.g. `CLAUDE.md`) is often loaded *in addition to* `AGENTS.md`, not instead of it — so keep them in sync or have one import the other.  
-- **Nested files layer, they don't replace.** A `packages/api/AGENTS.md` adds repo-local constraints for that package. This is your friend for monorepos: root file for universal rules, package files for invariants that only matter there.  
+- **Repo root is the default.** Most agents read `./AGENTS.md` relative to the working directory they were launched in. If you start the agent in a subdirectory (or it `cd`s into one), the root file still applies, but a `docs/AGENTS.md` in the subfolder layers on top.
+- **Agent-specific names take precedence where supported.** Claude Code reads `CLAUDE.md`; Cursor reads project rules; OpenCode and many open agents read `AGENTS.md`. When a harness supports both, the agent-native name (e.g. `CLAUDE.md`) is often loaded *in addition to* `AGENTS.md`, not instead of it — so keep them in sync or have one import the other.
+- **Nested files layer, they don't replace.** A `packages/api/AGENTS.md` adds repo-local constraints for that package. This is your friend for monorepos: root file for universal rules, package files for invariants that only matter there.
 - **Linked docs are not auto-loaded.** Writing "see `docs/architecture.md`" does not mean the agent read it. If a rule is load-bearing, paste the rule or use an explicit `@path` import that your harness supports. Vague references are the #1 cause of agents "forgetting" a constraint that was technically documented.
 
 The mental model: `AGENTS.md` is the file that gets **automatically injected into context**. Anything outside it must be explicitly pulled in.
@@ -138,7 +79,7 @@ One paragraph: what this repo does, who it serves.
 
 ## Style
 - Naming, file size preferences
-- “Match existing patterns” over inventing new ones
+- "Match existing patterns" over inventing new ones
 
 ## Definition of done
 - Tests pass
@@ -150,34 +91,34 @@ One paragraph: what this repo does, who it serves.
 
 ### Claude Code
 
-- Keep root `AGENTS.md` or `CLAUDE.md` focused; put long skill docs in `skills/*/SKILL.md`.  
-- Assume it will **act** — safety section is mandatory.  
+- Keep root `AGENTS.md` or `CLAUDE.md` focused; put long skill docs in `skills/*/SKILL.md`.
+- Assume it will **act** — safety section is mandatory.
 - See security failures in the [security checklist](/blog/coding-agent-security-checklist-2026/).
 
 ### OpenCode / skill-driven agents
 
-- Pair `AGENTS.md` with `skills/<name>/SKILL.md` for workflows.  
+- Pair `AGENTS.md` with `skills/<name>/SKILL.md` for workflows.
 - Intent → skill mapping beats giant prompts.
 
 ### Cursor
 
-- `AGENTS.md` + project rules; keep rules **repo-local**, not only user-global.  
+- `AGENTS.md` + project rules; keep rules **repo-local**, not only user-global.
 - Point the agent at the files that own invariants.
 
 ### Codex / Copilot CLI
 
-- Prefer explicit test and lint commands; cloud agents love “done” without proof.  
+- Prefer explicit test and lint commands; cloud agents love "done" without proof.
 - Sandbox assumptions differ by OS — verify.
 
 ## Operating system pitfalls (the section most teams skip)
 
 If your agents behave perfectly on macOS and "randomly" break on Windows (or CI), the cause is usually in `AGENTS.md` itself, not the model.
 
-- **Line endings.** A file written with CRLF on Windows and LF on Linux confuses diffs and some test fixtures. State `*.sh text eol=lf` in `.gitattributes` and tell the agent never to rewrite line endings as a side effect of an edit.  
-- **Path separators.** Agents trained on Unix will emit `src/utils/foo.ts` but Windows shells and some tools want `src\utils\foo.ts`. Tell the agent explicitly: "use forward slashes in all paths; this repo builds on Windows."  
-- **Shebang and shell.** A `./scripts/build.sh` with no executable bit works on Windows WSL but fails on a bare Windows terminal. Either call it through `bash scripts/build.sh` (what you put in AGENTS.md) or document the invocation that actually works on every target OS.  
-- **`node_modules`/`.venv` assumptions.** A command that works because a binary is globally installed on your laptop will fail in CI. Pin the command to the repo-local binary: `npx tsc` not `tsc`, `python -m pytest` not `pytest`.  
-- **Symlinks and case-sensitivity.** macOS is case-insensitive by default; Linux is not. "I renamed `Utils` to `utils`" is a silent break on deploy. State the canonical casing and forbid case-only renames.  
+- **Line endings.** A file written with CRLF on Windows and LF on Linux confuses diffs and some test fixtures. State `*.sh text eol=lf` in `.gitattributes` and tell the agent never to rewrite line endings as a side effect of an edit.
+- **Path separators.** Agents trained on Unix will emit `src/utils/foo.ts` but Windows shells and some tools want `src\utils\foo.ts`. Tell the agent explicitly: "use forward slashes in all paths; this repo builds on Windows."
+- **Shebang and shell.** A `./scripts/build.sh` with no executable bit works on Windows WSL but fails on a bare Windows terminal. Either call it through `bash scripts/build.sh` (what you put in AGENTS.md) or document the invocation that actually works on every target OS.
+- **`node_modules`/`.venv` assumptions.** A command that works because a binary is globally installed on your laptop will fail in CI. Pin the command to the repo-local binary: `npx tsc` not `tsc`, `python -m pytest` not `pytest`.
+- **Symlinks and case-sensitivity.** macOS is case-insensitive by default; Linux is not. "I renamed `Utils` to `utils`" is a silent break on deploy. State the canonical casing and forbid case-only renames.
 
 These five alone eliminate most "works on my machine" agent failures.
 
@@ -185,16 +126,16 @@ These five alone eliminate most "works on my machine" agent failures.
 
 A common mistake is treating `AGENTS.md` as a security boundary. It is not. `AGENTS.md` is **advice the model is asked to follow**; a permission system is an **enforced gate the model cannot bypass**.
 
-- Put *intent* in `AGENTS.md`: "never force-push main."  
-- Put *enforcement* in the harness: deny `git push --force`, require approval for `rm -rf`, sandbox network egress.  
+- Put *intent* in `AGENTS.md`: "never force-push main."
+- Put *enforcement* in the harness: deny `git push --force`, require approval for `rm -rf`, sandbox network egress.
 
 When the agent "ignores" a safety rule, the fix is usually to move it from the advice layer to the enforcement layer. See the [security checklist](/blog/coding-agent-security-checklist-2026/) for the boundary that actually holds. The guide on the [feature every coding agent is missing](/blog/feature-every-coding-agent-missing/) covers why enforcement beats trust.
 
 ## Progressive disclosure (context hygiene)
 
-1. **Root AGENTS.md** — always loaded, ~200–400 lines ideally  
-2. **docs/** or **skills/** — loaded when the task matches  
-3. **Never** paste entire design history into the root file  
+1. **Root AGENTS.md** — always loaded, ~200–400 lines ideally
+2. **docs/** or **skills/** — loaded when the task matches
+3. **Never** paste entire design history into the root file
 
 When the root file crosses ~400 lines, agents start skipping it the same way humans skim a wall of text. If your rules are long, promote whole sections into linked `docs/` files and keep the root as an index with the few rules that are truly universal.
 
@@ -202,16 +143,16 @@ When the root file crosses ~400 lines, agents start skipping it the same way hum
 
 Instructions you can't verify are wishes. Add a 60-second check to your workflow:
 
-1. Add a deliberately odd-but-harmless rule, e.g. "Always echo `AGENTS_OK` as the first line of any shell output in this repo."  
-2. Ask the agent a trivial task and watch whether it complies.  
-3. If it doesn't, the file isn't being loaded at the path/working directory you assumed — fix discovery before blaming the model.  
+1. Add a deliberately odd-but-harmless rule, e.g. "Always echo `AGENTS_OK` as the first line of any shell output in this repo."
+2. Ask the agent a trivial task and watch whether it complies.
+3. If it doesn't, the file isn't being loaded at the path/working directory you assumed — fix discovery before blaming the model.
 
 Remove the canary rule after the check. This single loop resolves the majority of "it ignores my file" reports.
 
 ## Monorepo and multi-repo patterns
 
-- **Monorepo:** root `AGENTS.md` for universal rules (no force-push, run tests, match style). Per-package `AGENTS.md` for invariants that only matter there (e.g. "the `api` package owns the database schema; never edit migrations by hand").  
-- **Shared conventions across repos:** keep the canonical rules in one repo and have others `@import` or copy a pinned version. A drifting copy is worse than no file — version it.  
+- **Monorepo:** root `AGENTS.md` for universal rules (no force-push, run tests, match style). Per-package `AGENTS.md` for invariants that only matter there (e.g. "the `api` package owns the database schema; never edit migrations by hand").
+- **Shared conventions across repos:** keep the canonical rules in one repo and have others `@import` or copy a pinned version. A drifting copy is worse than no file — version it.
 - **Generated code:** explicitly tell the agent which directories are generated and must never be hand-edited ("`dist/`, `*.pb.go`, `openapi_client/` are generated; change the source, not the output").
 
 ## Anti-patterns
@@ -236,10 +177,10 @@ Instruction files do not replace isolation. After you write `AGENTS.md`, still r
 
 ## Related
 
-- [Best coding agents decision guide](/blog/best-coding-agents-2026-decision-guide/)  
-- [Feature every coding agent is missing](/blog/feature-every-coding-agent-missing/)  
-- [Automate code review with agents](/blog/automate-code-review-ai-agents/)  
-- [UI.md design rules](/blog/ui-md-design-rules-coding-agents/)  
+- [Best coding agents decision guide](/blog/best-coding-agents-2026-decision-guide/)
+- [Feature every coding agent is missing](/blog/feature-every-coding-agent-missing/)
+- [Automate code review with agents](/blog/automate-code-review-ai-agents/)
+- [UI.md design rules](/blog/ui-md-design-rules-coding-agents/)
 
 *Update this guide when major harnesses change how they load project instructions.*
 

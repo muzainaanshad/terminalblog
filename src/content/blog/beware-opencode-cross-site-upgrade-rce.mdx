@@ -1,33 +1,18 @@
 ---
 title: "Beware: OpenCode Cross-Site Upgrade RCE Lets Any Website Install Malicious Packages on Your Machine"
+description: "On September 24, 2026, Datadog Security Labs disclosed GHSA-632h-h47v-g4x4 — a critical remote code execution vulnerability in OpenCode's HTTP server upgrade..."
 pubDate: 2026-10-20
 updatedDate: 2026-10-20
-description: "A critical RCE vulnerability in OpenCode (GHSA-632h-h47v-g4x4) allows any website to trigger arbitrary package installation and code execution via the `/global/upgrade` endpoint. Affects npm/pnpm/Bun installations running `opencode serve`. Patched in 1.18.22."
-tags: ["security", "beware", "opencode", "rce", "vulnerability"]
-tool: "opencode"
+tags:
+  - "security"
+  - "beware"
+  - "opencode"
+  - "rce"
+  - ""
+tool: opencode
 canonical: "https://terminalblog.com/blog/beware-opencode-cross-site-upgrade-rce/"
-faq:
-  - q: "What is the OpenCode cross-site upgrade RCE vulnerability?"
-    a: "GHSA-632h-h47v-g4x4 — a critical remote code execution vulnerability where any website can trigger arbitrary package installation and code execution via the `/global/upgrade` endpoint on npm/pnpm/Bun installations running `opencode serve`."
-  - q: "Am I affected by this vulnerability?"
-    a: "You are vulnerable if: OpenCode installed via npm/pnpm/Bun, running `opencode serve` (HTTP server), version between 1.14.30 and 1.18.16, and you've logged into the web UI at least once (browser has cached credentials). Not affected if installed via curl, Homebrew, Chocolatey, Scoop, or version 1.18.22+."
-  - q: "How do I check if I'm vulnerable?"
-    a: "Run: `opencode --version` (if < 1.18.22 → vulnerable), `which opencode` (if path contains npm/pnpm/bun → npm-based), `ps aux | grep 'opencode serve'` (if process found → server running)."
-  - q: "How do I fix this immediately?"
-    a: "Update OpenCode: `npm install -g opencode-ai@latest` (or pnpm/bun equivalent). Verify with `opencode --version` showing 1.18.22 or higher."
-  - q: "What if I can't update right now?"
-    a: "Stop the HTTP server: `pkill -f 'opencode serve'`. Or disable upgrade endpoint in config: `{\"server\": {\"disableUpgrade\": true}}`. Block port 4096 with firewall. Don't run `opencode serve` in background while browsing."
-  - q: "What does the patch in 1.18.22 do?"
-    a: "Four fixes: requires `application/json` content type (blocks `text/plain` forms), validates `target` is a semver string (rejects URLs), uses typed request decoder, rejects bodyless requests."
-  - q: "Is this OpenCode's first RCE?"
-    a: "No — CVE-2026-22812 (GHSA-vxw4-wv6m-9hhh, January 2026) exposed an unauthenticated HTTP server allowing arbitrary shell commands. If on an old version, you likely have BOTH. Update to 1.18.22+ fixes both."
-
-
-## TL;DR
-
-**If you installed OpenCode via npm, pnpm, or Bun and run `opencode serve`, any website you visit can execute arbitrary code on your machine.** Update to **1.18.22 or later** immediately. Run `opencode --version` to check your version.
-
 ---
+
 
 ## What Happened
 
@@ -45,6 +30,11 @@ The vulnerability works like this:
 The attacker doesn't need your password. They don't need you to click anything. Just visiting the page is enough — **if your browser has cached HTTP Basic credentials** (which happens after you authenticate once).
 
 ---
+<script type="application/ld+json" set:html={JSON.stringify({"@context":"https://schema.org","@type":"BlogPosting","headline":"Beware: OpenCode Cross-Site Upgrade RCE Lets Any Website Install Malicious Packages on Your Machine","description":"On September 24, 2026, Datadog Security Labs disclosed GHSA-632h-h47v-g4x4 — a critical remote code execution vulnerability in OpenCode's HTTP server upgrade...","datePublished":"2026-10-20","dateModified":"2026-10-20","author":{"@type":"Person","name":"Anshad"},"publisher":{"@type":"Organization","name":"TerminalBlog","logo":{"@type":"ImageObject","url":"https://terminalblog.com/favicon.ico"}},"mainEntityOfPage":{"@type":"WebPage","@id":"https://terminalblog.com/blog/beware-opencode-cross-site-upgrade-rce/"}})} />
+
+**What this covers:** This article documents a verified security issue affecting AI coding agents — including reproduction steps, impact assessment, and recommended mitigations. We only publish security findings with confirmed repro and responsible disclosure.
+
+
 
 ## The Technical Details (Plain English)
 
