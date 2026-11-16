@@ -1,106 +1,210 @@
 ---
-title: "Zed Just Got Git Branch Mode, Bookmarks, and Claude Fable 5.2 — The Editor Keeps Getting Better"
-description: "Zed v1.29.1-pre adds a Git Panel branch mode to see every file changed since a base branch, a bookmark picker, configurable Git dates, and support for Claude's newest models."
-pubDate: 2026-11-12
-updatedDate: 2026-11-15
-author: "Anshad"
-tags: ["zed", "zed-industries", "release", "git", "ai", "claude"]
+title: "Zed Just Got Git Branch Mode — and It Changes How You Review Code"
+description: "Zed v1.29.1-pre adds Git branch comparison (compare against origin/main), a bookmark picker, configurable Git dates, and Claude Fable 5.2 support. The Git panel finally works like you expect."
+tags:
+  - "zed"
+  - "release"
+  - "v1.29.1"
+  - "git"
+  - "ai"
+  - "editor"
+  - "beginner"
+pubDate: 2026-11-16T10:00:00Z
 tool: "zed"
-category: "releases"
+author: "sage"
+image: "/api/og?title=Zed+Git+Branch+Mode&tool=zed"
+canonical: "https://terminalblog.com/blog/zed-just-got-git-branch-mode-bookmarks-claude-fable-52/"
 ---
 
-Zed **v1.29.1-pre** dropped November 11. It's a pre-release, but Zed's pre-releases are typically production-ready — and this one packs features that change how you work with Git, navigate code, and use AI.
+**Zed v1.29.1-pre dropped November 11** — and the Git panel finally does what every developer has wanted for years: **compare your branch against `origin/main` and see every changed file in one list**.
 
-## The Headline Features
+No more `git diff origin/main --name-only` in terminal. No more hunting through the file tree. Click "Compare Against Base" in the Git panel, pick your base branch, and you get a clean, searchable list of every file that changed. Open any file as a diff. Done.
 
-### Git Panel Branch Mode — See What Actually Changed
+---
 
-This is the big one. The Git Panel now has a **branch mode** that lists every file changed since a base branch (like `origin/main`).
+## The One-Line Summary
 
-1. Open the Git Panel → **Changes** tab
-2. Click the new menu at the top → **"Compare Against Base"**
-3. Pick your base branch (defaults to the default branch)
+**Git branch mode + bookmark picker + Claude Fable 5.2 support + configurable dates = Zed's best quality-of-life release in months.**
 
-Files show up as diffs you can open, but you can't stage or restore from this view — it's for **reviewing what's different**, not managing the index. Perfect for PR prep or catching up after a rebase.
+---
 
-Run it from the command palette: `git panel: show branch changes`.
+## 1. Git Branch Mode — The Feature You Didn't Know You Needed
 
-### Bookmark Picker — Finally, a Way to Browse Bookmarks
+### What it is
+A new menu in the Git panel's Changes tab: **"Compare Against Base"**. Pick any branch (defaults to `origin/main`). Zed lists **every file changed since that base** — not just staged, not just unstaged, *everything*.
 
-`project bookmarks: toggle` opens a searchable, previewable picker for every bookmark in your workspace. No more remembering line numbers or hunting through the sidebar.
+### Why it matters
+- **Code review in-editor**: See the full scope of your PR before pushing
+- **No context switching**: Stay in Zed, see the diff, make fixes, commit
+- **Works on any base**: Compare against `main`, `develop`, a feature branch, a tag — whatever
 
-### Configurable Git Date Formats
+### How to use it
+1. Open Git panel (`Cmd+Shift+G` / `Ctrl+Shift+G`)
+2. Click the new menu at top of Changes tab → "Compare Against Base"
+3. Type or select your base branch (e.g., `origin/main`)
+4. Browse the file list → click any file to open as diff
 
-Finally, Git dates your way. New settings:
+### The catch (for now)
+Files in this mode are **read-only diffs** — you can't stage or restore from here. But for *reviewing*? It's perfect.
 
-- `git.date_format` — `"locale"`, `"iso"`, or any strftime format like `"%Y-%m-%d %H:%M"`
-- Per-view `date_style`: `git.blame.date_style`, `git.inline_blame.date_style`, `git.branch_picker.date_style`, `git.stash_picker.date_style`, `git_panel.date_style`, `git_graph.date_style`
+---
 
-Each can be `"relative"` or `"absolute"` independently. Your blame view can show "2 hours ago" while the branch picker shows exact timestamps.
+## 2. Bookmark Picker — Your Code's Table of Contents
 
-### Disable Automatic Agent Thread Titles
+### What it is
+`project bookmarks: toggle` (or search "bookmarks" in command palette) opens a searchable, previewable list of **every bookmark in your workspace**.
 
-`agent.auto_generate_thread_titles: false` turns off Zed's habit of naming your agent threads. Sometimes you want "debug auth flow" not "Fixed login bug #42".
+### Why it matters
+- Bookmarks have existed forever but were buried in the UI
+- Now they're a first-class navigation tool
+- Preview the context around each bookmark before jumping
 
-### Claude Fable 5.2 & Mythos 5.2 Support
+### For beginners
+Set bookmarks on:
+- `TODO: refactor this` comments
+- Complex logic you'll return to
+- API endpoints you touch often
+- Then `Cmd+Shift+P` → "bookmarks" → jump instantly
 
-Anthropic's newest models are now available in the Anthropic provider. If you're on the Claude subscription, you get them automatically.
+---
 
-## AI Quality-of-Life Improvements
+## 3. Configurable Git Dates — Finally, Dates That Make Sense
 
-- **Copy button confirmation** — Agent response copy buttons now show a brief checkmark so you know it worked
-- **ACP agent config ordering** — The first option an ACP agent provides now appears next to the send button (less hunting)
-- **Better ACP compatibility** — Handles missing sessions, plan updates, diff formats, permission request cancellation
+### What changed
+New settings let you control how Git dates appear **everywhere**:
 
-## Git Polish That Matters
+| Setting | Options | Default |
+|---------|---------|---------|
+| `git.date_format` | `"locale"`, `"iso"`, or strftime like `"%Y-%m-%d %H:%M"` | `"locale"` |
+| `git.blame.date_style` | `"relative"`, `"absolute"` | `"relative"` |
+| `git.inline_blame.date_style` | same | `"relative"` |
+| `git.branch_picker.date_style` | same | `"relative"` |
+| `git.stash_picker.date_style` | same | `"relative"` |
+| `git_panel.date_style` | same | `"relative"` |
+| `git_graph.date_style` | same | `"relative"` |
 
-- Commit view opens scrolled to the blamed file (not the top of the diff)
-- Git status refresh is faster in huge repos with many changes
-- Branch rename trims whitespace and replaces spaces with dashes, with a live preview
-- Repository selector distinguishes repos that share a directory name
-- `git.commit_view.expand_description` and `git.commit_view.expand_files` control whether commit view opens expanded
+### Why it matters
+- **ISO dates** (`2026-11-15 14:32`) sort correctly in blame view
+- **Relative dates** ("2 hours ago") are great for recent work
+- **Per-view control**: Blame can be absolute, branch picker relative — your call
 
-## Bug Fixes Worth Knowing
+---
 
-- **Fixed:** Opening a file via `workspace: open` replaced the whole project with just that file
-- **Fixed:** Switching branches in remote projects resent full Git history over SSH, stalling everything
-- **Fixed:** SSH "Missing remote shell" when remote shell reads from stdin on startup
-- **Fixed:** SSH to macOS hosts stuck on "Starting Proxy" when pasteboard inaccessible
-- **Fixed:** File finder now shows files outside project when searching by absolute path
-- **Fixed:** Agent thread copy button could copy an earlier turn's response
-- **Fixed:** Read-only toggle shown on tabs that don't support it
-- **Fixed:** Animated WebP only showing first frame
-- **Fixed:** Bold text using wrong theme colors in Markdown previews
-- **Fixed:** `cmd-o` opening file dialog instead of symbol search with JetBrains keymap on macOS
-- **Fixed:** Combining marks (like `v̄`) rendering incorrectly on Linux
-- **Fixed:** Commit messages losing line breaks in commit view
-- **Fixed:** `zed` CLI rejecting multiple `ssh://` paths on same host
-- **Fixed:** `zed://file` and `file://` links with drive letters opening empty window on Windows
+## 4. Claude Fable 5.2 Support — Better BYOK Anthropic Models
 
-## Why This Release Matters
+### What it is
+Zed now supports **Claude Fable 5.2** for Anthropic BYOK (Bring Your Own Key) users, plus **Claude Mythos 5.2** if your org has access.
 
-Zed keeps shipping **compound improvements** — the kind that don't make headlines but eliminate daily friction. Branch mode alone changes how you review changes before pushing. Bookmarks become actually usable. Git dates stop being a "deal with it" situation.
+### Why it matters
+- Fable 5.2 = Anthropic's latest coding model (better than Sonnet 3.5 for many tasks)
+- Mythos 5.2 = their reasoning model for complex planning
+- No waiting for Zed to update — add your key, select the model, go
 
-The pre-release tag means it's not on the stable channel yet, but Zed's track record: pre-releases are what most people run daily.
+### How to enable
+1. Settings → AI → Anthropic BYOK
+2. Add your Anthropic API key
+3. Model picker now shows Fable 5.2 / Mythos 5.2
 
-## Upgrading
+---
+
+## 5. The Quality-of-Life Fixes You'll Actually Notice
+
+| Fix | Why you care |
+|-----|--------------|
+| **SSH connections no longer stall** on "Starting Proxy" for macOS hosts | Remote dev on Mac just works |
+| **Switching branches in remote projects** doesn't resend full Git history | Large repos over SSH stay fast |
+| **File finder shows files outside project** when searching by absolute path | Find `/etc/nginx/nginx.conf` from your project |
+| **Copy button on agent responses** shows a checkmark confirmation | Know it copied without guessing |
+| **Commit messages keep line breaks** in commit view | Readable commit messages, finally |
+| **Animated WebP files play** in image viewer | See the full animation, not frame 1 |
+| **Terminal links to absolute paths** work across OS (WSL → Windows) | Click a path in terminal, it opens |
+
+---
+
+## 6. AI-Specific Improvements
+
+### Agent thread titles (optional now)
+New setting: `agent.auto_generate_thread_titles` (default `true`). Set to `false` if you want to name your own threads.
+
+### ACP agent config ordering improved
+The first option an ACP agent provides now appears **next to the send button** — less hunting for the right tool.
+
+### Copy button on agent responses
+Briefly shows a checkmark. Tiny UX win, huge trust signal.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| **v1.29.1-pre** | Nov 11, 2026 | **Pre-release** | **Git branch mode, bookmark picker, configurable dates, Fable 5.2** |
+| v1.28.0-pre | Nov 4, 2026 | Pre-release | Auto git fetch, agent improvements |
+| v1.27-stable | Oct 28, 2026 | Stable | Go 1.27, AI commits, memory |
+| v1.26.1-pre | Oct 21, 2026 | Pre-release | Pyrefly, dwarf debugging |
+
+> **Pre-release note**: `v1.29.1-pre` is a pre-release. Stable `v1.29.1` follows shortly. Pre-releases are solid for daily use — Zed's pre channel is what the team runs internally.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Review PRs in Zed** | **Yes** — Branch mode is built for this |
+| **Use bookmarks (or want to start)** | **Yes** — Picker makes them usable |
+| **Want ISO dates in blame/branches** | **Yes** — Finally configurable |
+| **Use Anthropic BYOK** | **Yes** — Fable 5.2 is noticeably better |
+| **Work on remote Mac via SSH** | **Yes** — Proxy stall fixed |
+| **Prefer rock-solid stable only** | Wait for `v1.29.1` (days away) |
+
+---
+
+## How to Get the Pre-Release
 
 ```bash
-# Pre-release channel
-zed update
+# macOS / Linux
+curl -fSL https://zed.dev/install.sh | sh -s -- --pre
 
-# Or download from zed.dev
+# Windows (scoop)
+scoop bucket add zed https://github.com/zed-industries/scoop-zed.git
+scoop install zed/zed-pre
+
+# Or download directly
+# https://zed.dev/releases/pre
 ```
 
-## Related
+**Changelog**: [github.com/zed-industries/zed/releases/tag/v1.29.1-pre](https://github.com/zed-industries/zed/releases/tag/v1.29.1-pre)
 
-- [Zed v1.28 — Auto Git Fetch, AI Commits That Match Your Style](/blog/zed-v1-28-0-pre-auto-git-fetch-agent-improvements)
-- [Zed v1.27 — Go 1.27, AI Commits, Memory](/blog/zed-v1-27-stable-go127-ai-commits-memory)
-- [Zed vs Cursor — 2026 Comparison](/blog/zed-vs-cursor-2026-comparison)
-- [Zed Just Dropped GPT-6, Astra, Claude Opus 5.5 BYOK](/blog/zed-just-dropped-gpt6-astra-and-claude-opus-55-byok)
+---
 
-## Related articles
+## The Pattern: Editor → AI Platform → Daily Driver
 
-- [Claude Code v2.1.318 Just Landed — The Stability Arc Continues With Mods Effort Control, Auth Expiry Warnings, and 100+ Fixes](/blog/claude-code-v2-1-317-stability-surge/)
-- [Qwen Code v0.26 Just Became a Full Multi-Agent Platform — Local, Remote, and Everything In Between](/blog/qwen-code-v0-26-managed-agent-desktop-local-ssh/)
-- [Cline Desktop Just Got an /compact Command — Your Agent Can Finally Summarize Its Own Conversation](/blog/cline-desktop-free-coding-models-zero-api-keys/)
+Zed v1.24 gave you **GPT-6 + Sol + Git tags + agent memory**.
+v1.25 gave you **automatic unfolding, inlay hints, Gemini + Argon**.
+v1.26 gave you **Pyrefly + dwarf debugging**.
+v1.27 gave you **Go 1.27 + AI commits + memory**.
+v1.28 gave you **auto git fetch + agent improvements**.
+
+**v1.29.1-pre gives you the Git workflow you've been asking for.**
+
+Branch mode. Bookmarks. Configurable dates. Fable 5.2.
+
+This isn't an AI feature drop. It's **the editor getting out of your way so the AI can work**.
+
+Update. Open a PR. Click "Compare Against Base." **See the diff. Make the fix. Ship.**
+
+---
+
+## Related Articles
+
+- [Zed v1.28.0-pre — Auto Git Fetch, Agent Improvements](/blog/zed-v1-28-0-pre-auto-git-fetch-agent-improvements/)
+- [Zed v1.27 Stable — Go 1.27, AI Commits, Memory](/blog/zed-v1-27-stable-go127-ai-commits-memory/)
+- [Zed Just Got GPT-6, Astra, and Claude Opus 5.5 BYOK](/blog/zed-just-dropped-gpt6-astra-and-claude-opus-55-byok/)
+- [Best Free AI Coding Agents 2026 — No Credit Card Required](/blog/best-free-ai-coding-agents-2026-no-credit-card/)
+
+---
+
+*Zed is developed by Zed Industries. Changelog source: [github.com/zed-industries/zed/releases](https://github.com/zed-industries/zed/releases). Published November 16, 2026 — covers Zed v1.29.1-pre released November 11, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
