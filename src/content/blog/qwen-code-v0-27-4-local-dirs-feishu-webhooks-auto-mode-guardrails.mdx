@@ -1,0 +1,207 @@
+---
+title: "Qwen Code v0.27.4 Just Gave Your AI Agent Local File Access Without Credentials — And Feishu/WeCom Webhooks"
+description: "Qwen Code v0.27.4 (Nov 15) adds managed agent local directory grants, Feishu/WeCom webhooks, Auto Mode guardrails for risky actions, Web Shell Goals multi-workspace, restored /memory CLI, and HTTP fallback for native UUID. Beginner breakdown of what's new."
+tags:
+  - "qwen-code"
+  - "release"
+  - "v0.27.4"
+  - "managed-agent"
+  - "webhooks"
+  - "auto-mode"
+  - "coding-agent"
+  - "beginner"
+  - "alibaba"
+pubDate: 2026-11-16T10:00:00Z
+tool: "qwen-code"
+author: "sage"
+image: "/api/og?title=Qwen+Code+v0.27.4+Local+Access+Webhooks&tool=qwen-code"
+canonical: "https://terminalblog.com/blog/qwen-code-v0-27-4-local-dirs-feishu-webhooks-auto-mode-guardrails/"
+faq:
+  - q: "What's the biggest change in v0.27.4?"
+    a: "Managed Agent sessions can now access your local filesystem through temporary directory grants — without persisting credentials or paths. Plus Feishu/WeCom webhooks for long replies, and Auto Mode now requires explicit authorization for risky actions."
+  - q: "Is this a breaking change?"
+    a: "No known breaking changes. The release notes explicitly state 'No known breaking changes.'"
+  - q: "How do the local directory grants work?"
+    a: "When using Managed Agent sessions, you grant temporary access to specific local directories. The agent can read/write those dirs during the session, but credentials and paths aren't persisted after the session ends."
+  - q: "What are the Feishu/WeCom webhooks for?"
+    a: "Long managed-channel replies are now split into ordered delivery segments instead of being truncated. You get a visible truncation notice if the segment limit is exceeded. Great for team notifications in Chinese enterprise environments."
+  - q: "What changed in Auto Mode?"
+    a: "Auto Mode now requires explicit user authorization for destructive, discarding, shared-history, or bulk actions. It also reviews classifier timeouts, avoids HTTP(S) URL filesystem lookups (prevents Windows network delays), and visibly marks Full Access mode."
+  - q: "Should I upgrade from v0.27.3?"
+    a: "Yes — the local directory grants for Managed Agents, Feishu/WeCom webhooks, Auto Mode guardrails, and restored /memory CLI are significant quality-of-life improvements. No breaking changes."
+---
+
+**Qwen Code v0.27.4 dropped November 15** — and it's the kind of release that makes managed agents actually usable for real work. Local directory grants without credential persistence. Feishu/WeCom webhooks for team notifications. Auto Mode that finally respects risk. And your `/memory` CLI is back.
+
+If you've been waiting for Qwen Code's managed agent story to mature — **this is the release.**
+
+---
+
+## The One-Line Summary
+
+**Managed Agents get temporary local filesystem access (no stored creds), Feishu/WeCom webhooks for long replies, Auto Mode guardrails for risky actions, multi-workspace Goals, restored `/memory` CLI, and HTTP fallback when native UUID fails. No breaking changes.**
+
+---
+
+## 1. Managed Agents Finally Touch Your Local Files — Safely
+
+**What it is:** Managed Agent sessions can now use **your browser's local filesystem** through **temporary directory grants**. You grant access to a specific folder. The agent reads/writes during the session. **Nothing persists** — no credentials, no paths stored after the session ends.
+
+**Why it matters:** Previously, managed agents were cloud-only. You couldn't say "refactor this local repo" without complex setup. Now: grant `/home/user/my-project` → agent works → session ends → access revoked. Clean.
+
+**For beginners:** Think of it like a browser file picker, but for your AI agent. You pick the folder. Agent gets temporary access. Done.
+
+---
+
+## 2. Feishu & WeCom Webhooks — Long Replies Don't Get Truncated Anymore
+
+**What it is:** 
+- **Feishu custom bot webhook** delivery (secret URL, optional signing secret, channel control, scheduled group delivery)
+- **WeCom group webhook** (send Notify outputs, prompt results, scheduled-task results to WeCom groups)
+- Long managed-channel replies split into **ordered delivery segments** instead of being cut off
+- Visible truncation notice if segment limit exceeded
+
+**Why it matters:** If your team lives in Feishu (Lark) or WeCom (Enterprise WeChat), Qwen Code now speaks your language natively. No more "reply truncated" — you get the full output in segments.
+
+**For beginners:** Webhooks = "push updates to our team chat automatically." Feishu = ByteDance's Slack competitor. WeCom = Tencent's enterprise WeChat. Huge in China, growing globally.
+
+---
+
+## 3. Auto Mode Guardrails — Your Agent Asks Before Breaking Things
+
+**What changed:**
+- **Explicit authorization required** for destructive, discarding, shared-history, or bulk actions (not just "relevance")
+- **Classifier timeout review** — session model reviews fast-classifier timeouts once when identifiers differ
+- **No HTTP(S) URL filesystem lookups** — prevents Windows network lookup delays and session termination before requests start
+- **Full Access (YOLO) mode visibly marked** — composer trigger shows destructive color icon/label
+
+**Why it matters:** Auto Mode used to be "trust me bro." Now it's "I'll ask for the scary stuff." You stay in control without babysitting.
+
+**For beginners:** Auto Mode = agent runs without asking every step. Guardrails = it still asks before `rm -rf` or pushing to prod.
+
+---
+
+## 4. Web Shell Goals: Multi-Workspace Support
+
+**What it is:** Goals page now:
+- **Merges goals from trusted workspaces** (see everything in one view)
+- **Shows workspace badges** (know which project a goal belongs to)
+- **Lets new goals target a selected workspace** (organize from the start)
+
+**Why it matters:** If you juggle multiple repos/projects, your Goals dashboard finally reflects that reality. No more single-workspace tunnel vision.
+
+---
+
+## 5. `/memory` CLI Is Back — And It Persists
+
+**What it is:** Native `/memory` controls restored in CLI with:
+- Workspace settings that **persist across restarts**
+- User/Project file or managed-folder actions
+- Typed SDK APIs to preview, submit, inspect, cancel, retry Codex memory imports
+
+**Why it matters:** Memory was one of Qwen Code's differentiators. v0.27.x had it partially removed. Now it's back — better, typed, and persistent.
+
+---
+
+## 6. HTTP Fallback — Works Even When Native UUID Fails
+
+**What it is:** Terminal tabs, web previews, local commands, slash commands, and related shell flows now **keep working over plain HTTP** by generating IDs when native UUID support is unavailable.
+
+**Why it matters:** Corporate environments, restricted networks, older systems — Qwen Code doesn't hard-fail anymore. It degrades gracefully.
+
+---
+
+## 7. Security Fixes (Quiet but Critical)
+
+- Updated `qs`, `fast-uri`, `ip-address`, `Hono`, Node adapter security dependencies
+- Updated `fast-uri` and `ip-address` in Live Host and CUA Electron builds
+- Upgraded `glob` and `minimatch` to secure versions (matching reliability + search regressions fixed)
+- Updated `unzipper` to 0.12.5
+- Removed obsolete ExcelJS archive dependency paths
+- MCP, DOMPurify, and compression request parsing vulnerabilities fixed
+
+**Translation:** Supply chain hygiene. Your agent's foundation got patched.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| **v0.27.4** | Nov 15, 2026 | **Stable (Latest)** | **Local dir grants, Feishu/WeCom webhooks, Auto Mode guardrails, multi-workspace Goals, /memory CLI restored, HTTP fallback** |
+| v0.27.3 | Nov 8, 2026 | Stable | Managed agent improvements, web shell polish |
+| v0.27.2 | Nov 1, 2026 | Stable | Worktree tasks, daemon settings, permissions |
+| v0.27.1 | Oct 28, 2026 | Stable | Goals pause, stuck worktree fixes |
+| v0.27.0 | Oct 25, 2026 | Stable | Managed agent platform launch |
+
+---
+
+## Should You Upgrade?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Use Managed Agents** | **Yes** — local dir grants change the game |
+| **Team uses Feishu/WeCom** | **Yes** — native webhooks, no truncation |
+| **Run Auto Mode in production** | **Yes** — guardrails prevent accidents |
+| **Juggle multiple workspaces** | **Yes** — Goals finally multi-workspace |
+| **Need persistent memory** | **Yes** — `/memory` CLI back and better |
+| **On restricted/corporate network** | **Yes** — HTTP fallback prevents hard fails |
+| **Want zero-risk stability only** | Safe — no breaking changes, but wait a week if ultra-conservative |
+
+---
+
+## How to Update
+
+```bash
+# npm (recommended)
+npm i -g @qwen-code/qwen-code@latest
+
+# Or if you use the standalone installer
+# Download from: https://github.com/QwenLM/qwen-code/releases/tag/v0.27.4
+
+# Check version
+qwen-code --version
+# Should show 0.27.4
+```
+
+---
+
+## The Bigger Picture
+
+Qwen Code v0.27.0 launched the **Managed Agent platform**. v0.27.4 makes it **production-ready**:
+
+- **v0.27.0** = "Here's the platform"
+- **v0.27.1-3** = "Fix the rough edges"
+- **v0.27.4** = "Now it actually works for real teams" (local access, webhooks, guardrails, persistence)
+
+The pattern: Alibaba ships fast, iterates in public, hardens quickly. v0.27.4 is the first Managed Agent release I'd confidently recommend for team adoption.
+
+---
+
+## TL;DR
+
+- **Local directory grants** = Managed Agents touch your files safely (temp, no stored creds)
+- **Feishu/WeCom webhooks** = Full replies in your team chat, segmented, not truncated
+- **Auto Mode guardrails** = Asks before destructive/bulk actions, skips HTTP filesystem lookups
+- **Multi-workspace Goals** = One dashboard, multiple projects, organized
+- **`/memory` CLI restored** = Persistent, typed, with Codex import SDK
+- **HTTP fallback** = Works in restricted networks
+- **Security deps updated** = Supply chain clean
+- **No breaking changes** = Safe upgrade
+
+**Upgrade command:** `npm i -g @qwen-code/qwen-code@latest`
+
+---
+
+## Related Articles
+
+- [Qwen Code v0.26 Just Became a Full Multi-Agent Platform — Local, Remote, and Everything In Between](/blog/qwen-code-v0-26-managed-agent-desktop-local-ssh/)
+- [Claude Code v2.1.325 Just Landed — Security Fixes, Code Mode, and 100+ More Fixes](/blog/claude-code-v2-1-317-stability-surge/)
+- [Best Free AI Coding Agents 2026 — No Credit Card Required](/blog/best-free-ai-coding-agents-2026-no-credit-card/)
+- [How to Setup AI Coding Agents — Complete Beginner Guide](/blog/how-to-setup-ai-coding-agents/)
+
+---
+
+*Qwen Code is developed by Alibaba's Qwen team. Repository: [github.com/QwenLM/qwen-code](https://github.com/QwenLM/qwen-code). Release: [v0.27.4](https://github.com/QwenLM/qwen-code/releases/tag/v0.27.4). Published November 15, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
