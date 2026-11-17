@@ -1,0 +1,184 @@
+---
+title: "Zed v1.28.1 Just Dropped — Auto Git Fetch, Agent Fixes, and the Editor Finally Gets Out of Your Way"
+description: "Zed v1.28.1 (Nov 11) graduates auto Git fetching from pre-release, fixes agent compaction bugs, adds mouse-wheel font zoom, and delivers 50+ polish fixes. The stable you've been waiting for."
+tags:
+  - "zed"
+  - "release"
+  - "v1.28.1"
+  - "git"
+  - "ai"
+  - "editor"
+  - "beginner"
+pubDate: 2026-11-17T10:00:00Z
+tool: "zed"
+author: "sage"
+image: "/api/og?title=Zed+v1.28.1+Stable&tool=zed"
+canonical: "https://terminalblog.com/blog/zed-v1-28-1-stable-auto-git-fetch-agent-fixes/"
+---
+
+**Zed v1.28.1 landed November 11** — and it's the stable release that makes v1.28.0-pre's promises real. Auto Git fetching graduates from experimental. Agent compaction stops eating your context window. Mouse-wheel font zoom works in diffs and terminals. Fifty-plus bug fixes later, the editor finally feels like it's *done* fighting you.
+
+---
+
+## The One-Line Summary
+
+**Auto Git fetch + fixed agent compaction + mouse-wheel zoom + 50 fixes = Zed's most polished stable in months.**
+
+---
+
+## 1. Auto Git Fetch — Now Stable, Off By Default
+
+### What it is
+`git.auto_fetch.enabled` (default `false`) fetches your current branch's upstream and the default branch's remote on a configurable interval (60s default).
+
+```json
+// settings.json
+{
+  "git.auto_fetch.enabled": true,
+  "git.auto_fetch.interval_secs": 60
+}
+```
+
+### Why it matters
+- **No more stale branches**: Your branch picker, Git panel, and graph reflect reality
+- **CI/CD stays green**: Fetch failures surface immediately, not at push time
+- **Remote workspaces**: Finally usable over high-latency connections
+
+### The catch
+It's **opt-in**. The team made it default-off because aggressive fetching on large monorepos can spike bandwidth. Enable it per-project or globally — your call.
+
+---
+
+## 2. Agent Compaction Fixed — No More Context Window Explosions
+
+### The bug
+Auto-compaction ran **once per agent turn**. On long turns with many tool calls, the thread could exceed the model's context window before compaction triggered again.
+
+### The fix
+Compaction now runs **continuously** during long turns. It also reuses the prompt cache for ChatGPT subscription models — so you're not paying for tokens you've already sent.
+
+### What this means for you
+- **Long refactoring sessions** don't silently truncate history
+- **ChatGPT subscribers** see lower bills (cached input is cheaper)
+- **Claude users** get the same reliability — compaction respects provider limits
+
+---
+
+## 3. Mouse-Wheel Font Zoom — Finally in Diffs and Terminals
+
+Hold `Cmd` (Mac) or `Ctrl` (Linux/Windows) + scroll in:
+- **Diff views** — zoom the diff, not the whole editor
+- **Terminal panes** — zoom terminal output independently
+
+Enabled via `mouse_wheel_zoom` setting (default on). Tiny UX win, massive daily quality-of-life.
+
+---
+
+## 4. The 50+ Fixes You'll Actually Notice
+
+| Fix | Why you care |
+|-----|--------------|
+| **Windows launch restores previous session** | No more blank window on second launch |
+| **SSH to macOS no longer stalls on "Starting Proxy"** | Remote Mac dev works again |
+| **Switching branches in remote projects** doesn't resend full Git history | Large repos over SSH stay fast |
+| **File finder shows files outside project** when searching by absolute path | Find `/etc/nginx/nginx.conf` from your project |
+| **Copy button on agent responses** shows checkmark confirmation | Know it copied without guessing |
+| **Commit messages keep line breaks** in commit view | Readable commit messages, finally |
+| **Animated WebP files play** in image viewer | See the full animation, not frame 1 |
+| **Terminal links to absolute paths** work across OS (WSL → Windows) | Click a path in terminal, it opens |
+| **Registry agents (Claude Agent, etc.)** no longer fail with `ERR_MODULE_NOT_FOUND` after interrupted install | npm installs are resilient |
+| **Remote terminals** work on Windows SSH servers with Nushell | No more shell-compatibility surprises |
+
+---
+
+## 5. AI-Specific Improvements
+
+### Edit prediction button toggle
+New setting: `edit_predictions.button` — hide the status bar button if you don't use it.
+
+### ACP agent config ordering
+The first option an ACP agent provides now appears **next to the send button** — less hunting for the right tool.
+
+### Subagent cards improved
+Full-screen opens a finished subagent run at its **start**, not the end. Review the whole flow.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| **v1.28.1** | Nov 11, 2026 | **Stable** | **Auto git fetch, agent compaction fixed, mouse-wheel zoom, 50+ fixes** |
+| v1.28.0-pre | Nov 4, 2026 | Pre-release | Auto git fetch, agent improvements |
+| v1.27-stable | Oct 28, 2026 | Stable | Go 1.27, AI commits, memory |
+| v1.26.1-pre | Oct 21, 2026 | Pre-release | Pyrefly, dwarf debugging |
+
+> **Stable vs Pre**: v1.28.1 is the *same code* as v1.28.0-pre plus two weeks of bug fixes. If you were on pre, update. If you wait for stable, this is it.
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Want auto Git fetch without pre-release risk** | **Yes** — now stable |
+| **Hit agent context window limits** | **Yes** — compaction fixed |
+| **Work on remote Mac via SSH** | **Yes** — proxy stall fixed |
+| **Use Zed on Windows** | **Yes** — session restore fixed |
+| **Prefer rock-solid only** | **Already here** — this *is* the stable |
+
+---
+
+## How to Get It
+
+```bash
+# macOS / Linux
+curl -fSL https://zed.dev/install.sh | sh
+
+# Windows (scoop)
+scoop bucket add zed https://github.com/zed-industries/scoop-zed.git
+scoop install zed
+
+# Or download directly
+# https://zed.dev/releases
+```
+
+**Changelog**: [github.com/zed-industries/zed/releases/tag/v1.28.1](https://github.com/zed-industries/zed/releases/tag/v1.28.1)
+
+---
+
+## The Pattern: Editor → AI Platform → Daily Driver
+
+Zed v1.24 gave you **GPT-6 + Sol + Git tags + agent memory**.  
+v1.25 gave you **automatic unfolding, inlay hints, Gemini + Argon**.  
+v1.26 gave you **Pyrefly + dwarf debugging**.  
+v1.27 gave you **Go 1.27 + AI commits + memory**.  
+
+**v1.28.1 gives you the Git workflow that just works.**
+
+Auto fetch. Fixed compaction. Zoom that respects context. Fifty fixes that vanish.
+
+This isn't an AI feature drop. It's **the editor disappearing so the AI can work**.
+
+Update. Enable `git.auto_fetch.enabled`. Watch the branch picker stay current. **Code. Commit. Ship.**
+
+---
+
+## Related Articles
+
+- [Zed v1.28.0-pre — Auto Git Fetch, Agent Improvements](/blog/zed-v1-28-0-pre-auto-git-fetch-agent-improvements/)
+- [Zed v1.27 Stable — Go 1.27, AI Commits, Memory](/blog/zed-v1-27-stable-go127-ai-commits-memory/)
+- [Zed Just Got Git Branch Mode — and It Changes How You Review Code](/blog/zed-just-got-git-branch-mode-bookmarks-claude-fable-52/)
+- [Best Free AI Coding Agents 2026 — No Credit Card Required](/blog/best-free-ai-coding-agents-2026-no-credit-card/)
+
+## Related articles
+
+- [Zed v1.27 Just Made AI Commit Messages Sound Like You — Plus Go 1.27 Syntax and 30% Less Agent RAM](/blog/zed-v1-27-stable-go127-ai-commits-memory/)
+- [Zed v1.24 Just Added Git Tag Creation, Terminal-to-Agent Drag-and-Drop, and a 23% Smaller Linux Binary -- The Pre-Release That Feels Like a Milestone](/blog/zed-v1-24-gpt6-sol-git-tags-agent-memory/)
+- [Zed v1.27.0-pre Just Dropped Go 1.27 Syntax, AI Commit Messages That Match Your Style, and Agent Memory Fixes](/blog/zed-v1-27-0-pre-go127-ai-commits-memory/)
+
+---
+
+*Changelog source: [github.com/zed-industries/zed/releases/tag/v1.28.1](https://github.com/zed-industries/zed/releases/tag/v1.28.1). Published November 17, 2026 — covers Zed v1.28.1 released November 11, 2026.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you all of them and more for just $12/mo. One subscription, every answer.*
