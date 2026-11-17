@@ -1,0 +1,210 @@
+---
+title: "Codex 0.168 Just Gave You Side Conversations in the Terminal — And Model Providers in the UI"
+description: "Codex v0.168.0 (Nov 13) adds opt-in side conversation panes in the TUI, model provider browsing and selection in the config panel, audio recording support, animated GIF generation, and 100+ bug fixes. The stable release that makes the terminal workspace multi-context."
+tags:
+  - "codex"
+  - "openai"
+  - "release"
+  - "v0.168.0"
+  - "tui-workspace"
+  - "side-conversations"
+  - "model-providers"
+  - "coding-agent"
+  - "beginner"
+pubDate: 2026-11-17
+updatedDate: 2026-11-17
+author: "Anshad"
+tool: "codex"
+category: "releases"
+canonical: "https://terminalblog.com/blog/codex-0-168-side-conversations-model-providers/"
+---
+
+**Codex v0.168.0 landed November 13, 2026** — same day as v0.169.0, but this one's the quiet workhorse. The headline: **opt-in side conversation panes** in the TUI (enable `features.tui_workspace`), **model provider browsing and selection** in the config panel, **audio recording support** for voice-capable models, **animated GIF generation**, and **OSC 777 terminal notifications**.
+
+If v0.167 gave you the Command Center, v0.168 gives you a **multi-context terminal workspace**.
+
+---
+
+## The One-Line Summary
+
+**Codex 0.168.0 (Nov 13) → Side conversation panes in TUI (drag divider, zoom with leader z), browse/switch model providers in config panel, audio recordings with rejection recovery, animated GIF generation, tmux image previews, OSC 777 notifications. Run `cargo install codex --version 0.168.0` or re-run installer.**
+
+---
+
+## Feature 1: Side Conversation Panes — Your Multi-Context Workspace
+
+**What it is:** Enable `features.tui_workspace` and get a **resizable side pane** beside your main chat. Drag the divider to resize. Press `leader z` to zoom the focused pane. Each pane = independent conversation context.
+
+```bash
+# In Codex TUI config:
+# Enable: features.tui_workspace = true
+# Then: restart Codex
+# Open side pane: leader s (or menu)
+# Resize: drag divider or leader + arrow keys
+# Zoom focused pane: leader z
+```
+
+**Why it matters:** Before 0.168, you had *one* conversation. Working on a frontend bug and a backend refactor meant: finish one → clear context → start the other. Now: **main pane = frontend, side pane = backend**. Switch with a keystroke. Context preserved in both.
+
+**For beginners:** Think of it like a split terminal (`tmux` split) but each side is a full Codex conversation with its own history, files, and context. You're not "losing your place" — you're working in parallel.
+
+---
+
+## Feature 2: Model Provider Browsing in the TUI Config Panel
+
+**What it is:** Under **Sessions → Model providers** in the TUI config panel, you can now:
+- **Browse available providers** (OpenAI, Anthropic, Google, Azure, Bedrock, GCP Vertex AI, custom gateways)
+- **Choose the default provider for new chats**
+- **Create custom gateways** with your own endpoints
+- **Update gateway, Bedrock, and GCP settings** inline
+
+**Why it matters:** Previously, provider setup meant editing config files or using CLI flags. Now it's **discoverable in the UI**. New users see what's available. Power users switch providers without leaving the TUI.
+
+**For beginners:** If you've ever wondered "which models can I actually use?" — open the config panel, go to Model providers, and *see the list*. No more guessing.
+
+---
+
+## Feature 3: Audio Recording Support (Voice-Capable Models)
+
+**What it is:** Attach audio recordings when using models that support audio input. Codex:
+- **Skips confirmed rejected recordings** on later turns (no re-sending what you already said "no" to)
+- **Uses clip duration** to keep more short recordings in context
+- **Durable rejection recovery** — if a recording was rejected, Codex remembers and doesn't retry it
+
+```bash
+# In TUI with audio-capable model:
+# 1. Press record shortcut (or menu)
+# 2. Speak your prompt
+# 3. Recording attaches to composer
+# 4. Send → model hears your voice
+```
+
+**Why it matters:** Voice coding isn't a gimmick — it's faster for "explain this function" or "write a test for the auth flow." The rejection recovery means you don't get duplicate audio in context when you retry.
+
+---
+
+## Feature 4: Animated GIF Generation
+
+**What it is:** Enable `features.image_generation_animation` to generate or edit **animated GIFs** with optional frame count and timing controls.
+
+```bash
+# In TUI config:
+features.image_generation_animation = true
+
+# Then in chat:
+"Generate a loading spinner GIF: 8 frames, 100ms per frame, blue pulse"
+```
+
+**Why it matters:** Quick UI prototypes, loading states, micro-interaction demos — generated in chat, no Figma/After Effects roundtrip.
+
+---
+
+## Feature 5: Fullscreen Image Previews in tmux (Ghostty/Kitty)
+
+**What it is:** Fullscreen Codex now displays **image previews and pets** (the little Codex mascots) in tmux on Ghostty and Kitty with `allow-passthrough all`.
+
+**Why it matters:** If you live in tmux + Ghostty/Kitty, images *just work* in fullscreen. No more "open in browser" to see a diagram.
+
+---
+
+## Feature 6: OSC 777 Terminal Notifications
+
+**What it is:** Set `tui.notification_method = "osc777"` for **terminal-native notifications**. Approval notifications show:
+- **Longer command previews** (see what's actually running)
+- **Distinction between terminal input vs network access requests**
+
+```bash
+# In Codex config:
+tui.notification_method = "osc777"
+
+# Requires terminal supporting OSC 777 (Ghostty, Kitty, WezTerm, iTerm2)
+```
+
+**Why it matters:** No more guessing "what did I just approve?" — the notification tells you *exactly* what's waiting.
+
+---
+
+## Key Bug Fixes (50+)
+
+| Fix | Impact |
+|-----|--------|
+| Local TUI history/resume filtered by signed-in ChatGPT account | No cross-account thread leakage |
+| Open/resumed chats use saved model provider after default change | Your sessions don't switch providers unexpectedly |
+| TUI renders interrupted replies as single Markdown message | Cleaner transcript, reasoning summaries restored on replay |
+| Steering messages reach running turns during final save/switch | Your mid-stream corrections actually arrive |
+| Fuzzy file search prioritizes filename matches | Parent directories don't crowd out exact matches |
+| Idle Windows MCP servers release filesystem I/O | No more "file locked by Codex" on Windows |
+| Windows deny-read globs expanded without ripgrep | Faster sandbox policy evaluation |
+
+---
+
+## The Upgrade Path
+
+```bash
+# If installed via cargo
+cargo install codex --version 0.168.0
+
+# Or re-run installer (check codex.openai.com for current method)
+# Typical: curl -fsSL https://codex.openai.com/install.sh | bash
+
+# Check version
+codex --version
+# Should show 0.168.0
+
+# Enable side conversations (opt-in)
+# In TUI: /config → Features → tui_workspace → enable → restart
+```
+
+---
+
+## Should You Update?
+
+| If You... | Verdict |
+|-----------|---------|
+| **Want multi-context in terminal** | **Yes** — side panes = parallel workflows |
+| **Switch model providers often** | **Yes** — UI provider browser is a UX leap |
+| **Use voice/audio with models** | **Yes** — recording support + rejection recovery |
+| **Live in tmux + Ghostty/Kitty** | **Yes** — images/pets in fullscreen |
+| **On 0.167.x and stable** | **Yes** — pure upgrades, no breaking changes |
+| **Never use TUI workspace** | Optional — but try it, it's the point |
+
+---
+
+## The Pattern
+
+```
+0.167 (Nov 6)  → Command Center, image previews, GCP wizard, cross-backend switching
+0.168 (Nov 13) → Side conversations, model provider UI, audio, GIF gen, OSC 777
+0.169 (Nov 13) → Multi-tab workspace, task search, collapsible transcripts
+```
+
+OpenAI shipped **two stable releases same day** (0.168 + 0.169). 0.168 = **workspace polish + provider UX**. 0.169 = **multi-tab + search + transcript UX**. Together they make the TUI a **full terminal IDE**.
+
+---
+
+## Quick Test: Your First Side Conversation in 2 Minutes
+
+```bash
+# 1. Update to 0.168.0
+# 2. Enable workspace: /config → Features → tui_workspace = true → restart
+# 3. Open side pane: leader s (default leader = Ctrl+Space)
+# 4. In main pane: "Help me refactor the auth middleware"
+# 5. In side pane: "Write unit tests for the new auth flow"
+# 6. Switch: leader + arrow keys (or click)
+# 7. Both contexts preserved. Both histories independent.
+```
+
+---
+
+## Related Articles
+
+- [Codex 0.169 Just Gave You Multiple Side Chats - Switch Contexts Without Losing Your Mind](/blog/codex-0-169-agent-command-center-side-chats/)
+- [Codex v0.167 Just Dropped an Agent Command Center — And It Runs in Your Terminal](/blog/codex-v0-167-agent-command-center-stable/)
+- [Claude Code v2.1.326 Just Dropped 150+ Fixes — The Stability Wave Is Now Unstoppable](/blog/claude-code-v2-1-326-stability-breakthrough/)
+- [Best Coding Agents 2026 Decision Guide](/blog/best-coding-agents-2026-decision-guide/)
+
+---
+
+*Codex 0.168.0 released November 13, 2026. Full changelog: [github.com/openai/codex/releases/tag/rust-v0.168.0](https://github.com/openai/codex/releases/tag/rust-v0.168.0). Codex CLI is Apache-2.0 open source.*
+
+*Why pay $20/mo for ChatGPT, $20/mo for Claude, $20/mo for Gemini? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you unified access to Claude, GPT, Gemini, Grok, and 50+ models for just $12/mo. One subscription, every answer.*
