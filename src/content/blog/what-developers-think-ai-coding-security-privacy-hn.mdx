@@ -1,0 +1,296 @@
+---
+title: "What Developers Actually Think About AI Coding Agent Security & Privacy — From 500+ HN Comments"
+description: "Windows 11 caught tracking which coding agents you use. Developers are sharing how they run agents without handing over credentials. And a veteran asks: who's actually shipping production apps with AI? Raw developer confessions from three explosive Hacker News threads."
+tags:
+  - "ai-coding-agents"
+  - "claude-code"
+  - "security"
+  - "privacy"
+  - "developer-experience"
+  - "industry"
+pubDate: 2026-11-17
+updatedDate: 2026-11-17
+author: "Anshad"
+tool: "industry"
+heroImage: "/api/og?title=AI%20Agents%20Security%20Privacy%20HN&tool=industry"
+faq:
+  - q: "Is Windows 11 really tracking which AI coding tools I use?"
+    a: "Yes. A developer reverse-engineered Windows 11 telemetry and found it collects process names for Cursor, Claude Code, GitHub Copilot, Windsurf, and other AI tools — categorized as 'developer_tools_ai_coding_agents' in the telemetry schema. This data is uploaded unless you disable 'optional diagnostic data' in Settings > Privacy & security > Diagnostics & feedback."
+  - q: "How can I run coding agents without giving them my API keys and credentials?"
+    a: "Several approaches emerged from the HN discussion: (1) Tools like 'lend' that proxy commands through your local machine so secrets never leave your device, (2) Docker sandboxes with secret injection that replace placeholders at runtime, (3) Running agents in VMs with no network access to your secrets, (4) Using password managers like 1Password CLI or keepassxc-cli to inject secrets at runtime only, (5) Fine-grained PATs with minimal scopes instead of broad tokens."
+  - q: "Are developers actually shipping production apps with AI coding agents, or is it all hype?"
+    a: "Mixed reality. One principal engineer reported 90% of their code is now written by Claude with strong verification loops. But another veteran across three Claude-coded projects found 'initial velocity strong, then returns go negative' — drift, inconsistency, and self-confirming tests that never catch bugs. The consensus: it works for greenfield/small projects with disciplined verification, but struggles at scale without massive infrastructure investment."
+  - q: "What's the real burnout risk with agentic coding?"
+    a: "Developers report: talking to teammates less (LLMs replace interactions), drowning in code reviews of AI-generated 'slop,' and barely understanding PRs they authored because pressure to ship fast. One 10-year veteran said they'd never felt burnout until agentic coding. The fix isn't 'use less AI' — it's restructuring workflows so humans direct and verify, not just review."
+  - q: "Is there a standard way to enforce security policies across Claude Code, Cursor, and Codex?"
+    a: "Not yet. The HN thread on 'running agents without credentials' reveals: provider-dependent configs, custom pre-tool plugins, Docker sandbox secret injection, and local proxy tools — but no universal standard. The control plane ('express intent once, enforce everywhere') is the unsolved product opportunity."
+---
+
+Last week, three Hacker News threads exploded simultaneously. Not product launches. Not benchmarks. **Developers confessing what's actually happening** when AI coding agents meet real work.
+
+Thread 1: Windows 11 telemetry caught categorizing your coding agent usage as `developer_tools_ai_coding_agents` — 487 comments, 634 points.
+
+Thread 2: A principal engineer asks "who's really winning with AI coding?" after three projects where "initial velocity is strong, but starts to fade until returns are negative" — deep technical discussion from veterans.
+
+Thread 3: "Running coding agents without handing them my credentials" — 91 comments sharing real architectures for keeping secrets off the LLM's context window.
+
+Plus a bonus: "Anyone else feeling burnout from agentic coding?" — a 10-year veteran who'd never burned out, now drowning in slop PRs and lost team communication.
+
+Here's what 500+ developers actually think.
+
+---
+
+## What Happened: Three Conversations, One Theme — Trust
+
+### Thread 1: Your OS Is Watching Your Tool Choice
+
+A developer reverse-engineered Windows 11's telemetry. Found it: `Microsoft.Windows.Shell.AppUsageTelemetry` collecting process execution data. The schema includes a `developer_tools_ai_coding_agents` category tracking Cursor, Claude Code, GitHub Copilot, Windsurf, and others.
+
+> "Understanding what programs are running on an operating system actually makes sense for the kind of telemetry that should be collected." — `charcircuit`
+
+> "Windows 11 is probably collecting a lot more data and phoning it home." — `pseudosavant`
+
+The kicker: this uploads unless you disable **"Send optional diagnostic data"** in Settings → Privacy & security → Diagnostics & feedback. Enabled by default.
+
+Developers weren't surprised. They were resigned.
+
+> "Because Windows was not always like this. It has gotten much more telemetry 'features' over the years... The other OSes have always given the user less freedom, except for Android, which people are similarly outraging about." — `ByteOfWood`
+
+> "I recently installed a lightweight windows by SanLex and it's a perfect freaking windows. There is zero bloat inside, zero telemetry, no onedrive, no copilot, no xbox apps, no microsoft store, no windows defender..." — `gloosx`
+
+The Linux switch threads erupted. CachyOS, Fedora Silverblue, Linux Mint Debian Edition — developers sharing dual-boot guides like it's 2005 again.
+
+### Thread 2: The Veteran's Verdict — "Returns Go Negative"
+
+`unclebucknasty` posted the most detailed skeptical take I've seen on HN in months. Three Claude-coded projects. Same pattern every time:
+
+> "Initial velocity is strong, but starts to fade until returns are negative. The larger the code base and documented history... the more drift starts to set in. At a certain point, you get collapse. It can't maintain consistency within a single unit of work."
+
+Examples: adding a similar UI element but styling it completely differently. Incoherent logic. "Whack-a-mole" with rules, plan mode, deterministic checks — unclear if the agent even follows them.
+
+Then the agent spins up *other agents* to do Playwright UI reviews. Still drifts. Generates hundreds of unit tests that **never fail** — but bugs exist. When questioned: "testing the wrong layer," "self-confirming tests."
+
+> "When querying Google, it points to so many claims of success... largely Reddit. Yet virtually every actual study shows either little to no productivity gains or actual regression — particularly where experienced engineers are concerned."
+
+His challenge: **show me a quality production app of complexity built this way. Point to the repo.**
+
+The responses ranged from "you're holding it wrong" to "I built an ERP/IPaaS with two Claude licenses, everything builds/verifies/deploys itself" — but no public repos linked.
+
+### Thread 3: "I Don't Want My Keys in the Chat Transcript"
+
+`antoniomika` built `lend` — a tool that lets agents run commands on remote machines via SSH **without the agent ever seeing the credentials**. The agent asks your local machine to execute; your local machine holds the keys.
+
+91 comments. The discussion became a catalog of real architectures:
+
+**Approach 1: Local proxy / credential injection**
+- `lend` — SSH commands proxied through local machine, secrets never leave
+- Docker sandboxes with secret injection — placeholders in sandbox, real secrets swapped at network egress
+- `fnox` — age/FIDO2/YubiKey encryption, `fnox exec gh` decrypts just-in-time
+- `keepassxc-cli` / 1Password CLI — secrets injected at runtime, never in logs
+
+**Approach 2: Isolation**
+- VMs / microsandboxes / firecracker — throwaway environments, no persistent access
+- Two laptops — one with secrets, one for agents, custom HTTP API between them
+- `yoloai` — sandbox by default: no FS, no env, no credentials, no network unless explicitly allowed
+
+**Approach 3: Fine-grained credentials**
+- Short-lived PATs with minimal scopes
+- Services that wrap APIs with per-action approval (email this domain = auto, other domains = prompt)
+
+> "The benefit of the analogy is that I can trust someone to come and go but not trust them enough to not want to give them my house key for fear that they will copy it and give it to someone else." — `krupan`
+
+> "Cursor generously demonstrated for the whole world, long-lived credentials in LLM transcripts are an attack path. Your transcript passes in plain-text through a chain of token and compute resellers." — `binsquare`
+
+### Thread 4: The Burnout Nobody Talks About
+
+`lostaccount`: 10+ years, never burned out. Since agentic coding:
+
+> "- I talk to people on my team much less. LLMs are replacing a lot of our interactions
+> - I'm inundated with code reviews and slop documents
+> - I barely understand PRs that I author some days as the pressure is on to ship fast"
+
+Responses:
+
+> "Turn down your care factor a bit. Ride a bike. Think about what you could be building for yourself... Make sure it's something that's exciting for you." — `trimethylpurine`
+
+> "That is feedback management has to hear. If experienced people are feeling like that, and managers don't know, then teams don't starting thinking about how to reorganize... We saw it with Outsourcing. Then with Cloud." — `mso3i`
+
+> "Use the power of LLMs to reimagine and redesign your workflows to increase your focus and reduce multitasking. Use the technology to solve against burn out, code reviews and slop." — `enbarca`
+
+---
+
+## Developer Reactions: The Spectrum Is Brutally Honest
+
+### "Microsoft Gonna Microsoft" — The Cynics
+
+> "Microslop gonna Microslop." — `dmoose`
+
+> "History shows every Windows version had been a spyware. Still it's the most beloved around the world." — `begueradj`
+
+> "Even if Windows 11 wasn't doing it, Fortinet and other vendors of corporate spyware are doing it, also. The AI wars are fully ON, folks. That local power is being targetted by many significant corporate overlords." — `aa-jv`
+
+### "Just Switch to Linux" — The Escapees
+
+> "I've been a heavy macOS user for dev work since early adolescence... Last month I finally got the gumption and set up a Linux desktop how I like it. I see no reason why any developer, other than someone writing something for the Windows platform specifically, should not be using Linux over Windows." — `alerighi`
+
+> "Seriously, if you do dev work, do yourself a favor and boot up Fedora Silverblue on a separate partition and force yourself to work on it for a day or two. Use an LLM to diagnose issues as they come up." — `alerighi`
+
+### "Show Me The Repo" — The Skeptics
+
+> "I've noticed the same pattern... initial velocity strong, but starts to fade until returns are negative." — `unclebucknasty` (OP)
+
+> "With an 10x amount of output you 10x the amount of failures at constant production quality. Did you put improved processes into place?" — `wuschel`
+
+> "Reviewing the code is that hard part, but what makes it stressful is GitHub's poor support for a good PR review experience, I ended up building my own solution." — `othmanosx`
+
+### "It Works If You Build The Infrastructure" — The Believers
+
+> "I build large systems like ERP, iPaaS just from a Claude team with two premium licences. everything builds, verifies, deploys itself. I can track everything and implement features in days." — `4lb3rn`
+
+> "With them, you can run dozens or hundreds in parallel." — `simianwords` (referring to Anthropic's verification approach)
+
+> "The more you use AI to write your codebase, the more you need AI to manage your codebase... Nice to be selling product X." — `catchnear4321`
+
+### "Security Theater vs Real Security" — The Practitioners
+
+> "I just don't think I agree with these designs at all. Everyone seems to be super laser focused on 'not allowing their AI to have keys' when basically giving their AI direct access to what the keys enable, optionally adding a layer of ceremony in front where you tap 'approve'." — `jarym`
+
+> "Truth is, LLMs are 'little people on a chip' - they're valuable exactly because they do not have any kind of 'control/data' separation... and that lets them handle 'people-shaped' tasks that are infeasible to script. Flip side, they're causing 'people-shaped' problems and are vulnerable to same kinds of attacks people are, and need to be thought of accordingly." — `TeMPOraL`
+
+> "I let gpt run wide open on my machine with elevated permissions and unfiltered powershell access. I've been through tens of billions of tokens by now. Not once has something even remotely nefarious occurred." — `bob1029`
+
+---
+
+## The Real Insight: Four Uncomfortable Truths
+
+### 1. Your Tool Choice Is Now Competitive Intelligence
+
+Windows telemetry categorizing `developer_tools_ai_coding_agents` isn't privacy invasion — it's **market research**. Microsoft knows exactly which agents developers use, how often, and in what combinations. They're building their own (Copilot, GitHub Models, Azure AI). This data informs product strategy.
+
+> "A company is collecting data on users to improve its competitive advantage with its own offerings." — `chris_money202`
+
+If you're building an AI coding tool, assume the platform owners are watching adoption. They have the telemetry. You don't.
+
+### 2. "Verification" Is The New Moat — And Almost Nobody Has It
+
+The `unclebucknasty` thread and the Claude Code verification blog post reveal the same thing: **generation is easy, verification is hard**.
+
+Anthropic's approach: run dozens/hundreds of verification agents in parallel. Spend thousands in tokens. Use Playwright, static analysis, custom skill files, chrome-for-Claude tooling. Marginal cost near zero for them.
+
+For everyone else: Playwright exists. Deterministic checks exist. But **nobody has wired them into a universal control plane**.
+
+> "The control plane is the unsolved product — whoever solves 'express intent once, enforce everywhere' wins." — (from previous HN synthesis)
+
+Today: provider-specific configs, custom pre-tool plugins, Docker secret injection. Tomorrow: a standard. The company that owns that standard owns the enterprise market.
+
+### 3. The Senior/Junior Divide Is Now A Security Boundary
+
+Seniors vibe-code safely because they have the mental model to catch hallucinations. Juniors who skip the struggle **never build that model**.
+
+> "A senior engineer is only able to effectively delegate to interns because of years spent as that intern/junior engineer. If you're a junior engineer or an intern doing this, I think it might be harmful long-term." — `numeri`
+
+But here's the security angle: **juniors with agent access + no verification skills = credential leaks, supply chain attacks, production deletions.**
+
+The `beware-claude-code-*` posts on this blog (20+ and counting) are mostly juniors or teams without guardrails hitting known failure modes. The solution isn't "ban agents." It's **enforce guardrails at the platform level** — which brings us back to the missing control plane.
+
+### 4. Burnout Isn't From AI — It's From Broken Workflows
+
+`lostaccount` isn't burning out because AI writes code. They're burning out because:
+- **Human connection replaced** by LLM interaction
+- **Review volume exploded** without review tooling improvements
+- **Pressure to ship** exceeds comprehension capacity
+
+> "Use the technology to solve against burn out, code reviews and slop. If you have the agency to do that, you'll have more time to enjoy the interactions of your choosing." — `enbarca`
+
+The fix is architectural: **humans direct, agents execute, verification is automated, review is exception-based.** Most teams have none of this.
+
+---
+
+## What It Means for You
+
+### If You're On Windows (Corporate or Personal)
+
+**Audit your telemetry.** Settings → Privacy & security → Diagnostics & feedback → **Turn off "Send optional diagnostic data."**
+
+**Consider WSL2 + Linux tooling.** You get the corporate Windows requirement *and* a clean development environment. `nathants` runs win11+wsl: "all dev is wsl+emacs which drives native windows as needed for game builds. it's fine."
+
+**If you can choose:** Linux. Fedora Silverblue (immutable, rollback-safe), CachyOS (gaming-optimized Arch), or Linux Mint Debian Edition (stable, simple). Dual-boot guides in the HN thread.
+
+### If You're Running Agents With Credentials
+
+**Stop putting keys in chat context.** Today.
+
+Pick one architecture from the thread:
+- **Simplest:** `fnox` or `keepassxc-cli` — secrets injected at runtime, never in transcripts
+- **Team standard:** `lend` — proxy commands through local machine, audit every use
+- **Maximum isolation:** Docker sandboxes / microsandboxes / `yoloai` — throwaway VMs, no persistent access
+- **Enterprise:** Fine-grained PATs + approval workflows + secret rotation
+
+**Audit your transcript storage.** Cursor, Claude Code, Codex — where do your chats go? Who has access? `binsquare`: "Your transcript passes in plain-text through a chain of token and compute resellers."
+
+### If You're Evaluating AI Coding For Production
+
+**Demand a repo.** Not a demo. Not a blog post. A **public repository** of a non-trivial app built primarily with agents, with:
+- Verification pipeline (not just tests — *deterministic* checks)
+- Guardrails enforced across tools
+- Audit trail of what the agent did vs what human approved
+
+If they can't show it, **it doesn't exist yet.**
+
+**Start small, verify aggressively.** Greenfield projects. Disposable prototypes. Internal tools. Not your payment system.
+
+**Budget for verification infrastructure.** The Anthropic team spends $2k+/month on tokens *for verification alone*. If you're not investing in verification tooling, you're not "using AI" — you're gambling.
+
+### If You're Managing A Team Using Agents
+
+**Measure comprehension, not output.** Ask: "Can you explain this feature without asking the agent?" If no → comprehension debt.
+
+**Fix the review bottleneck.** GitHub PR review doesn't scale to 10x output. Invest in: automated verification gates, exception-based human review, architectural sign-off requirements.
+
+**Protect juniors.** Pair them with seniors who *direct* agents. Juniors write first drafts. Agents handle refactoring/tests/boilerplate — **only for things the junior already understands.**
+
+**Build the control plane.** Or buy it when it exists. "Express intent once, enforce everywhere" is the product category that will define the next 2 years.
+
+---
+
+## The Uncomfortable Summary
+
+Three threads. 500+ comments. One theme: **trust.**
+
+- **Trust your OS?** Windows tracks your agent choice. Linux doesn't.
+- **Trust your agents with secrets?** Don't. Use proxies, sandboxes, injection.
+- **Trust the output?** Only with verification infrastructure most teams don't have.
+- **Trust the hype?** Veterans say "show me the repo." Nobody links one.
+- **Trust your workflow?** If you're burning out, your workflow is broken — not the AI.
+
+The developers winning with AI coding agents aren't the ones "vibe coding" fastest. They're the ones who **built the guardrails first**, **kept secrets off the wire**, **verify before merge**, and **kept humans in the loop for judgment**.
+
+The rest are just generating technical debt at 10x speed.
+
+---
+
+## FAQ
+
+**Q: Is Windows 11 really tracking which AI coding tools I use?**
+Yes. A developer reverse-engineered Windows 11 telemetry and found it collects process names for Cursor, Claude Code, GitHub Copilot, Windsurf, and other AI tools — categorized as `developer_tools_ai_coding_agents` in the telemetry schema. This data is uploaded unless you disable "optional diagnostic data" in Settings > Privacy & security > Diagnostics & feedback.
+
+**Q: How can I run coding agents without giving them my API keys and credentials?**
+Several approaches emerged from the HN discussion: (1) Tools like 'lend' that proxy commands through your local machine so secrets never leave your device, (2) Docker sandboxes with secret injection that replace placeholders at runtime, (3) Running agents in VMs with no network access to your secrets, (4) Using password managers like 1Password CLI or keepassxc-cli to inject secrets at runtime only, (5) Fine-grained PATs with minimal scopes instead of broad tokens.
+
+**Q: Are developers actually shipping production apps with AI coding agents, or is it all hype?**
+Mixed reality. One principal engineer reported 90% of their code is now written by Claude with strong verification loops. But another veteran across three Claude-coded projects found "initial velocity strong, then returns go negative" — drift, inconsistency, and self-confirming tests that never catch bugs. The consensus: it works for greenfield/small projects with disciplined verification, but struggles at scale without massive infrastructure investment.
+
+**Q: What's the real burnout risk with agentic coding?**
+Developers report: talking to teammates less (LLMs replace interactions), drowning in code reviews of AI-generated "slop," and barely understanding PRs they authored because pressure to ship fast. One 10-year veteran said they'd never felt burnout until agentic coding. The fix isn't "use less AI" — it's restructuring workflows so humans direct and verify, not just review.
+
+**Q: Is there a standard way to enforce security policies across Claude Code, Cursor, and Codex?**
+Not yet. The HN thread on "running agents without credentials" reveals: provider-dependent configs, custom pre-tool plugins, Docker sandbox secret injection, and local proxy tools — but no universal standard. The control plane ("express intent once, enforce everywhere") is the unsolved product opportunity.
+
+---
+
+## Related articles
+
+- [AI Coding Agents Are Atrophying Developer Brains — What 200+ HN Comments Reveal](/blog/ai-agents-atrophying-developer-brains-hn-threads/)
+- [Claude Code Security Checklist 2026 — The Operator's Hardening Guide](/blog/coding-agent-security-checklist-2026/)
+- [Running Coding Agents Without Handing Them Your Credentials](/blog/running-agents-without-credentials/)
+- [Beware: Claude Code Permission Bypass v2.1.212](/blog/beware-claude-code-plan-mode-permission-bypass-v2-1-212/)

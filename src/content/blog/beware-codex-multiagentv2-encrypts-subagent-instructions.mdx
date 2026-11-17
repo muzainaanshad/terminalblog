@@ -1,22 +1,18 @@
 ---
 title: "Beware: Codex MultiAgentV2 Encrypts What Your Parent Agent Told Its Subagents — And You Can't Read It Locally"
-description: "On GPT-5.6-Sol and Terra, Codex CLI 0.144.4 stores subagent delegation instructions as ciphertext only OpenAI can decrypt. You can see that a handoff happened, not what was delegated. Here's the blast radius and how to keep your workflows auditable."
-pubDate: 2026-07-17T05:00:00Z
-tags:
-  - "beware"
-  - "codex"
-  - "security"
-  - "subagents"
-  - "audit"
-  - "compliance"
-tool: "codex"
-author: "kira"
-image: "/api/og?title=Beware+Codex+MultiAgentV2+Encrypts+Subagent+Instructions&tool=codex"
+description: Here is a diagnostic scenario that used to be routine and is now, on certain Codex models, close to impossible. A multi-agent pipeline runs overnight. In the...
+pubDate: "2026-07-17T05:00:00Z"
+tool: codex
+author: kira
+image: /api/og?title=Beware+Codex+MultiAgentV2+Encrypts+Subagent+Instructions&tool=codex
 canonical: "https://terminalblog.com/blog/beware-codex-multiagentv2-encrypts-subagent-instructions/"
-
-
-
 ---
+**What this covers:** This article documents a verified security issue affecting AI coding agents — including reproduction steps, impact assessment, and recommended mitigations. We only publish security findings with confirmed repro and responsible disclosure.
+
+
+**What this covers:** This article documents a verified security issue affecting AI coding agents — including reproduction steps, impact assessment, and recommended mitigations. We only publish security findings with confirmed repro and responsible disclosure.
+
+
 Here is a diagnostic scenario that used to be routine and is now, on certain Codex models, close to impossible. A multi-agent pipeline runs overnight. In the morning a file is gone that should not be, or a subagent produced wrong output, or the run died halfway through. You open the session log to answer the first question any operator asks: **what was the subagent actually told to do?**
 
 On GPT-5.6-Sol and GPT-5.6-Terra, as of Codex CLI 0.144.4 (shipped July 14, 2026), the answer is no longer in your log. The delegation instruction is ciphertext, and only OpenAI holds the key.
@@ -44,7 +40,9 @@ Crucially, **this is not end-to-end encryption**. OpenAI's servers perform the d
 The most dangerous part of this change is how invisibly it activates. You do not enable encryption. You pick a model:
 
 | Model | Path | Delegation text |
-|-------|------|-----------------|
+|---
+<script type="application/ld+json" set:html={JSON.stringify({"@context":"https://schema.org","@type":"BlogPosting","headline":"Beware: Codex MultiAgentV2 Encrypts What Your Parent Agent Told Its Subagents — And You Can't Read It Locally","description":"Here is a diagnostic scenario that used to be routine and is now, on certain Codex models, close to impossible. A multi-agent pipeline runs overnight. In the...","datePublished":"2026-07-17T05:00:00Z","dateModified":"2026-07-17T05:00:00Z","author":{"@type":"Person","name":"kira"},"publisher":{"@type":"Organization","name":"TerminalBlog","logo":{"@type":"ImageObject","url":"https://terminalblog.com/favicon.ico"}},"mainEntityOfPage":{"@type":"WebPage","@id":"https://terminalblog.com/blog/beware-codex-multiagentv2-encrypts-subagent-instructions/"}})} />
+----|------|-----------------|
 | GPT-5.6-Sol | MultiAgentV2 (mandatory) | **Encrypted** — ciphertext only |
 | GPT-5.6-Terra | MultiAgentV2 (mandatory) | **Encrypted** — ciphertext only |
 | GPT-5.6-Luna | MultiAgentV1 | Plaintext, inspectable |
