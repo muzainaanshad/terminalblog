@@ -1,0 +1,159 @@
+---
+title: "Hermes Agent v0.23.2 Just Landed — 8,000 Commits, 2,000 PRs, One Solid Patch Release"
+description: "Hermes Agent v0.23.2 (Nov 16) rolls up nearly 2,000 PRs and 8,000 commits since v0.23.1 into a stable patch. Durable subagents, prompt-cache clock, fallback check, slimmer macOS bundle, and 940 issues closed — here's what matters for daily use."
+tags:
+  - "hermes"
+  - "nous-research"
+  - "release"
+  - "coding-agents"
+  - "stable"
+  - "beginner"
+pubDate: 2026-11-16
+author: "Anshad"
+tool: "hermes"
+category: "releases"
+---
+
+**Hermes Agent v0.23.2 dropped November 16** — and it's the kind of patch release that makes you wonder what they consider a "minor" update. Nearly 8,000 commits. Almost 2,000 merged PRs. 940 issues closed. All rolled into one stable tag.
+
+---
+
+## The One-Line Summary
+
+**v0.23.2 is a massive stabilization window masquerading as a patch.** If you've been on canary or holding at v0.23.1, this is the "it just works" update you've been waiting for. Full curated notes ship with v0.24.0 — but the fixes are live now.
+
+---
+
+## What Actually Changed (The Highlights)
+
+### Durable Subagents That Survive Gateway Restarts
+This is huge. Subagents now persist across gateway crashes and restarts. You can continue a subagent on its own conversation after a restart. No more losing hours of background work because the gateway hiccuped.
+
+### One Prompt-Cache Clock Per Session
+Previously, cache timing could drift across operations. Now each session has a single prompt-cache clock — cleaner accounting, fewer surprises with token billing, especially on providers that charge differently for cached vs uncached input.
+
+### `hermes fallback check` — New CLI Command
+```bash
+hermes fallback check
+```
+Validates your entire fallback chain before you need it. Runs through provider order, checks auth, confirms models are reachable. Run it once, know your failover works.
+
+### `hermes update --force` — Stop Gateways At Once
+The old `hermes update` drains gateways gracefully. `--force` stops them immediately. Useful when you need a clean restart now, not after current sessions finish.
+
+### One-Time Browser Vault Codes (Telegram & Discord)
+Enter vault codes once from Telegram or Discord — they're stored securely and don't need re-entry per session. Small UX win, big friction reduction if you use Hermes across devices.
+
+### Opt-In Shared Telegram DM Threads
+Share a DM thread with a teammate. Both see the conversation, both can steer. Great for pair-programming with an agent or handing off a session.
+
+### Gemini Interactions API by Default (Gemini 3+ / Gemini 4 Carbon)
+If you use Google models, you're now on the Interactions API path by default. Better tool calling, cleaner streaming, fewer edge cases.
+
+### Fast Mode for Claude Mythos 5.2
+Mythos 5.2 (Anthropic's reasoning model) now has a fast mode toggle. Faster responses for planning-heavy tasks without full reasoning overhead.
+
+### Per-Job Cron Options
+```yaml
+# cron config
+jobs:
+  my-job:
+    schedule: "0 2 * * *"
+    wrap_response: true      # wrap output in a fresh thread each run
+    fresh_thread: true       # start clean every execution
+```
+No more cron output piling up in one endless thread. Each run gets its own context.
+
+### New Plugin APIs
+- `ctx.fork_session()` — programmatically fork a session
+- `ctx.redact_text()` — strip secrets from logs/output before they leave your machine
+- `ctx.register_idle_task()` — schedule background work that runs when the session is idle
+
+### Compatibility Shims Across Module Moves
+Updates work even when internal modules shift. You won't hit "module not found" errors after updating across versions.
+
+### Slimmer macOS Bundle (Chromium on First Use)
+The macOS installer no longer bundles Chromium. It downloads on first use. Download size drops ~120MB. First launch takes a few extra seconds — once.
+
+### 940 Issues Closed
+The issue tracker got a serious cleanup. If you filed something, check if it's resolved.
+
+---
+
+## Fixed in This Release Candidate
+
+| Bug | Impact |
+|-----|--------|
+| Desktop chats from August bare `custom` provider can send again | Restores broken chats after update |
+| Streaming reply beside todo/memory call now settles | No more stuck "Stop" button |
+| Crash mid-stream on Telegram no longer shows duplicate "Recovered reply" | Cleaner recovery |
+| Desktop no longer loses/scrambles typed input during startup | Your keystrokes land where you expect |
+| Reconnect mid-reply shows reply once, in full, with attachments | No more partial/duplicate renders |
+| Webapp Cloud agents now prompt for Nous Portal sign-in (not Webapp login) | Clearer auth flow |
+| CLI exiting during startup update check no longer leaves `git` running | Clean process cleanup |
+
+---
+
+## Upgrading
+
+```bash
+# CLI
+hermes update
+
+# Desktop (installer .exe / .dmg)
+# Updates with next bundled release — no change in v0.23.2
+
+# Microsoft Store
+# Updates through Store automatically
+
+# Docker / Hermes Cloud
+docker pull nousresearch/hermes-agent:stable
+# or :latest
+```
+
+---
+
+## Why This Release Matters
+
+v0.23.1 was September. v0.23.2 is November. **Two months, 8,000 commits, 2,000 PRs.**
+
+That's not a patch — that's a **stabilization milestone**. The team explicitly says: *"Full curated release notes for this window ship with v0.24.0 — highlights, feature areas, and complete contributor credits. Nothing in this window is skipped."*
+
+Translation: **v0.24.0 will be the "here's everything we did" release. v0.23.2 is the "here's the working build" release.**
+
+If you're on canary, you've been living this. If you're on stable, this is the update that makes stable feel like canary — minus the rough edges.
+
+---
+
+## What's Next
+
+**v0.24.0** — the curated release notes for everything v0.23.0 → v0.23.2. Expect feature area breakdowns, contributor credits, and the "story" of this development window.
+
+Until then: `hermes update`, verify your fallback chain with `hermes fallback check`, and enjoy durable subagents.
+
+---
+
+## Quick Version Context
+
+| Version | Date | Type | Notes |
+|---------|------|------|-------|
+| **v0.23.2** | Nov 16, 2026 | **Stable Patch** | 8K commits, 2K PRs, 940 issues, durable subagents, fallback check |
+| v0.23.1+canary | Nov 13-16, 2026 | Canary | Daily builds leading to this release |
+| v0.23.1 | Sep 2026 | Stable | Hearth release — Desktop, Webapp, Browser |
+| v0.22.x | Summer 2026 | Stable | Threshold release, major architecture |
+
+---
+
+## Related Reading
+
+- [Hermes Agent v0.23 Hearth Release — Desktop, Webapp, Browser All In One](/blog/hermes-agent-v0-23-hearth-release-desktop-webapp-browser/)
+- [Hermes Agent v0.23.1 Plugin Catalog Fix](/blog/hermes-agent-v0-23-1-plugin-catalog-fix/)
+- [Hermes Agent Security Audit — 5 High-Severity Findings](/blog/beware-hermes-agent-security-audit-5-high-severity-findings/)
+- [Why Hermes Agent Is the Most Underrated Open-Source AI Assistant 2026](/blog/why-hermes-agent-is-the-most-underrated-open-source-ai-assistant-2026/)
+- [Hermes Multi-Provider Model Routing Across 15+ LLMs](/blog/hermes-multi-provider-model-routing-across-15-llms/)
+
+---
+
+*Changelog source: [github.com/NousResearch/hermes-agent/releases/tag/v0.23.2](https://github.com/NousResearch/hermes-agent/releases/tag/v0.23.2). Published November 16, 2026 — covers Hermes Agent v0.23.2 released November 16, 2026.*
+
+*Tired of juggling API keys for every model? **[aiFiesta](https://aifiesta.link/muhammed-anshad)** gives you unified access to Claude, GPT, Gemini, Grok, and 50+ models for $12/mo. One subscription, every answer.*
